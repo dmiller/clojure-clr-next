@@ -5,7 +5,7 @@ We are using this space to develop ideas for the next generation implementation 
 * restructuring the compiler to make it more rational and easier to develop and debug
 * taking full advantage of all aspects of the CLR in the context of Clojure, with special emphasis on the type system:  assemblies, value types, generics, type references, etc.
 
-Of the original goals of the [lojureCLR project](https://github.com/clojure/clojure-clr):
+Of the original goals of the [ClojureCLR project](https://github.com/clojure/clojure-clr):
 
 1. Implement a feature-complete Clojure on top of CLR/DLR.
 2. Stay as close as possible to the JVM implementation.
@@ -25,7 +25,7 @@ We are using this site's wiki for discussion and planning.
  *   Copyright (c) Rich Hickey. All rights reserved.
  *   The use and distribution terms for this software are covered by the
  *   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
- *   which can be found in the file epl-v10.html at the root of this distribution.
+ *   which can be found in the file LICENSE at the root of this distribution.
  *   By using this software in any fashion, you are agreeing to be bound by
  * 	 the terms of this license.
  *   You must not remove this notice, or any other, from this software.
