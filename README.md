@@ -1,6 +1,6 @@
 # clojure-clr-next
 
-We are using this space to document the development of a new implementation of Clojure CLR.
+I am using this space to document the development of a new implementation of Clojure CLR.
 
 For more info on ClojureCLR go to the [ClojureCLR Github repo](https://github.com/clojure/clojure-clr).
 
