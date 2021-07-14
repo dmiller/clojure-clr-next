@@ -1,6 +1,8 @@
 ---
 layout: post
 title: Introduction
+date: 2021-07-14 19:36:00 -0500
+categories: general
 ---
 
 # ClojureCLR: Reconsidered
