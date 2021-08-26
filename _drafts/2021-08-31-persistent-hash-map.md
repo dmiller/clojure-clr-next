@@ -1,13 +1,13 @@
 ---
 layout: post
 title: Making a hash of things
-date: 2021-08-26 19:36:00 -0500
+date: 2021-08-31 19:36:00 -0500
 categories: general
 ---
 
 # Making a hash of things
 
-The most complex data structure in the Clojure catalog has to be the PersistentHashMap. This is Phil Bagwell's [Hash Array Mapped Trie (HAMT)](https://en.wikipedia.org/wiki/Hash_array_mapped_trie) as modified by Rich Hickey to be immutable and persistent.  (Bagwell's original paper is available [here](http://infoscience.epfl.ch/record/64398/files/idealhashtrees.pdf).  I want to describe and code a simple implementation, leaving out complexities that come from various efficiency hacks.
+The most complex data structure in the Clojure catalog has to be the PersistentHashMap. This is Phil Bagwell's [Hash Array Mapped Trie (HAMT)](https://en.wikipedia.org/wiki/Hash_array_mapped_trie) as modified by Rich Hickey to be immutable and persistent.  (Bagwell's original paper is available [here](http://infoscience.epfl.ch/record/64398/files/idealhashtrees.pdf).  I want to describe the ideas behind this data structure and code a simple implementation, leaving out complexities that come from various efficiency hacks.
 
 
  # Hashing
@@ -22,11 +22,11 @@ Another approach uses trees instead of arrays.  As an example, we could store ke
 
 Again, one must deal with collisions.  
 
-Binary branching is not efficient.  One can end up with trees that are quite deep and that are fragmented in memory.  Depth correlates with the number of memory accesses.  Fragmentation means the accesses are expensive.   A _hash array mapped trie/tree_ (HAMT) combines the array and tree notions.   Rather than a node branching in two directions and the path to choose based on a single bit,  in an HAMT the branching factor in a node is greater -- usually a small power of two -- and the branch to choose is based on several contiguous bits in the hash.  Which bits depend on the branching factor (power of two) and the level in the tree.  Using four as the branching factor, we might see a configuration such as the following:
+Binary branching is not efficient.  One can end up with trees that are quite deep and fragmented in memory.  Depth correlates with the number of memory accesses; fragmentation means the accesses are expensive.   A _hash array mapped trie/tree_ (HAMT) combines the array and tree notions.   Rather than a node branching in two directions and the path to choose based on a single bit,  in a HAMT the branching factor at a node is larger -- usually a small power of two -- and the branch to choose is based on several contiguous bits in the hash treated as an integer to yield an index.  Which bits are used depends on the branching factor (power of two) and the level in the tree.  Using four as the branching factor, we might see a configuration such as the following:
 
 ![HAMT example](/assets/images/HAMT-1.png)
 
-As the branching factor and hence the size of the arrays in the nodes increases, there can be a significant amount of space wasted by empty arrays.  A solution is allocate array storage only for the occupied cells.  We then need to know which cells are occupied and have a way to find the cell corresponding to a given index.  This is done by including an integer treated as bitmap -- 1 bits indicate an occupied cell.  There is a neat trick to get the index involving calculating the number of one bits in the bitmap, sometimes known as the _population count_.
+As the branching factor and hence the size of the arrays in the nodes increases, there can be a significant amount of space wasted by empty array entries.  A solution is allocating array storage only for the occupied cells. In this scheme, given a hash code and thus the index for this level, we need to know if that index is present and we must map this index to an index in the compressed array.  This is done by the node having a bitmap  where one bits indicate occupied indexes.  There is a neat trick to map an index to the array cell involving calculating the number of one bits in the bitmap, sometimes known as the _population count_.  (See below.)
 
 Time for some code.  Let's pick a branching factor of 32 (a common choice).  Five bits are needed from the hashcode at each level.  We can extract the five bits with
 
@@ -34,7 +34,7 @@ Time for some code.  Let's pick a branching factor of 32 (a common choice).  Fiv
 let mask(hash,shift) = (hash >>> shift) &&& 0x01f
 ```
 
-(In our example, we would pass in values for `shift` that are a multiple of 5.)
+(In our example, we would pass in values for `shift` that are a multiple of 5, the multiple corresponding to the depth of the node in question in tree.)
 
 We can get an integer with a 1 in the appropirate position by shifting.  
 
@@ -42,7 +42,7 @@ We can get an integer with a 1 in the appropirate position by shifting.
 let bitPos(hash, shift) = 1 <<< mask(hash,shift)
 ```
 
-We can tell if the key is represented in a node using the node's bitmap:
+and use this to determine if the key is represented in a node by looking at the node's bitmap:
 
 ```F#
 bitmap &&& bitPos(hash,shift) <> 0
@@ -77,7 +77,7 @@ Now take a node with bitmap 0xD36FCB4.  It is set in bits 2, 4, 5, 7, 10, 11, 12
 
 ## Adding persistence and immutablility
 
-There are plenty of tutorials available online with wonderful pictures and animations that illustrate the ideas behind persistent, immutable tree structures.  I refer you to them for nice visuals.  however, I'll provide some mediocre visuals.  The main idea is that we do not modify the parts making up the tree structure.  If a connection has to change, or the data in a node has to change, one makes a copy of the nodes from the changed node back up to the root, reproducing the structure of the part of the tree that does not change by linking to those parts from the new parts.  Consider the following binary tree.  Nodes are labeled with _id:datum_.
+There are plenty of tutorials available online with wonderful pictures and animations that illustrate the ideas behind persistent, immutable tree structures.  I refer you to them for nice visuals.  See below for some mediocre visuals.  The main idea is that we do not modify the any tree's structure.  If a pointer has to change, or the data in a node has to change, one makes a copy of the nodes from the changed node back up to the root, reproducing the structure of the part of the tree that does not change by linking to those parts from the new parts.  Consider the following binary tree.  Nodes are labeled with _id:datum_.
 
 ![Original tree](/assets/images/PersistentTree-1.png)
 
@@ -143,7 +143,7 @@ type IPersistentMap =
     abstract count: unit -> int
  ```
 
-A `SimpleHashMap` is either empty or contains at least one key/value entry.  If it contains any entries, they will be in a tree designed along the lines discussed above.  For convenience, it will also cache the count of entries.  Hence,
+A `SimpleHashMap` is either empty or contains at least one key/value entry.  If it contains any entries, they will be in a tree designed along the lines discussed above; the nodes of that tree will be of type `SHMNode`.  For convenience, it will also cache the count of entries.  Hence,
 
 ```F#
 type SimpleHashMap = 
@@ -151,7 +151,7 @@ type SimpleHashMap =
     | Rooted of Count: int * Node: SHMNode 
 ```
 
-Most of the implementations of the interface methods are very simple (if `Empty`) or defer to one of a few special operations supported by the tree nodes (if 'Rooted`).
+Most of the implementations of the interface methods are very simple (if `Empty`) or defer to one of a few special operations supported by the tree nodes (if `Rooted`).
 
 ```F#
     interface Counted with
@@ -173,7 +173,7 @@ Most of the implementations of the interface methods are very simple (if `Empty`
         member this.equiv(o) = ... maybe more on this later ...
 ``` 
 
-Other than cheating a little by deferring `IPersistentCollection.cons` to the yet-to-appear `IPersistentMap.cons`, perhaps this is self-explanatory.  We see here the first of our delegations to the node class: `getNodeSeq()`.
+A standard trick is to define `IPersistentCollection.cons` in terms of the yet-to-appear `IPersistentMap.cons`.  We see here the first of our delegations to the node type: `getNodeSeq()`.
 
 Onward to the more map-specific interfaces.
 
@@ -186,7 +186,7 @@ Onward to the more map-specific interfaces.
             | Rooted(Node=n) -> n.find2 0 (hash(k)) k nf 
 ```
 
-The one-arg `valAt` pushes to the two-arg version -- that's usual.  And another debt (`find2`) is imposed on our nodes.
+The one-arg `valAt` pushes to the two-arg version -- that's usual. An `Empty` map always returns the not-found value. And another debt (`find2`) is imposed on our nodes.
 
 ```F#
     static member notFoundValue = obj()
@@ -206,9 +206,9 @@ The one-arg `valAt` pushes to the two-arg version -- that's usual.  And another 
         member this.assoc(k,v) = upcast (this:>IPersistentMap).assoc(k,v)
 ```
 
-We continue our reliance on `find2`, incur a new dependency (`find`) and defer `Associative.assoc` to `IPersistentMap.assoc`.  Regarding our two finder methods on the nodes, `find` returns an `IMapentry option` to indicate whether or not a value was found for the key;  `find2` returns either the value for the key or the given _not found_ value; here we can test for 'not found' coming back to yes to derive a true/false result for `containsKey`.
+We continue our reliance on `find2`, incur a new dependency (`find`), and defer `Associative.assoc` to `IPersistentMap.assoc`.  Regarding our two finder methods on the nodes, `find` returns an `IMapentry option` to indicate whether or not a value was found for the key;  `find2` returns either the value for the key or the given _not found_ value; here we can test for 'not found' coming back to derive a true/false result for `containsKey`.
 
-And on to the real action, the `IPersistentMap` interface:
+On to the real action: the `IPersistentMap` interface.
 
 ```F#
     interface IPersistentMap with
@@ -223,7 +223,6 @@ And on to the real action, the `IPersistentMap` interface:
 
 
 ```F#
-
         member this.cons(o) = 
             match o with 
             | null -> upcast this
@@ -277,4 +276,6 @@ As we did above, our `assoc` will defer the action down to a node.  If we are `R
 The `without` method follows a similar pattern.  It is not an error to to remove a non-existent key, so `without` when we are `Empty` is a no-op.  If `Rooted`, we push the op down to the node.  Now, if the node comes back, there was no change (key was not present) and this is a no-op.  Else, we have a new root;  the count definitely decreased.
 
 And we are done.
+
+Well, at this level.  We've deferred a lot to the type `HSMNode` of the tree nodes.  Take a deep breath.
 
