@@ -7,13 +7,13 @@ categories: general
 
 # Making a hash of things
 
-The most complex data structure in the Clojure catalog has to be the PersistentHashMap. This is Phil Bagwell's [Hash Array Mapped Trie (HAMT)](https://en.wikipedia.org/wiki/Hash_array_mapped_trie) as modified by Rich Hickey to be immutable and persistent.  (Bagwell's original paper is available [here](http://infoscience.epfl.ch/record/64398/files/idealhashtrees.pdf).  I want to describe the ideas behind this data structure and code a simple implementation, leaving out complexities that come from various efficiency hacks.
+The most complex data structure in the Clojure catalog has to be the PersistentHashMap. This is Phil Bagwell's [Hash Array Mapped Trie (HAMT)](https://en.wikipedia.org/wiki/Hash_array_mapped_trie) as modified by Rich Hickey to be immutable and persistent.  (Bagwell's original paper is available [here](http://infoscience.epfl.ch/record/64398/files/idealhashtrees.pdf.)  I want to describe the ideas behind this data structure and code a simple implementation, leaving out complexities that come from various efficiency hacks.
 
 
  # Hashing
 
  There are a variety of data structures that use hashing to provide O(1) or O(ln n) access to data.  A simple flavor is the _hash table_.  Assume we are mapping keys to values. A hash code is computed from the key which in turn is used to compute an index into an array
- where the corresponding value will be found.  Because generally hash codes or indexes  are not unique, two keys can _collide_, i.e., are mapped to the same location.  Some technique must be developed to deal with collisions.   The theory on hash tables of this type is extensive; you can get started [here](https://en.wikipedia.org/wiki/Hash_table).
+ where the corresponding value will be found.  Typically the index is computed by modding the hash code by the array length.  Because (generally) hash codes or indexes  are not unique, two keys can _collide_, i.e., are mapped to the same index.  Some technique must be developed to deal with collisions.   The theory on hash tables of this type is extensive; you can get started [here](https://en.wikipedia.org/wiki/Hash_table).
 
 
 Another approach uses trees instead of arrays.  As an example, we could store key/value pairs in a binary tree.  Treating the hash code as a sequence of bits and mapping 1 to Left and 0 to Right, the hash code of an item describes a path through the tree.  One does not need to use all the bits, just enough to distinguish a given key from all the others.  Assuming 5-bit hashcodes, this picture illustrates how a given set of four keys would be distributed.
@@ -26,7 +26,7 @@ Binary branching is not efficient.  One can end up with trees that are quite dee
 
 ![HAMT example](/assets/images/HAMT-1.png)
 
-As the branching factor and hence the size of the arrays in the nodes increases, there can be a significant amount of space wasted by empty array entries.  A solution is allocating array storage only for the occupied cells. In this scheme, given a hash code and thus the index for this level, we need to know if that index is present and we must map this index to an index in the compressed array.  This is done by the node having a bitmap  where one bits indicate occupied indexes.  There is a neat trick to map an index to the array cell involving calculating the number of one bits in the bitmap, sometimes known as the _population count_.  (See below.)
+As the branching factor and hence the size of the arrays in the nodes increases, there can be a significant amount of space wasted by empty array entries.  A solution is allocating array storage only for the occupied cells. In this scheme, given a hash code and thus the index for this level, we need to know if that index is present and we must map this index to an index in the compressed array.  This is done by the node having a bitmap  where one bits indicate occupied indexes.  There is a neat trick to map an index to the array cell involving calculating the number of one bits (sometimes known as the _population count_) in a masked section of the bitmap.  (See below.)
 
 Time for some code.  Let's pick a branching factor of 32 (a common choice).  Five bits are needed from the hashcode at each level.  We can extract the five bits with
 
@@ -60,7 +60,7 @@ If the key is represented in this node, one has to compute the index of the bit 
     let bitIndex(bitmap,bit) = bitCount(bitmap &&& (bit-1))
 ```
 
-Here, bit would be an int with one bit set, such as from `bitPos`.
+Here, the argument for `bit` would be an `int` with one bit set, such as from `bitPos`.
 
 The code for `bitCount` can be found in a lot of places.  Some CPU architectures have a single instruction which computes this.  You may have access to a function that inlines to that instruction (e.g., `System.Numerics.BitOperations.PopCount`).  The secret here is that `bit-1` for an integer with single bit set gives an integer with all 1s before that bit.  And'ing that with the bitmap and taking the population count tells you how many bits are set before the bit of interest.  That gives an index.
 
@@ -243,7 +243,7 @@ The heart of the map is the find/assoc/without trio -- lookups, insertions, dele
 
 ```F#
         member this.assoc(k,v) = 
-            let addedLeaf = SillyBox()
+            let addedLeaf = Box()
             let rootToUse = 
                 match this with
                 | Empty -> SHMNode.EmptyBitmapNode
@@ -258,7 +258,7 @@ The heart of the map is the find/assoc/without trio -- lookups, insertions, dele
 
 ```
 
-As we did above, our `assoc` will defer the action down to a node.  If we are `Rooted`, we defer to the root node; if we are `Empty`, there is no node to defer to, so we defer to an empty instance of one of our node types.  The pattern that results will recur constantly below:  if an action gives us back the same node as we started with, then nothing happened, and our map itself is the answer.  In other words, we were trying to add a key/value pair, that pairing was already pressent, so the map to return is ourself.   If a different node comes back, then the result of the assoc will be a new SimpleHashMap, rooted with the returned node.  The `addedLeaf:SillyBox` that we pass in is a sentinel.  It goes in _unset_.  If it is 'set' during the operation, then a new entry was made in the map and we need to add one to our count.  (If we assoc a key/value pair and the key is present, the count of entries is unchanged;  if there is no entry for the key prior to the operation, then the count has gone up.)
+As we did above, our `assoc` will defer the action down to a node.  If we are `Rooted`, we defer to the root node; if we are `Empty`, there is no node to defer to, so we defer to an empty instance of one of our node types.  The pattern that results will recur constantly below:  if an action gives us back the same node as we started with, then nothing happened, and our map itself is the answer.  In other words, we were trying to add a key/value pair, that pairing was already present, so the map to return is ourself.   If a different node comes back, then the result of the assoc will be a new SimpleHashMap, rooted with the returned node.  The `addedLeaf:Box` that we pass in is a sentinel.  It goes in _unset_.  If it is 'set' during the operation, then a new entry was made in the map and we need to add one to our count.  (If we assoc a key/value pair and the key is present, the count of entries is unchanged;  if there is no entry for the key prior to the operation, then the count has gone up.)
 
 
 ```F#
@@ -277,5 +277,5 @@ The `without` method follows a similar pattern.  It is not an error to to remove
 
 And we are done.
 
-Well, at this level.  We've deferred a lot to the type `HSMNode` of the tree nodes.  Take a deep breath.
+Well, at this level.  We've deferred a lot to the type `SHMNode` of the tree nodes.  Take a deep breath.
 

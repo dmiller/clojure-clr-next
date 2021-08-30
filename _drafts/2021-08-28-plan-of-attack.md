@@ -37,31 +37,22 @@ Here is a rough breakdown of the application code (again, not including `primifs
 | Runtime		| 62		| Runtime support functions							|
 | Standalone	| 23		| BigDecimal, Printf, etc.							|
 
-The line between Library and Runtime is fuzzy.  I included in the Library category objects such as symbols, keywords, vars, refs, atoms, and agents.  The Runtime category includes the `RT` and `Util` classes that provide code needed, well, at runtime.  `RT` in particular provides a lot of methods that implement Clojure functions such as `first` and `reduce`. This area also will also the locus of analysis for and application of _protocols-at-the-bottom_.
+The line I drew between Library and Runtime is fuzzy.  I included in the Library category objects such as symbols, keywords, vars, refs, atoms, and agents.  The Runtime category includes the `RT` and `Util` classes that provide code needed, well, at runtime.  `RT` in particular provides a lot of methods that implement Clojure functions such as `first` and `reduce`. This area also will also the locus of analysis for and application of _protocols-at-the-bottom_.
 
 ## Where to start?
 
 There are a lot of dependencies in this code.  Those dependencies determine roughly the order in which things can be written.
 
-The Standalones are a good place to start.  Not because they are needed immediately, but because they are simple and can be written and tested independently.  Given that at the onset I will have not have written an F# program more than a few lines long, I need to practice writing and structuring F# code and to develop friendly relations with testing libraries, BenchmarkDotNet, and other niceties/necessities.  I plan to ditch `BigInteger` for `System.Numerics.BigInteger` and rewrite `BigDecimal` using the latter.  The only other libraries here are Murmur3, which will be needed fairly early in the process (hash codes for collections), and Printf, which won't be needed for a long time.  (For the record, I've already completed `BigDecimal` and Murmur3.)
+The Standalones are a good place to start.  Not because they are needed immediately, but because they are simple and can be written and tested independently.  I will start with `BigDecimal` and `Murmur3` so I can practive writing and structuring F# code--I have almost no experience--writing unit tests, and benchmarking.  I plan to ditch my own `BigInteger` for `System.Numerics.BigInteger` and rewrite `BigDecimal` using the latter.  `Murmur3` is needed fairly early for certain hash code computations. 
 
-The Collections, IFn, and Runtime categories are incredibly intertwined.   Much of Runtime needs a certain minimum of collections to exist.  The collections in turn use code out of the Runtime.  The support code for implementing `IFn`s needs some collections.  The collections need `IFn` for things like `reduce` and `LazySeq`.   Deconstructing and linearising this code is going to take serious analysis of dependencies.  
+The Collections, IFn, and Runtime categories are intertwined.   Much of Runtime needs a certain minimum of collections to exist.  The collections in turn use code out of the Runtime.  The support code for implementing `IFn`s needs some collections.  The collections need `IFn` for things like `reduce` and `LazySeq`.   Deconstructing and linearising this code is going to take serious analysis of dependencies.  
 
-Once one has the right set of collections, support for `IFn`, and some of `RT`, one can implement most of the Reader code. This will also involve much of what I called the Library code:  The readers know symbols, keywords, namespaces, vars, ... . There are a few parts of  `LispReader` that invoke the compiler; we'll play some tricks to defer those references.
+Once one has the right set of collections, support for `IFn`, and some of `RT`, one can implement most of the Reader code. This will also involve much of what I called the Library code:  The readers know symbols, keywords, namespaces, vars, ... . There are a few parts of  `LispReader` that invoke the compiler; we'll play some tricks to defer those references until the compiler is ready. (And to prevent circularities.)
 
 And then the compiler and remaining pieces of runtime support.
 
-## A bad start?
+## an approach
 
-I'm going to start off implementing the Collections/IFn/parts-of-Runtime with a fairly direct mapping of C# to F#.  That means interfaces, abstract classes, concrete classes, inheritance, a liberal sprinkling of `[<AllowNullLiteral>]`, etc. 
+I'm going to start off implementing the Collections/IFn/parts-of-Runtime with a fairly direct mapping of C# to F#.  That means interfaces, abstract classes, concrete classes, inheritance, a liberal sprinkling of `[<AllowNullLiteral>]`, etc.  There are some significant reasons for this approach -- non-trivial amounts of shared code as defaults for operations, for example.  Some of the new capabilities of F# such as default implementations for interface methods don't appear to be applicable -- differing implementations across categories of collections are a stumbling block.
 
-I am not starting with protocols.  I don't know how to do protocols yet.  I could spend a long time figuring this out and never get to the more critical part of this rewrite, the compiler improvements.  So I am deferring on protocols for now.   I am more than willing to do significant reworking of my early code if that is required.  But I have a suspicion that the final choice of implementation will not require significant rip-and-replace of the early code.  In the meantime, I will note where protocols are likely to come into play. 
-
-
-
-
-
-
-
-
-
+I am not starting with protocols.  I don't know how to do protocols yet.  I could spend a long time figuring this out and never get to the more critical part of this rewrite, the compiler improvements.  So I am deferring on protocols for now.   I will do significant rewriting of my early code if that is required.
