@@ -7,13 +7,13 @@ categories: general
 
 # For your Cons-ideration
 
-To build a Lisp, you would perhaps start with the simplest data structure, the cons cell: two fields that hold pointers.  In Clojure, we don't even need setters for the fields. 
+To build a Lisp, you would perhaps start with the simplest data structure, the _cons_ cell: two fields holding pointers.  In Clojure, we don't even need setters for the fields. 
 
 ```F#
 type Cons = {car:obj; cdr:obj}
 ```
 
-(In old Lisps, `car` and `cdr` were the traditional names for the fields. And they would be mutable.)  Okay, good, let's move on. Well, not really.  If you look at a diagram of the inheritance relationships of the various interfaces and concrete collection classes in Clojure, you get a picture something like this:
+(In old Lisps, `car` and `cdr` were the traditional names for the fields. And they would be mutable. Not for us.)  Okay, good, let's move on. Well, not really.  If you look at a diagram of the inheritance relationships of the various interfaces and concrete collection classes in Clojure, you get a picture something like this:
 
 ![Full dependency graph](/assets/images/all-dependencies.png)
 
@@ -23,14 +23,29 @@ F# does not like circularities.
 
 What is the minimum needed implement `Cons`?  Let's grab the tree by the `Cons` and pull and see what comes up with it.  In the following graph boxes indicate interfaces, 'eggs' indicate abstract classes, and ellipses indicate concrete classes.
 
-Solid lines indicate inheritance; dashed lines indicate a reference to the head of the arrow in the API of the tail.
+Solid lines indicate inheritance; dashed lines indicate a reference in the API of the tail type.
 
 ![Cons dependency graph](/assets/images/cons-dependencies.png)
 
-Circularities are the first concern; if implemented naively as indicated, they indicate places where F# will require mutually recursive definitions.  The first such grouping is the triple of interfaces `Seqable`, `IPersistentCollection`, and `ISeq`.  Mutually recursive definitions here.
+Circularities are the first concern; if implemented naively as indicated, they indicate places where F# will require mutually recursive definitions.  The first such grouping is the triple of interfaces `Seqable`, `IPersistentCollection`, and `ISeq`.  Mutually recursive definitions here:
 
 ```F#
+type [<AllowNullLiteral>] Seqable =
+    abstract seq : unit -> ISeq
 
+and [<AllowNullLiteral>] IPersistentCollection = 
+    inherit Seqable
+    abstract count : unit -> int
+    abstract cons: obj -> IPersistentCollection
+    abstract empty: unit -> IPersistentCollection
+    abstract equiv: obj -> bool
+
+and [<AllowNullLiteral>] ISeq =
+    inherit IPersistentCollection
+    abstract first : unit -> obj
+    abstract next : unit -> ISeq
+    abstract more : unit -> ISeq
+    abstract cons : obj -> ISeq
 ```
 
 These interface definitions must precede essentially everything else.  Once these are defined, all the other interfaces can be defined directly, with no mutual recursion, just the appropriate ordering to respect inheritance.
@@ -49,7 +64,7 @@ And we're off to the races.  The minimum:
 
 1. Define the interfaces shown above, with the only mutual recursion being among `Seqable` + `IPersistentCollection` + `ISeq`.  
 2. Implement `Obj`.  
-3. Implement `EmptyList`.  If we make `cons` and raise errors to get started, we can isolate this to test.
+3. Implement `EmptyList`.  If we make `cons` raise errors to get started, we can isolate this to test.
 4. Implement `Cons`, `ASeq` together.
 5. Implement `PersistentList`.  Mutually recursive with `EmptyList`.  Finish the definition of `EmptyList.cons`.
 6. Did I mention testing?

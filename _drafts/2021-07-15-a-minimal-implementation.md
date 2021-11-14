@@ -7,7 +7,7 @@ categories: general
 
 I decided it would be good to begin testing certain functionality even before I got to work on `ASeq`, `Cons`, and the others in the minimal implementation.  E.g., those classes might use `RT.count()`.  How do I test `RT.count()` without those classes?
 
-So I decided to write a minimum implementation of an `ISeq` for testing purposes.  Doing so forced me to sift through the `ASeq`/`Cons`/etc. to really see how this code fits together.  (Seriously, it's been a decade since I had to look at this code.  I don't remember any details.)
+I decided to write a minimum implementation of an `ISeq` for testing purposes.  Doing so forced me to sift through the `ASeq`/`Cons`/etc. to really see how this code fits together.  (Seriously, it's been a decade since I had to look at this code.  I don't remember any details.)
 
 
 What is the minimum?  I went with a simple cons cell and a simple empty list (necessary because a cons cell is definitely not empty), implementing only the `ISeq` + `IPersistentCollection` + `Seqable` interfaces.  I also implemented a third collection type (a simple range sequence) just to see what the common code might be that could eventually be moved to an abstract base class or a utility module.  (Which is exactly the case in the current code -- such things reside in places such as `RT`.) 
@@ -35,22 +35,22 @@ and [<AllowNullLiteral>] ISeq =
     abstract cons : obj -> ISeq
 ```
 
-A `Seqable` is anything that can produce an `ISeq` to iterate over its contents.  For some collections, `seq()` might return the object itself: its class implements `ISeq`.  For some objects, calling `seq()` on it might produce a different object to handle the iteration.  Thus, something could be `Seqable` without itself being an `ISeq` (or even an `IPersistentCollection`).
+A `Seqable` is anything that can produce an `ISeq` to iterate over its contents.  For some collections, `seq()` might return the object itself: its class implements `ISeq`.  For some objects, calling `seq()` on it will produce a different object to handle the iteration.  Thus, something could be `Seqable` without itself being an `ISeq` or an `IPersistentCollection`.
 
-The `IPersistentCollection` interface is straightforward.  Again, an object could be an `IPersistentCollection` with being an `ISeq`, so we cannot merge.
+The `IPersistentCollection` interface is straightforward.  Again, an object could be an `IPersistentCollection` without being an `ISeq`, so we cannot merge.
 
 - `count()` returns a count of items in the collection -- for an `ISeq`, that would be the number of items in the sequence from that point on.  
 - `empty()` yields an empty collection _of the appropriate type_.  (You'd have to read comments in the Clojure code to get this.) A hash map would return an empty hash map, for example.  For a `Cons`, say, which cannot itself be empty, `EmptyList` is used.
-- `x.cons(o)` returns a new `ISeq` which has the item `o` first, followed by the items in 'x'.  It is up to each type to figure out how to implement this.  For example, `PersistentList` returns a new `PersistentList`.  `EmptyList` does also.  Other types might use a `Cons'.
-- `equiv(o)` is used for equality checking on collections.  Each collection defines its own.  This deserves its own post. `equiv` and equality in Clojure will require a separate post.
+- `x.cons(o)` returns a new `ISeq` which has the item `o` first, followed by the items in 'x'.  It is up to each type to figure out how to implement this.  For example, `PersistentList` returns a new `PersistentList`.  `EmptyList` does also.  Other types might use a `Cons`.
+- `equiv(o)` is used for equality checking on collections.  Each collection defines its own.   (Discussing `equiv` and equality in Clojure will require a separate post.)
 
-The `ISeq` interface captures the essence of iteration across a sequence.  If you have `null` in your hand, that is an empty sequence. The Clojure code for `first`  `next`, `more`, others special case this.  The difference between `next` and `more` is subtle.  The best place to learn a little more (no pun) is [here](https://clojure.org/reference/lazy) but you'll have to read carefully.  Originlly, Clojure had just `first` and `rest`, the equivalents to `car` and `cdr` in old Lisps. When laziness became central, a redesign was needed.  To decide what the next element is in a lazy sequence might require significant computation, computation that you might want to defer until absolutely necessary.  Thus, `rest` got split into two methods in `ISeq`, `next` and `more`.   `more` can defer determining if there is a next element.  From [Sequences](https://clojure.org/reference/sequences) we have:
+The `ISeq` interface captures the essence of iteration across a sequence.  If you have `null` in your hand, that is an empty sequence. The Clojure code for `first`  `next`, `more`, and others special case this.  The difference between `next` and `more` is subtle.  The best place to learn a little more (no pun) is [here](https://clojure.org/reference/lazy) but you'll have to read carefully.  Originlly, Clojure had just `first` and `rest`, the equivalents to `car` and `cdr` in old Lisps. When laziness became central, a redesign was needed.  To decide what the next element is in a lazy sequence might require significant computation, computation that you might want to defer until absolutely necessary.  Thus, `rest` got split into two methods in `ISeq`, `next` and `more`.   `more` can defer determining if there is a next element.  From [Sequences](https://clojure.org/reference/sequences) we have:
 
 > The Seq interface
 > 
 > ( _first_ coll)
 >
->  Returns the first item int he collections. Calls seq on its argument.  If coll is nil, returns nil.
+>  Returns the first item in  he collections. Calls seq on its argument.  If coll is nil, returns nil.
 >
 >  ( _rest_ coll)
 >
@@ -97,6 +97,7 @@ This walks the sequence and combines hash codes for each element.  Finally, we n
 ```F#
     let seqCount (s:ISeq) = 
         let rec step (s:ISeq) cnt = if isNull s then cnt else step (s.next()) (cnt+1)
+        step s 0
 ```
 
 And now we can write our two collection classes.  These are mutually recursive and so are joined by `and` in the actual code.  Let's start with the simpler 'empty sequence'.
@@ -114,7 +115,7 @@ type SimpleEmptySeq() =
     override x.ToString() = "()"
 ```
 
-The basic overrides are simple.  Fixed hashcode value, `ToString` as required by Clojure.   For equals, we can only be equal to an empty sequence, which is something that returns `null` (= `nil` in Clojure) when `seq` is called on it.  That means we need something that `seq` can be called on: a `Seqable`.
+The basic overrides are simple.  Fixed hashcode value; `ToString` as required by Clojure.   For equality, we can only be equal to an empty sequence, which is something that returns `null` (= `nil` in Clojure) when `seq` is called on it.  That means we need something that `seq` can be called on: a `Seqable`.
 
 You will note that a `SimpleEmptySeq` is not equal to `null`.  The loss of so-called 'nil-punning' in sequences has been questioned (bemoaned?) many times.
 
@@ -144,7 +145,7 @@ The defining characteristic of an empty sequence object is that calling `seq` on
         member x.equiv(o) = x.Equals(o)
 ```
 
-The object is its own `empty`.  Obviously the `count` is zero.  `equiv` equates to `Equal` here.
+The object is its own `empty`.  Obviously the `count` is zero.  `equiv` equates to `Equals` here.
 
 For `cons`, the definition is a bit strange.  We have two different `cons`es floating around: `IPersistentCollection.cons` and `ISeq.cons`.  They have distinct return types. In C#, we have to deal with this using explicit interface declarations.  In F#, things are already explicit.   Because an `ISeq` is an `IPersistentCollection`, you will often see what have done here: implent the `IPersistentCollection` version in terms of the `ISeq` version, with an `upcast'.
 
@@ -159,12 +160,11 @@ Finally,
 ```
 The values for `first` and `next` are by definition.  We need to return an emtpy sequence for `more`; the object itself is such a thing.  Finally, `cons` gives us our entanglement with `SimpleCons`
 
-And so:
+And so on to `SimpleCons`:
 
 ```F#
-type SimpleCons(h,t) =
-    let head : obj = h      // I had to restrain myself from calling these car & cdr
-    let tail : ISeq =  t
+type SimpleCons(head: obj, tail: ISeq ) =
+    // I had to restrain myself from calling these car & cdr
  ```
  
  The main constructor is all we need, along with two fields to hold the values.  Like all the Clojure collections, these are immutable.  Doing the `Object` overrides, we can defer mostly to our utility functions:
@@ -214,15 +214,3 @@ The reason I went with a cons cell to begin with is that it is just what we need
 That test for emptiness here is very specific to `SimpleCons`: a `null` `tail`.  `next` is often defined in terms of `more`.  If `more` returns an empty sequence, the `seq` on it will return `null`, which is what `next`'s contract says.
 
 And we are done.
-
-
-
- 
- 
- 
-
-
-
-
-
-
