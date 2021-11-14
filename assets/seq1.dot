@@ -1,0 +1,51 @@
+strict digraph G {
+
+rankdir = RL;
+
+node [shape=box];
+	
+subgraph iobjrelated {
+	node [shape=box];
+	IMeta;
+	IObj  -> {  IMeta };
+	Obj [shape=egg];
+	Obj -> {  IObj };
+}	
+
+subgraph basicseq {
+	node [shape=box];
+	Seqable;
+	Sequential;
+	IPersistentCollection  -> {  Seqable };
+	ISeq -> {  IPersistentCollection };
+	Counted;
+	Reversible;
+	Indexed  -> {  Counted };
+}
+
+subgraph looking {
+	node [shape=box];
+	ILookup;
+	Associative -> { IPersistentCollection, ILookup };
+}
+
+subgraph reductions {
+	node [shape=box];
+	IReduce  -> {  IReduceInit };
+	IReduceInit;
+}
+
+subgraph collections {
+	node [shape=box];
+
+	IArraySeq  -> {  IObj, ISeq, IndexedSeq, IReduce };
+	IPersistentList -> {  Sequential, IPersistentStack };
+	IPersistentMap -> {   Associative, Counted };
+	IPersistentSet -> {  IPersistentCollection, Counted };
+	IPersistentStack -> {  IPersistentCollection };
+	IPersistentVector -> {  Associative, Sequential, IPersistentStack, Reversible, Indexed };
+
+	IndexedSeq  -> {  ISeq, Sequential, Counted };
+}
+
+}

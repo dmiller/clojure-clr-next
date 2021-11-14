@@ -1,0 +1,130 @@
+strict digraph G {
+
+rankdir = RL;
+
+	subgraph cluster_seqable	{
+	
+		node [shape=box];
+		edge [style = solid];
+	
+
+		Seqable;
+		IPersistentCollection;
+		ISeq;
+		
+		IPersistentCollection -> Seqable;
+		ISeq -> IPersistentCollection;
+		Seqable -> ISeq [style=dotted];
+	
+	}
+
+	subgraph cluster_obj {
+		node [shape=box];
+		edge [style = solid];
+		
+		IMeta;
+		IObj;
+		Obj[shape=egg];
+		
+		IObj -> IMeta;
+		Obj -> IObj;
+		
+	}
+	
+	subgraph cluster_reduce {
+		node [shape=box];
+		edge [style = solid];
+		
+		IFn;
+		IReduce;
+		IReduceInit;
+		
+		IReduceInit -> IFn[style=dotted];
+		IReduce -> IReduceInit;
+	}
+	
+	subgraph cluster_mappythings {
+		node [shape=box];
+		edge [style = solid];
+		
+		ILookup;
+		IMapEntry;
+		Associative;
+		IPersistentMap;
+		
+		IPersistentMap -> Associative;
+		IPersistentMap -> IMapEntry;
+		IPersistentMap -> Counted;
+		
+		Associative -> IPersistentCollection;
+		Associative -> ILookup;
+		Associative -> IMapEntry[style=dotted];
+	
+	}
+	
+	subgraph cluster_remainder {
+	
+	node [shape=box];
+	edge [style = solid];
+
+	ASeq[shape=egg];
+	Counted;
+	IHashEq;
+	IPersistentList;
+	IPersistentStack;
+	Sequential;
+	Cons [shape=ellipse];
+	EmptyList [shape=ellipse];
+	PersistentList [shape=ellipse];
+
+	IPersistentList -> Sequential;
+	IPersistentList -> IPersistentStack;
+	IPersistentStack -> IPersistentCollection;
+	
+	Cons -> ASeq;
+	ASeq -> Obj;
+	ASeq -> ISeq;
+	ASeq -> Sequential;
+	ASeq -> IHashEq;
+
+
+	EmptyList -> Obj;
+	EmptyList -> IPersistentList;
+	EmptyList -> ISeq;
+	EmptyList -> Counted;
+	EmptyList -> IHashEq;
+
+	PersistentList -> ASeq;
+	PersistentList -> IPersistentList;
+	PersistentList -> IReduce;
+	PersistentList -> Counted;
+
+	
+
+	edge [style = dotted];
+
+	
+	Cons -> IPersistentMap;
+	Cons -> ISeq;
+	ASeq -> Cons;
+	ASeq -> Counted;
+	ASeq -> EmptyList;
+	Obj -> IPersistentMap;
+	IMeta -> IPersistentMap;
+
+
+	EmptyList -> IPersistentMap;
+	EmptyList -> PersistentList;
+	PersistentList -> EmptyList;
+
+}
+}
+
+
+
+
+
+
+
+
+
