@@ -50,35 +50,36 @@ But mapped to what index in the node's array? Well, you can count how many bits 
 These calculations are fairly easy to capture in code.  First we must extract five bits from the appropriate place in the hash.  `mask` does that -- the shift will be five times the level in the tree.
 
 ```F#
-let mask(hash,shift) = (hash >>> shift) &&& 0x01f
+    let mask (hash, shift) = (hash >>> shift) &&& 0x01f
 ```
 
 We now need an integer with the appropriate bit set (in our example, 21):
 
 ```F#
-let bitPos(hash, shift) = 1 <<< mask(hash,shift)
+    let bitPos (hash, shift) = 1 <<< mask (hash, shift)
 ```
 
 The text for whether our index is present in the compacted array is
 
 ```F#
-let bit = bitPos(hash,shift)
-if bitmap &&& bit <> 0 then ...
+        let bit = bitPos (hash, shift)
+
+        if bit &&& bitmap = 0 then
 ```
 
 If the key is indeed, present, we need to know how many bits are set below it.  The trick is to take our bit and subtract one.  That will give us all ones in the positions prior to us (0 to 20)
 If we `AND` that mask with the bitmap for the node and then count how many bits are set in the result, we will have our index.  This function will do the trick:
 
 ```F#
-let bitIndex(bitmap,bit) = bitCount(bitmap &&& (bit-1))
+    let bitIndex (bitmap, bit) = bitCount (bitmap &&& (bit - 1))
 ```
 
 The function `bitCount` is sometimes referred to as the population count.
 Here is an implementation:
 
 ```F#
-    let bitCount(x) =
-        let x = x-((x >>> 1) &&& 0x55555555);
+    let bitCount (x) =
+        let x = x - ((x >>> 1) &&& 0x55555555)
         let x = (((x >>> 2) &&& 0x33333333) + (x &&& 0x33333333))
         let x = (((x >>> 4) + x) &&& 0x0f0f0f0f)
         (x * 0x01010101) >>> 24
@@ -110,55 +111,68 @@ If we want to modify the data of node 6 to be Q, we must make copies of all node
  We will develop our map class to meet the requirements of the Clojure interfaces of relevance:
 
  ```F#
-type [<AllowNullLiteral>] Seqable =
-    abstract seq : unit -> ISeq
+[<AllowNullLiteral>]
+type Seqable =
+    abstract seq: unit -> ISeq
 
-and [<AllowNullLiteral>] IPersistentCollection = 
+and [<AllowNullLiteral>] IPersistentCollection =
     inherit Seqable
-    abstract count : unit -> int
+    abstract count: unit -> int
     abstract cons: obj -> IPersistentCollection
     abstract empty: unit -> IPersistentCollection
     abstract equiv: obj -> bool
 
+and [<AllowNullLiteral>] ISeq =
+    inherit IPersistentCollection
+    abstract first: unit -> obj
+    abstract next: unit -> ISeq
+    abstract more: unit -> ISeq
+    abstract cons: obj -> ISeq
+
 [<AllowNullLiteral>]
-type ILookup = 
-    abstract valAt : key:obj -> obj
-    abstract valAt : key: obj * notFound: obj -> obj
+type ILookup =
+    abstract valAt: key: obj -> obj
+    abstract valAt: key: obj * notFound: obj -> obj
 
 [<AllowNullLiteral>]
 type IMapEntry =
-    abstract key : unit -> obj
-    abstract value : unit -> obj
+    abstract key: unit -> obj
+    abstract value: unit -> obj
 
 [<AllowNullLiteral>]
-type Associative = 
+type Associative =
     inherit IPersistentCollection
     inherit ILookup
-    abstract containsKey : key: obj -> bool
-    abstract entryAt : key: obj -> IMapEntry
-    abstract assoc : key: obj * value: obj -> Associative
+    abstract containsKey: key: obj -> bool
+    abstract entryAt: key: obj -> IMapEntry
+    abstract assoc: key: obj * value: obj -> Associative
 
- [<AllowNullLiteral>]
+[<AllowNullLiteral>]
+type Sequential =
+    interface
+    end
+
+[<AllowNullLiteral>]
 type Counted =
-    abstract count : unit -> int   
+    abstract count: unit -> int
 
 [<AllowNullLiteral>]
 type IPersistentMap =
     inherit Associative
+    inherit IEnumerable<IMapEntry> // do we really need this?
     inherit Counted
-    abstract assoc : key: obj * value: obj -> IPersistentMap
-    abstract assocEx : key: obj * value: obj -> IPersistentMap
-    abstract without : key: obj -> IPersistentMap
-    abstract cons: o:obj -> IPersistentMap
-    abstract count: unit -> int
+    abstract assoc: key: obj * value: obj -> IPersistentMap
+    abstract assocEx: key: obj * value: obj -> IPersistentMap
+    abstract without: key: obj -> IPersistentMap
+    abstract cons: o: obj -> IPersistentMap
  ```
 
 A `SimpleHashMap` is either empty or contains at least one key/value entry.  If it contains any entries, they will be in a tree designed along the lines discussed above; the nodes of that tree will be of type `SHMNode`.  For convenience, it will also cache the count of entries.  Hence,
 
 ```F#
-type SimpleHashMap = 
+type SimpleHashMap =
     | Empty
-    | Rooted of Count: int * Node: SHMNode 
+    | Rooted of Count: int * Node: SHMNode
 ```
 
 Most of the implementations of the interface methods are very simple (if `Empty`) or defer to one of a few special operations supported by the tree nodes (if `Rooted`).
@@ -188,12 +202,13 @@ Other than cheating a little by deferring `IPersistentCollection.cons` to the ye
 Onward to the more map-specific interfaces.
 
 ```F#
-   interface ILookup with
-        member this.valAt(k) = (this:>ILookup).valAt(k,null)
-        member this.valAt(k,nf) = 
+    interface ILookup with
+        member this.valAt(k) = (this :> ILookup).valAt (k, null)
+
+        member this.valAt(k, nf) =
             match this with
             | Empty -> nf
-            | Rooted(Node=n) -> n.find2 0 (hash k) k nf 
+            | Rooted (Node = n) -> n.find2 0 (hash k) k nf
 ```
 
 The one-arg `valAt` delegates to the two-arg version -- that's usual.  And another debt (`find2`) is imposed on our node class.
@@ -201,19 +216,24 @@ The one-arg `valAt` delegates to the two-arg version -- that's usual.  And anoth
 ```F#
     static member notFoundValue = obj()
 
-    interface Associative with  
+    interface Associative with
         member this.containsKey(k) =
             match this with
             | Empty -> false
-            | Rooted(Node=n) -> (n.find2 0 (hash k) k SimpleHashMap.notFoundValue)  <> (upcast SimpleHashMap.notFoundValue)
-        member this.entryAt(k) = 
+            | Rooted (Node = n) ->
+                (n.find2 0 (hash k) k SimpleHashMap.notFoundValue)
+                <> (upcast SimpleHashMap.notFoundValue)
+
+        member this.entryAt(k) =
             match this with
             | Empty -> null
-            | Rooted(Node=n) -> 
+            | Rooted (Node = n) ->
                 match n.find 0 (hash k) k with
                 | None -> null
                 | Some me -> me
-        member this.assoc(k,v) = upcast (this:>IPersistentMap).assoc(k,v)
+
+        member this.assoc(k, v) =
+            upcast (this :> IPersistentMap).assoc (k, v)
 ```
 
 We continue our reliance on `find2`, incur a new dependency (`find`) and defer `Associative.assoc` to `IPersistentMap.assoc`.  Regarding our two finder methods on the nodes, `find` returns an `IMapEntry option` to indicate whether or not a value was found for the key;  `find2` returns either the value for the key or the given _not found_ value; here we can test for 'not found' coming back to us to derive a true/false result for `containsKey`.
@@ -222,49 +242,64 @@ And on to the heart of hte matter, the `IPersistentMap` interface:
 
 ```F#
     interface IPersistentMap with
-        member this.count() = (this:>Counted).count()
-        member this.assocEx(k,v) = 
-            if (this:>Associative).containsKey(k) then raise <| InvalidOperationException("Key already present")
-            (this:>IPersistentMap).assoc(k,v)
+        member this.count() = (this :> Counted).count ()
 
+        member this.assocEx(k, v) =
+            if (this :> Associative).containsKey (k) then
+                raise
+                <| InvalidOperationException("Key already present")
+
+            (this :> IPersistentMap).assoc (k, v)
 ```
 
 `count` was handled above.  `assocEx` throws an exception if the given key is already in the map.  If not, we defer to the regular `assoc`, coming up in a moment.
 
 
 ```F#
-        member this.cons(o) = 
-            match o with 
+        member this.cons(o) =
+            match o with
             | null -> upcast this
-            | :? IMapEntry as e -> (this:>IPersistentMap).assoc(e.key(),e.value())
-            | _ -> 
-                let rec step (s:ISeq) (m:IPersistentMap) =
+            | :? IMapEntry as e ->
+                (this :> IPersistentMap)
+                    .assoc (e.key (), e.value ())
+            | _ ->
+                let rec step (s: ISeq) (m: IPersistentMap) =
                     if isNull s then
                         m
                     else
-                        let me = s.first() :?> IMapEntry
-                        step (s.next()) (m.assoc(me.key(),me.value()))
-                step (RT.seq(o)) this
+                        let me = s.first () :?> IMapEntry
+                        step (s.next ()) (m.assoc (me.key (), me.value ()))
+
+                step (RT.seq (o)) this
 
 ```
-TClojure defines the `cons` operation is defined a bit strangely on maps.  Consing `null` is a no-op.  Consing an `IMapEntry` does an `assoc` to add the key/value pair.  Otherwise, we need to be consing something that can be converted to an `ISeq`. We iterate through the seq;  all entries must be `IMapEntry`s  and we add all those key/value pairs.  I encoded the iteration as a recursion -- you could go with mutable variables and a `while` loop if you are so inclined.
+Clojure defines the `cons` operation a bit strangely on maps.  Consing `null` is a no-op.  Consing an `IMapEntry` does an `assoc` to add the key/value pair.  Otherwise, we need to be consing something that can be converted to an `ISeq`. We iterate through the seq;  all entries must be `IMapEntry`s  and we add all those key/value pairs.  I encoded the iteration as a recursion -- you could go with mutable variables and a `while` loop if you are so inclined.  (My actual code also has cases for `DictionaryEntry`, `KeyValuePair<K,V>`, and `IPersisentVector` (if it has exactly two elements) -- they don't add to this discussion.)
 
 The heart of the map is the `find`/`assoc`/`without` trio -- lookups, insertions, deletions.  We hit lookups above.  Here we go with the remaining two.
 
 ```F#
-        member this.assoc(k,v) = 
+        member this.assoc(k, v) =
             let addedLeaf = Box()
-            let rootToUse = 
+
+            let rootToUse =
                 match this with
                 | Empty -> SHMNode.EmptyBitmapNode
-                | Rooted(Node=n) -> n
+                | Rooted (Node = n) -> n
+
             let newRoot = rootToUse.assoc 0 (hash k) k v addedLeaf
+
             if newRoot = rootToUse then
                 upcast this
             else
-                let count = (this:>Counted).count()
-                let updatedCount = if addedLeaf.isSet then count+1 else count
-                upcast Rooted(updatedCount,newRoot)
+                let count = (this :> Counted).count ()
+
+                let updatedCount =
+                    if addedLeaf.isSet then
+                        count + 1
+                    else
+                        count
+
+                upcast Rooted(updatedCount, newRoot)
 
 ```
 
@@ -272,17 +307,16 @@ As we did above, our `assoc` will defer the action down to a node.  If we are `R
 
 
 ```F#
-        member this.without(k) = 
+        member this.without(k) =
             match this with
             | Empty -> upcast this
-            | Rooted(Count=c;Node=n) ->
-                let newRoot = n.without 0 (hash k) k
-                if newRoot = n then
-                    upcast this
-                elif c = 1 then
-                    Empty
-                else
-                    upcast Rooted(c-1,newRoot)
+            | Rooted (Count = c; Node = n) ->
+                match n.without 0 (hash k) k with
+                | None -> upcast this
+                | Some newRoot ->
+                    if newRoot = n then upcast this
+                    elif c = 1 then upcast Empty
+                    else upcast Rooted(c - 1, newRoot)
 ```
 
 The `without` method follows a similar pattern.  It is not an error to to remove a non-existent key, so `without` when we are `Empty` is a no-op.  If `Rooted`, we delegate the operation to the node.  If the node itselfcomes back, there was no change (key was not present) and this is a no-op.  Else, we have a new root;  the count definitely decreased.
@@ -302,12 +336,16 @@ There are three node types:  (1) A `BitmapNode` is the kind of node described ea
 We can capture these nodes types with a discriminated union and one helper type:
 
 ```F#
-type  BNodeEntry = | KeyValue of Key:obj * Value:obj | Node of Node:SHMNode
+type BNodeEntry =
+    | KeyValue of Key: obj * Value: obj
+    | Node of Node: SHMNode
 
-and  SHMNode = 
-    | ArrayNode of Count:int * Nodes : (SHMNode option)[]
-    | BitmapNode of Bitmap:int * Entries : BNodeEntry[]
-    | CollisionNode of Hash:int * Count: int * KVs: MapEntry[]  
+and SHMNode =
+    | ArrayNode of Count: int * Nodes: (SHMNode option) []
+    | BitmapNode of Bitmap: int * Entries: BNodeEntry []
+    | CollisionNode of Hash: int * Count: int * KVs: MapEntry []
+
+    ...
 ```
 
 ## Finding our way
@@ -315,12 +353,13 @@ and  SHMNode =
 Perhaps the easiest way to see how the pieces fit together is to look at the search operation.  Recall how this is coded at the root:
 
 ```F#
-   interface ILookup with
-        member this.valAt(k) = (this:>ILookup).valAt(k,null)
-        member this.valAt(k,nf) = 
+    interface ILookup with
+        member this.valAt(k) = (this :> ILookup).valAt (k, null)
+
+        member this.valAt(k, nf) =
             match this with
             | Empty -> nf
-            | Rooted(Node=n) -> n.find2 0 (hash k) k nf 
+            | Rooted (Node = n) -> n.find2 0 (hash k) k nf
 ```
 
 In `SHMNode` 
@@ -336,48 +375,53 @@ We return the value associated with `key` if it is in the map; otherwise we retu
 At an `ArrayNode`, see if there is an entry in the index indicated by hash (for this level).  If that slot is empty, the key is not present and we can return 'notFound'.  If there is a entry, it is a node in the next level down and we continue the search there.
 
 ```F#
-        | ArrayNode(Count=count; Nodes=nodes) -> 
-            let idx = mask(hash,shift)
+        | ArrayNode (Count = count; Nodes = nodes) ->
+            let idx = mask (hash, shift)
+
             match nodes.[idx] with
             | None -> notFound
-            | Some node -> node.find2 (shift+5) hash key notFound
+            | Some node -> node.find2 (shift + 5) hash key notFound
 ```
 
 At a `BitmapNode`, we again check to see if there is an entry -- this uses the bitmap technique described earlier.  If no entry, we are done.  If there is an entry, it can be a key-value pair or another node.  if it is a key-value pair, we need to comparre the search key with the key in the key-value pair.   Match or no-match indicates our return value.   If we find a node, we continue our search down a level.
 
 ```F#
-        | BitmapNode(Bitmap=bitmap; Entries=entries) ->
+        | BitmapNode (Bitmap = bitmap; Entries = entries) ->
             match hashToIndex hash shift bitmap with
             | None -> notFound
             | Some idx ->
                 match entries.[idx] with
-                |KeyValue(Key=k; Value=v) -> if equiv(key,k) then v else notFound
-                |Node(Node=node) -> node.find2 (shift+5) hash key notFound
+                | KeyValue (Key = k; Value = v) -> if equiv (key, k) then v else notFound
+                | Node (Node = node) -> node.find2 (shift + 5) hash key notFound
 ```
 
 The function `hashToiIndex` codes the mapping from the hash index to the array index.  It returns an `int option` so we can tell if there is an entry or not.
 
 ```F#
-    let hashToIndex (hash:int) (shift:int) (bitmap:int) : int option =
-        let bit = bitPos(hash,shift)
-        if bit &&& bitmap = 0 then None else bitIndex(bitmap,bit) |> Some
+    let hashToIndex (hash: int) (shift: int) (bitmap: int) : int option =
+        let bit = bitPos (hash, shift)
+
+        if bit &&& bitmap = 0 then
+            None
+        else
+            bitIndex (bitmap, bit) |> Some
 ```
 
 At a `CollisioNode`, we just conduct a linear search.
 
 ```F#
-        | CollisionNode(Hash=hash; Count=count; KVs=kvs) -> 
-            match SHMNode.tryFindCNodeIndex(key,kvs) with  
+        | CollisionNode (Hash = hash; Count = count; KVs = kvs) ->
+            match SHMNode.tryFindCNodeIndex (key, kvs) with
             | None -> notFound
-            | Some idx -> (kvs.[idx]:>IMapEntry).value()
+            | Some idx -> (kvs.[idx] :> IMapEntry).value ()
 ```
 
 where the linear search is coded by `tryFindCNodeIndex`:
 
 ```F#
-    static member tryFindCNodeIndex(key:obj, kvs:MapEntry[]) =
-        kvs 
-        |> Array.tryFindIndex (fun kv -> equiv((kv:>IMapEntry).key(),key))
+    static member tryFindCNodeIndex(key: obj, kvs: MapEntry []) =
+        kvs
+        |> Array.tryFindIndex (fun kv -> equiv ((kv :> IMapEntry).key (), key))
 ```
 
 The function `equiv` should encode the key equality comparison of your choice.
@@ -396,22 +440,30 @@ In `SHMNode`, we have
 For an `ArrayNode`, we index into its array of items.  If nothing is there, then the key is not present, so we will insert it.  Being immutable, 'insert' means create a duplicate of this node with a new entry in the appropriate position in the array.  What kind of enty?  We create an empty `BitmapNode` and `assoc` our key/value into it.  If there is an entry, then it is an `SHMNode` one level down.  Defer the `assoc` to that level.  If we get back the same node we started with, then the `assoc` does nothing -- the key is already in the map with the given value -- and we can return our own node to indicate no change.   If we get back a different node, then we need to 'replace' the node that was there -- again, due to immutability, we will be making a copy.
 
 ```F#
-        | ArrayNode(Count=count ;Nodes=nodes) -> 
-            let idx = mask(hash,shift)
+        | ArrayNode (Count = count; Nodes = nodes) ->
+            let idx = mask (hash, shift)
+
             match nodes.[idx] with
-            | None -> 
-                let newNode = SHMNode.EmptyBitmapNode.assoc (shift+5) hash key value addedLeaf
-                ArrayNode(count+1,cloneAndSet(nodes,idx,Some newNode))
+            | None ->
+                let newNode =
+                    SHMNode.EmptyBitmapNode.assoc (shift + 5) hash key value addedLeaf
+
+                ArrayNode(count + 1, cloneAndSet (nodes, idx, Some newNode))
             | Some node ->
-                let newNode = node.assoc (shift+5) hash key value addedLeaf
-                if newNode = node then  this else  ArrayNode(count,cloneAndSet(nodes,idx,Some newNode))
+                let newNode =
+                    node.assoc (shift + 5) hash key value addedLeaf
+
+                if newNode = node then
+                    this
+                else
+                    ArrayNode(count, cloneAndSet (nodes, idx, Some newNode))
 ```
 
 The `cloneAndSet` method creates a copy of this node's entries with a new value in the indicated position:
 
 ```F#
-    let cloneAndSet(arr : 'T[], i: int, a : 'T) : 'T[] =
-        let clone : 'T[] = downcast arr.Clone()
+    let cloneAndSet (arr: 'T [], i: int, a: 'T) : 'T [] =
+        let clone: 'T [] = downcast arr.Clone()
         clone.[i] <- a
         clone
 ```
@@ -430,69 +482,113 @@ Doing `assoc` on a `BitmapNode` is a bit more complex, in fact the most complica
 I present the code without additional commentary.   You really need to work through the mechanics.
 
 ```F#
-       | BitmapNode(Bitmap=bitmap; Entries=entries) -> 
+        | BitmapNode (Bitmap = bitmap; Entries = entries) ->
             match hashToIndex hash shift bitmap with
             | None ->
-                let n = bitCount(bitmap)
+                let n = bitCount (bitmap)
+
                 if n >= 16 then
                     //[see code segment A below]
                 else
                     //[see code segment B below]
 
-            | Some idx ->
+           | Some idx ->
                 let entry = entries.[idx]
+
                 match entry with
-                | KeyValue(Key=k; Value=v) ->                    
-                    if equiv(key,k) then
-                        if value = v  then
-                            // key/value match, no-op
-                            this             
+                | KeyValue (Key = k; Value = v) ->
+                    if equiv (key, k) then
+                        if value = v then
+                            this
                         else
-                            // key present, new value
-                            BitmapNode(bitmap,cloneAndSet(entries,idx,KeyValue(key,value)))
+                            BitmapNode(bitmap, cloneAndSet (entries, idx, KeyValue(key, value)))
                     else
-                        // key at this entry not the target, need to add a new node to differentiate
-                        addedLeaf.set()
-                        let newNode =  SHMNode.createNode (shift+5) k v hash key value
-                        BitmapNode(bitmap,cloneAndSet(entries,idx,Node(newNode)))
-                | Node(Node=node) -> 
-                    let newNode = node.assoc (shift+5) hash key value addedLeaf
-                    if  newNode = node then 
+                        addedLeaf.set ()
+
+                        let newNode =
+                            SHMNode.createNode (shift + 5) k v hash key value
+
+                        BitmapNode(bitmap, cloneAndSet (entries, idx, Node(newNode)))
+                | Node (Node = node) ->
+                    let newNode =
+                        node.assoc (shift + 5) hash key value addedLeaf
+
+                    if newNode = node then
                         this
                     else
-                        BitmapNode(bitmap,cloneAndSet(entries,idx,Node(newNode)))
+                        BitmapNode(bitmap, cloneAndSet (entries, idx, Node(newNode)))
 ```
 
 ```F#
     // Code segment A -- no entry for this key's hash here, but node is too full -- create ArrayNode
-                    let nodes : SHMNode option [] = Array.zeroCreate 32   
-                   
+                    let nodes: SHMNode option [] = Array.zeroCreate 32
+
                     // create an entry for the new keya/value
-                    let jdx = mask(hash,shift)  
-                    nodes.[jdx] <- SHMNode.EmptyBitmapNode.assoc (shift+5) hash key value addedLeaf |> Some
+                    let jdx = mask (hash, shift)
+
+                    nodes.[jdx] <-
+                        SHMNode.EmptyBitmapNode.assoc (shift + 5) hash key value addedLeaf
+                        |> Some
 
                     // copy the entries from the exsiting BitmapNode to the new ArrayNode we are creating
                     let mutable j = 0
+
                     for i = 0 to 31 do
-                        if ((bitmap>>>i) &&& 1) <> 0 then   
-                            nodes.[i] <- 
-                                match entries.[j] with 
-                                | KeyValue(Key=k; Value=v) -> SHMNode.EmptyBitmapNode.assoc (shift+5) (getHash k) k v addedLeaf |> Some
-                                | Node(Node=node) -> node |> Some
-                            j <- j+1
-                    ArrayNode(n+1,nodes)
+                        if ((bitmap >>> i) &&& 1) <> 0 then
+                            nodes.[i] <-
+                                match entries.[j] with
+                                | KeyValue (Key = k; Value = v) ->
+                                    SHMNode.EmptyBitmapNode.assoc (shift + 5) (getHash k) k v addedLeaf
+                                    |> Some
+                                | Node (Node = node) -> node |> Some
+
+                            j <- j + 1
+
+                    ArrayNode(n + 1, nodes)
 ```
 
 ```F#
     // Code segment B -- no entry for this key's hash here, the node is not too full -- create a BitmapNode with the new key/value added
-                    let bit = bitPos(hash,shift)
-                    let idx = bitIndex(bitmap,bit)
-                    let newArray : BNodeEntry[] = Array.zeroCreate (n+1)
-                    Array.Copy(entries,0,newArray,0,idx)
-                    newArray.[idx] <- KeyValue(key,value)
-                    Array.Copy(entries,idx,newArray, idx+1,n-idx)
-                    addedLeaf.set()
+                    let bit = bitPos (hash, shift)
+                    let idx = bitIndex (bitmap, bit)
+                    let newArray: BNodeEntry [] = Array.zeroCreate (n + 1)
+                    Array.Copy(entries, 0, newArray, 0, idx)
+                    newArray.[idx] <- KeyValue(key, value)
+                    Array.Copy(entries, idx, newArray, idx + 1, n - idx)
+                    addedLeaf.set ()
                     BitmapNode((bitmap ||| bit), newArray)
+```
+
+If we have reached a collision node, then there are keys with the same hash as our target, through the number of bits considered at this level.  Our target may have the same hash as those keys, in which case it should be added to the list.  (Rather, a new `CollisionNode` will be created with our key/value pair added.)  If the hash of our target key is different, then it is not colliding.  We can replace the `CollisionNode` with a `BitmapNode`, with the `CollisionNode` as its one entry, and then `assoc` our key/value into the new node.
+
+```F#
+        | CollisionNode (Hash = h; Count = count; KVs = kvs) ->
+            if hash = h then
+                match SHMNode.tryFindCNodeIndex (key, kvs) with
+                | Some idx ->
+                    let kv = kvs.[idx] :> IMapEntry
+
+                    if kv.value () = value then
+                        this
+                    else
+                        CollisionNode(hash, count, cloneAndSet (kvs, idx, MapEntry(key, value)))
+                | None ->
+                    let newArray: MapEntry [] = count + 1 |> Array.zeroCreate
+                    Array.Copy(kvs, 0, newArray, 0, count)
+                    newArray.[count] <- MapEntry(key, value)
+                    addedLeaf.set ()
+                    CollisionNode(hash, count + 1, newArray)
+            else
+                BitmapNode(
+                    bitPos (hash, shift),
+                    [| Node(this) |]
+                )
+                    .assoc
+                    shift
+                    h
+                    key
+                    value
+                    addedLeaf
 ```
 
 ## Doing `without`
@@ -517,14 +613,17 @@ The return value is an `SHMNode option`  Across all three subtypes of `SHMNode`,
                 match node.without (shift+5) hash key with
                 | None ->                                                                // this branch got deleted
                     if count <= 8 then 
-                        SHMNode.pack count nodes idx |> Some                             // we are small, convert back to using a BitmapNode
+                        SHMNode.pack count nodes idx 
+                        |> Some                             // we are small, convert back to using a BitmapNode
                     else 
-                        ArrayNode(count-1,cloneAndSet(nodes,idx,None)) |> Some           // zero out the entry
+                        ArrayNode(count-1,cloneAndSet(nodes,idx,None)) 
+                        |> Some           // zero out the entry
                 | Some newNode ->
                     if newNode = node then 
                         this  |> Some                                                    // key not present in subtree => no=op
                     else
-                        ArrayNode(count-1,cloneAndSet(nodes,idx,Some newNode)) |> Some   // use the new node
+                        ArrayNode(count-1,cloneAndSet(nodes,idx,Some newNode)) 
+                        |> Some   // use the new node
 ```
 
 
@@ -541,7 +640,8 @@ The return value is an `SHMNode option`  Across all three subtypes of `SHMNode`,
                         if bitmap = bit then                                             // only one entry, which is the one we are removing
                             None
                         else
-                            BitmapNode(bitmap^^^bit,removeEntry(entries,idx)) |> Some    // create new node with the k/v entry removed
+                            BitmapNode(bitmap^^^bit,removeEntry(entries,idx)) 
+                            |> Some    // create new node with the k/v entry removed
                     else this |> Some                                                    // key here not our target => no-op
                 | Node(Node=node) -> 
                     match node.without (shift+5) hash key with
@@ -550,7 +650,8 @@ The return value is an `SHMNode option`  Across all three subtypes of `SHMNode`,
                         if n = node then 
                             this |> Some                                                 // key was not in subtree => no-op
                         else 
-                            BitmapNode(bitmap,cloneAndSet(entries,idx,Node(n))) |> Some  // key was removed from subtree, create node with new subtree
+                            BitmapNode(bitmap,cloneAndSet(entries,idx,Node(n))) 
+                            |> Some  // key was removed from subtree, create node with new subtree
 ```
 
 ```F#
@@ -561,31 +662,35 @@ The return value is an `SHMNode option`  Across all three subtypes of `SHMNode`,
                 if count = 1 then                                                       
                     None                                                                // key present, only entry, node deleted
                 else 
-                    CollisionNode(h,count-1,removeEntry(kvs,idx)) |> Some               // key not present, create new node with entry removed
+                    CollisionNode(h,count-1,removeEntry(kvs,idx)) 
+                    |> Some               // key not present, create new node with entry removed
 ```
 
 One little debt was incurred above.  When an `ArrayNode` gets an entry removed (because a subtree is emptied by the operation), we have the opportunity to create a more efficient `BitmapNode`.  The size break here is 8.  The `pack` method is used to create a `BitmapNode` from an `ArrayNode`, with a specified entry to be left out.
 
 ```F#
     static member pack (count: int) (nodes: SHMNode option []) (idx: int) : SHMNode =
-        let newArray : BNodeEntry [] = count-1 |> Array.zeroCreate 
+        let newArray: BNodeEntry [] = count - 1 |> Array.zeroCreate
         let mutable j = 0
         let mutable bitmap = 0
-        for i=0 to idx-1 do
+
+        for i = 0 to idx - 1 do
             match nodes.[i] with
             | None -> ()
-            | Some n -> 
-                newArray.[j] <- Node n; 
+            | Some n ->
+                newArray.[j] <- Node n
                 bitmap <- bitmap ||| 1 <<< i
-                j <- j+1
-        for i=idx+1 to nodes.Length-1 do
+                j <- j + 1
+
+        for i = idx + 1 to nodes.Length - 1 do
             match nodes.[i] with
             | None -> ()
-            | Some n -> 
-                newArray.[j] <- Node n; 
+            | Some n ->
+                newArray.[j] <- Node n
                 bitmap <- bitmap ||| 1 <<< i
-                j <- j+1
-        BitmapNode(bitmap,newArray)
+                j <- j + 1
+
+        BitmapNode(bitmap, newArray)
 ```
 
 We could probably do this with some fancy work with sequence functions, but I was feeling tired.
@@ -611,77 +716,79 @@ There is a variant of the sequence datatype for each of the node subtypes.  They
 The code is simplest for `CollisionNode`s as they have only key-value pairs and no empty entries.  Recall that when we have no more values, `next` should return `null`.
 
 ```F#
-and CollisionNodeSeq(kvs : MapEntry[], idx: int) =
+CollisionNodeSeq(kvs: MapEntry [], idx: int) =
     inherit ASeq()
 
-    static member create(kvs: MapEntry[], idx:int) : ISeq =
-        if idx >= kvs.Length then null else CollisionNodeSeq(kvs,idx)
+    static member create(kvs: MapEntry [], idx: int) : ISeq =
+        if idx >= kvs.Length then
+            null
+        else
+            CollisionNodeSeq(kvs, idx)
 
     interface ISeq with
-        member _.first() = kvs[idx]
-        member _.next() = CollisionNodeSeq.create(kvs,idx+1)
+        member _.first() = kvs.[idx]
+        member _.next() = CollisionNodeSeq.create (kvs, idx + 1)
 ```
 
 
 `ArrayNode`s are slightly complicated because they have `option` entries.  Any `None` entries must be skipped over when advancing to the `next` sequence.  We need also skip over any subnode that has a `null` sequence.
 
 ```F#
-ArrayNodeSeq(nodes: (SHMNode option)[], idx: int, s: ISeq) =
+ArrayNodeSeq(nodes: (SHMNode option) [], idx: int, s: ISeq) =
     inherit ASeq()
-    
-    static member create(nodes: (SHMNode option)[], idx: int) : ISeq =
+
+
+    static member create(nodes: (SHMNode option) [], idx: int) : ISeq =
         if idx >= nodes.Length then
             null
         else
-            match nodes[idx] with
-            | Some(node) -> 
-                match node.getNodeSeq() with
-                | null -> ArrayNodeSeq.create(nodes,idx+1)
-                | _ as s -> ArrayNodeSeq(nodes,idx,s)
-            | None -> ArrayNodeSeq.create(nodes,idx+1)
+            match nodes.[idx] with
+            | Some (node) ->
+                match node.getNodeSeq () with
+                | null -> ArrayNodeSeq.create (nodes, idx + 1)
+                | s -> ArrayNodeSeq(nodes, idx, s)
+            | None -> ArrayNodeSeq.create (nodes, idx + 1)
 
-    interface ISeq with 
-        member _.first() = s.first()
-        member _.next() = 
-            match s.next() with
-            | null -> ArrayNodeSeq.create(nodes,idx+1) 
-            | _ as s1 -> ArrayNodeSeq(nodes,idx,s1)
+    interface ISeq with
+        member _.first() = s.first ()
+
+        member _.next() =
+            match s.next () with
+            | null -> ArrayNodeSeq.create (nodes, idx + 1)
+            | s1 -> ArrayNodeSeq(nodes, idx, s1)
 ```
 
 `BitmapNode`s need to deal with having both key-value pairs and nodes as entries.  However, they don't have to deal with `option`al entries.
 
 ```F#
-and BitmapNodeSeq(entries: BNodeEntry[], idx: int, seq: ISeq) =
+BitmapNodeSeq(entries: BNodeEntry [], idx: int, seq: ISeq) =
     inherit ASeq()
 
-    static member create(entries: BNodeEntry[], idx: int) : ISeq =
-        if idx >= entries.Length 
-        then 
+    static member create(entries: BNodeEntry [], idx: int) : ISeq =
+        if idx >= entries.Length then
             null
         else
-            match entries[idx] with
-            | KeyValue(_,_) -> BitmapNodeSeq(entries,idx,null)
-            | Node(Node=node) -> 
-                match node.getNodeSeq() with
-                | null -> BitmapNodeSeq.create(entries,idx+1)
-                | _ as s -> BitmapNodeSeq(entries,idx,s)
+            match entries.[idx] with
+            | KeyValue (_, _) -> BitmapNodeSeq(entries, idx, null)
+            | Node (Node = node) ->
+                match node.getNodeSeq () with
+                | null -> BitmapNodeSeq.create (entries, idx + 1)
+                | s -> BitmapNodeSeq(entries, idx, s)
 
     interface ISeq with
         member _.first() =
-            match entries[idx] with
-            | KeyValue(Key=k;Value=v) -> MapEntry(k,v)
-            | Node(Node=_) -> seq.first()
+            match entries.[idx] with
+            | KeyValue (Key = k; Value = v) -> MapEntry(k, v)
+            | Node (Node = _) -> seq.first ()
 
-        member _.next() = 
-            match entries[idx] with
-            | KeyValue(_,_) -> BitmapNodeSeq.create(entries,idx+1)
-            | Node(_) -> 
-                match seq.next() with
-                | null -> BitmapNodeSeq.create(entries,idx+1)
-                | _ as s -> BitmapNodeSeq(entries,idx,s)
+        member _.next() =
+            match entries.[idx] with
+            | KeyValue (_, _) -> BitmapNodeSeq.create (entries, idx + 1)
+            | Node (_) ->
+                match seq.next () with
+                | null -> BitmapNodeSeq.create (entries, idx + 1)
+                | s -> BitmapNodeSeq(entries, idx, s)
 ```
-
-
 
 ## Sigh
 
