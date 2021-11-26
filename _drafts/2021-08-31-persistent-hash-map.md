@@ -312,7 +312,7 @@ As we did above, our `assoc` will defer the action down to a node.  If we are `R
             | Empty -> upcast this
             | Rooted (Count = c; Node = n) ->
                 match n.without 0 (hash k) k with
-                | None -> upcast this
+                | None -> Empty
                 | Some newRoot ->
                     if newRoot = n then upcast this
                     elif c = 1 then upcast Empty
@@ -666,7 +666,7 @@ The return value is an `SHMNode option`  Across all three subtypes of `SHMNode`,
                     |> Some               // key not present, create new node with entry removed
 ```
 
-One little debt was incurred above.  When an `ArrayNode` gets an entry removed (because a subtree is emptied by the operation), we have the opportunity to create a more efficient `BitmapNode`.  The size break here is 8.  The `pack` method is used to create a `BitmapNode` from an `ArrayNode`, with a specified entry to be left out.
+A few small debts were incurred above.  When an `ArrayNode` gets an entry removed (because a subtree is emptied by the operation), we have the opportunity to create a more efficient `BitmapNode`.  The size break here is 8.  The `pack` method is used to create a `BitmapNode` from an `ArrayNode`, with a specified entry to be left out.
 
 ```F#
     static member pack (count: int) (nodes: SHMNode option []) (idx: int) : SHMNode =
@@ -694,6 +694,16 @@ One little debt was incurred above.  When an `ArrayNode` gets an entry removed (
 ```
 
 We could probably do this with some fancy work with sequence functions, but I was feeling tired.
+
+And we need to create a new array from an existing one, removing one item.
+
+```F#
+    let removeEntry (arr: 'T [], i: int) : 'T [] =
+        let newArr: 'T [] = Array.zeroCreate <| arr.Length - 1
+        Array.Copy(arr, 0, newArr, 0, i)
+        Array.Copy(arr, (i + 1), newArr, i, newArr.Length - i)
+        newArr
+```
 
 And we are done.
 
