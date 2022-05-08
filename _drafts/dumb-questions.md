@@ -31,4 +31,23 @@ this is a factory function  of the form map->TypeName, taking a map of keywords 
 We will take the supplied argument (m#) as is if it supports MapEquivalence, but copy it otherwise (so we will end up with a standard IPersistentMap that does support it).	
 What situation are we dealing with here?
 
-		
+============
+
+APersistentMap.cons
+
+why if we cons a non-Map.Entry, non-IPersistenVector, do we treat the argument as sequence of Map.Entry objects and assoc them in individually?
+Why is this cons and not some form of append?
+also, consing a null is a no-op.
+
+================
+
+// APersistentMap.hashCode
+
+public int hashCode(){
+    int cached = this._hash;
+	if(cached == 0)
+		{
+		this._hash = cached = mapHash(this);
+		}
+	return cached;
+}
