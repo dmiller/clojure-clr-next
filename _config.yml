@@ -1,1 +1,3 @@
 theme: jekyll-theme-modernist
+title: ClojureCLR -- reconsidered
+description: A project to rewrite the ClojureCLR engine
