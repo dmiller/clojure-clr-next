@@ -19,7 +19,8 @@ Well, not really.  A `Cons` in Clojure has to slot into the ecosystem that Cloju
 
 If you diagram the inheritance relationships of the various interfaces and concrete collection classes in Clojure, you get a picture something like this:
 
-![Full dependency graph]( {{ site.baseurl}}/assets/images/all-dependencies.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/all-dependencies.png" alt="Full dependency graph" />
+
 
 (And at least one interface has been added since I originally drew this.)
 
@@ -31,7 +32,7 @@ F# does not like circularities.  Neither does my brain when it is trying to figu
 
 What is the minimum needed implement `Cons`?  Let's grab the tree by the `Cons`,  pull it up, and see what comes up with it.  In the following graph boxes indicate interfaces, 'eggs' indicate abstract classes, and ellipses indicate concrete classes. Solid lines indicate inheritance; dashed lines indicate a reference in the API of the 'tail' to the 'head' type.
 
-![Cons dependency graph]( {{ site.baseurl}}/assets/images/cons-dependencies.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/cons-dependencies.png" alt="Cons dependency graph" />
 
 I have grouped to items to try to indicate how they can be broken into manageable pieces.  Where there is true circularity, we cannot develop the items independently.
 
