@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="SimplestCollections.fs" />
+    <Compile Include="SimpleHashMap.fs" />
+    <Compile Include="SimpleHashMap2.fs" />
+    <Compile Include="SimpleHashMap3.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="6.0.4-beta.22181.2" />
+  </ItemGroup>
+
+</Project>

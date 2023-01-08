@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarnOn>3390;$(WarnOn)</WarnOn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <OtherFlags></OtherFlags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="ArithmeticHelpers.fs" />
+    <Compile Include="BigDecimal.fsi" />
+    <Compile Include="BigDecimal.fs" />
+    <Compile Include="BigRaitonal.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Runtime.Numerics" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="6.0.4-beta.22181.2" />
+  </ItemGroup>
+
+</Project>
