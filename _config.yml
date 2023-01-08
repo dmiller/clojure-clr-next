@@ -22,7 +22,7 @@ title: ClojureCLR - Next!
 email: dmiller2718@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
   A project to rewrite the ClojureCLR engine.
-baseurl: "clojure-clr-next/" # the subpath of your site, e.g. /blog
+baseurl: "/clojure-clr-next" # the subpath of your site, e.g. /blog
 url: "https://dmiller.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: dmiller2718
 github_username:  dmiller
