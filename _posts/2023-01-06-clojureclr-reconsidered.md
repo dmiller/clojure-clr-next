@@ -1,11 +1,9 @@
 ---
 layout: post
-title: ClojureCLR: Reconsidered
-date: 2023-01-09 00:00:00 -0500
+title: ClojureCLR -- Reconsidered
+date: 2023-01-06 00:00:00 -0500
 categories: general
 ---
-
-# ClojureCLR: Reconsidered
 
 I originally started ClojureCLR, with Rich Hickey's blessing, in the fall of 2008.  (I wrote about that [here](https://rationalx.blogspot.com/2011/11/clojureclr-genesis.html)).  Jump ahead 14+ years and ClojureCLR is still keeping up with ClojureJVM itself, at least in terms of basic language features.
 
