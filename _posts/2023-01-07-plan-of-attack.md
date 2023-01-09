@@ -53,5 +53,3 @@ The Collections, IFn, and Runtime categories are intertwined.   Much of Runtime 
 Once one has the right set of collections, support for `IFn`, and some of `RT`, one can implement most of the Reader code. This will also involve much of what I called the Library code:  The readers know symbols, keywords, namespaces, vars, ... . There are a few parts of  `LispReader` that invoke the evaluator/compiler; we'll play some tricks to defer those references until the those other pieces are ready. (And to prevent circularities.)
 
 And then the compiler and remaining pieces of runtime support.
-
-##
