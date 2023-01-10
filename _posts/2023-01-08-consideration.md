@@ -30,7 +30,7 @@ And this only shows the direct inheritance relationships.  It does not show, for
 
 F# does not like circularities.  Neither does my brain when it is trying to figure out how things fit together and how to get started on an implementation.
 
-What is the minimum needed implement `Cons`?  Let's grab the tree by the `Cons`,  pull it up, and see what comes up with it.  In the following graph boxes indicate interfaces, 'eggs' indicate abstract classes, and ellipses indicate concrete classes. Solid lines indicate inheritance; dashed lines indicate a reference in the API of the 'tail' to the 'head' type.
+What is the minimum needed to implement `Cons`?  Let's grab the tree by the `Cons`,  pull it up, and see what comes up with it.  In the following graph boxes indicate interfaces, 'eggs' indicate abstract classes, and ellipses indicate concrete classes. Solid lines indicate inheritance; dashed lines indicate a reference in the API of the 'tail' to the 'head' type.
 
 <img src="{{site.baseurl | prepend: site.url}}/assets/images/cons-dependencies.png" alt="Cons dependency graph" />
 
@@ -87,4 +87,8 @@ We're getting a little too deep here. Let's look at the minimum required to get 
 ## The good news
 
 Feeling the burn?  The good news is that this is probably the nastiest bit of analysis we have to do on the data structure side.  we can illustrate all this with a 'simple' implementation of `Cons` that pulls together all these pieces.  With that under our belts, when we implement more complicated data structures, such as hash array mapped tries with persistence, we can focus on the inherit complexity of the data structure itself;  slotting it into the ecosystem will be an easy task.
+
+## Even better news
+
+We'll take the time in the next few posts to show how to implement simple versions of some collections types -- cons cells, maps, etc. -- before approaching this whole mess in gory detail.
 
