@@ -1,5 +1,7 @@
 ﻿namespace Clojure.Collections
 
+open System.Text
+
 module Util =
 
     let checkEquals o1 o2 =
@@ -33,15 +35,22 @@ module Util =
         step s 1
 
     let rec seqToString (s: ISeq) =
-        let itemToString (o: obj) =
+        let sb = new StringBuilder()
+
+        let rec appendItem (o: obj) =
             match o with
-            | :? Seqable as s -> seqToString (s.seq ())
-            | _ -> o.ToString()
+            | :? Seqable as s -> appendSeq (s.seq ())
+            | _ -> sb.Append(o.ToString()) |> ignore
 
-        let rec itemsToString (s: ISeq) =
-            if isNull s then
-                ""
-            else
-                (itemToString (s.first ())) + (itemsToString (s.next ()))
+        and appendSeq (s: ISeq) =
+            match s with
+            | null -> ()
+            | _ ->
+                appendItem (s.first ())
+                sb.Append(" ") |> ignore
+                appendSeq (s.next ())
 
-        if isNull s then "nil" else "(" + (itemsToString s) + ")"
+        sb.Append("(") |> ignore
+        appendSeq s
+        sb.Append(")") |> ignore
+        sb.ToString()
