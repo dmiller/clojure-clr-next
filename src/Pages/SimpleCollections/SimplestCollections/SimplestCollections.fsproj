@@ -10,6 +10,7 @@
     <Compile Include="Util.fs" />
     <Compile Include="SimpleCons.fs" />
     <Compile Include="SimpleIntRange.fs" />
+    <Compile Include="SimpleStringSeq.fs" />
     <Compile Include="SimpleMap.fs" />
   </ItemGroup>
 

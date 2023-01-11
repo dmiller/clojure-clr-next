@@ -1,4 +1,4 @@
-﻿module SimpleRangeTests
+﻿module SimpleIntRangeTests
 
 
 open Expecto
@@ -11,9 +11,9 @@ let simpleRangeTests =
         "SimpleRange tests"
         [
 
-          testCase "SimpleRange implements ISeq"
+          testCase "SimpleIntRange implements ISeq"
           <| fun _ ->
-              let c = SimpleIntRange(0, 3) :> ISeq
+              let c = SimpleIntRange.create(0, 3)
               let mutable mc = c
 
               for i = 0 to 3 do
@@ -25,16 +25,23 @@ let simpleRangeTests =
               Expect.equal (c2.next ()) c "range.cons.next should be itself"
 
 
-          testCase "SimpleRange implements IPersistentCollection"
+          testCase "SimpleIntRange implements IPersistentCollection"
           <| fun _ ->
-              let c = SimpleIntRange(0, 3)
+              let c = SimpleIntRange.create(0, 3)
               let pc = c :> IPersistentCollection
               Expect.equal (pc.count ()) 4 "range.count should be item count"
               Expect.equal (pc.empty().GetType()) typeof<SimpleEmptySeq> "range.empty should be an emptySeq"
               Expect.isTrue (pc.equiv (c)) "range should be equiv of itself"
-              Expect.isFalse (pc.equiv ((c :> ISeq).next ())) "range should not be equiv of its next"
+              Expect.isFalse (pc.equiv (c.next ())) "range should not be equiv of its next"
 
-          testCase "SimpleRange implements Seqable"
+          testCase "SimpleIntRange implements Seqable"
           <| fun _ ->
-              let c = SimpleIntRange(0, 3)
-              Expect.equal ((c :> Seqable).seq ()) (upcast c) "cons.seq should be itself" ]
+              let c = SimpleIntRange.create(0, 3)
+              Expect.equal ((c :> Seqable).seq ()) c "cons.seq should be itself" 
+
+          testCase "SimpleIntRange on empty range creates a SimpleEmptySeq"
+          <| fun _ ->
+              let c = SimpleIntRange.create(3, 0)
+              Expect.isTrue  (c.GetType() = typeof<SimpleEmptySeq>) "creating an cmpty range"
+
+          ]

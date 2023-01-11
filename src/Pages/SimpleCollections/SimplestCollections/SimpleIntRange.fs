@@ -4,7 +4,14 @@ open Clojure.Collections
 
 
 [<AllowNullLiteral>]
-type SimpleIntRange(startVal: int, endVal: int) =
+type SimpleIntRange private (startVal: int, endVal: int) =
+
+    static member create(startVal,endVal) : ISeq = 
+        if endVal <= startVal then  
+            SimpleEmptySeq()
+        else
+            SimpleIntRange(startVal,endVal)
+
 
     interface ISeq with
         member _.first() = upcast startVal

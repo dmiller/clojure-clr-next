@@ -7,8 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="SimpleStringSeqTests.fs" />
     <Compile Include="SimpleMapTests.fs" />
-    <Compile Include="SimpleRangeTests.fs" />
+    <Compile Include="SimpleIntRangeTests.fs" />
     <Compile Include="SimpleConsTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
