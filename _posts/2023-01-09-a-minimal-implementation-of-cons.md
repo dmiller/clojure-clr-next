@@ -285,3 +285,6 @@ The dance here between `more` and `next` is common.
 `next` is often defined in terms of `more` in the manner shown here.  If `more` returns an empty sequence, the `seq` on it will return `null`, which is what `next`'s contract says. And our `tail` is an `ISeq`, which is an `IPersistentCollection`, which is an `ISeq`, so the call to `seq()` on the `more` will always be safe.
 
 And we are done.
+
+
+Source code for these examples are available at [ClojureCLR-Next repo](https://github.com/dmiller/clojure-clr-next).
