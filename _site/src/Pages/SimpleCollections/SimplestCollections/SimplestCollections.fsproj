@@ -9,12 +9,6 @@
     <Compile Include="Interfaces.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="SimpleCons.fs" />
-    <Compile Include="SimpleIntRange.fs" />
-    <Compile Include="SimpleMap.fs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="7.0.0" />
   </ItemGroup>
 
 </Project>

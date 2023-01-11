@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="SimpleCollectionsTests.fs" />
+    <Compile Include="SimpleHashMap1Tests.fs" />
+    <Compile Include="SimpleHashMap2Tests.fs" />
+    <Compile Include="SimpleHashMap3Tests.fs" />
+    <Compile Include="Main.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Expecto" Version="9.0.4" />
+    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.12.20" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.2.0-preview-20220401-08" />
+    <ProjectReference Include="..\Clojure.Collections.Simple\Clojure.Collections.Simple.fsproj" />
+    <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="6.0.4-beta.22181.2" />
+  </ItemGroup>
+
+</Project>

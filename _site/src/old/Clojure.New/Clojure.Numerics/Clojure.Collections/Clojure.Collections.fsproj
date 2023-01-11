@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarnOn>3390;$(WarnOn)</WarnOn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Atomics.fs" />
+    <None Include="GenerateRestFnSource.fsx" />
+    <Compile Include="Murmur3.fs" />
+    <Compile Include="Interfaces.fs" />
+    <Compile Include="Fn.fs" />
+    <Compile Include="RTEnv.fs" />
+    <Compile Include="SmallThings.fs" />
+    <Compile Include="Helpers.fs" />
+    <Compile Include="Sequences.fs" />
+    <Compile Include="SymKey.fs" />
+    <Compile Include="MapBasics.fs" />
+    <Compile Include="SIllyBox.fs" />
+    <Compile Include="PersistentHashMap.fs" />
+    <Compile Include="OtherMaps.fs" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="6.0.4-beta.22181.2" />
+  </ItemGroup>
+  
+</Project>

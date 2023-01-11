@@ -1,7 +1,6 @@
-﻿namespace Clojure.Collections.Simple
+﻿namespace Clojure.Collections
 
 open System.Text
-open Clojure.Collections
 
 module Util =
 

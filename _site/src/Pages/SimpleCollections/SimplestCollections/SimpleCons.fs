@@ -1,12 +1,10 @@
-﻿namespace Clojure.Collections.Simple
-
-open Clojure.Collections
+﻿namespace Clojure.Collections
 
 type SimpleCons(head: obj, tail: ISeq) =
 
     interface ISeq with
         member _.first() = head
-        member this.next() = (this :> ISeq).more().seq ()
+        member this.next() = (this :> ISeq).more().seq()
 
         member _.more() =
             if isNull tail then upcast SimpleEmptySeq() else tail
@@ -15,7 +13,7 @@ type SimpleCons(head: obj, tail: ISeq) =
 
     interface IPersistentCollection with
         member _.count() = 1 + Util.seqCount tail
-        member this.cons(o) = upcast (this :> ISeq).cons (o)
+        member this.cons(o) = upcast (this :> ISeq).cons(o)
         member _.empty() = upcast SimpleEmptySeq()
 
         member this.equiv(o) =
@@ -46,7 +44,7 @@ and SimpleEmptySeq() =
 
     interface IPersistentCollection with
         member _.count() = 0
-        member this.cons(o) = upcast (this :> ISeq).cons (o)
+        member this.cons(o) = upcast (this :> ISeq).cons(o)
         member this.empty() = upcast this
         member this.equiv(o) = this.Equals(o)
 
@@ -61,3 +59,5 @@ and SimpleEmptySeq() =
     override x.GetHashCode() = 1
 
     override x.ToString() = "()"
+
+
