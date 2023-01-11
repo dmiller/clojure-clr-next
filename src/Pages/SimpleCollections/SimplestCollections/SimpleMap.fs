@@ -17,6 +17,11 @@ type SimpleMapEntry(key: obj, value: obj) =
 [<AllowNullLiteral>]
 type SimpleMap(keys: obj list, vals: obj list) =
 
+    do
+        if keys.Length <> vals.Length then
+            raise (ArgumentException("keys and vals lists must have the same length"))
+
+
     new() = SimpleMap(List.Empty, List.Empty)
 
     static member mapCompare(m1: IPersistentMap, o: obj) : bool =
@@ -29,9 +34,9 @@ type SimpleMap(keys: obj list, vals: obj list) =
                     false
                 else
                     let rec step (s: ISeq) =
-                        if isNull s then
-                            true
-                        else
+                        match s with
+                        | null -> true
+                        | _ ->
                             let me: IMapEntry = downcast s.first ()
 
                             if m2.containsKey (me.key ()) && m2.valAt(me.key ()).Equals(me.value ()) then

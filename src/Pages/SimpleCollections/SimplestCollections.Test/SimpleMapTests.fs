@@ -3,11 +3,15 @@
 open Expecto
 open Clojure.Collections
 open Clojure.Collections.Simple
+open System
 
 let makeSimpleMap(n: int) =
     let keys = seq { for c in 'a' .. 'z' -> box c } |> Seq.take n |> Seq.toList
     let vals = seq { for c in 'A' .. 'Z' -> box c } |> Seq.take n |> Seq.toList
     SimpleMap(keys, vals)
+
+let tryBadCreate() =
+    SimpleMap([1;2],[3]) |> ignore
 
 [<Tests>]
 let simpleMapTests =
@@ -92,4 +96,12 @@ let simpleMapTests =
 
               Expect.isFalse ((sm5a :> IPersistentCollection).equiv (sm0)) "Non-empty should not be equiv to empty"
               Expect.isFalse ((sm0 :> IPersistentCollection).equiv (sm5a)) "Empty should not be equiv to non-empty"
-              Expect.isTrue ((sm0 :> IPersistentCollection).equiv (sm0)) "SEmpty ould be equiv to itself" ]
+              Expect.isTrue ((sm0 :> IPersistentCollection).equiv (sm0)) "SEmpty ould be equiv to itself" 
+              
+          testCase "Throws exception on unequal size keys/vals lists"
+          <| fun _ ->
+                Expect.throwsT<ArgumentException>  tryBadCreate "unequal-sized keys/vals lists should throw exception on create"
+                
+        ]
+            
+              
