@@ -6,12 +6,13 @@ open System.Collections.Generic
 open Clojure.Collections
 
 
-[<AllowNullLiteral>]
-type SimpleMapEntry(key: obj, value: obj) =
-
+type SimpleMapEntry =
+    {Key: obj 
+     Value: obj} 
+    
     interface IMapEntry with
-        member _.key() = key
-        member _.value() = value
+        member this.key() = this.Key
+        member this.value() = this.Value
 
 
 [<AllowNullLiteral>]
@@ -76,7 +77,7 @@ type SimpleMap(keys: obj list, vals: obj list) =
 
         member this.entryAt(key) =
             if (this :> Associative).containsKey key then
-                SimpleMapEntry(key, (this :> ILookup).valAt (key)) :> IMapEntry
+                { Key = key; Value = (this :> ILookup).valAt (key) } :> IMapEntry
             else
                 null
 
@@ -90,7 +91,7 @@ type SimpleMap(keys: obj list, vals: obj list) =
         member _.GetEnumerator() : IEnumerator<IMapEntry> =
             (seq {
                 for i = 0 to keys.Length - 1 do
-                    yield SimpleMapEntry(keys.Item(i), vals.Item(i)) :> IMapEntry
+                    yield { Key = keys.Item(i); Value = vals.Item(i)} :> IMapEntry
             })
                 .GetEnumerator()
 
@@ -144,7 +145,7 @@ and SimpleMapSeq(keys: obj list, vals: obj list) =
 
     interface ISeq with
         member _.first() =
-            upcast SimpleMapEntry(keys.Head, vals.Head)
+            upcast { Key = keys.Head; Value = vals.Head }
 
         member _.next() =
             if keys.Length <= 1 then
@@ -158,5 +159,3 @@ and SimpleMapSeq(keys: obj list, vals: obj list) =
             | s -> s
 
         member this.cons(o) = upcast SimpleCons(o, this)
-
-    interface Sequential
