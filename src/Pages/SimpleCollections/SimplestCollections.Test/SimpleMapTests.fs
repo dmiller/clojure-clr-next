@@ -8,12 +8,8 @@ open System.Collections
 open System.Collections.Generic
 
 let makeSimpleMap(n: int) =
-    let keys = seq { for c in 'a' .. 'z' -> box c } |> Seq.take n |> Seq.toList
-    let vals = seq { for c in 'A' .. 'Z' -> box c } |> Seq.take n |> Seq.toList
-    SimpleMap(keys, vals)
-
-let tryBadCreate() =
-    SimpleMap([1;2],[3]) |> ignore
+    let kvs = seq { for c in 'a' .. 'z' -> {Key = c; Value = Char.ToUpper(c)} :> IMapEntry } |> Seq.take n |> Seq.toList
+    SimpleMap(kvs)
 
 [<Tests>]
 let simpleMapTests =
@@ -30,7 +26,7 @@ let simpleMapTests =
           testCase "simpleMap.count"
           <| fun _ ->
               let sm5 = makeSimpleMap 5
-              let sm0 = SimpleMap([], [])
+              let sm0 = SimpleMap.EmptyMap
               Expect.equal ((sm5 :> IPersistentCollection).count ()) 5 "size 5 map"
               Expect.equal ((sm0 :> IPersistentCollection).count ()) 0 "size 0 map"
 
@@ -47,8 +43,8 @@ let simpleMapTests =
               let sm5 = makeSimpleMap 5
               let sm5Val = (sm5 :> ILookup).valAt ('b', 2000)
               let sm5Missing = (sm5 :> ILookup).valAt (99, 2000)
-              Expect.equal sm5Val (box 'B') "found key has correct value"
-              Expect.equal sm5Missing (box 2000) "missing key gets null"
+              Expect.equal sm5Val 'B' "found key has correct value"
+              Expect.equal sm5Missing 2000 "missing key gets null"
 
           testCase "simpleMap.cons"
           <| fun _ ->
@@ -99,10 +95,6 @@ let simpleMapTests =
               Expect.isFalse ((sm5a :> IPersistentCollection).equiv (sm0)) "Non-empty should not be equiv to empty"
               Expect.isFalse ((sm0 :> IPersistentCollection).equiv (sm5a)) "Empty should not be equiv to non-empty"
               Expect.isTrue ((sm0 :> IPersistentCollection).equiv (sm0)) "SEmpty ould be equiv to itself" 
-              
-          testCase "Throws exception on unequal size keys/vals lists"
-          <| fun _ ->
-                Expect.throwsT<ArgumentException>  tryBadCreate "unequal-sized keys/vals lists should throw exception on create"
 
           testCase "without works anywhere in the list" 
           <| fun _ ->

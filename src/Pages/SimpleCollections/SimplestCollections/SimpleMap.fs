@@ -16,14 +16,9 @@ type SimpleMapEntry =
 
 
 [<AllowNullLiteral>]
-type SimpleMap(keys: obj list, vals: obj list) =
+type SimpleMap(kvs : IMapEntry list) =
 
-    do
-        if keys.Length <> vals.Length then
-            raise (ArgumentException("keys and vals lists must have the same length"))
-
-
-    new() = SimpleMap(List.Empty, List.Empty)
+    static member EmptyMap = SimpleMap(List.Empty)
 
     static member mapCompare(m1: IPersistentMap, o: obj) : bool =
         if obj.ReferenceEquals(m1, o) then
@@ -53,45 +48,45 @@ type SimpleMap(keys: obj list, vals: obj list) =
         member this.count() = (this :> IPersistentMap).count ()
 
         member this.cons(o) =
-            (this :> IPersistentMap).cons (o) :> IPersistentCollection
+            (this :> IPersistentMap).cons (o)
 
-        member _.empty() = SimpleMap() :> IPersistentCollection
+        member _.empty() = SimpleMap.EmptyMap
         member this.equiv(o) = SimpleMap.mapCompare (this, o)
 
     interface Seqable with
-        member _.seq() = upcast SimpleMapSeq(keys, vals)
+        member _.seq() = upcast SimpleMapSeq(kvs)
 
     interface ILookup with
         member _.valAt(key) =
-            match List.tryFindIndex (fun k -> k = key) keys with
-            | Some idx -> vals.Item(idx)
+            match List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs with
+            | Some me -> me.value()
             | None -> null
 
         member _.valAt(key, notFound) =
-            match List.tryFindIndex (fun k -> k = key) keys with
-            | Some idx -> vals.Item(idx)
+            match List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs with
+            | Some me -> me.value()
             | None -> notFound
 
     interface Associative with
-        member _.containsKey(key) = List.contains key keys
+        member this.containsKey(key) = 
+            (List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs).IsSome 
 
         member this.entryAt(key) =
-            if (this :> Associative).containsKey key then
-                { Key = key; Value = (this :> ILookup).valAt (key) } :> IMapEntry
-            else
-                null
+            match List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs with
+            | Some me -> me
+            | None -> null
 
         member this.assoc(k, v) =
             upcast (this :> IPersistentMap).assoc (k, v)
 
     interface Counted with
-        member _.count() = keys.Length
+        member _.count() = kvs.Length
 
     interface IEnumerable<IMapEntry> with
         member _.GetEnumerator() : IEnumerator<IMapEntry> =
             (seq {
-                for i = 0 to keys.Length - 1 do
-                    yield { Key = keys.Item(i); Value = vals.Item(i)} :> IMapEntry
+                for i = 0 to kvs.Length - 1 do
+                    yield kvs.Item(i)
             })
                 .GetEnumerator()
 
@@ -104,7 +99,7 @@ type SimpleMap(keys: obj list, vals: obj list) =
             if (this :> Associative).containsKey k then
                 (this :> IPersistentMap).without(k).assoc (k, v) // not the most efficient way, but who cares?
             else
-                SimpleMap(k :: keys, v :: vals) :> IPersistentMap
+                SimpleMap({Key = k; Value = v} :: kvs) :> IPersistentMap
 
         member this.assocEx(k, v) =
             if (this :> Associative).containsKey (k) then
@@ -113,11 +108,10 @@ type SimpleMap(keys: obj list, vals: obj list) =
                 (this :> IPersistentMap).assoc (k, v)
 
         member this.without(key) =
-            match List.tryFindIndex (fun k -> k = key) keys with
+            match List.tryFindIndex (fun (me:IMapEntry) -> me.key() = key) kvs with
             | Some idx ->
-                let keysHead, keysTail = List.splitAt idx keys
-                let valsHead, valsTail = List.splitAt idx vals
-                SimpleMap(keysHead @ keysTail.Tail, valsHead @ valsTail.Tail) :> IPersistentMap
+                let kvsHead, kvsTail = List.splitAt idx kvs
+                SimpleMap(kvsHead @ kvsTail.Tail) :> IPersistentMap
             | None -> this :> IPersistentMap
 
         member this.cons(o) =
@@ -125,16 +119,16 @@ type SimpleMap(keys: obj list, vals: obj list) =
             | :? IMapEntry as me -> (this :> IPersistentMap).assoc (me.key (), me.value ())
             | _ -> raise <| InvalidOperationException("Can only cons an IMapEntry to this map")
 
-        member _.count() = keys.Length
+        member _.count() = kvs.Length
 
 
-and SimpleMapSeq(keys: obj list, vals: obj list) =
+and SimpleMapSeq(kvs : IMapEntry list) =
 
     interface Seqable with
         member this.seq() = upcast this
 
     interface IPersistentCollection with
-        member _.count() = List.length keys
+        member _.count() = List.length kvs
         member this.cons(o) = upcast SimpleCons(o, this)
         member _.empty() = upcast SimpleEmptySeq()
 
@@ -144,14 +138,13 @@ and SimpleMapSeq(keys: obj list, vals: obj list) =
             | _ -> false
 
     interface ISeq with
-        member _.first() =
-            upcast { Key = keys.Head; Value = vals.Head }
+        member _.first() = kvs.Head
 
         member _.next() =
-            if keys.Length <= 1 then
+            if kvs.Length <= 1 then
                 null
             else
-                upcast SimpleMapSeq(keys.Tail, vals.Tail)
+                upcast SimpleMapSeq(kvs.Tail)
 
         member this.more() =
             match (this :> ISeq).next () with
