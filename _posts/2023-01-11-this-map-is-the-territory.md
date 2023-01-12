@@ -176,21 +176,21 @@ The flavors of 'find value from key' are straightforward.
 ```F#
     interface ILookup with
         member _.valAt(key) =
-            match List.tryFind (isEntryforKey key) kvs with
+            match List.tryFind (SimpleMap.isEntryforKey key) kvs with
             | Some me -> me.value()
             | None -> null
 
         member _.valAt(key, notFound) =
-            match List.tryFind (isEntryforKey key) kvs with
+            match List.tryFind (SimpleMap.isEntryforKey key) kvs with
             | Some me -> me.value()
             | None -> notFound
 
     interface Associative with
         member this.containsKey(key) = 
-            (List.tryFind (isEntryforKey key) kvs).IsSome 
+            (List.tryFind (SimpleMap.isEntryforKey key) kvs).IsSome 
 
         member this.entryAt(key) =
-            match List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs with
+            match List.tryFind (SimpleMap.isEntryforKey key) kvs with
             | Some me -> me
             | None -> null
 
@@ -232,8 +232,8 @@ Note this is a little inefficent because after we check `containsKey` we will ca
             match List.tryFindIndex (fun (me:IMapEntry) -> me.key() = key) kvs with
             | Some idx ->
                 let kvsHead, kvsTail = List.splitAt idx kvs
-                upcate SimpleMap(kvsHead @ kvsTail.Tail)
-            | None -> upcast this 
+                SimpleMap(kvsHead @ kvsTail.Tail)
+            | None -> this 
 ```
 
 For `without`, if the key is absent, then this map is already a map with the key removed.  Otherwise, we create a new map by cutting the list where the key/value pair is, and resplicing it without that entry.  Just a little list surgery.
