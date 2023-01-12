@@ -56,23 +56,25 @@ type SimpleMap(kvs : IMapEntry list) =
     interface Seqable with
         member _.seq() = upcast SimpleMapSeq(kvs)
 
+    static member isEntryForKey key (me : IMapEntry) = me.key() = key
+
     interface ILookup with
         member _.valAt(key) =
-            match List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs with
+            match List.tryFind (SimpleMap.isEntryForKey key) kvs with
             | Some me -> me.value()
             | None -> null
 
         member _.valAt(key, notFound) =
-            match List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs with
+            match List.tryFind (SimpleMap.isEntryForKey key) kvs with
             | Some me -> me.value()
             | None -> notFound
 
     interface Associative with
         member this.containsKey(key) = 
-            (List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs).IsSome 
+            (List.tryFind (SimpleMap.isEntryForKey key) kvs).IsSome 
 
         member this.entryAt(key) =
-            match List.tryFind (fun (me:IMapEntry) -> me.key() = key) kvs with
+            match List.tryFind (SimpleMap.isEntryForKey key) kvs with
             | Some me -> me
             | None -> null
 
@@ -108,11 +110,11 @@ type SimpleMap(kvs : IMapEntry list) =
                 (this :> IPersistentMap).assoc (k, v)
 
         member this.without(key) =
-            match List.tryFindIndex (fun (me:IMapEntry) -> me.key() = key) kvs with
+            match List.tryFindIndex (SimpleMap.isEntryForKey key) kvs with
             | Some idx ->
                 let kvsHead, kvsTail = List.splitAt idx kvs
-                SimpleMap(kvsHead @ kvsTail.Tail) :> IPersistentMap
-            | None -> this :> IPersistentMap
+                SimpleMap(kvsHead @ kvsTail.Tail)
+            | None -> this
 
         member this.cons(o) =
             match o with
