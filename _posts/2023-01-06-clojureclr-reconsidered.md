@@ -5,6 +5,11 @@ date: 2023-01-06 00:00:00 -0500
 categories: general
 ---
 
+Introducing a project to rewrite ClojureCLR -- ClojureCLR.Next.  With this blog, I hope to record some of the thinking I go through in the process, for myself mostly but perhaps for a future maintainer of the project.
+
+
+## The origin
+
 I originally started ClojureCLR, with Rich Hickey's blessing, in the fall of 2008.  (I wrote about that [here](https://rationalx.blogspot.com/2011/11/clojureclr-genesis.html)).  Jump ahead 14+ years and ClojureCLR is still keeping up with ClojureJVM itself, at least in terms of basic language features.
 
 That's only one sense of _keeping up_.  The community using ClojureCLR is very small.  As a result, there has not been much development of documentation, libraries, tooling, and other contributions to the ecosystem that make a language successful.

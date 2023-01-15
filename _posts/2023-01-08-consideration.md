@@ -5,7 +5,9 @@ date: 2023-01-08 00:00:00 -0500
 categories: general
 ---
 
-To build a Lisp, you could perhaps start with the simplest data structure, the cons cell: a simple record structure with two fields that hold pointers.   Clojure likes immutability, so we don't even need setters for the fields. 
+To build a Lisp, you could perhaps start with the simplest data structure, the cons cell: a simple record structure with two fields that hold pointers and a staple of Lisp implementation from the beginning.   
+
+Clojure likes immutability, so we don't even need setters for the fields. 
 
 ```F#
 type Cons = {Car:obj; Cdr:obj}
