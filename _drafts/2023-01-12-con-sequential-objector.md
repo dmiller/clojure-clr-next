@@ -75,4 +75,4 @@ But I still had questions:  What is an example of a data structure that is `Sequ
 
  I'm happy now. Almost completely. Except for feeling foolish. Except for one last question: 
 
-Is there an example of an `ISeq` that is not `Sequential`?  Should that ever happen? (The issue could be forced:  Have `ISeq` inherit from `Sequential`.)
+Is there an example of an `ISeq` that is not `Sequential`?  Should that ever happen? (The issue could be forced:  Have `ISeq` inherit from `Sequential`.)  Think about a `Cons`.  It is `Sequential`.  Its tail defines the rest of its sequence of items.  Its tail is an `ISeq`.  What would it mean to have `Cons` with a `next` that is not `Sequential`?
