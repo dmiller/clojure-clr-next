@@ -216,15 +216,15 @@ If you look across all the code for `Number.ops`, `Ops.combine`, and `Ops.combin
 
 |     |   L  |   D  |   R  |  BI  |  BD  |
 |-----|:----:|:----:|:----:|:----:|:----:|
-| L   |   L  |   D  |   R  |  BI  |  BD  |
-| D   |   D  |   D  |   D  |   D  |   D  |
-| R   |   R  |   D  |   R  |   R  |  BD  |
-| BI  |  BI  |   D  |   R  |  BI  |  BD  |
-| BD  |  BD  |   D  |  BD  |  BD  |  BD  |
+| L >  |   L  |   D  |   R  |  BI  |  BD  |
+| D >  |   D  |   D  |   D  |   D  |   D  |
+| R >  |   R  |   D  |   R  |   R  |  BD  |
+| BI > |  BI  |   D  |   R  |  BI  |  BD  |
+| BD > |  BD  |   D  |  BD  |  BD  |  BD  |
 
 where _L_ = `Long`, _D_ = `Double`, _R_ = `Ratio`, _BI_ = `BigInteger` and _BD_ = 'BigDouble`.
 
-As I mentioned before `Double` contaminates everything.
+As I mentioned before, `Double` contaminates everything.
 The other conversions are _widening_: the wider type can represent faithfully all the values of the narrower type.
 
 ```
@@ -237,13 +237,73 @@ There are some interesting cases.  What is the combination of _L_ with _UL_?  Th
 
  |  *  |  L |  D |  R | BI | BD | UL | CD |
  |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
- | L   |  L |  D |  R | BI | BD | BI | CD |
- | D   |  D |  D |  D |  D |  D |  D |  D |
- | R   |  R |  D |  R |  R | BD |  R | BD |
- | BI  | BI |  D |  R | BI | BD | BI | BD |
- | BD  | BD |  D | BD | BD | BD | BD | BD |
- | UL  | BI |  D |  R | BI | BD | UL | CD |
- | CD  | CD |  D | BD | BD | BD | CD | CD |
+ | L  > |  L |  D |  R | BI | BD | BI | CD |
+ | D  > |  D |  D |  D |  D |  D |  D |  D |
+ | R  > |  R |  D |  R |  R | BD |  R | BD |
+ | BI > | BI |  D |  R | BI | BD | BI | BD |
+ | BD > | BD |  D | BD | BD | BD | BD | BD |
+ | UL > | BI |  D |  R | BI | BD | UL | CD |
+ | CD > | CD |  D | BD | BD | BD | CD | CD |
 
+
+## What we need
+
+Our goal is to get collections implemented, not provide the entire runtime apparatus for numbers.  We don't need arithemetic and shift operators for example.  Does that mean we should split.  Actually, yes.  There are a few places in `Numbers` collection or other types such as `Var` are needed.
+
+We need just enough to support comparing numbers and computing hashes.  For comparisons, `Numbers` provides two static methods:
+
+```C#
+public static bool equal(object x, object y)
+{
+    return category(x) == category(y)
+        && ops(x).combine(ops(y)).equiv(x, y);
+}
+
+
+public static int compare(object x, object y)
+{
+    Ops xyops = ops(x).combine(ops(y));
+    if (xyops.lt(x, y))
+        return -1;
+    else if (xyops.lt(y, x))
+        return 1;
+    else
+        return 0;
+}
+```
+
+So we need the mapping-to-`Ops`-subclass code, and the `Ops.combine`, `Ops.equiv`, and `Ops.lt` methods.  Fortunately, these methods can be written very directly.   And we can toss `Ops.lte` and a few others for very little cost.
+
+For hashing, we also get lucky:
+
+```C#
+public static int hasheq(object x)
+{
+    Type xc = x.GetType();
+
+    if (xc == typeof(long))
+    {
+        long lpart = Util.ConvertToLong(x);
+        //return (int)(lpart ^ (lpart >> 32));
+        return Murmur3.HashLong(lpart);
+    }
+    if (xc == typeof(double))
+    {
+        if (x.Equals(-0.0))
+            return 0;  // match 0.0
+        return x.GetHashCode();
+    }
+
+    return hasheqFrom(x, xc);
+}
+```
+
+I'll save you the details of `hasheqFrom`, but it is not problematic.
+
+## What we'll do.
+
+- Implement enough of `Ops` and its subclasses to get `equiv`, `compare`, and `hasheq`
+- Maybe contemplate whether there is a better way to accomplish the two-parameter arg dispatch  in F#.
+- Definitely contemplate how to get the remaining operations, mostly arithmetic operations, working with this when we have the other pieces to make that possible.
 
 
