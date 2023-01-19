@@ -7,11 +7,12 @@ categories: general
 
 Wherein I look at hashing and equality in Clojure.
 
-## Do your reading
+## Getting your head in the game
 
-To get started, it helps to have some familiarity with the interaction of equality with collections and numbers.  There is an excellent Clojure guide titled [Equality](https://clojure.org/guides/equality) that you should read in depth.
+To get started, it helps to have some familiarity with the interaction of equality with collections and numbers.  There is an excellent Clojure guide titled [Equality](https://clojure.org/guides/equality) that you should take a look at. The summary might suffice.  I won't quote it here.
 
-Just read the summary for now.  I won't bother quoting it -- the summary is almost as long asthis post.
+
+## A code-based approach
 
 Perhaps the most useful fruitful approach would be to look at the code from the top down.  Starting in the Clojure source, from `core.clj`:
 
@@ -59,9 +60,9 @@ Of interest, this is followed by a _commented out_ version that is based on a di
      false)))
 ```
 
-I leave you to contemplate the chance in the comment.  However, there are clues toward the bottom of the _Equality_ document.
+I leave you to contemplate the change in the comment.  There are some clues toward the bottom of the _Equality_ document.
 
-Functionally, the difference is between calling `Util.equals` vs `Util.equiv`.  They didn't just leave `=` alone and rewrite `Util.equals`.  They wrote `Util.equiv` instead.  As it turns out, `Util.equals` is still there and is used in Clojure code, in both Java/C# and Clojure.
+TThe code difference is between calling `Util.equals` and `Util.equiv`.  They didn't just leave `=` alone and rewrite `Util.equals`.  They wrote `Util.equiv` instead.  As it turns out, `Util.equals` is still there and is used in Clojure code, in both Java/C# and Clojure.
 
 So let's take a look in `Util`.  I'll go with the C# version.
 
@@ -106,12 +107,12 @@ static public bool equals(object k1, object k2)
     }
 return false;
 ```
-In other words, `equiv` without a special case for objects that are `IPersistentCollection`.  The historical notes give some clue.  But you can assume that a point had been reached where the `Equals` method on Clojure collections was no longer capable of doing the work.  
+In other words, the older version of `equals` is just the new `equiv` without a special case for objects that are `IPersistentCollection`.  The historical notes in _Equality_ again give clues.  You can conclude that a point had been reached where the `Equals` method on Clojure collections was no longer capable of doing the work.  
 
-Back to `equiv`. All the assertions made in the summary quoted above become obligations on `pcequiv` for Clojure collections and on our implementations of `Equals` for everything else.
+Back to `equiv`. The assertions about equality made in the summary become obligations on `pcequiv` for Clojure collections and on our implementations of `Equals` for everything else.
 
 
-The work for collections is now done in `pcequiv`:
+ `pcequiv` is straightforward:
 
 ```C#
 public static bool pcequiv(object k1, object k2)
@@ -122,7 +123,7 @@ public static bool pcequiv(object k1, object k2)
 }
 ```
 
-In other words, whichever argument is a `IPersistentCollection`, use its `equiv` method.  So equality testing now has moved to the collection's `equiv` _versus_ its `Equals`.  Let's compare these for a typical collection.  Let's try `PersistentVector`;  these methods are defined for it in its base class, `APersistentVector`.  I'm going to switch the Java code here because there is an important point illustrated there that is not in the C# version (for reasons that will become apparent in a moment):
+In other words, whichever argument is a `IPersistentCollection`, use its `equiv` method.  So equality testing now has moved to the collection's `equiv` _versus_ its `Equals`.  Let's compare these for a typical collection.  Let's try `PersistentVector`;  these methods are defined for it in its base class, `APersistentVector`.  I'm going to switch the Java code here because there is an important point illustrated there that is not in the C# version (for reasons that will become apparent in a bit):
 
 ```Java
 public boolean equals(Object obj){
@@ -138,7 +139,7 @@ public boolean equiv(Object obj){
 }
 ```
 
-So the entry points here handle reference equality and delegate. Starting with
+So the entry points here handle reference equality and then delegate for content-based comparison. Starting with
 
 ```Java
 static boolean doEquals(IPersistentVector v, Object obj){
@@ -186,7 +187,7 @@ static boolean doEquals(IPersistentVector v, Object obj){
 }
 ```
 
-Fairly straightforward.  `doEquiv` looks very similar.  We can take advantage that the first argument is known to be an IPersistentVector, so we can do indexing efficiently.
+Fairly straightforward.  `doEquiv` looks very similar.  We can take advantage that the first argument is known to be an IPersistentVector, allowing us to use access by index rather than using an iterator.
 
 
 ```Java
@@ -238,7 +239,7 @@ static boolean doEquiv(IPersistentVector v, Object obj){
 }
 ```
 
-But there is one major clue in that code. The early escape clause in the `IList` section for `doEquals` is:
+There is one major clue in that code. The early escape clause in the `IList` section for `doEquals` is:
 
 ```Java
 		if(ma.size() != v.count() || ma.hashCode() != v.hashCode())
@@ -248,11 +249,12 @@ But there is one major clue in that code. The early escape clause in the `IList`
 while in `doEquiv` we see:
 
 ```Java
-		if((!(ma instanceof IPersistentCollection) || (ma instanceof Counted)) && (ma.size() != v.count()))
+		if((!(ma instanceof IPersistentCollection) 
+            || (ma instanceof Counted)) && (ma.size() != v.count()))
 			return false;
 ```
 
-A size comparison (with some little bits hanging off of it in one case) in both.
+A size comparison in both.
 But only `doEquals` looks at hashcode equality.  And therein lies the historical tale.
 There was a need to improve the distribution of hash codes for collections.  Because many Clojure collections implement `java.util.List`, to fit into the Java eco-system, they needed to follow the [contract for hash codes](https://docs.oracle.com/javase/1.5.0/docs/api/java/util/List.html#hashCode()) for that interface:
 
@@ -262,15 +264,15 @@ There was a need to improve the distribution of hash codes for collections.  Bec
 > Returns the hash code value for this list. The hash code of a list is defined to be the result of the following calculation:
 
 ```Java
-  hashCode = 1;
-  Iterator i = list.iterator();
-  while (i.hasNext()) {
-      Object obj = i.next();
-      hashCode = 31*hashCode + (obj==null ? 0 : obj.hashCode());
-  }
+        hashCode = 1;
+        Iterator i = list.iterator();
+        while (i.hasNext()) {
+            Object obj = i.next();
+            hashCode = 31*hashCode + (obj==null ? 0 : obj.hashCode());
+        }
 ```
 
-Thus, `APersistentVector.hashCode()` has in its core:
+Thus, `APersistentVector.hashCode()` at its core is:
 
 ```Java
 hash = 1;
@@ -319,7 +321,7 @@ while for `APersistentMap.hasheq()`, Murmur3 to the rescue again:
 Murmur3.hashUnordered(m)
 ```
 
-There were other factors in the change from the older `Equals/hashCode` approach to using `equiv/hasheq`, most prominent being the need to deal with numbers more effectively and consistently.  That is the topic of [the next post]({%  site_url 2023-01-18-a-numbers-game %}).
+There were other factors in the change from the older `Equals/hashCode` approach to using `equiv/hasheq`, most prominent being the need to deal with numbers more effectively and consistently.  That is the topic of [the next post]({%  post_url 2023-01-19-a-numbers-game %}).
 
 I hope this explains some of the code we will see later on.  The constraints on `Equals/hashCode` and `equiv/hasheq` need to be kept in mind going forward.
 
@@ -327,4 +329,4 @@ I hope this explains some of the code we will see later on.  The constraints on 
 Note: When I first ported the Java code to C#, I did a lot of straight copying, then modifying the code to get rid of compiler errors. 
 Not too much thinking required.  When I began testing, I was getting failures on some of the equality tests on collections.  Not surprising, given that hashcode check -- totally different regimen for dealing with hashcodes in `System.Collections.*`.  (As in there is no regimen.) So I had to remove the hashcode short-circuits.  
 
-When `equiv/hasheq` came into the picture, I just put in the changes.  I might have needed to keep the `Equals` vs `equiv` part the same, but I'm guessing there was no need to keep around two different hash codes.  Botth hash code computations will meet that requirement that 'equality' of two objects require that they have the same hash code.   Something else to look at as we make our way through the data structure rewrites.
+When `equiv/hasheq` came into the picture, I just put in the changes.  Although I  needed to keep the `Equals`/`equiv` part the same, I'm guessing there was no need to keep around two different hash codes.   Something else to consider as we make our way through the data structure rewrites.
