@@ -9,7 +9,7 @@
     <Compile Include="ArithmeticHelpers.fs" />
     <Compile Include="BigDecimal.fsi" />
     <Compile Include="BigDecimal.fs" />
-    <Compile Include="BigRational.fs" />
+    <Compile Include="Rational.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,7 +5,7 @@ open System.Numerics
 
 
 [<Sealed>]
-type BigRational(n: BigInteger, d: BigInteger) =
+type Rational(n: BigInteger, d: BigInteger) =
     let mutable numerator = n
     let mutable denominator = d
 
@@ -19,25 +19,25 @@ type BigRational(n: BigInteger, d: BigInteger) =
             elif d.Sign < 0 then (-n, -d)
             else (n, d)
 
-        let n2, d2 = BigRational.normalize n1 d1
+        let n2, d2 = Rational.normalize n1 d1
         numerator <- n2
         denominator <- d2
 
 
     // integer constructors
 
-    new(x: BigInteger) = BigRational(x, BigInteger.One)
-    new(x: int32) = BigRational(BigInteger(x), BigInteger.One)
-    new(x: int64) = BigRational(BigInteger(x), BigInteger.One)
-    new(x: uint32) = BigRational(BigInteger(x), BigInteger.One)
-    new(x: uint64) = BigRational(BigInteger(x), BigInteger.One)
+    new(x: BigInteger) = Rational(x, BigInteger.One)
+    new(x: int32) = Rational(BigInteger(x), BigInteger.One)
+    new(x: int64) = Rational(BigInteger(x), BigInteger.One)
+    new(x: uint32) = Rational(BigInteger(x), BigInteger.One)
+    new(x: uint64) = Rational(BigInteger(x), BigInteger.One)
 
 
     // non-integer numeric constructors
 
     new(x: decimal) =
         let coeff, exp = ArithmeticHelpers.deconstructDecimal x
-        BigRational(coeff, BigInteger.Pow(ArithmeticHelpers.biTen, exp))
+        Rational(coeff, BigInteger.Pow(ArithmeticHelpers.biTen, exp))
 
     new(x: double) =
         let n, d =
@@ -60,7 +60,7 @@ type BigRational(n: BigInteger, d: BigInteger) =
                 let n = if p then n else BigInteger.Negate(n)
                 n, d
 
-        BigRational(n, d)
+        Rational(n, d)
 
 
     static member private normalize (n: BigInteger) (d: BigInteger) =
@@ -76,22 +76,22 @@ type BigRational(n: BigInteger, d: BigInteger) =
 
     // Some contants
     static member Zero =
-        BigRational(BigInteger.Zero, BigInteger.One)
+        Rational(BigInteger.Zero, BigInteger.One)
 
     static member One =
-        BigRational(BigInteger.One, BigInteger.One)
+        Rational(BigInteger.One, BigInteger.One)
 
     // basic interfaces
 
-    interface IEquatable<BigRational> with
-        member this.Equals(y: BigRational) =
+    interface IEquatable<Rational> with
+        member this.Equals(y: Rational) =
             if this.Denominator = y.Denominator
             then this.Numerator = y.Numerator
             else this.Numerator * y.Denominator = y.Numerator * this.Denominator
 
     override this.Equals(obj) =
         match obj with
-        | :? BigRational as r -> (this :> IEquatable<BigRational>).Equals(r)
+        | :? Rational as r -> (this :> IEquatable<Rational>).Equals(r)
         | _ -> false
 
     override this.GetHashCode() =
@@ -104,7 +104,7 @@ type BigRational(n: BigInteger, d: BigInteger) =
         + this.Denominator.ToString()
 
 
-    interface IComparable<BigRational> with
+    interface IComparable<Rational> with
         member this.CompareTo(y) =
             BigInteger.Compare(this.Numerator * y.Denominator, y.Numerator * this.Denominator)
 
@@ -113,8 +113,8 @@ type BigRational(n: BigInteger, d: BigInteger) =
         member this.CompareTo y =
             match y with
             | null -> 1
-            | :? BigRational as r -> (this :> IComparable<BigRational>).CompareTo(r)
-            | _ -> invalidArg "y" "Argument must be of type BigRational"
+            | :? Rational as r -> (this :> IComparable<Rational>).CompareTo(r)
+            | _ -> invalidArg "y" "Argument must be of type Rational"
 
 
     // some conversions
@@ -173,18 +173,18 @@ type BigRational(n: BigInteger, d: BigInteger) =
 
     // Parsing
 
-    static member Parse(s: string): BigRational =
+    static member Parse(s: string): Rational =
         let parts = s.Split("/")
 
         match Array.length parts with
         | 0 -> invalidArg "s" "No characters to parse"
-        | 1 -> BigRational(BigInteger.Parse(parts.[0]))
-        | 2 -> BigRational(BigInteger.Parse(parts.[0]), BigInteger.Parse(parts.[1]))
+        | 1 -> Rational(BigInteger.Parse(parts.[0]))
+        | 2 -> Rational(BigInteger.Parse(parts.[0]), BigInteger.Parse(parts.[1]))
         | _ -> invalidArg "s" "More than one /"
 
-    static member TryParse(s: String, value: outref<BigRational>): bool =
+    static member TryParse(s: String, value: outref<Rational>): bool =
         try
-            value <- BigRational.Parse s
+            value <- Rational.Parse s
             true
         with ex -> false
 
@@ -196,82 +196,82 @@ type BigRational(n: BigInteger, d: BigInteger) =
     member this.Negate() =
         if this.IsZero
         then this
-        else BigRational(-this.Numerator, this.Denominator)
+        else Rational(-this.Numerator, this.Denominator)
 
-    static member Negate(x: BigRational) = x.Negate()
-    static member (~-)(x: BigRational) = x.Negate()
-    static member (~+)(x: BigRational) = x
+    static member Negate(x: Rational) = x.Negate()
+    static member (~-)(x: Rational) = x.Negate()
+    static member (~+)(x: Rational) = x
 
     // abs (a/b) = abs(a)/b
     member this.Abs() =
         if this.Numerator.Sign < 0
-        then BigRational(BigInteger.Abs(this.Numerator), this.Denominator)
+        then Rational(BigInteger.Abs(this.Numerator), this.Denominator)
         else this
 
-    static member Abs(x: BigRational) = x.Abs()
+    static member Abs(x: Rational) = x.Abs()
 
     // a/b + c/d = (ad+bc)/bd
-    member this.Add(y: BigRational) =
-        BigRational
+    member this.Add(y: Rational) =
+        Rational
             (this.Numerator * y.Denominator
              + this.Denominator * y.Numerator,
              this.Denominator * y.Denominator)
 
-    static member Add(x: BigRational, y: BigRational) = x.Add(y)
-    static member (+)(x: BigRational, y: BigRational) = x.Add(y)
+    static member Add(x: Rational, y: Rational) = x.Add(y)
+    static member (+)(x: Rational, y: Rational) = x.Add(y)
 
     // a/b - c/d = (ad-bc)/bd
-    member this.Subtract(y: BigRational) =
-        BigRational
+    member this.Subtract(y: Rational) =
+        Rational
             (this.Numerator * y.Denominator
              - this.Denominator * y.Numerator,
              this.Denominator * y.Denominator)
 
-    static member Subtract(x: BigRational, y: BigRational) = x.Subtract(y)
-    static member (-)(x: BigRational, y: BigRational) = x.Subtract(y)
+    static member Subtract(x: Rational, y: Rational) = x.Subtract(y)
+    static member (-)(x: Rational, y: Rational) = x.Subtract(y)
 
 
     // a/b * c/d = ac/bd
-    member this.Multiply(y: BigRational) =
-        BigRational(this.Numerator * y.Numerator, this.Denominator * y.Denominator)
+    member this.Multiply(y: Rational) =
+        Rational(this.Numerator * y.Numerator, this.Denominator * y.Denominator)
 
-    static member Multiply(x: BigRational, y: BigRational) = x.Multiply(y)
-    static member (*)(x: BigRational, y: BigRational) = x.Multiply(y)
+    static member Multiply(x: Rational, y: Rational) = x.Multiply(y)
+    static member (*)(x: Rational, y: Rational) = x.Multiply(y)
 
     // a/b / c/d = ad/bc
-    member this.Divide(y: BigRational) =
-        BigRational(this.Numerator * y.Denominator, this.Numerator * y.Denominator)
+    member this.Divide(y: Rational) =
+        Rational(this.Numerator * y.Denominator, this.Numerator * y.Denominator)
 
-    static member Divide(x: BigRational, y: BigRational) = x.Divide(y)
-    static member (/)(x: BigRational, y: BigRational) = x.Divide(y)
+    static member Divide(x: Rational, y: Rational) = x.Divide(y)
+    static member (/)(x: Rational, y: Rational) = x.Divide(y)
 
     // a/b % c/d = (ad % bc)/bd
-    member this.Mod(y: BigRational) =
-        BigRational
+    member this.Mod(y: Rational) =
+        Rational
             (this.Numerator * y.Denominator % this.Denominator
              * y.Numerator,
              this.Denominator * y.Denominator)
 
-    static member Mod(x: BigRational, y: BigRational) = x.Mod(y)
-    static member (%)(x: BigRational, y: BigRational) = x.Mod(y)
+    static member Mod(x: Rational, y: Rational) = x.Mod(y)
+    static member (%)(x: Rational, y: Rational) = x.Mod(y)
 
     // a/b / c/d  == (ad)/(bc)
     // a/b % c/d  == (ad % bc)/bd
-    member this.DivRem(y: BigRational, remainder: outref<BigRational>) =
+    member this.DivRem(y: Rational, remainder: outref<Rational>) =
         let ad = this.Numerator * y.Denominator
         let bc = this.Denominator * y.Numerator
         let bd = this.Denominator * y.Denominator
-        remainder <- BigRational(ad % bc, bd)
+        remainder <- Rational(ad % bc, bd)
         ad / bc
 
-    static member DivRem(x: BigRational, y: BigRational, remainder: outref<BigRational>) = x.DivRem(y, &remainder)
+    static member DivRem(x: Rational, y: Rational, remainder: outref<Rational>) = x.DivRem(y, &remainder)
 
 
     // multiplicative inverse of a/b = b/a
     member this.Invert() =
-        BigRational(this.Denominator, this.Numerator)
+        Rational(this.Denominator, this.Numerator)
 
-    static member Invert(x: BigRational) = x.Invert()
+    static member Invert(x: Rational) = x.Invert()
 
     member this.Pow(n: int) =
         if n = 0 then
@@ -279,7 +279,7 @@ type BigRational(n: BigInteger, d: BigInteger) =
                 raise
                 <| ArithmeticException("Cannot compute 0**0")
             else
-                BigRational.Zero
+                Rational.Zero
         elif n < 0 then
             if this.IsZero then
                 raise
@@ -287,10 +287,10 @@ type BigRational(n: BigInteger, d: BigInteger) =
             else
                 this.Invert().Pow(-n)
         else
-            BigRational(BigInteger.Pow(this.Numerator, n), BigInteger.Pow(this.Denominator, n))
+            Rational(BigInteger.Pow(this.Numerator, n), BigInteger.Pow(this.Denominator, n))
 
 
     // LCD( a/b, c/d ) = (bd) / GCD(b,d)
-    static member LeastCommonDenominator(x: BigRational, y: BigRational) =
+    static member LeastCommonDenominator(x: Rational, y: Rational) =
         (x.Denominator * y.Denominator)
         / BigInteger.GreatestCommonDivisor(x.Denominator, y.Denominator)

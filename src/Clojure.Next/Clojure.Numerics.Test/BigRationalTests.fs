@@ -1,4 +1,4 @@
-﻿module BigRationalTests
+﻿module RationalTests
 
 open Expecto
 open Clojure.Numerics
@@ -17,7 +17,7 @@ let primaryConstructorTests =
           <| fun _ ->
               let n = BigInteger(10)
               let d = BigInteger(7)
-              let r = BigRational(n, d)
+              let r = Rational(n, d)
               Expect.equal r.Numerator n "should have same numerator"
               Expect.equal r.Denominator d "should have same denominator"
 
@@ -27,7 +27,7 @@ let primaryConstructorTests =
               let d = BigInteger(2 * 5 * 7 * 9)
               let nr = BigInteger(2)
               let dr = BigInteger(3 * 7)
-              let r = BigRational(n, d)
+              let r = Rational(n, d)
               Expect.equal r.Numerator nr "should have reduced numerator"
               Expect.equal r.Denominator dr "should have reduced denominator"
 
@@ -37,7 +37,7 @@ let primaryConstructorTests =
               let d = BigInteger(77)
               let nn = BigInteger.Negate(n)
               let dn = BigInteger.Negate(d)
-              let r1 = BigRational(n, dn)
+              let r1 = Rational(n, dn)
               Expect.equal r1.Numerator nn "Numerator should be negative"
               Expect.equal r1.Denominator d "Denominator should be positive"
 
@@ -47,7 +47,7 @@ let primaryConstructorTests =
               let d = BigInteger(77)
               let nn = BigInteger.Negate(n)
               let dn = BigInteger.Negate(d)
-              let r1 = BigRational(nn, d)
+              let r1 = Rational(nn, d)
               Expect.equal r1.Numerator nn "Numerator should be negative"
               Expect.equal r1.Denominator d "Denominator should be positive"
 
@@ -57,14 +57,14 @@ let primaryConstructorTests =
               let d = BigInteger(77)
               let nn = BigInteger.Negate(n)
               let dn = BigInteger.Negate(d)
-              let r1 = BigRational(nn, dn)
+              let r1 = Rational(nn, dn)
               Expect.equal r1.Numerator n "Numerator should be positive"
               Expect.equal r1.Denominator d "Denominator should be positive"
 
           testCase "Should fail if denominator is zero"
           <| fun _ ->
               Expect.throwsT<DivideByZeroException> (fun f ->
-                  BigRational(BigInteger.One, BigInteger.Zero)
+                  Rational(BigInteger.One, BigInteger.Zero)
                   |> ignore) "Fail if denominator is zero" ]
 
 
@@ -74,7 +74,7 @@ let primaryConstructorTests =
 
 let simpleIntTest (i: int) =
     let bi = BigInteger(i)
-    let r = BigRational(i)
+    let r = Rational(i)
     Expect.equal r.Numerator bi ("Numerator should be BI of " + i.ToString())
     Expect.equal r.Denominator BigInteger.One "Denominator shoudld be BI of 1"
 
@@ -95,7 +95,7 @@ let basicIntConstructionTestList =
 // create from decimal
 
 let simpleDecimalTest (d: decimal) (s: string) =
-    let r: BigRational = BigRational(d)
+    let r: Rational = Rational(d)
     Expect.equal (r.ToString()) s "decimal?"
 
 let createDecimalTests data =
@@ -124,7 +124,7 @@ let basicDecimalConstructionTestList =
 
 
 let simpleParseTest (inStr: string) (outStr: string) =
-    let r = BigRational.Parse(inStr)
+    let r = Rational.Parse(inStr)
     Expect.equal (r.ToString()) outStr "representation should match"
 
 let createParseTests data =
@@ -154,7 +154,7 @@ let basicParserTestList =
 // Negate
 
 let simpleNegateTest (inStr: string) (outStr: string) =
-    let r = BigRational.Parse(inStr).Negate()
+    let r = Rational.Parse(inStr).Negate()
     Expect.equal (r.ToString()) outStr "representation should match"
 
 let createNegateTests data =
@@ -183,7 +183,7 @@ let basicNegateTestList =
 // Abs
 
 let simpleAbsTest (inStr: string) (outStr: string) =
-    let r = BigRational.Parse(inStr).Abs()
+    let r = Rational.Parse(inStr).Abs()
     Expect.equal (r.ToString()) outStr "representation should match"
 
 let createAbsTests data =
@@ -213,8 +213,8 @@ let basicAbsTestList =
 // Add
 
 let simpleAddTest (lhs: string) (rhs: string) (result: string) =
-    let r1 = BigRational.Parse(lhs)
-    let r2 = BigRational.Parse(rhs)
+    let r1 = Rational.Parse(lhs)
+    let r2 = Rational.Parse(rhs)
     let r = r1 + r2
     Expect.equal (r.ToString()) result "sum should match"
 
@@ -248,8 +248,8 @@ let basicAddTestList =
 // Sub
 
 let simpleSubTest (lhs: string) (rhs: string) (result: string) =
-    let r1 = BigRational.Parse(lhs)
-    let r2 = BigRational.Parse(rhs)
+    let r1 = Rational.Parse(lhs)
+    let r2 = Rational.Parse(rhs)
     let r = r1 - r2
     Expect.equal (r.ToString()) result "difference should match"
 
