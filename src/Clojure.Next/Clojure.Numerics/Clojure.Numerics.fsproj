@@ -6,13 +6,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="ArithmeticHelpers.fs" />
-    <Compile Include="BigDecimal.fs" />
-    <Compile Include="Rational.fs" />
+    <Compile Include="Murmur3.fs" />
+    <Compile Include="Converters.fs" />
+    <Compile Include="Ratio.fs" />
+    <Compile Include="Numbers.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Runtime.Numerics" Version="4.3.0" />
+    <ProjectReference Include="..\Clojure.BigArith\Clojure.BigArith.fsproj" />
   </ItemGroup>
 
 </Project>

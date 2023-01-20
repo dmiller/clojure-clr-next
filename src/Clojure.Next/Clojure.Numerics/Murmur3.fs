@@ -1,4 +1,4 @@
-﻿namespace Clojure.Collections
+﻿namespace Clojure.Numerics
 
 open System
 open System.Collections

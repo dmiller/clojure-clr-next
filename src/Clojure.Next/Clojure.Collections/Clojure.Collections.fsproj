@@ -6,8 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Numbers.fs" />
-    <Compile Include="Murmur3.fs" />
     <Compile Include="Interfaces.fs" />
     <Compile Include="SmallThings.fs" />
   </ItemGroup>
