@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Clojure.Numerics\Clojure.Numerics.fsproj" />
+    <ProjectReference Include="..\Clojure.BigArith\Clojure.BigArith.fsproj" />
   </ItemGroup>
 
 </Project>

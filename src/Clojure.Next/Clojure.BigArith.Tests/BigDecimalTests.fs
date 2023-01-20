@@ -29,7 +29,7 @@
 module BigDecimalTests
 
 open Expecto
-open Clojure.Numerics
+open Clojure.BigArith
 open System.Numerics
 open System
 

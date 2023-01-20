@@ -1,4 +1,4 @@
-namespace Clojure.Numerics
+namespace Clojure.BigArith
 
 /// Indicates the rounding mode to use
 type RoundingMode =

@@ -1,4 +1,4 @@
-﻿namespace Clojure.Numerics
+﻿namespace Clojure.BigArith
 
 open System
 open System.Text
