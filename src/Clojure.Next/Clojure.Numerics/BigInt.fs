@@ -2,35 +2,44 @@
 
 open System
 open System.Numerics
+open Clojure.BigArith
 
-type BigInt(lpart:float, bipart:BigInteger option) =
+type BigInt(lpart: int64, bipart: BigInteger option) =
 
     member this.Lpart = lpart
     member this.Bipart = bipart
 
-    static member ZERO = BigInt(0,None)
-    static member ONE = BigInt(1,None)
+    static member ZERO = BigInt(0, None)
+    static member ONE = BigInt(1, None)
 
-    static member private BigIntegerAsInt64(bi:BigInteger) : int64 option =
-        if bi.CompareTo(Int64.MaxValue) <= 0 && bi.CompareTo(Int64.MinValue) >= 0 then 
-            int64(bi) |> Some
+    static member private BigIntegerAsInt64(bi: BigInteger) : int64 option =
+        if bi.CompareTo(Int64.MaxValue) <= 0 && bi.CompareTo(Int64.MinValue) >= 0 then
+            int64 (bi) |> Some
         else
             None
 
-    static member fromBigInteger(bi:BigInteger) =
+    static member private BigIntegerAsUInt64(bi: BigInteger) : uint64 option =
+        if bi.CompareTo(UInt64.MaxValue) <= 0 && bi.CompareTo(Int64.MinValue) >= 0 then
+            uint64 (bi) |> Some
+        else
+            None
+
+
+    static member fromBigInteger(bi: BigInteger) =
         match BigInt.BigIntegerAsInt64(bi) with
-        | Some n -> BigInt(float(n),None)
-        | None -> BigInt(0,Some bi)
+        | Some n -> BigInt(n, None)
+        | None -> BigInt(0, Some bi)
 
 
-    static member fromLong(n:int64) = BigInt(float(n),None)
-    static member valueOf(n:int64) = BigInt(float(n),None)
+    static member fromLong(n: int64) = BigInt(n, None)
+    static member valueOf(n: int64) = BigInt(n, None)
 
     override this.Equals(o) : bool =
-        if o = this then true
+        if o = this then
+            true
         else
-            match o with 
-            | :? BigInt as obi -> 
+            match o with
+            | :? BigInt as obi ->
                 match bipart with
                 | Some bi -> obi.Bipart.IsSome && obi.Bipart.Value = bi
                 | None -> obi.Bipart.IsNone && obi.Lpart = lpart
@@ -40,580 +49,273 @@ type BigInt(lpart:float, bipart:BigInteger option) =
         match bipart with
         | Some bi -> bipart.GetHashCode()
         | None -> lpart.GetHashCode()
-   
+
     override this.ToString() =
         match bipart with
         | Some bi -> bipart.ToString()
         | None -> lpart.ToString()
-   
-   
-   
-//        public bool AsInt32(out int ret)
-//        {
-//            ret = 0;
-//            if (_bipart != null)
-//                return false;
-//            if (_lpart < int.MinValue || _lpart > int.MaxValue)
-//                return false;
-
-//            ret = (int)_lpart;
-//            return true;
-//        }
-
-//        /// <summary>
-//        /// Try to convert to an Int64.
-//        /// </summary>
-//        /// <param name="ret">Set to the converted value</param>
-//        /// <returns><value>true</value> if successful; <value>false</value> if the value cannot be represented.</returns>
-//        public bool AsInt64(out long ret)
-//        {
-//            ret = 0;
-//            if (_bipart != null)
-//                return false;
-
-//            ret = _lpart;
-//            return true;
-//        }
-
-//        /// <summary>
-//        /// Try to convert to an UInt32.
-//        /// </summary>
-//        /// <param name="ret">Set to the converted value</param>
-//        /// <returns><value>true</value> if successful; <value>false</value> if the value cannot be represented.</returns>
-//        public bool AsUInt32(out uint ret)
-//        {
-//            ret = 0;
-//            if (_bipart != null)
-//                return false;
-//            if (_lpart < uint.MinValue || _lpart > uint.MaxValue)
-//                return false;
-
-//            ret = (uint)_lpart;
-//            return true;
-//        }
-
-//        /// <summary>
-//        /// Try to convert to an UInt64.
-//        /// </summary>
-//        /// <param name="ret">Set to the converted value</param>
-//        /// <returns><value>true</value> if successful; <value>false</value> if the value cannot be represented.</returns>
-//        public bool AsUInt64(out ulong ret)
-//        {
-//            ret = 0;
-//            if (_bipart != null)
-//                return _bipart.AsUInt64(out ret);
-//            if (_lpart < 0)
-//                return false;
-
-//            ret = (ulong)_lpart;
-//            return true;
-//        }
-
-//        /// <summary>
-//        /// Try to convert to a Decimal.
-//        /// </summary>
-//        /// <param name="ret">Set to the converted value</param>
-//        /// <returns><value>true</value> if successful; <value>false</value> if the value cannot be represented.</returns>
-//        public bool AsDecimal(out Decimal ret)
-//        {
-//            ret = ToDecimal(null);
-//            return true;
-//        }
-
-//        #endregion
-
-//        #region Conversions
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public BigInteger toBigInteger()
-//        {
-//            if (_bipart == null)
-//                return BigInteger.Create(_lpart);
-//            else
-//                return _bipart;
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public int intValue()
-//        {
-//            if (_bipart == null)
-//                return (int)_lpart;
-//            else
-//                return _bipart.ToInt32();
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public long longValue()
-//        {
-//            if (_bipart == null)
-//                return _lpart;
-//            else
-//                return _bipart.ToInt64();
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public float floatValue()
-//        {
-//            if (_bipart == null)
-//                return _lpart;
-//            else
-//                return _bipart.ToSingle(null);
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public double doubleValue()
-//        {
-//            if (_bipart == null)
-//                return _lpart;
-//            else
-//                return _bipart.ToDouble(null);
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public byte byteValue()
-//        {
-//            if (_bipart == null)
-//                return (byte)_lpart;
-//            else
-//                return _bipart.ToByte(null);
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public short shortValue()
-//        {
-//            if (_bipart == null)
-//                return (short)_lpart;
-//            else
-//                return _bipart.ToInt16(null);
-//        }
-
-//        #endregion
-
-//        #region Conversion operators (to BigInt)
-
-//        /// <summary>
-//        /// Implicitly convert from byte to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(byte v)
-//        {
-//            return fromLong(v);
-//        }
-
-//        /// <summary>
-//        /// Implicitly convert from sbyte to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(sbyte v)
-//        {
-//            return fromLong(v);
-//        }
-
-//        /// <summary>
-//        /// Implicitly convert from short to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(short v)
-//        {
-//            return fromLong(v);
-//        }
-
-//        /// <summary>
-//        /// Implicitly convert from ushort to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(ushort v)
-//        {
-//            return fromLong(v);
-//        }
-
-//        /// <summary>
-//        /// Implicitly convert from uint to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(uint v)
-//        {
-//            return fromLong(v);
-//        }
-
-//        /// <summary>
-//        /// Implicitly convert from int to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(int v)
-//        {
-//            return fromLong(v);
-//        }
-
-//        /// <summary>
-//        /// Implicitly convert from ulong to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(ulong v)
-//        {
-//            if (v > long.MaxValue)
-//                return fromBigInteger(BigInteger.Create(v));
-//            return fromLong((long)v);
-//        }
-
-//        /// <summary>
-//        /// Implicitly convert from long to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(long v)
-//        {
-//            return fromLong(v);
-//        }
-
-//        /// <summary>
-//        /// Implicitly convert from decimal to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static implicit operator BigInt(decimal v)
-//        {
-//            return fromBigInteger(BigInteger.Create(v));
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from double to <see cref="BigInt"/>.
-//        /// </summary>
-//        /// <param name="v">The value to convert</param>
-//        /// <returns>The equivalent <see cref="BigInt"/></returns>
-//        public static explicit operator BigInt(double v)
-//        {
-//            return fromBigInteger(BigInteger.Create(v));
-//        }
-
-//        #endregion
-
-//        #region Conversion operators (from BigInt)
-
-//        /// <summary>
-//        /// Implicitly convert from <see cref="BigInt"/> to double.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent double</returns>
-//        public static explicit operator double(BigInt i)
-//        {
-//            return i.ToDouble(null);
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to byte.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent byte</returns>
-//        public static explicit operator byte(BigInt self)
-//        {
-//            if (self.AsInt32(out int tmp))
-//            {
-//                return checked((byte)tmp);
-//            }
-//            throw new OverflowException();
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to sbyte.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent sbyte</returns>
-//        public static explicit operator sbyte(BigInt self)
-//        {
-//            if (self.AsInt32(out int tmp))
-//            {
-//                return checked((sbyte)tmp);
-//            }
-//            throw new OverflowException();
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to UInt16.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent UInt16</returns>
-//        public static explicit operator UInt16(BigInt self)
-//        {
-//            if (self.AsInt32(out int tmp))
-//            {
-//                return checked((UInt16)tmp);
-//            }
-//            throw new OverflowException();
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to Int16.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent Int16</returns>
-//        public static explicit operator Int16(BigInt self)
-//        {
-//            if (self.AsInt32(out int tmp))
-//            {
-//                return checked((Int16)tmp);
-//            }
-//            throw new OverflowException();
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to UInt32.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent UInt32</returns>
-//        public static explicit operator UInt32(BigInt self)
-//        {
-//            if (self.AsUInt32(out uint tmp))
-//            {
-//                return tmp;
-//            }
-//            throw new OverflowException();
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to Int32.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent Int32</returns>
-//        public static explicit operator Int32(BigInt self)
-//        {
-//            if (self.AsInt32(out int tmp))
-//            {
-//                return tmp;
-//            }
-//            throw new OverflowException();
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to Int64.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent Int64</returns>
-//        public static explicit operator Int64(BigInt self)
-//        {
-//            if (self.AsInt64(out long tmp))
-//            {
-//                return tmp;
-//            }
-//            throw new OverflowException();
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to UInt64.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent UInt64</returns>
-//        public static explicit operator UInt64(BigInt self)
-//        {
-//            if (self.AsUInt64(out ulong tmp))
-//            {
-//                return tmp;
-//            }
-//            throw new OverflowException();
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to float.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent float</returns>
-//        public static explicit operator float(BigInt self)
-//        {
-//            return checked((float)self.ToDouble(null));
-//        }
-
-//        /// <summary>
-//        /// Explicitly convert from <see cref="BigInt"/> to double.
-//        /// </summary>
-//        /// <param name="i">The <see cref="BigInt"/> to convert</param>
-//        /// <returns>The equivalent decimal</returns>
-//        public static explicit operator decimal(BigInt self)
-//        {
-//            if (self.AsDecimal(out decimal res))
-//            {
-//                return res;
-//            }
-//            throw new OverflowException();
-//        }
-
-//        #endregion
-
-//        #region IConvertible methods
-
-//        public TypeCode GetTypeCode()
-//        {
-//            return TypeCode.Object;
-//        }
-
-//        public bool ToBoolean(IFormatProvider provider)
-//        {
-//            return _bipart == null ? _lpart != 0 : _bipart.ToBoolean(provider);
-//        }
-
-//        public byte ToByte(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (byte)_lpart : _bipart.ToByte(provider);
-//        }
-
-//        public char ToChar(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (char)_lpart : _bipart.ToChar(provider);
-//        }
-
-//        public DateTime ToDateTime(IFormatProvider provider)
-//        {
-//            throw new NotImplementedException();
-//        }
-
-//        public decimal ToDecimal(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (decimal)_lpart : _bipart.ToDecimal(provider);
-//        }
-
-//        public double ToDouble(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (double)_lpart : _bipart.ToDouble(provider);
-//        }
-
-//        public short ToInt16(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (short)_lpart : _bipart.ToInt16(provider);
-//        }
-
-//        public int ToInt32(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (int)_lpart : _bipart.ToInt32(provider);
-//        }
-
-//        public long ToInt64(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (long)_lpart : _bipart.ToInt64(provider);
-//        }
-
-//        public sbyte ToSByte(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (sbyte)_lpart : _bipart.ToSByte(provider);
-//        }
-
-//        public float ToSingle(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (float)_lpart : _bipart.ToSingle(provider);
-//        }
-
-//        public string ToString(IFormatProvider provider)
-//        {
-//            return ToString();
-//        }
-
-//        public object ToType(Type conversionType, IFormatProvider provider)
-//        {
-//            if (conversionType == typeof(BigInt))
-//                return this;
-//            else if (conversionType == typeof(BigInteger))
-//                return toBigInteger();
-//            throw new InvalidCastException();
-//        }
-
-//        public ushort ToUInt16(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (ushort)_lpart : _bipart.ToUInt16(provider);
-//        }
-
-//        public uint ToUInt32(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (uint)_lpart : _bipart.ToUInt32(provider);
-//        }
-
-//        public ulong ToUInt64(IFormatProvider provider)
-//        {
-//            return _bipart == null ? (ulong)_lpart : _bipart.ToUInt64(provider);
-//        }
-
-//        public BigDecimal ToBigDecimal()
-//        {
-//            return _bipart == null ? BigDecimal.Create(_lpart) : BigDecimal.Create(_bipart);
-//        }
-
-//        #endregion
-
-//        #region Arithmetic operations
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public BigInt add(BigInt y)
-//        {
-//            if ((_bipart == null) && (y._bipart == null))
-//            {
-//                long ret = _lpart + y._lpart;
-//                if ((ret ^ _lpart) >= 0 || (ret ^ y._lpart) >= 0)
-//                    return BigInt.valueOf(ret);
-//            }
-//            return BigInt.fromBigInteger(this.toBigInteger().Add(y.toBigInteger()));
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public BigInt multiply(BigInt y)
-//        {
-//            if ((_bipart == null) && (y._bipart == null))
-//            {
-//                long ret = _lpart * y._lpart;
-//                if (y._lpart == 0 
-//                    || (_lpart != Int64.MinValue && unchecked(ret / y._lpart) == _lpart ))
-//                    return BigInt.valueOf(ret);
-//            }
-//            return BigInt.fromBigInteger(this.toBigInteger().Multiply(y.toBigInteger()));
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public BigInt quotient(BigInt y)
-//        {
-//            if ((_bipart == null) && (y._bipart == null))
-//            {
-//                if (_lpart == Int64.MinValue && y._lpart == -1)
-//                    return BigInt.fromBigInteger(this.toBigInteger().Negate());
-//                return BigInt.valueOf(_lpart / y._lpart);
-//            }
-//            return BigInt.fromBigInteger(this.toBigInteger().Divide(y.toBigInteger()));
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public BigInt remainder(BigInt y)
-//        {
-//            if ((_bipart == null) && (y._bipart == null))
-//            {
-//                return BigInt.valueOf(_lpart % y._lpart);
-//            }
-//            return BigInt.fromBigInteger(this.toBigInteger().Mod(y.toBigInteger()));
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public bool lt(BigInt y)
-//        {
-//            if ((_bipart == null) && (y._bipart == null))
-//            {
-//                return _lpart < y._lpart;
-//            }
-//            return this.toBigInteger().CompareTo(y.toBigInteger()) < 0;
-//        }
-
-//        #endregion
-
-//        #region IHashEq
-
-//        public int hasheq()
-//        {
-//            if (_bipart == null)
-//                return Murmur3.HashLong(_lpart);
-
-//            return _bipart.GetHashCode();
-//        }
-
-//        #endregion
-//    }
-//}
+
+
+    member this.AsInt32(ret: outref<int>) : bool =
+        ret <- 0
+
+        match bipart with
+        | Some _ -> false
+        | None ->
+            if lpart < Int32.MinValue || lpart > Int32.MaxValue then
+                false
+            else
+                ret <- int (lpart)
+                true
+
+    member this.AsInt64(ret: outref<int64>) : bool =
+        ret <- 0
+
+        match bipart with
+        | Some _ -> false
+        | None ->
+            ret <- int64 (lpart)
+            true
+
+    member this.AsUInt32(ret: outref<uint>) : bool =
+        ret <- 0u
+
+        match bipart with
+        | Some _ -> false
+        | None ->
+            if lpart < int64 (UInt32.MinValue) || lpart > int64 (UInt32.MaxValue) then
+                false
+            else
+                ret <- uint (lpart)
+                true
+
+    member this.AsUInt64(ret: outref<uint64>) : bool =
+        ret <- 0UL
+
+        match bipart with
+        | Some bi ->
+            match BigInt.BigIntegerAsUInt64(bi) with
+            | Some n ->
+                ret <- n
+                true
+            | None -> false
+        | None ->
+            if lpart < 0 then
+                false
+            else
+                ret <- uint64 (lpart)
+                true
+
+    member this.AsDecimal(ret: outref<decimal>) : bool =
+        ret <- (this :> IConvertible).ToDecimal(null)
+        true
+
+    member this.ToBigInteger() =
+        match bipart with
+        | Some bi -> bi
+        | None -> BigInteger(lpart)
+
+
+    member this.IntValue() =
+        match bipart with
+        | Some bi -> int (bi)
+        | None -> int (lpart)
+
+    member this.LongValue() =
+        match bipart with
+        | Some bi -> int64 (bi)
+        | None -> int64 (lpart)
+
+    member this.FloatValue() =
+        match bipart with
+        | Some bi -> float32 (bi)
+        | None -> float32 (lpart)
+
+    member this.DoubleValue() =
+        match bipart with
+        | Some bi -> float (bi)
+        | None -> float (lpart)
+
+    member this.ByteValue() =
+        match bipart with
+        | Some bi -> byte (bi)
+        | None -> byte (lpart)
+
+    member this.ShortValue() =
+        match bipart with
+        | Some bi -> int16 (bi)
+        | None -> int16 (lpart)
+
+    // Do we really need the implicit operators?
+
+    static member op_implicit(v: byte) : BigInt = BigInt.fromLong (int64 (v))
+    static member op_implicit(v: sbyte) : BigInt = BigInt.fromLong (int64 (v))
+    static member op_implicit(v: int16) : BigInt = BigInt.fromLong (int64 (v))
+    static member op_implicit(v: uint16) : BigInt = BigInt.fromLong (int64 (v))
+    static member op_implicit(v: int32) : BigInt = BigInt.fromLong (int64 (v))
+    static member op_implicit(v: uint32) : BigInt = BigInt.fromLong (int64 (v))
+    static member op_implicit(v: int64) : BigInt = BigInt.fromLong (v)
+
+    static member op_implicit(v: uint64) : BigInt =
+        if v > uint64 (Int64.MaxValue) then
+            BigInt.fromBigInteger (BigInteger(v))
+        else
+            BigInt.fromLong (int64 (v))
+
+    static member op_implicit(v: decimal) : BigInt = BigInt.fromBigInteger (BigInteger(v))
+    static member op_implicit(v: double) : BigInt = BigInt.fromBigInteger (BigInteger(v))
+
+    // The original had explicit conversions
+    // I do not know how to do multiple op_explicit definitions in F#.
+    // They are overloaded only on return type.
+
+
+    interface IConvertible with
+
+        member this.GetTypeCode() = TypeCode.Object
+
+        member this.ToBoolean(provider: IFormatProvider) : bool =
+            match bipart with
+            | Some bi -> true
+            | None -> lpart <> 0
+
+        member this.ToByte(provider: IFormatProvider) : byte =
+            match bipart with
+            | Some bi -> byte (bi)
+            | None -> byte (lpart)
+
+        member this.ToChar(provider: IFormatProvider) : char =
+            match bipart with
+            | Some bi ->
+                raise (System.InvalidOperationException("Cannot convert BigInteger value (from BigInt) to char"))
+            | None -> char (lpart)
+
+        member this.ToDateTime(provider: IFormatProvider) : DateTime =
+            raise (System.NotImplementedException())
+
+        member this.ToDecimal(provider: IFormatProvider) : decimal =
+            match bipart with
+            | Some bi -> decimal (bi)
+            | None -> decimal (lpart)
+
+        member this.ToDouble(provider: IFormatProvider) : double =
+            match bipart with
+            | Some bi -> double (bi)
+            | None -> double (lpart)
+
+        member this.ToInt16(provider: IFormatProvider) : int16 =
+            match bipart with
+            | Some bi -> int16 (bi)
+            | None -> int16 (lpart)
+
+        member this.ToInt32(provider: IFormatProvider) : int =
+            match bipart with
+            | Some bi -> int (bi)
+            | None -> int (lpart)
+
+        member this.ToInt64(provider: IFormatProvider) : int64 =
+            match bipart with
+            | Some bi -> int64 (bi)
+            | None -> int64 (lpart)
+
+        member this.ToSByte(provider: IFormatProvider) : sbyte =
+            match bipart with
+            | Some bi -> sbyte (bi)
+            | None -> sbyte (lpart)
+
+        member this.ToSingle(provider: IFormatProvider) : float32 =
+            match bipart with
+            | Some bi -> float32 (bi)
+            | None -> float32 (lpart)
+
+        member this.ToString(provider: IFormatProvider) : string = this.ToString()
+
+        member this.ToType(conversionType: Type, provider: IFormatProvider) : obj =
+            if conversionType = typeof<BigInt> then
+                this
+            elif conversionType = typeof<BigInteger> then
+                this.ToBigInteger()
+            else
+                raise (InvalidCastException())
+
+        member this.ToUInt16(provider: IFormatProvider) : uint16 =
+            match bipart with
+            | Some bi -> uint16 (bi)
+            | None -> uint16 (lpart)
+
+        member this.ToUInt32(provider: IFormatProvider) : uint32 =
+            match bipart with
+            | Some bi -> uint32 (bi)
+            | None -> uint32 (lpart)
+
+        member this.ToUInt64(provider: IFormatProvider) : uint64 =
+            match bipart with
+            | Some bi -> uint64 (bi)
+            | None -> uint64 (lpart)
+
+
+    member this.ToBigDecimal() =
+        match bipart with
+        | Some bi -> BigDecimal.Create(bi)
+        | None -> BigDecimal.Create(lpart)
+
+
+    member this.add(y: BigInt) : BigInt =
+        let addBig (x: BigInt, y: BigInt) =
+            BigInt.fromBigInteger (x.ToBigInteger() + y.ToBigInteger())
+
+        if this.Bipart.IsNone && y.Bipart.IsNone then
+            let ret = this.Lpart + y.Lpart
+
+            if ret ^^^ lpart >= 0 || ret ^^^ y.Lpart >= 0 then
+                BigInt.valueOf (ret)
+            else
+                addBig (this, y)
+        else
+            addBig (this, y)
+
+    member this.multiply(y: BigInt) : BigInt =
+        let multBig (x: BigInt, y: BigInt) =
+            BigInt.fromBigInteger (x.ToBigInteger() * y.ToBigInteger())
+
+        if this.Bipart.IsNone && y.Bipart.IsNone then
+            let ret = this.Lpart * y.Lpart
+
+            if
+                ret ^^^ y.Lpart = 0
+                || ((this.Lpart <> Int64.MinValue)
+                    && (Microsoft.FSharp.Core.Operators.(/) ret y.Lpart) = this.Lpart)
+            then
+                BigInt.valueOf (ret)
+            else
+                multBig (this, y)
+        else
+            multBig (this, y)
+
+    member this.quotient(y: BigInt) : BigInt =
+        if this.Bipart.IsNone && y.Bipart.IsNone then
+            if lpart = Int64.MinValue && y.Lpart = -1 then
+                BigInt.fromBigInteger (- this.ToBigInteger())
+            else
+                BigInt.valueOf (this.Lpart / y.Lpart)
+        else
+            BigInt.fromBigInteger (this.ToBigInteger() / y.ToBigInteger())
+
+    member this.remainder(y: BigInt) : BigInt =
+        if this.Bipart.IsNone && y.Bipart.IsNone then
+            BigInt.valueOf (this.Lpart % y.Lpart)
+        else
+            BigInt.fromBigInteger (this.ToBigInteger() % y.ToBigInteger())
+
+    member this.lt(y: BigInt) : bool =
+        if this.Bipart.IsNone && y.Bipart.IsNone then
+            this.Lpart < y.Lpart
+        else
+            this.ToBigInteger().CompareTo(y.ToBigInteger()) < 0
+
+    // This should be interface IHashEq implementation, but we don't have the yet.
+
+    member this.hasheq() : int =
+        match bipart with
+        | Some bi -> bi.GetHashCode()
+        | None -> Murmur3.HashLong(lpart)

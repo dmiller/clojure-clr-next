@@ -9,6 +9,7 @@
     <Compile Include="Murmur3.fs" />
     <Compile Include="Converters.fs" />
     <Compile Include="Ratio.fs" />
+    <Compile Include="BigInt.fs" />
     <Compile Include="Numbers.fs" />
   </ItemGroup>
 
