@@ -127,7 +127,7 @@ type Ops =
     abstract decP: x: obj -> obj
     abstract unchecked_dec: x: obj -> obj
 
-    abstract abs : x:obj -> obj
+    abstract abs: x: obj -> obj
 
 [<AbstractClass>]
 type OpsP() =
@@ -277,11 +277,9 @@ type Numbers() =
         else
             (x + y) :> obj
 
-    static member add(x: double, y: obj) =
-        Numbers.add (x, Converters.convertToDouble (y))
+    static member add(x: double, y: obj) = Numbers.add (x, convertToDouble (y))
 
-    static member add(x: obj, y: double) =
-        Numbers.add (Converters.convertToDouble (x), y)
+    static member add(x: obj, y: double) = Numbers.add (convertToDouble (x), y)
 
     static member add(x: double, y: int64) = x + double (y)
     static member add(x: int64, y: double) = double (x) + y
@@ -326,11 +324,9 @@ type Numbers() =
         else
             (x + y) :> obj
 
-    static member addP(x: double, y: obj) =
-        Numbers.addP (x, Converters.convertToDouble (y))
+    static member addP(x: double, y: obj) = Numbers.addP (x, convertToDouble (y))
 
-    static member addP(x: obj, y: double) =
-        Numbers.addP (Converters.convertToDouble (x), y)
+    static member addP(x: obj, y: double) = Numbers.addP (convertToDouble (x), y)
 
     static member addP(x: double, y: int64) = x + double (y)
     static member addP(x: int64, y: double) = double (x) + y
@@ -444,11 +440,9 @@ type Numbers() =
         else
             (x - y) :> obj
 
-    static member minus(x: double, y: obj) =
-        Numbers.minus (x, Converters.convertToDouble (y))
+    static member minus(x: double, y: obj) = Numbers.minus (x, convertToDouble (y))
 
-    static member minus(x: obj, y: double) =
-        Numbers.minus (Converters.convertToDouble (x), y)
+    static member minus(x: obj, y: double) = Numbers.minus (convertToDouble (x), y)
 
     static member minus(x: double, y: int64) = x - double (y)
     static member minus(x: int64, y: double) = double (x) - y
@@ -492,11 +486,9 @@ type Numbers() =
         else
             (x - y) :> obj
 
-    static member minusP(x: double, y: obj) =
-        Numbers.minusP (x, Converters.convertToDouble (y))
+    static member minusP(x: double, y: obj) = Numbers.minusP (x, convertToDouble (y))
 
-    static member minusP(x: obj, y: double) =
-        Numbers.minusP (Converters.convertToDouble (x), y)
+    static member minusP(x: obj, y: double) = Numbers.minusP (convertToDouble (x), y)
 
     static member minusP(x: double, y: int64) = x - double (y)
     static member minusP(x: int64, y: double) = double (x) - y
@@ -564,10 +556,10 @@ type Numbers() =
     static member multiply(x: decimal, y: decimal) = x * y
 
     static member multiply(x: double, y: obj) =
-        Numbers.multiply (x, Converters.convertToDouble (y))
+        Numbers.multiply (x, convertToDouble (y))
 
     static member multiply(x: obj, y: double) =
-        Numbers.multiply (Converters.convertToDouble (x), y)
+        Numbers.multiply (convertToDouble (x), y)
 
     static member multiply(x: double, y: int64) = x * double (y)
     static member multiply(x: int64, y: double) = double (x) * y
@@ -611,10 +603,10 @@ type Numbers() =
             Numbers.BIGDEC_OPS.multiply (x, y)
 
     static member multiplyP(x: double, y: obj) =
-        Numbers.multiplyP (x, Converters.convertToDouble (y))
+        Numbers.multiplyP (x, convertToDouble (y))
 
     static member multiplyP(x: obj, y: double) =
-        Numbers.multiplyP (Converters.convertToDouble (x), y)
+        Numbers.multiplyP (convertToDouble (x), y)
 
     static member multiplyP(x: double, y: int64) = x * double (y)
     static member multiplyP(x: int64, y: double) = double (x) * y
@@ -681,8 +673,8 @@ type Numbers() =
     static member divide(x: int64, y: int64) = Numbers.divide (x :> obj, y :> obj)
     static member divide(x: uint64, y: uint64) = Numbers.divide (x :> obj, y :> obj)
     static member divide(x: decimal, y: decimal) = Numbers.divide (x :> obj, y :> obj)
-    static member divide(x: double, y: obj) = x / Converters.convertToDouble (y)
-    static member divide(x: obj, y: double) = Converters.convertToDouble (x) / y
+    static member divide(x: double, y: obj) = x / convertToDouble (y)
+    static member divide(x: obj, y: double) = convertToDouble (x) / y
     static member divide(x: double, y: int64) = x / double (x)
     static member divide(x: int64, y: double) = double (x) / y
     static member divide(x: double, y: uint64) = x / double (x)
@@ -863,8 +855,8 @@ type Numbers() =
     static member equiv(x: int64, y: int64) = x = y
     static member equiv(x: uint64, y: uint64) = x = y
     static member equiv(x: decimal, y: decimal) = x = y
-    static member equiv(x: double, y: obj) = x = Converters.convertToDouble (y)
-    static member equiv(x: obj, y: double) = Converters.convertToDouble (x) = y
+    static member equiv(x: double, y: obj) = x = convertToDouble (y)
+    static member equiv(x: obj, y: double) = convertToDouble (x) = y
     static member equiv(x: double, y: int64) = x = double (y)
     static member equiv(x: int64, y: double) = double (x) = y
     static member equiv(x: double, y: uint64) = x = double (y)
@@ -881,8 +873,8 @@ type Numbers() =
     static member lt(x: int64, y: int64) = x < y
     static member lt(x: uint64, y: uint64) = x < y
     static member lt(x: decimal, y: decimal) = x < y
-    static member lt(x: double, y: obj) = x < Converters.convertToDouble (y)
-    static member lt(x: obj, y: double) = Converters.convertToDouble (x) < y
+    static member lt(x: double, y: obj) = x < convertToDouble (y)
+    static member lt(x: obj, y: double) = convertToDouble (x) < y
     static member lt(x: double, y: int64) = x < double (y)
     static member lt(x: int64, y: double) = double (x) < y
     static member lt(x: double, y: uint64) = x < double (y)
@@ -899,8 +891,8 @@ type Numbers() =
     static member lte(x: int64, y: int64) = x <= y
     static member lte(x: uint64, y: uint64) = x <= y
     static member lte(x: decimal, y: decimal) = x <= y
-    static member lte(x: double, y: obj) = x <= Converters.convertToDouble (y)
-    static member lte(x: obj, y: double) = Converters.convertToDouble (x) <= y
+    static member lte(x: double, y: obj) = x <= convertToDouble (y)
+    static member lte(x: obj, y: double) = convertToDouble (x) <= y
     static member lte(x: double, y: int64) = x <= double (y)
     static member lte(x: int64, y: double) = double (x) <= y
     static member lte(x: double, y: uint64) = x <= double (y)
@@ -917,8 +909,8 @@ type Numbers() =
     static member gt(x: int64, y: int64) = x > y
     static member gt(x: uint64, y: uint64) = x > y
     static member gt(x: decimal, y: decimal) = x > y
-    static member gt(x: double, y: obj) = x > Converters.convertToDouble (y)
-    static member gt(x: obj, y: double) = Converters.convertToDouble (x) > y
+    static member gt(x: double, y: obj) = x > convertToDouble (y)
+    static member gt(x: obj, y: double) = convertToDouble (x) > y
     static member gt(x: double, y: int64) = x > double (y)
     static member gt(x: int64, y: double) = double (x) > y
     static member gt(x: double, y: uint64) = x < double (y)
@@ -935,8 +927,8 @@ type Numbers() =
     static member gte(x: int64, y: int64) = x >= y
     static member gte(x: uint64, y: uint64) = x >= y
     static member gte(x: decimal, y: decimal) = x >= y
-    static member gte(x: double, y: obj) = x >= Converters.convertToDouble (y)
-    static member gte(x: obj, y: double) = Converters.convertToDouble (x) >= y
+    static member gte(x: double, y: obj) = x >= convertToDouble (y)
+    static member gte(x: obj, y: double) = convertToDouble (x) >= y
     static member gte(x: double, y: int64) = x >= double (y)
     static member gte(x: int64, y: double) = double (x) >= y
     static member gte(x: double, y: uint64) = x >= double (y)
@@ -957,68 +949,66 @@ type Numbers() =
         elif Numbers.gt (x, y) then x
         else y
 
-    static member max(x: double, y: double) = Math.Max(x,y)
-    static member max(x: int64, y: int64) = Math.Max(x,y)
-    static member max(x: uint64, y: uint64) = Math.Max(x,y)
-    static member max(x: decimal, y: decimal) = Math.Max(x,y)
+    static member max(x: double, y: double) = Math.Max(x, y)
+    static member max(x: int64, y: int64) = Math.Max(x, y)
+    static member max(x: uint64, y: uint64) = Math.Max(x, y)
+    static member max(x: decimal, y: decimal) = Math.Max(x, y)
 
-    static member max(x: double, y: obj) = 
+    static member max(x: double, y: obj) =
         if Numbers.IsNaN(x) then x :> obj
-        elif Numbers.IsNaN(y) then y 
-        elif x > Converters.convertToDouble(y) then x
+        elif Numbers.IsNaN(y) then y
+        elif x > convertToDouble (y) then x
         else y
 
-    static member max(x: obj, y: double) = 
-        if Numbers.IsNaN(x) then x 
-        elif Numbers.IsNaN(y) then y 
-        elif Converters.convertToDouble(x) > y then x
-        else y
-
-    static member max(x: double, y: int64) : obj = 
+    static member max(x: obj, y: double) =
         if Numbers.IsNaN(x) then x
-        elif x > double(y) then x
+        elif Numbers.IsNaN(y) then y
+        elif convertToDouble (x) > y then x
         else y
 
-    static member max(x: int64, y: double) : obj = 
-        if Numbers.IsNaN(y) then y
-        elif double(x) > y then x
-        else y
-
-    static member max(x: double, y: uint64) : obj = 
+    static member max(x: double, y: int64) : obj =
         if Numbers.IsNaN(x) then x
-        elif x > double(y) then x
+        elif x > double (y) then x
         else y
 
-    static member max(x: uint64, y: double) : obj = 
+    static member max(x: int64, y: double) : obj =
         if Numbers.IsNaN(y) then y
-        elif double(x) > y then x
+        elif double (x) > y then x
+        else y
+
+    static member max(x: double, y: uint64) : obj =
+        if Numbers.IsNaN(x) then x
+        elif x > double (y) then x
+        else y
+
+    static member max(x: uint64, y: double) : obj =
+        if Numbers.IsNaN(y) then y
+        elif double (x) > y then x
         else y
 
     static member max(x: int64, y: obj) =
         if Numbers.IsNaN(y) then y
-        elif Numbers.gt(x,y) then x
+        elif Numbers.gt (x, y) then x
         else y
 
-    static member max(x: obj, y: int64) = 
+    static member max(x: obj, y: int64) =
         if Numbers.IsNaN(x) then x
-        elif Numbers.gt(x,y) then x
+        elif Numbers.gt (x, y) then x
         else y
 
     static member max(x: uint64, y: obj) =
         if Numbers.IsNaN(y) then y
-        elif Numbers.gt(x,y) then x
+        elif Numbers.gt (x, y) then x
         else y
 
-    static member max(x: obj, y: uint64) = 
+    static member max(x: obj, y: uint64) =
         if Numbers.IsNaN(x) then x
-        elif Numbers.gt(x,y) then x
+        elif Numbers.gt (x, y) then x
         else y
 
-    static member max(x: int64, y: uint64) : obj = 
-        if Numbers.gt(x,y) then x else y
+    static member max(x: int64, y: uint64) : obj = if Numbers.gt (x, y) then x else y
 
-    static member max(x: uint64, y: int64) : obj = 
-        if Numbers.gt(x,y) then x else y
+    static member max(x: uint64, y: int64) : obj = if Numbers.gt (x, y) then x else y
 
 
     static member min(x: obj, y: obj) =
@@ -1027,256 +1017,315 @@ type Numbers() =
         elif Numbers.lt (x, y) then x
         else y
 
-    static member min(x: double, y: double) = Math.Min(x,y)
-    static member min(x: int64, y: int64) = Math.Min(x,y)
-    static member min(x: uint64, y: uint64) = Math.Min(x,y)
-    static member min(x: decimal, y: decimal) = Math.Min(x,y)
+    static member min(x: double, y: double) = Math.Min(x, y)
+    static member min(x: int64, y: int64) = Math.Min(x, y)
+    static member min(x: uint64, y: uint64) = Math.Min(x, y)
+    static member min(x: decimal, y: decimal) = Math.Min(x, y)
 
-    static member min(x: double, y: obj) = 
+    static member min(x: double, y: obj) =
         if Numbers.IsNaN(x) then x :> obj
-        elif Numbers.IsNaN(y) then y 
-        elif x < Converters.convertToDouble(y) then x
+        elif Numbers.IsNaN(y) then y
+        elif x < convertToDouble (y) then x
         else y
 
-    static member min(x: obj, y: double) = 
-        if Numbers.IsNaN(x) then x 
-        elif Numbers.IsNaN(y) then y 
-        elif Converters.convertToDouble(x) < y then x
-        else y
-
-    static member min(x: double, y: int64) : obj = 
+    static member min(x: obj, y: double) =
         if Numbers.IsNaN(x) then x
-        elif x < double(y) then x
+        elif Numbers.IsNaN(y) then y
+        elif convertToDouble (x) < y then x
         else y
 
-    static member min(x: int64, y: double) : obj = 
-        if Numbers.IsNaN(y) then y
-        elif double(x) < y then x
-        else y
-
-    static member min(x: double, y: uint64) : obj = 
+    static member min(x: double, y: int64) : obj =
         if Numbers.IsNaN(x) then x
-        elif x < double(y) then x
+        elif x < double (y) then x
         else y
 
-    static member min(x: uint64, y: double) : obj = 
+    static member min(x: int64, y: double) : obj =
         if Numbers.IsNaN(y) then y
-        elif double(x) < y then x
+        elif double (x) < y then x
+        else y
+
+    static member min(x: double, y: uint64) : obj =
+        if Numbers.IsNaN(x) then x
+        elif x < double (y) then x
+        else y
+
+    static member min(x: uint64, y: double) : obj =
+        if Numbers.IsNaN(y) then y
+        elif double (x) < y then x
         else y
 
     static member min(x: int64, y: obj) =
         if Numbers.IsNaN(y) then y
-        elif Numbers.lt(x,y) then x
+        elif Numbers.lt (x, y) then x
         else y
 
-    static member min(x: obj, y: int64) = 
+    static member min(x: obj, y: int64) =
         if Numbers.IsNaN(x) then x
-        elif Numbers.lt(x,y) then x
+        elif Numbers.lt (x, y) then x
         else y
 
     static member min(x: uint64, y: obj) =
         if Numbers.IsNaN(y) then y
-        elif Numbers.lt(x,y) then x
+        elif Numbers.lt (x, y) then x
         else y
 
-    static member min(x: obj, y: uint64) = 
+    static member min(x: obj, y: uint64) =
         if Numbers.IsNaN(x) then x
-        elif Numbers.lt(x,y) then x
+        elif Numbers.lt (x, y) then x
         else y
 
-    static member min(x: int64, y: uint64) : obj = 
-        if Numbers.lt(x,y) then x else y
+    static member min(x: int64, y: uint64) : obj = if Numbers.lt (x, y) then x else y
 
-    static member min(x: uint64, y: int64) : obj = 
-        if Numbers.lt(x,y) then x else y
+    static member min(x: uint64, y: int64) : obj = if Numbers.lt (x, y) then x else y
 
-    static member abs(x:obj) = Numbers.getOps(x).abs(x)
+    static member abs(x: obj) = Numbers.getOps(x).abs (x)
 
     // int overloads for basic ops -- needed by the compiler and core.clj
 
-    static member unchecked_int_add(x:int, y:int) = x+y
-    static member unchecked_int_subtract(x:int, y:int) = x-y
-    static member unchecked_int_negate(x:int) = -x
-    static member unchecked_int_inc(x:int) = x+1
-    static member unchecked_int_dec(x:int) = x-1
-    static member unchecked_int_multiply(x:int, y:int) = x*y
-    static member unchecked_int_divide(x:int, y:int) = x/y
-    static member unchecked_int_remainder(x:int, y:int) = x%y
+    static member unchecked_int_add(x: int, y: int) = x + y
+    static member unchecked_int_subtract(x: int, y: int) = x - y
+    static member unchecked_int_negate(x: int) = -x
+    static member unchecked_int_inc(x: int) = x + 1
+    static member unchecked_int_dec(x: int) = x - 1
+    static member unchecked_int_multiply(x: int, y: int) = x * y
+    static member unchecked_int_divide(x: int, y: int) = x / y
+    static member unchecked_int_remainder(x: int, y: int) = x % y
 
 
     // utility methods
 
     //[<WarnedBoxMath(false)>]
-    static member ToBigInt(x:obj) = 
+    static member ToBigInt(x: obj) =
         match x with
         | :? BigInt as bi -> bi
-        | :? BigInteger as bi -> BigInt.fromBigInteger(bi)
-        | _ -> BigInt.fromLong(Converters.convertToLong(x))
+        | :? BigInteger as bi -> BigInt.fromBigInteger (bi)
+        | _ -> BigInt.fromLong (convertToLong (x))
 
     //[<WarnedBoxMath(false)>]
-    static member ToBigInteger(x:obj) = 
+    static member ToBigInteger(x: obj) =
         match x with
         | :? BigInteger as bi -> bi
         | :? BigInt as bi -> bi.ToBigInteger()
-        | _ -> BigInteger(Converters.convertToLong(x))
+        | _ -> BigInteger(convertToDouble (x))
 
     //[<WarnedBoxMath(false)>]
-    static member ToBigDecimal(x:obj) = 
-        match x with 
+    static member ToBigDecimal(x: obj) =
+        match x with
         | :? BigDecimal as bd -> bd
         | :? BigInt as bi ->
             match bi.Bipart with
             | Some b -> BigDecimal.Create(b)
-            | None -> BigDecimal.Create(bi.Lpart) 
+            | None -> BigDecimal.Create(bi.Lpart)
         | :? BigInteger as bi -> BigDecimal.Create(bi)
         | :? double as d -> BigDecimal.Create(d)
-        | :? float32 as f -> BigDecimal.Create(double(f))
-        | :? Ratio as r -> Numbers.divide(BigDecimal.Create(r.Numerator),r.Denominator) :?> BigDecimal
-        | _ -> BigDecimal.Create(Converters.convertToLong(x))
+        | :? float32 as f -> BigDecimal.Create(double (f))
+        | :? Ratio as r -> Numbers.divide (BigDecimal.Create(r.Numerator), r.Denominator) :?> BigDecimal
+        | _ -> BigDecimal.Create(convertToDouble (x))
 
 
     static member private BigIntegerTen = BigInteger(10)
 
     //[<WarnedBoxMath(false)>]
-    static member ToRatio(x:obj) =
+    static member ToRatio(x: obj) =
         match x with
         | :? Ratio as r -> r
         | :? BigDecimal as bd ->
             let exp = bd.Exponent
+
             if exp >= 0 then
-                Ratio(bd.ToBigInteger(),BigInteger.One)
+                Ratio(bd.ToBigInteger(), BigInteger.One)
             else
-                Ratio(bd.MovePointRight(-exp).ToBigInteger(), BigInteger.Pow(Numbers.BigIntegerTen ,-exp))
-        | _ -> Ratio(Numbers.ToBigInteger(x),BigInteger.One)
+                Ratio(bd.MovePointRight(-exp).ToBigInteger(), BigInteger.Pow(Numbers.BigIntegerTen, -exp))
+        | _ -> Ratio(Numbers.ToBigInteger(x), BigInteger.One)
 
     //[<WarnedBoxMath(false)>]
-    static member rationalize(x:obj) : obj = 
+    static member rationalize(x: obj) : obj =
         match x with
-        | :? double as d -> Numbers.rationalize(BigDecimal.Create(d))
-        | :? float32 as f -> Numbers.rationalize(BigDecimal.Create(double(f)))
+        | :? double as d -> Numbers.rationalize (BigDecimal.Create(d))
+        | :? float32 as f -> Numbers.rationalize (BigDecimal.Create(double (f)))
         | :? BigDecimal as bd ->
             let exp = bd.Exponent
+
             if exp >= 0 then
-                BigInt.fromBigInteger(bd.ToBigInteger())
+                BigInt.fromBigInteger (bd.ToBigInteger())
             else
-                Numbers.divide(bd.MovePointRight(-exp).ToBigInteger(), BigInteger.Pow(Numbers.BigIntegerTen,-exp)) 
+                Numbers.divide (bd.MovePointRight(-exp).ToBigInteger(), BigInteger.Pow(Numbers.BigIntegerTen, -exp))
         | _ -> x
 
     // BigInteger support
 
     //[<WarnedBoxMath(false)>]
-    static member ReduceBigInt(x:BigInt) : obj =
+    static member ReduceBigInt(x: BigInt) : obj =
         match x.Bipart with
         | Some bip -> bip
         | None -> x.Lpart
 
-    static member BIDivide(n:BigInteger, d:BigInteger) : obj =
+    static member BIDivide(n: BigInteger, d: BigInteger) : obj =
         if d.IsZero then
             raise <| ArithmeticException("Divide by zero")
-        else 
-            let gcd = BigInteger.GreatestCommonDivisor(n,d)
+        else
+            let gcd = BigInteger.GreatestCommonDivisor(n, d)
+
             if gcd.IsZero then
                 BigInt.ZERO
             else
-                let n1 = n/gcd
-                let d1 = d/gcd
+                let n1 = n / gcd
+                let d1 = d / gcd
+
                 if d1.IsOne then
-                    BigInt.fromBigInteger(n1)
+                    BigInt.fromBigInteger (n1)
                 elif d1.Equals(BigInteger.MinusOne) then
-                    BigInt.fromBigInteger(-n1)
+                    BigInt.fromBigInteger (-n1)
                 else
-                    Ratio((if d1 < BigInteger.Zero then -n1 else n1),BigInteger.Abs(d1))
+                    Ratio((if d1 < BigInteger.Zero then -n1 else n1), BigInteger.Abs(d1))
 
 
     // basic bit operations
 
-    static member bitOpsCast(x:obj) =
+    static member bitOpsCast(x: obj) =
         match x with
-        | :? int64 as n -> n 
-        | :? int32 as n -> int64(n)
-        | :? int16 as n -> int64(n)
-        | :? byte as n -> int64(n)
-        | :? uint64 as n -> int64(n)
-        | :? uint32 as n -> int64(n)
-        | :? uint16 as n -> int64(n)
-        | :? sbyte  as n -> int64(n)
+        | :? int64 as n -> n
+        | :? int32 as n -> int64 (n)
+        | :? int16 as n -> int64 (n)
+        | :? byte as n -> int64 (n)
+        | :? uint64 as n -> int64 (n)
+        | :? uint32 as n -> int64 (n)
+        | :? uint16 as n -> int64 (n)
+        | :? sbyte as n -> int64 (n)
         | _ -> raise <| ArgumentException($"bit operations not supported for: {x.GetType()}")
 
-    static member shiftLeftInt(x:int, n:int) = x <<< n
-    static member shiftLeft(x:obj, n:obj) = Numbers.shiftLeft(Numbers.bitOpsCast(x),Numbers.bitOpsCast(n))
-    static member shiftLeft(x:obj, n:int64) = Numbers.shiftLeft(Numbers.bitOpsCast(x),n)
-    static member shiftLeft(x:int64, n:obj) = Numbers.shiftLeft(x,Numbers.bitOpsCast(n))
-    static member shiftLeft(x:int64, n:int64) = Numbers.shiftLeft(x,int(n))
-    static member shiftLeft(x:int64, n:int) = x <<< n
-        
-    static member shiftRightInt(x:int, n:int) = x >>> n
-    static member shiftRight(x:obj, n:obj) = Numbers.shiftRight(Numbers.bitOpsCast(x),Numbers.bitOpsCast(n))
-    static member shiftRight(x:obj, n:int64) = Numbers.shiftRight(Numbers.bitOpsCast(x),n)
-    static member shiftRight(x:int64, n:obj) = Numbers.shiftRight(x,Numbers.bitOpsCast(n))
-    static member shiftRight(x:int64, n:int64) = Numbers.shiftRight(x,int(n))
-    static member shiftRight(x:int64, n:int) = x >>> n
+    static member shiftLeftInt(x: int, n: int) = x <<< n
 
-    static member unsignedShiftRightInt(x:int, n:int) = int(uint(x) >>> n)
-    static member unsignedShiftRight(x:obj, y:obj) = Numbers.unsignedShiftRight(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member unsignedShiftRight(x:obj, y:int64) = Numbers.unsignedShiftRight(Numbers.bitOpsCast(x),y)
-    static member unsignedShiftRight(x:int64, y:obj) = Numbers.unsignedShiftRight(x,Numbers.bitOpsCast(y))
-    static member unsignedShiftRight(x:int64, y:int64) = int64(uint64(x) >>> int(y))
+    static member shiftLeft(x: obj, n: obj) =
+        Numbers.shiftLeft (Numbers.bitOpsCast (x), Numbers.bitOpsCast (n))
+
+    static member shiftLeft(x: obj, n: int64) =
+        Numbers.shiftLeft (Numbers.bitOpsCast (x), n)
+
+    static member shiftLeft(x: int64, n: obj) =
+        Numbers.shiftLeft (x, Numbers.bitOpsCast (n))
+
+    static member shiftLeft(x: int64, n: int64) = Numbers.shiftLeft (x, int (n))
+    static member shiftLeft(x: int64, n: int) = x <<< n
+
+    static member shiftRightInt(x: int, n: int) = x >>> n
+
+    static member shiftRight(x: obj, n: obj) =
+        Numbers.shiftRight (Numbers.bitOpsCast (x), Numbers.bitOpsCast (n))
+
+    static member shiftRight(x: obj, n: int64) =
+        Numbers.shiftRight (Numbers.bitOpsCast (x), n)
+
+    static member shiftRight(x: int64, n: obj) =
+        Numbers.shiftRight (x, Numbers.bitOpsCast (n))
+
+    static member shiftRight(x: int64, n: int64) = Numbers.shiftRight (x, int (n))
+    static member shiftRight(x: int64, n: int) = x >>> n
+
+    static member unsignedShiftRightInt(x: int, n: int) = int (uint (x) >>> n)
+
+    static member unsignedShiftRight(x: obj, y: obj) =
+        Numbers.unsignedShiftRight (Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
+
+    static member unsignedShiftRight(x: obj, y: int64) =
+        Numbers.unsignedShiftRight (Numbers.bitOpsCast (x), y)
+
+    static member unsignedShiftRight(x: int64, y: obj) =
+        Numbers.unsignedShiftRight (x, Numbers.bitOpsCast (y))
+
+    static member unsignedShiftRight(x: int64, y: int64) = int64 (uint64 (x) >>> int (y))
 
     // bit operations
 
-    static member Not(x:obj) = Numbers.Not(Numbers.bitOpsCast(x))
-    static member Not(x:int64) = ~~~x
+    static member Not(x: obj) = Numbers.Not(Numbers.bitOpsCast (x))
+    static member Not(x: int64) = ~~~x
 
-    static member And(x:obj, y:obj) = Numbers.And(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member And(x:obj, y:int64) = Numbers.And(Numbers.bitOpsCast(x),y)
-    static member And(x:int64, y:obj) = Numbers.And(x,Numbers.bitOpsCast(y))
-    static member And(x:int64, y:int64) = x &&& y
+    static member And(x: obj, y: obj) =
+        Numbers.And(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
 
-    static member Or(x:obj, y:obj) = Numbers.Or(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member Or(x:obj, y:int64) = Numbers.Or(Numbers.bitOpsCast(x),y)
-    static member Or(x:int64, y:obj) = Numbers.Or(x,Numbers.bitOpsCast(y))
-    static member Or(x:int64, y:int64) = x ||| y
+    static member And(x: obj, y: int64) = Numbers.And(Numbers.bitOpsCast (x), y)
+    static member And(x: int64, y: obj) = Numbers.And(x, Numbers.bitOpsCast (y))
+    static member And(x: int64, y: int64) = x &&& y
 
-    static member Xor(x:obj, y:obj) = Numbers.Xor(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member Xor(x:obj, y:int64) = Numbers.Xor(Numbers.bitOpsCast(x),y)
-    static member Xor(x:int64, y:obj) = Numbers.Xor(x,Numbers.bitOpsCast(y))
-    static member Xor(x:int64, y:int64) = x ^^^ y
-    
-    static member AndNot(x:obj, y:obj) = Numbers.AndNot(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member AndNot(x:obj, y:int64) = Numbers.AndNot(Numbers.bitOpsCast(x),y)
-    static member AndNot(x:int64, y:obj) = Numbers.AndNot(x,Numbers.bitOpsCast(y))
-    static member AndNot(x:int64, y:int64) = x &&& (~~~y)
+    static member Or(x: obj, y: obj) =
+        Numbers.Or(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
 
-    static member ClearBit(x:obj, y:obj) = Numbers.ClearBit(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member ClearBit(x:obj, y:int64) = Numbers.ClearBit(Numbers.bitOpsCast(x),y)
-    static member ClearBit(x:int64, y:obj) = Numbers.ClearBit(x,Numbers.bitOpsCast(y))
-    static member ClearBit(x:int64, y:int64) = Numbers.ClearBit(x,int(y))
-    static member ClearBit(x:int64, y:int) =   x &&& ~~~(1L <<< y)
+    static member Or(x: obj, y: int64) = Numbers.Or(Numbers.bitOpsCast (x), y)
+    static member Or(x: int64, y: obj) = Numbers.Or(x, Numbers.bitOpsCast (y))
+    static member Or(x: int64, y: int64) = x ||| y
 
-    static member SetBit(x:obj, y:obj) = Numbers.SetBit(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member SetBit(x:obj, y:int64) = Numbers.SetBit(Numbers.bitOpsCast(x),y)
-    static member SetBit(x:int64, y:obj) = Numbers.SetBit(x,Numbers.bitOpsCast(y))
-    static member SetBit(x:int64, y:int64) = Numbers.SetBit(x,int(y))
-    static member SetBit(x:int64, y:int) =   x ||| ~~~(1L <<< y)
+    static member Xor(x: obj, y: obj) =
+        Numbers.Xor(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
 
-    static member FlipBit(x:obj, y:obj) = Numbers.FlipBit(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member FlipBit(x:obj, y:int64) = Numbers.FlipBit(Numbers.bitOpsCast(x),y)
-    static member FlipBit(x:int64, y:obj) = Numbers.FlipBit(x,Numbers.bitOpsCast(y))
-    static member FlipBit(x:int64, y:int64) = Numbers.FlipBit(x,int(y))
-    static member FlipBit(x:int64, y:int) =   x ^^^ ~~~(1L <<< y)
+    static member Xor(x: obj, y: int64) = Numbers.Xor(Numbers.bitOpsCast (x), y)
+    static member Xor(x: int64, y: obj) = Numbers.Xor(x, Numbers.bitOpsCast (y))
+    static member Xor(x: int64, y: int64) = x ^^^ y
 
-    static member TestBit(x:obj, y:obj) = Numbers.TestBit(Numbers.bitOpsCast(x),Numbers.bitOpsCast(y))
-    static member TestBit(x:obj, y:int64) = Numbers.TestBit(Numbers.bitOpsCast(x),y)
-    static member TestBit(x:int64, y:obj) = Numbers.TestBit(x,Numbers.bitOpsCast(y))
-    static member TestBit(x:int64, y:int64) = Numbers.TestBit(x,int(y))
-    static member TestBit(x:int64, y:int) =   (x &&& (1L <<< y)) <> 0
+    static member AndNot(x: obj, y: obj) =
+        Numbers.AndNot(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
+
+    static member AndNot(x: obj, y: int64) =
+        Numbers.AndNot(Numbers.bitOpsCast (x), y)
+
+    static member AndNot(x: int64, y: obj) =
+        Numbers.AndNot(x, Numbers.bitOpsCast (y))
+
+    static member AndNot(x: int64, y: int64) = x &&& (~~~y)
+
+    static member ClearBit(x: obj, y: obj) =
+        Numbers.ClearBit(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
+
+    static member ClearBit(x: obj, y: int64) =
+        Numbers.ClearBit(Numbers.bitOpsCast (x), y)
+
+    static member ClearBit(x: int64, y: obj) =
+        Numbers.ClearBit(x, Numbers.bitOpsCast (y))
+
+    static member ClearBit(x: int64, y: int64) = Numbers.ClearBit(x, int (y))
+    static member ClearBit(x: int64, y: int) = x &&& ~~~(1L <<< y)
+
+    static member SetBit(x: obj, y: obj) =
+        Numbers.SetBit(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
+
+    static member SetBit(x: obj, y: int64) =
+        Numbers.SetBit(Numbers.bitOpsCast (x), y)
+
+    static member SetBit(x: int64, y: obj) =
+        Numbers.SetBit(x, Numbers.bitOpsCast (y))
+
+    static member SetBit(x: int64, y: int64) = Numbers.SetBit(x, int (y))
+    static member SetBit(x: int64, y: int) = x ||| ~~~(1L <<< y)
+
+    static member FlipBit(x: obj, y: obj) =
+        Numbers.FlipBit(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
+
+    static member FlipBit(x: obj, y: int64) =
+        Numbers.FlipBit(Numbers.bitOpsCast (x), y)
+
+    static member FlipBit(x: int64, y: obj) =
+        Numbers.FlipBit(x, Numbers.bitOpsCast (y))
+
+    static member FlipBit(x: int64, y: int64) = Numbers.FlipBit(x, int (y))
+    static member FlipBit(x: int64, y: int) = x ^^^ ~~~(1L <<< y)
+
+    static member TestBit(x: obj, y: obj) =
+        Numbers.TestBit(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
+
+    static member TestBit(x: obj, y: int64) =
+        Numbers.TestBit(Numbers.bitOpsCast (x), y)
+
+    static member TestBit(x: int64, y: obj) =
+        Numbers.TestBit(x, Numbers.bitOpsCast (y))
+
+    static member TestBit(x: int64, y: int64) = Numbers.TestBit(x, int (y))
+    static member TestBit(x: int64, y: int) = (x &&& (1L <<< y)) <> 0
 
 
     // Numericity
 
     // the following were originally in Util
 
-    static member private IsNumericType(t:Type) =
+    static member private IsNumericType(t: Type) =
         match Type.GetTypeCode(t) with
         | TypeCode.SByte
         | TypeCode.Byte
@@ -1290,13 +1339,13 @@ type Numbers() =
         | TypeCode.UInt64 -> true
         | _ ->
             match t with
-            | x when x = typeof<BigInt>   -> true
-            | x when x = typeof<BigInteger>  -> true
-            | x when x = typeof<BigDecimal>  -> true
-            | x when x = typeof<Ratio>  -> true
+            | x when x = typeof<BigInt> -> true
+            | x when x = typeof<BigInteger> -> true
+            | x when x = typeof<BigDecimal> -> true
+            | x when x = typeof<Ratio> -> true
             | _ -> false
 
-    static member private IsPrimitiveNumericType(t:Type) =
+    static member private IsPrimitiveNumericType(t: Type) =
         match Type.GetTypeCode(t) with
         | TypeCode.SByte
         | TypeCode.Byte
@@ -1310,7 +1359,7 @@ type Numbers() =
         | TypeCode.UInt64 -> true
         | _ -> false
 
-    static member private IsPrimitiveIntegerType(t:Type) =
+    static member private IsPrimitiveIntegerType(t: Type) =
         match Type.GetTypeCode(t) with
         | TypeCode.SByte
         | TypeCode.Byte
@@ -1322,7 +1371,7 @@ type Numbers() =
         | TypeCode.UInt64 -> true
         | _ -> false
 
-    static member IsNumeric(o:obj) = 
+    static member IsNumeric(o: obj) =
         match o with
         | null -> false
         | _ -> Numbers.IsNumericType(o.GetType())
@@ -1330,48 +1379,59 @@ type Numbers() =
 
     // hashing support
     // originally in Util
-    
+
     //[WarnBoxedMath(false)]
-    static member hasheqFrom(x:obj, xt:Type) =
-        if Numbers.IsPrimitiveIntegerType(xt) || xt = typeof<BigInteger> && Numbers.lte(x,Int64.MaxValue) && Numbers.gte(x,Int64.MaxValue) then
-            let lpart = Converters.convertToLong(x)
+    static member hasheqFrom(x: obj, xt: Type) =
+        if
+            Numbers.IsPrimitiveIntegerType(xt)
+            || xt = typeof<BigInteger>
+               && Numbers.lte (x, Int64.MaxValue)
+               && Numbers.gte (x, Int64.MaxValue)
+        then
+            let lpart = convertToLong (x)
             Murmur3.HashLong(lpart)
         elif xt = typeof<BigDecimal> then
             // stripTrailingZeros() to make all numerically equal
             // BigDecimal values come out the same before calling
             // hashCode.  Special check for 0 because
             // stripTrailingZeros() does not do anything to values
-            // equal to 0 with different scales.     
-            if Numbers.isZero(x) then
+            // equal to 0 with different scales.
+            if Numbers.isZero (x) then
                 BigDecimal.Zero.GetHashCode()
-            else 
+            else
                 let tmp = (x :?> BigDecimal).StripTrailingZeros()
                 tmp.GetHashCode()
-        elif xt = typeof<float32> && x.Equals(-0.0f) then   
+        elif xt = typeof<float32> && x.Equals(-0.0f) then
             0
         else
             x.GetHashCode()
-            
-    static member hasheq(x:obj) =
+
+    static member hasheq(x: obj) =
         match x with
         | :? int64 as n -> Murmur3.HashLong(n)
         | :? double as d ->
-            if d = -0.0 then 
+            if d = -0.0 then
                 0 // match 0.0
-            else d.GetHashCode()
-        | _ -> Numbers.hasheqFrom(x,x.GetType())
-            
+            else
+                d.GetHashCode()
+        | _ -> Numbers.hasheqFrom (x, x.GetType())
 
 
+and [<Sealed>] LongOps() =
 
-
-        
-
-and LongOps() =
+    static member gcd(u: int64, v: int64) =
+        let rec step x y = if y <> 0L then step y (x % y) else x
+        step u v
 
     interface Ops with
-        member this.add(x, y) =
-            (convertToLong (x) + convertToLong (y)) :> obj // *** number.add
+
+        member this.isNeg(x: obj) : bool = convertToLong (x) < 0L
+        member this.isPos(x: obj) : bool = convertToLong (x) > 0L
+        member this.isZero(x: obj) : bool = convertToLong (x) = 0L
+
+
+        member this.add(x, y) : obj =
+            Numbers.add (convertToLong (x), convertToLong (y))
 
         member this.addP(x: obj, y: obj) : obj =
             let lx = convertToLong (x)
@@ -1383,169 +1443,417 @@ and LongOps() =
             else
                 ret :> obj
 
-        member this.dec(x: obj) : obj =
-            raise (System.NotImplementedException())
+        member this.unchecked_add(x: obj, y: obj) : obj =
+            Numbers.unchecked_add (convertToLong (x), convertToLong (y))
 
-        member this.decP(x: obj) : obj =
-            raise (System.NotImplementedException())
 
-        member this.divide(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.equiv(x: obj, y: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.gte(x: obj, y: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.inc(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.incP(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.isNeg(x: obj) : bool = convertToLong (x) < 0L
-        member this.isPos(x: obj) : bool = convertToLong (x) > 0L
-        member this.isZero(x: obj) : bool = convertToLong (x) = 0L
-
-        member this.lt(x: obj, y: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.lte(x: obj, y: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.multiply(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
+        member this.multiply(x, y) : obj =
+            Numbers.multiply (convertToLong (x), convertToLong (y))
 
         member this.multiplyP(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
+            let lx = convertToLong (x)
+            let ly = convertToLong (y)
 
-        member this.negate(x: obj) : obj =
-            raise (System.NotImplementedException())
+            if lx = Int64.MinValue && ly < 0 then
+                Numbers.BIGINT_OPS.multiply (x, y)
+            else
+                let ret = lx * ly
 
-        member this.negateP(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.quotient(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.remainder(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.unchecked_add(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.unchecked_dec(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.unchecked_inc(x: obj) : obj =
-            raise (System.NotImplementedException())
+                if ly <> 0 && ret / ly <> lx then
+                    Numbers.BIGINT_OPS.multiply (x, y)
+                else
+                    ret :> obj
 
         member this.unchecked_multiply(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
+            Numbers.unchecked_multiply (convertToLong (x), convertToLong (y))
+
+        member this.divide(x: obj, y: obj) : obj =
+            let n = convertToLong (x)
+            let v = convertToLong (y)
+            let gcd1 = LongOps.gcd (n, v)
+
+            if gcd1 = 0 then
+                0
+            else
+                let n = n / gcd1
+                let d = v / gcd1
+
+                match d with
+                | 1L -> n
+                | _ when d < 0L -> Ratio(BigInteger(-n), BigInteger(-d))
+                | _ -> Ratio(BigInteger(-n), BigInteger(-d))
+
+
+        member this.quotient(x: obj, y: obj) : obj =
+            (convertToLong (x) / convertToLong (y)) :> obj
+
+        member this.remainder(x: obj, y: obj) : obj =
+            (convertToLong (x) % convertToLong (y)) :> obj
+
+        member this.equiv(x: obj, y: obj) : bool = convertToLong (x) = convertToLong (y)
+
+        member this.lt(x: obj, y: obj) : bool = convertToLong (x) < convertToLong (y)
+
+        member this.lte(x: obj, y: obj) : bool = convertToLong (x) <= convertToLong (y)
+
+        member this.gte(x: obj, y: obj) : bool = convertToLong (x) >= convertToLong (y)
+
+
+        member this.negate(x: obj) : obj = Numbers.minus (convertToLong (x))
+
+        member this.negateP(x: obj) : obj =
+            let lx = convertToLong (x)
+
+            if lx > Int64.MaxValue then
+                -lx
+            else
+                BigInt.fromBigInteger (- BigInteger(lx))
 
         member this.unchecked_negate(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.abs(x: obj) : obj =
-            raise (System.NotImplementedException())
+            Numbers.unchecked_minus (convertToLong (x))
 
 
-and ULongOps() =
+        member this.inc(x: obj) : obj = Numbers.inc (convertToLong (x))
+
+        member this.incP(x: obj) : obj =
+            let lx = convertToLong (x)
+
+            if lx < Int64.MaxValue then
+                (lx + 1L) :> obj
+            else
+                Numbers.BIGINT_OPS.inc (x)
+
+        member this.unchecked_inc(x: obj) : obj =
+            Numbers.unchecked_inc (convertToLong (x))
+
+
+        member this.dec(x: obj) : obj = Numbers.dec (convertToLong (x))
+
+        member this.decP(x: obj) : obj =
+            let lx = convertToLong (x)
+
+            if lx > Int64.MinValue then
+                (lx - 1L) :> obj
+            else
+                Numbers.BIGINT_OPS.dec (x)
+
+        member this.unchecked_dec(x: obj) : obj =
+            Numbers.unchecked_dec (convertToLong (x))
+
+
+        member this.abs(x: obj) : obj = Math.Abs(convertToLong (x))
+
+
+and [<Sealed>] ULongOps() =
+
+
+    static member gcd(u: uint64, v: uint64) =
+        let rec step x y = if y <> 0UL then step y (x % y) else x
+        step u v
 
     interface Ops with
-        member this.add(x, y) =
-            raise (System.NotImplementedException())
+
+        member this.isNeg(x: obj) : bool = convertToULong (x) < 0UL
+        member this.isPos(x: obj) : bool = convertToULong (x) > 0UL
+        member this.isZero(x: obj) : bool = convertToULong (x) = 0UL
+
+
+        member this.add(x, y) : obj =
+            Numbers.add (convertToULong (x), convertToULong (y))
 
         member this.addP(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
+            let ulx = convertToULong (x)
+            let uly = convertToULong (y)
 
-        member this.dec(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.decP(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.divide(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.equiv(x: obj, y: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.gte(x: obj, y: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.inc(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.incP(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.isNeg(x: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.isPos(x: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.isZero(x: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.lt(x: obj, y: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.lte(x: obj, y: obj) : bool =
-            raise (System.NotImplementedException())
-
-        member this.multiply(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.multiplyP(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.negate(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.negateP(x: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.quotient(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
-
-        member this.remainder(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
+            if ulx > UInt64.MaxValue - uly then
+                Numbers.BIGINT_OPS.add (x, y)
+            else
+                (ulx + uly) :> obj
 
         member this.unchecked_add(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
+            Numbers.unchecked_add (convertToULong (x), convertToULong (y))
 
-        member this.unchecked_dec(x: obj) : obj =
-            raise (System.NotImplementedException())
 
-        member this.unchecked_inc(x: obj) : obj =
-            raise (System.NotImplementedException())
+        member this.multiply(x, y) : obj =
+            Numbers.multiply (convertToULong (x), convertToULong (y))
+
+        member this.multiplyP(x: obj, y: obj) : obj =
+            let ulx = convertToULong (x)
+            let uly = convertToULong (y)
+
+            let ret = ulx * uly
+
+            if uly <> 0UL && ret / uly <> ulx then
+                Numbers.BIGINT_OPS.multiply (x, y)
+            else
+                ret
 
         member this.unchecked_multiply(x: obj, y: obj) : obj =
-            raise (System.NotImplementedException())
+            Numbers.unchecked_multiply (convertToULong (x), convertToULong (y))
+
+
+        member this.divide(x: obj, y: obj) : obj =
+            let n = convertToULong (x)
+            let v = convertToULong (y)
+            let gcd1 = ULongOps.gcd (n, v)
+
+            if gcd1 = 0UL then
+                0UL
+            else
+                let n = n / gcd1
+                let d = v / gcd1
+
+                match d with
+                | 1UL -> n
+                | _ -> Ratio(BigInteger(n), BigInteger(d))
+
+
+        member this.quotient(x: obj, y: obj) : obj =
+            (convertToULong (x) / convertToULong (y)) :> obj
+
+        member this.remainder(x: obj, y: obj) : obj =
+            (convertToULong (x) % convertToULong (y)) :> obj
+
+        member this.equiv(x: obj, y: obj) : bool = convertToULong (x) = convertToULong (y)
+
+        member this.lt(x: obj, y: obj) : bool = convertToULong (x) < convertToULong (y)
+
+        member this.lte(x: obj, y: obj) : bool =
+            convertToULong (x) <= convertToULong (y)
+
+        member this.gte(x: obj, y: obj) : bool =
+            convertToULong (x) >= convertToULong (y)
+
+
+        member this.negate(x: obj) : obj =
+            let lx = convertToULong (x)
+
+            if lx = 0UL then
+                x
+            else
+                raise
+                <| ArithmeticException("Checked operation error: negation of non-zero unsigned")
+
+        member this.negateP(x: obj) : obj =
+            BigInt.fromBigInteger (- BigInteger(convertToULong (x)))
 
         member this.unchecked_negate(x: obj) : obj =
-            raise (System.NotImplementedException())
+            Numbers.unchecked_minus (convertToULong (x))
+
+
+        member this.inc(x: obj) : obj = Numbers.inc (convertToULong (x))
+
+        member this.incP(x: obj) : obj =
+            let lx = convertToULong (x)
+
+            if lx < UInt64.MaxValue then
+                (lx + 1UL) :> obj
+            else
+                Numbers.BIGINT_OPS.inc (x)
+
+        member this.unchecked_inc(x: obj) : obj =
+            Numbers.unchecked_inc (convertToULong (x))
+
+
+        member this.dec(x: obj) : obj = Numbers.dec (convertToULong (x))
+
+        member this.decP(x: obj) : obj =
+            let lx = convertToULong (x)
+
+            if lx > 0UL then
+                (lx - 1UL) :> obj
+            else
+                Numbers.BIGINT_OPS.dec (x)
+
+        member this.unchecked_dec(x: obj) : obj =
+            Numbers.unchecked_dec (convertToULong (x))
+
+
+        member this.abs(x: obj) : obj = convertToULong (x)
+
+
+and [<Sealed>] DoubleOps() =
+    inherit OpsP()
+
+    interface Ops with
+
+        member this.isNeg(x: obj) : bool = convertToDouble (x) < 0.0
+        member this.isPos(x: obj) : bool = convertToDouble (x) > 0.0
+        member this.isZero(x: obj) : bool = convertToDouble (x) = 0.0
+
+        member this.add(x, y) : obj =
+            convertToDouble (x) + convertToDouble (y) :> obj
+
+        member this.multiply(x, y) : obj =
+            convertToDouble (x) * convertToDouble (y) :> obj
+
+        member this.divide(x: obj, y: obj) : obj =
+            convertToDouble (x) / convertToDouble (y) :> obj
+
+        member this.quotient(x: obj, y: obj) : obj =
+            Numbers.quotient (convertToDouble (x), convertToDouble (y))
+
+        member this.remainder(x: obj, y: obj) : obj =
+            Numbers.remainder (convertToDouble (x), convertToDouble (y))
+
+        member this.equiv(x: obj, y: obj) : bool =
+            convertToDouble (x) = convertToDouble (y)
+
+        member this.lt(x: obj, y: obj) : bool =
+            convertToDouble (x) < convertToDouble (y)
+
+        member this.lte(x: obj, y: obj) : bool =
+            convertToDouble (x) <= convertToDouble (y)
+
+        member this.gte(x: obj, y: obj) : bool =
+            convertToDouble (x) >= convertToDouble (y)
+
+        member this.negate(x: obj) : obj = - convertToDouble(x)
+        member this.inc(x: obj) : obj = (convertToDouble (x) + 1.0) :> obj
+        member this.dec(x: obj) : obj = (convertToDouble (x) - 1.0) :> obj
+
+        member this.abs(x: obj) : obj = Math.Abs(convertToDouble (x))
+
+and [<Sealed>] RatioOps() =
+    inherit OpsP()
+
+    interface Ops with
+
+        member this.isNeg(x: obj) : bool = (Numbers.ToRatio(x)).Numerator.Sign < 0
+        member this.isPos(x: obj) : bool = (Numbers.ToRatio(x)).Numerator.Sign > 0
+        member this.isZero(x: obj) : bool = (Numbers.ToRatio(x)).Numerator.Sign = 0
+
+        member this.add(x, y) : obj =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+
+            Numbers.divide (
+                ry.Numerator * rx.Denominator + rx.Numerator * ry.Denominator,
+                ry.Denominator * rx.Denominator
+            )
+
+        member this.multiply(x, y) : obj =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+            Numbers.divide (ry.Numerator * rx.Numerator, ry.Denominator * rx.Denominator)
+
+        member this.divide(x: obj, y: obj) : obj =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+            Numbers.divide (ry.Denominator * rx.Numerator, ry.Numerator * rx.Denominator)
+
+        member this.quotient(x: obj, y: obj) : obj =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+            (rx.Numerator * ry.Denominator) / (rx.Denominator * ry.Numerator) :> obj
+
+        member this.remainder(x: obj, y: obj) : obj =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+            let q = (rx.Numerator * ry.Denominator) / (rx.Denominator * ry.Numerator)
+            Numbers.minus (rx, Numbers.multiply (q, ry))
+
+        member this.equiv(x: obj, y: obj) : bool =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+            rx.Numerator.Equals(ry.Numerator) && rx.Denominator.Equals(ry.Denominator)
+
+        member this.lt(x: obj, y: obj) : bool =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+            rx.Numerator * ry.Denominator < ry.Numerator * rx.Denominator
+
+        member this.lte(x: obj, y: obj) : bool =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+            rx.Numerator * ry.Denominator <= ry.Numerator * rx.Denominator
+
+        member this.gte(x: obj, y: obj) : bool =
+            let rx = Numbers.ToRatio(x)
+            let ry = Numbers.ToRatio(y)
+            rx.Numerator * ry.Denominator >= ry.Numerator * rx.Denominator
+
+        member this.negate(x: obj) : obj =
+            let rx = Numbers.ToRatio(x)
+            Ratio(-rx.Numerator, rx.Denominator)
+
+        member this.inc(x: obj) : obj = Numbers.add (x, 1)
+        member this.dec(x: obj) : obj = Numbers.add (x, -1)
 
         member this.abs(x: obj) : obj =
-            raise (System.NotImplementedException())
+            let rx = Numbers.ToRatio(x)
+            Ratio(BigInteger.Abs(rx.Numerator), rx.Denominator)
 
-
-and DoubleOps() =
+and [<Sealed>] ClrDecimalOps() =
     inherit OpsP()
 
-and RatioOps() =
+and [<Sealed>] BigIntOps() =
     inherit OpsP()
 
-and ClrDecimalOps() =
-    inherit OpsP()
+    interface Ops with
 
-and BigIntOps() =
-    inherit OpsP()
+        member this.isNeg(x: obj) : bool =
+            let bx = Numbers.ToBigInt(x)
 
-and BigDecimalOps() =
+            match bx.Bipart with
+            | Some bi -> bi.Sign < 0
+            | None -> bx.Lpart < 0L
+
+        member this.isPos(x: obj) : bool =
+            let bx = Numbers.ToBigInt(x)
+
+            match bx.Bipart with
+            | Some bi -> bi.Sign > 0
+            | None -> bx.Lpart > 0L
+
+        member this.isZero(x: obj) : bool =
+            let bx = Numbers.ToBigInt(x)
+
+            match bx.Bipart with
+            | Some bi -> bi.IsZero
+            | None -> bx.Lpart = 0L
+
+        member this.add(x, y) : obj =
+            (Numbers.ToBigInt(x)).add (Numbers.ToBigInt(y))
+
+        member this.multiply(x, y) : obj =
+            (Numbers.ToBigInt(x)).multiply (Numbers.ToBigInt(y))
+
+        member this.divide(x: obj, y: obj) : obj =
+            Numbers.BIDivide(Numbers.ToBigInteger(x), Numbers.ToBigInteger(y))
+
+        member this.quotient(x: obj, y: obj) : obj =
+            (Numbers.ToBigInt(x)).quotient (Numbers.ToBigInt(y))
+
+        member this.remainder(x: obj, y: obj) : obj =
+            (Numbers.ToBigInt(x)).remainder (Numbers.ToBigInt(y))
+
+        member this.equiv(x: obj, y: obj) : bool =
+            Numbers.ToBigInt(x).Equals(Numbers.ToBigInt(y))
+
+        member this.lt(x: obj, y: obj) : bool =
+            Numbers.ToBigInt(x).lt (Numbers.ToBigInt(y))
+
+        member this.lte(x: obj, y: obj) : bool =
+            Numbers.ToBigInteger(x).CompareTo(Numbers.ToBigInt(y)) <= 0
+
+        member this.gte(x: obj, y: obj) : bool =
+            Numbers.ToBigInteger(x).CompareTo(Numbers.ToBigInt(y)) >= 0
+
+        member this.negate(x: obj) : obj =
+            BigInt.fromBigInteger (- Numbers.ToBigInteger(x))
+
+        member this.inc(x: obj) : obj =
+            BigInt.fromBigInteger (Numbers.ToBigInteger(x) + BigInteger.One)
+
+        member this.dec(x: obj) : obj =
+            BigInt.fromBigInteger (Numbers.ToBigInteger(x) - BigInteger.One)
+
+        member this.abs(x: obj) : obj =
+            BigInt.fromBigInteger (BigInteger.Abs(Numbers.ToBigInteger(x)))
+
+
+and [<Sealed>] BigDecimalOps() =
     inherit OpsP()
 
 and [<AbstractClass; Sealed>] OpsImpls =
@@ -1566,5 +1874,3 @@ and [<AbstractClass; Sealed>] OpsImpls =
 // | LookupCombine2D | 168.9 us | 2.04 us |  1.91 us |  0.48 |    0.02 |
 
 //let combinerArray = Array2D.create
-
-
