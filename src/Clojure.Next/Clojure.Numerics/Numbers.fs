@@ -1856,6 +1856,107 @@ and [<Sealed>] BigIntOps() =
 and [<Sealed>] BigDecimalOps() =
     inherit OpsP()
 
+        // Eventually, need to modify this to pick up the value from RT.MathContextVar.deref()  -- TODO, TODO, TODO
+        static member GetContext() : Context option = None
+
+    interface Ops with
+
+        member this.isNeg(x: obj) : bool = 
+            let bx = x :?> BigDecimal  // In JVM code, they cast here instead of calling Numbers.ToBigDecimal 
+            bx.IsNegative
+
+
+        member this.isPos(x: obj) : bool = 
+            let bx = x :?> BigDecimal  // In JVM code, they cast here instead of calling Numbers.ToBigDecimal 
+            bx.IsPositive
+
+        member this.isZero(x: obj) : bool = 
+            let bx = x :?> BigDecimal  // In JVM code, they cast here instead of calling Numbers.ToBigDecimal 
+            bx.IsZero
+
+
+        member this.add(x, y) : obj =
+            let bx = Numbers.ToBigDecimal(x)
+            let by = Numbers.ToBigDecimal(y)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.Add(by,cx)
+            | None -> bx.Add(by)
+
+        member this.multiply(x, y) : obj =
+            let bx = Numbers.ToBigDecimal(x)
+            let by = Numbers.ToBigDecimal(y)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.Multiply(by,cx)
+            | None -> bx.Multiply(by)
+
+        member this.divide(x: obj, y: obj) : obj =
+            let bx = Numbers.ToBigDecimal(x)
+            let by = Numbers.ToBigDecimal(y)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.Divide(by,cx)
+            | None -> bx.Divide(by)
+
+        member this.quotient(x: obj, y: obj) : obj =
+            let bx = Numbers.ToBigDecimal(x)
+            let by = Numbers.ToBigDecimal(y)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.DivideInteger(by,cx)
+            | None -> bx.DivideInteger(by)
+
+        member this.remainder(x: obj, y: obj) : obj =
+            let bx = Numbers.ToBigDecimal(x)
+            let by = Numbers.ToBigDecimal(y)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.Mod(by,cx)
+            | None -> bx.Mod(by)
+
+        member this.equiv(x: obj, y: obj) : bool =
+            (Numbers.ToBigDecimal(x):>IComparable<BigDecimal>).CompareTo(Numbers.ToBigDecimal(y)) = 0
+
+        member this.lt(x: obj, y: obj) : bool =
+            (Numbers.ToBigDecimal(x):>IComparable<BigDecimal>).CompareTo(Numbers.ToBigDecimal(y)) < 0
+
+        member this.lte(x: obj, y: obj) : bool =
+            (Numbers.ToBigDecimal(x):>IComparable<BigDecimal>).CompareTo(Numbers.ToBigDecimal(y)) >= 0
+
+        member this.gte(x: obj, y: obj) : bool =
+            (Numbers.ToBigDecimal(x):>IComparable<BigDecimal>).CompareTo(Numbers.ToBigDecimal(y)) >= 0
+
+        member this.negate(x: obj) : obj = 
+            let bx = Numbers.ToBigDecimal(x)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.Negate(cx)
+            | None -> bx.Negate()
+
+        member this.inc(x: obj) : obj =
+            let bx = Numbers.ToBigDecimal(x)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.Add(BigDecimal.One,cx)
+            | None -> bx.Add(BigDecimal.One)
+
+        member this.dec(x: obj) : obj = 
+            let bx = Numbers.ToBigDecimal(x)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.Subtract(BigDecimal.One,cx)
+            | None -> bx.Subtract(BigDecimal.One)
+
+
+        member this.abs(x: obj) : obj = 
+            let bx = Numbers.ToBigDecimal(x)
+            let c = BigDecimalOps.GetContext()
+            match c with
+            | Some cx -> bx.Abs(cx)
+            | None -> bx.Abs()
+
+
 and [<AbstractClass; Sealed>] OpsImpls =
     static member Long: Ops = LongOps()
     static member ULong = ULongOps()
