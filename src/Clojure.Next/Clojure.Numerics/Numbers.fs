@@ -1785,7 +1785,110 @@ and [<Sealed>] RatioOps() =
             Ratio(BigInteger.Abs(rx.Numerator), rx.Denominator)
 
 and [<Sealed>] ClrDecimalOps() =
-    inherit OpsP()
+
+    interface Ops with
+
+        member this.isNeg(x: obj) : bool = convertToDecimal (x) < 0M
+        member this.isPos(x: obj) : bool = convertToDecimal (x) > 0M
+        member this.isZero(x: obj) : bool = convertToDecimal (x) = 0M
+
+
+        member this.add(x, y) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            dx + dy :> obj
+
+        member this.addP(x: obj, y: obj) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            try
+                dx + dy :> obj
+            with
+            | :? OverflowException -> Numbers.BIGDEC_OPS.add(x,y)
+
+        member this.unchecked_add(x: obj, y: obj) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            dx + dy :> obj           
+
+
+        member this.multiply(x, y) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            dx * dy :> obj
+
+        member this.multiplyP(x: obj, y: obj) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            try
+                dx * dy :> obj
+            with
+            | :? OverflowException -> Numbers.BIGDEC_OPS.multiply(x,y)
+
+        member this.unchecked_multiply(x: obj, y: obj) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            dx * dy :> obj
+
+
+        member this.divide(x: obj, y: obj) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            try 
+                dx / dy :> obj
+            with 
+            | :? OverflowException -> BigDecimal.Create(dx).Divide(BigDecimal.Create(dy))
+
+
+        member this.quotient(x: obj, y: obj) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            dx / dy :> obj
+
+        member this.remainder(x: obj, y: obj) : obj =
+            let dx = convertToDecimal (x)
+            let dy = convertToDecimal (y)
+            dx % dy :> obj
+
+        member this.equiv(x: obj, y: obj) : bool = convertToDecimal (x) = convertToDecimal (y)
+
+        member this.lt(x: obj, y: obj) : bool = convertToDecimal (x) < convertToDecimal (y)
+
+        member this.lte(x: obj, y: obj) : bool = convertToDecimal (x) <= convertToDecimal (y)
+
+        member this.gte(x: obj, y: obj) : bool = convertToDecimal (x) >= convertToDecimal (y)
+
+
+        member this.negate(x: obj) : obj = - convertToDecimal(x)
+
+        member this.negateP(x: obj) : obj = - convertToDecimal(x)
+
+        member this.unchecked_negate(x: obj) : obj = - convertToDecimal(x)
+
+        member this.inc(x: obj) : obj = convertToDecimal(x) + 1M :> obj
+
+        member this.incP(x: obj) : obj =
+            let dx = convertToDecimal (x)
+            try 
+                dx + 1M :> obj
+            with 
+            | :? OverflowException -> Numbers.BIGDEC_OPS.inc(BigDecimal.Create(dx))
+
+        member this.unchecked_inc(x: obj) : obj = convertToDecimal(x) + 1M :> obj
+
+        member this.dec(x: obj) : obj = convertToDecimal(x) - 1M :> obj
+
+        member this.decP(x: obj) : obj =
+            let dx = convertToDecimal (x)
+            try 
+                dx - 1M :> obj
+            with 
+            | :? OverflowException -> Numbers.BIGDEC_OPS.dec(BigDecimal.Create(dx))
+
+        member this.unchecked_dec(x: obj) : obj = convertToDecimal(x) + 1M :> obj
+
+        member this.abs(x: obj) : obj = Math.Abs(convertToDecimal (x))
+
 
 and [<Sealed>] BigIntOps() =
     inherit OpsP()
