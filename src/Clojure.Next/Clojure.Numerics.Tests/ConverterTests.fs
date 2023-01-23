@@ -12,7 +12,7 @@ let floatTestValuesForIntegerConverters: obj list = [ 97.2f; 97.2; 97.2M ]
 let floatTestValuesForFloatConverters: obj list = [ 97.2f; 97.2; 97.2M; "97.2" ]
 
 let charTestValues: obj list =
-    List.append [ 97y :> obj; 97y; 97s; 97us; 97; 97u; 97L; 97UL; 'a'; "a" ] floatTestValuesForIntegerConverters
+    List.append [ 97y :> obj; 97uy; 97s; 97us; 97; 97u; 97L; 97UL; 'a'; "a" ] floatTestValuesForIntegerConverters
 
 let converterTest (converter: obj -> 'T) (value: 'T) (arg: obj) =
     let n = converter arg
@@ -65,7 +65,7 @@ let test1 =
               for v in charTestValues do
                   tester v
 
-          ftestCase "floatConverters"
+          testCase "floatConverters"
           <| fun _ ->
               floatTestAgainstIntegers (deltaConverterTest convertToFloat 97f 1e-6f)
               floatTestAgainstFloats (deltaConverterTest convertToFloat 97.2f 1e-6f)
