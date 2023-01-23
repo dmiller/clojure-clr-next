@@ -1,4 +1,4 @@
-﻿module Clojure.Numerics.Test
+﻿module Clojure.BigArith.Test
 
 open Expecto
 

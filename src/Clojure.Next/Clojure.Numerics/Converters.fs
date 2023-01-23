@@ -112,7 +112,7 @@ let convertToShort (o: obj) : int16 =
     | :? Decimal as d -> int16 (d)
     | _ -> Convert.ToInt16(o, CultureInfo.InvariantCulture)
 
-let convertToSUhort (o: obj) : uint16 =
+let convertToUShort (o: obj) : uint16 =
     match o with
     | :? Int64 as i -> uint16 (i)
     | :? Double as d -> uint16 (d)
