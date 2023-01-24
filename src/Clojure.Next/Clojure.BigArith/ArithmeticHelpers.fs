@@ -129,7 +129,7 @@ module internal ArithmeticHelpers =
             Buffer.BlockCopy(ints, 0, bytes, 0, byteLength)
 
             let coeff =
-                BigInteger(ReadOnlySpan(bytes), false, false)
+                BigInteger(ReadOnlySpan(bytes), true, false)
 
             let coeff = if sign = -1 then -coeff else coeff
             coeff, exp
