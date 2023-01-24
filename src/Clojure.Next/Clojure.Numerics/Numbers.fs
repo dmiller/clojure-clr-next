@@ -213,8 +213,8 @@ type Numbers() =
            Numbers.ULONG_OPS
            Numbers.CLRDEC_OPS |]
 
-    static member private IntOverflow() = ArithmeticException("integer overflow")
-    static member private DecOverflow() = ArithmeticException("decimal overflow")
+    static member private IntOverflow() = OverflowException("integer overflow")
+    static member private DecOverflow() = OverflowException("decimal overflow")
 
     static member IsNaN(x: obj) =
         match x with
@@ -1096,17 +1096,53 @@ type Numbers() =
 
     //[<WarnedBoxMath(false)>]
     static member ToBigInt(x: obj) =
-        match x with
-        | :? BigInt as bi -> bi
-        | :? BigInteger as bi -> BigInt.fromBigInteger (bi)
-        | _ -> BigInt.fromLong (convertToLong (x))
+        match OpsSelector.ops(x) with
+        | OpsType.BigInteger ->
+            match x with
+                | :? BigInt as bi -> bi
+                | :? BigInteger as bi -> BigInt.fromBigInteger (bi)
+                | _ -> raise <| InvalidOperationException("Unkown BigInteger type")
+        | OpsType.Long -> BigInt.fromLong(convertToLong(x))
+        | OpsType.Double -> BigInt.fromBigInteger(BigInteger(convertToDouble(x)))
+        | OpsType.ULong ->
+            let ul = convertToULong(x)
+            if ul <= uint64(Int64.MaxValue) then
+                BigInt.fromLong(int64(ul))
+            else
+                BigInt.fromBigInteger(BigInteger(ul))
+        | OpsType.Ratio -> 
+            let r = x :?> Ratio
+            BigInt.fromBigInteger(r.ToBigDecimal().ToBigInteger())
+        | OpsType.ClrDecimal -> 
+            let d = x :?> decimal
+            BigInt.fromBigInteger(BigDecimal.Create(d).ToBigInteger())
+        | OpsType.BigDecimal -> 
+            let bd = x :?> BigDecimal
+            BigInt.fromBigInteger(bd.ToBigInteger())
+        | _ -> raise <| InvalidOperationException("Unkown numeric OpsType")
+                
 
     //[<WarnedBoxMath(false)>]
     static member ToBigInteger(x: obj) =
-        match x with
-        | :? BigInteger as bi -> bi
-        | :? BigInt as bi -> bi.ToBigInteger()
-        | _ -> BigInteger(convertToDouble (x))
+        match OpsSelector.ops(x) with
+        | OpsType.BigInteger ->
+            match x with
+            | :? BigInteger as bi -> bi
+            | :? BigInt as bi -> bi.ToBigInteger()
+                | _ -> raise <| InvalidOperationException("Unkown BigInteger type")
+        | OpsType.Long -> BigInteger(convertToLong(x))
+        | OpsType.Double -> BigInteger(convertToDouble(x))
+        | OpsType.ULong -> BigInteger(convertToULong(x))
+        | OpsType.Ratio -> 
+            let r = x :?> Ratio
+            r.ToBigDecimal().ToBigInteger()
+        | OpsType.ClrDecimal -> 
+            let d = x :?> decimal
+            BigDecimal.Create(d).ToBigInteger()
+        | OpsType.BigDecimal -> 
+            let bd = x :?> BigDecimal
+            bd.ToBigInteger()
+        | _ -> raise <| InvalidOperationException("Unkown numeric OpsType")
 
     //[<WarnedBoxMath(false)>]
     static member ToBigDecimal(x: obj) =
@@ -1120,6 +1156,7 @@ type Numbers() =
         | :? double as d -> BigDecimal.Create(d)
         | :? float32 as f -> BigDecimal.Create(double (f))
         | :? Ratio as r -> Numbers.divide (BigDecimal.Create(r.Numerator), r.Denominator) :?> BigDecimal
+        | :? decimal as d -> BigDecimal.Create(d)
         | _ -> BigDecimal.Create(convertToDouble (x))
 
 
