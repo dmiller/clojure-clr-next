@@ -5,6 +5,7 @@ open Clojure.Numerics
 open System.Numerics
 open Clojure.BigArith
 open System
+open System.Text
 
 
 
@@ -119,8 +120,8 @@ let testOpsSelect =
 [<Tests>]
 let testAdd =
     ftestList
-        "Test add variations"
-        [ testCase "basic addition works"
+        "Test arithmetic operations"
+        [ testCase "addition"
           <| fun _ ->
               let r1 = Ratio(BigInteger(2), BigInteger(3))
               let r2 = Ratio(BigInteger(4), BigInteger(5))
@@ -128,16 +129,17 @@ let testAdd =
 
               let bi1 = BigInteger(1e10)
               let bi2 = BigInteger(2e10)
-              let bi3 = BigInt.fromBigInteger(BigInteger(3e10))
+              let bi3 = BigInt.fromBigInteger (BigInteger(3e10))
 
               let bd1 = BigDecimal.Create("11111111111111111.1111111111111")
               let bd2 = BigDecimal.Create("22222222222222222.2222222222222")
               let bd3 = BigDecimal.Create("33333333333333333.3333333333333")
 
-              let biMVp1 = BigInt.fromBigInteger(BigInteger(Int64.MaxValue)+BigInteger.One)
-              let biUMVp1 = BigInt.fromBigInteger(BigInteger(UInt64.MaxValue)+BigInteger.One)
+              let biMVp1 = BigInt.fromBigInteger (BigInteger(Int64.MaxValue) + BigInteger.One)
+              let biUMVp1 = BigInt.fromBigInteger (BigInteger(UInt64.MaxValue) + BigInteger.One)
               let bdMVp1 = BigDecimal.Create(Decimal.MaxValue) + BigDecimal.Create(1)
 
+              // add
 
               Expect.equal (Numbers.add (1L, 2L)) 3L "1+2=3"
               Expect.equal (Numbers.add (1UL, 2UL)) 3UL "1+2=3 unsigned"
@@ -148,18 +150,31 @@ let testAdd =
               Expect.equal (Numbers.add (1.2M, 2.3M)) 3.5M "1.2M+2.3M=3.5M"
 
               // Check indirect calls on primitive args
-              Expect.equal (Numbers.add (1L:>obj, 2L:>obj)) 3L "1+2=3"
-              Expect.equal (Numbers.add (1UL:>obj, 2UL:>obj)) 3UL "1+2=3 unsigned"
-              Expect.floatClose Accuracy.medium ((Numbers.add (1.2:>obj, 2.3:>obj)):?>float) 3.5 "1.2+2.3=3.5"
-              Expect.equal (Numbers.add (1.2M:>obj, 2.3M:>obj)) 3.5M "1.2M+2.3M=3.5M"
+              Expect.equal (Numbers.add (1L :> obj, 2L :> obj)) 3L "1+2=3"
+              Expect.equal (Numbers.add (1UL :> obj, 2UL :> obj)) 3UL "1+2=3 unsigned"
+              Expect.floatClose Accuracy.medium ((Numbers.add (1.2 :> obj, 2.3 :> obj)) :?> float) 3.5 "1.2+2.3=3.5"
+              Expect.equal (Numbers.add (1.2M :> obj, 2.3M :> obj)) 3.5M "1.2M+2.3M=3.5M"
 
               // check edge cases
-              Expect.throwsT<OverflowException> (fun () -> Numbers.add(Int64.MaxValue,1L) |> ignore) "add overflows"
-              Expect.throwsT<OverflowException> (fun () -> Numbers.add(Int64.MaxValue:>obj,1L:>obj) |> ignore) "add overflows"
-              Expect.throwsT<OverflowException> (fun () -> Numbers.add(UInt64.MaxValue,1UL) |> ignore) "add overflows"
-              Expect.throwsT<OverflowException> (fun () -> Numbers.add(UInt64.MaxValue:>obj,1UL:>obj) |> ignore) "add overflows"
-              Expect.throwsT<OverflowException> (fun () -> Numbers.add(Decimal.MaxValue,1M) |> ignore) "add overflows"
-              Expect.throwsT<OverflowException> (fun () -> Numbers.add(Decimal.MaxValue:>obj,1M:>obj) |> ignore) "add overflows"
+              Expect.throwsT<OverflowException> (fun () -> Numbers.add (Int64.MaxValue, 1L) |> ignore) "add overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.add (Int64.MaxValue :> obj, 1L :> obj) |> ignore)
+                  "add overflows"
+
+              Expect.throwsT<OverflowException> (fun () -> Numbers.add (UInt64.MaxValue, 1UL) |> ignore) "add overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.add (UInt64.MaxValue :> obj, 1UL :> obj) |> ignore)
+                  "add overflows"
+
+              Expect.throwsT<OverflowException> (fun () -> Numbers.add (Decimal.MaxValue, 1M) |> ignore) "add overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.add (Decimal.MaxValue :> obj, 1M :> obj) |> ignore)
+                  "add overflows"
+
+              // addP
 
               Expect.equal (Numbers.addP (1L, 2L)) 3L "1+2=3"
               Expect.equal (Numbers.addP (1UL, 2UL)) 3UL "1+2=3 unsigned"
@@ -170,17 +185,216 @@ let testAdd =
               Expect.equal (Numbers.addP (1.2M, 2.3M)) 3.5M "1.2M+2.3M=3.5M"
 
               // Check indirect calls on primitive args
-              Expect.equal (Numbers.add (1L:>obj, 2L:>obj)) 3L "1+2=3"
-              Expect.equal (Numbers.add (1UL:>obj, 2UL:>obj)) 3UL "1+2=3 unsigned"
-              Expect.floatClose Accuracy.medium ((Numbers.add (1.2:>obj, 2.3:>obj)):?>float) 3.5 "1.2+2.3=3.5"
-              Expect.equal (Numbers.add (1.2M:>obj, 2.3M:>obj)) 3.5M "1.2M+2.3M=3.5M"
+              Expect.equal (Numbers.addP (1L :> obj, 2L :> obj)) 3L "1+2=3"
+              Expect.equal (Numbers.addP (1UL :> obj, 2UL :> obj)) 3UL "1+2=3 unsigned"
+              Expect.floatClose Accuracy.medium ((Numbers.addP (1.2 :> obj, 2.3 :> obj)) :?> float) 3.5 "1.2+2.3=3.5"
+              Expect.equal (Numbers.addP (1.2M :> obj, 2.3M :> obj)) 3.5M "1.2M+2.3M=3.5M"
 
               // Edge cases should promote
-              Expect.equal (Numbers.addP(Int64.MaxValue,1L)) biMVp1 "add overflows"
-              Expect.equal (Numbers.addP(Int64.MaxValue:>obj,1L:>obj)) biMVp1 "add overflows"
-              Expect.equal (Numbers.addP(UInt64.MaxValue,1UL)) biUMVp1 "add overflows"
-              Expect.equal (Numbers.addP(UInt64.MaxValue:>obj,1UL:>obj)) biUMVp1 "add overflows"
-              Expect.equal (Numbers.addP(Decimal.MaxValue,1M)) bdMVp1 "add overflows"
-              Expect.equal (Numbers.addP(Decimal.MaxValue:>obj,1M:>obj)) bdMVp1 "add overflows"
+              Expect.equal (Numbers.addP (Int64.MaxValue, 1L)) biMVp1 "addP promotes"
+              Expect.equal (Numbers.addP (Int64.MaxValue :> obj, 1L :> obj)) biMVp1 "addP promotes"
+              Expect.equal (Numbers.addP (UInt64.MaxValue, 1UL)) biUMVp1 "addP promotes"
+              Expect.equal (Numbers.addP (UInt64.MaxValue :> obj, 1UL :> obj)) biUMVp1 "addP promotes"
+              Expect.equal (Numbers.addP (Decimal.MaxValue, 1M)) bdMVp1 "addP promotes"
+              Expect.equal (Numbers.addP (Decimal.MaxValue :> obj, 1M :> obj)) bdMVp1 "addP promotes"
+
+              // unchecked_add
+
+              Expect.equal (Numbers.unchecked_add (1L, 2L)) 3L "1+2=3"
+              Expect.equal (Numbers.unchecked_add (1UL, 2UL)) 3UL "1+2=3 unsigned"
+              Expect.floatClose Accuracy.medium (Numbers.unchecked_add (1.2, 2.3)) 3.5 "1.2+2.3=3.5"
+              Expect.equal (Numbers.unchecked_add (r1, r2)) r3 "2/3+4/5=22/15"
+              Expect.equal (Numbers.unchecked_add (bi1, bi2)) bi3 "1+2=3 bigint"
+              Expect.equal (Numbers.unchecked_add (bd1, bd2)) bd3 "1+2=3 bigdec"
+              Expect.equal (Numbers.unchecked_add (1.2M, 2.3M)) 3.5M "1.2M+2.3M=3.5M"
+
+              // Check indirect calls on primitive args
+              Expect.equal (Numbers.unchecked_add (1L :> obj, 2L :> obj)) 3L "1+2=3"
+              Expect.equal (Numbers.unchecked_add (1UL :> obj, 2UL :> obj)) 3UL "1+2=3 unsigned"
+
+              Expect.floatClose
+                  Accuracy.medium
+                  ((Numbers.unchecked_add (1.2 :> obj, 2.3 :> obj)) :?> float)
+                  3.5
+                  "1.2+2.3=3.5"
+
+              Expect.equal (Numbers.unchecked_add (1.2M :> obj, 2.3M :> obj)) 3.5M "1.2M+2.3M=3.5M"
+
+              // Edge cases should promote
+              Expect.equal (Numbers.unchecked_add (Int64.MaxValue, 1L)) Int64.MinValue "unchecked_add wraps around"
+
+              Expect.equal
+                  (Numbers.unchecked_add (Int64.MaxValue :> obj, 1L :> obj))
+                  Int64.MinValue
+                  "unchecked_add wraps around"
+
+              Expect.equal (Numbers.unchecked_add (UInt64.MaxValue, 1UL)) 0UL "unchecked_add wraps around"
+              Expect.equal (Numbers.unchecked_add (UInt64.MaxValue :> obj, 1UL :> obj)) 0UL "unchecked_add wraps around"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.unchecked_add (Decimal.MaxValue, 1M) |> ignore)
+                  "unchecked_add on decimal overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.unchecked_add (Decimal.MaxValue :> obj, 1M :> obj) |> ignore)
+                  "unchecked_add on decimal overflows"
+
+          testCase "multiplication"
+          <| fun _ ->
+              let r1 = Ratio(BigInteger(2), BigInteger(3))
+              let r2 = Ratio(BigInteger(4), BigInteger(5))
+              let r3 = Ratio(BigInteger(8), BigInteger(15))
+
+              let bi1 = BigInteger(2e10)
+              let bi2 = BigInt.fromBigInteger (BigInteger(3e10))
+              let bi3 = BigInt.fromBigInteger (BigInteger(6e20))
+
+              let bd1 = BigDecimal.Create("1.2")
+              let bd2 = BigDecimal.Create("2.3")
+              let bd3 = BigDecimal.Create("2.76")
+
+              //  9223372036854775807 * 2
+              // 18446744073709551614
+              let biMVm2 =
+                  BigInt.fromBigInteger (BigInteger(Int64.MaxValue) * BigInteger(2))
+
+              // 18446744073709551615 * 2 =
+              // 36893488147419103230
+              let biUMVm2 =
+                  BigInt.fromBigInteger (BigInteger(UInt64.MaxValue) * BigInteger(2))
+
+              //  79228162514264337593543950335 * 2 =
+              // 158456325028528675187087900670
+              let bdMVm2 = BigDecimal.Create("158456325028528675187087900670")
+
+              let biNeg2 = BigInt.fromLong (-2)
+
+              // multiply
+
+              Expect.equal (Numbers.multiply (2L, 3L)) 6L "2*3=6"
+              Expect.equal (Numbers.multiply (2UL, 3UL)) 6UL "2*3=6 unsigned"
+              Expect.floatClose Accuracy.medium (Numbers.multiply (1.2, 2.3)) 2.76 "1.2*2.3=2.76"
+              Expect.equal (Numbers.multiply (r1, r2)) r3 "2/3*4/5=8/15"
+              Expect.equal (Numbers.multiply (bi1, bi2)) bi3 "2*3=6 bigint"
+              Expect.equal (Numbers.multiply (bd1, bd2)) bd3 "2*3=6 bigdec"
+              Expect.equal (Numbers.multiply (1.2M, 2.3M)) 2.76M "1.2*2.3=2.76 M"
+
+              // Check indirect calls on primitive args
+              Expect.equal (Numbers.multiply (2L :> obj, 3L :> obj)) 6L "2*3=6"
+              Expect.equal (Numbers.multiply (2UL :> obj, 3UL :> obj)) 6UL "2*3=6 unsigned"
+
+              Expect.floatClose
+                  Accuracy.medium
+                  ((Numbers.multiply (1.2 :> obj, 2.3 :> obj)) :?> float)
+                  2.76
+                  "1.2*2.3=2.76"
+
+              Expect.equal (Numbers.multiply (1.2M :> obj, 2.3M :> obj)) 2.76M "1.2*2.3=2.76 M"
+
+              // check edge cases
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.multiply (Int64.MaxValue, 2L) |> ignore)
+                  "multiply overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.multiply (Int64.MaxValue :> obj, 2L :> obj) |> ignore)
+                  "multiply overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.multiply (UInt64.MaxValue, 2UL) |> ignore)
+                  "multiply overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.multiply (UInt64.MaxValue :> obj, 2UL :> obj) |> ignore)
+                  "multiply overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.multiply (Decimal.MaxValue, 2M) |> ignore)
+                  "multiply overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.multiply (Decimal.MaxValue :> obj, 2M :> obj) |> ignore)
+                  "multiply overflows"
+
+              // multiplyP
+
+              Expect.equal (Numbers.multiplyP (2L, 3L)) 6L "2*3=6"
+              Expect.equal (Numbers.multiplyP (2UL, 3UL)) 6UL "2*3=6 unsigned"
+              Expect.floatClose Accuracy.medium (Numbers.multiplyP (1.2, 2.3)) 2.76 "1.2*2.3=2.76"
+              Expect.equal (Numbers.multiplyP (r1, r2)) r3 "2/3*4/5=8/15"
+              Expect.equal (Numbers.multiplyP (bi1, bi2)) bi3 "2*3=6 bigint"
+              Expect.equal (Numbers.multiplyP (bd1, bd2)) bd3 "2*3=6 bigdec"
+              Expect.equal (Numbers.multiplyP (1.2M, 2.3M)) 2.76M "1.2*2.3=2.76 M"
+
+
+              // Check indirect calls on primitive args
+              Expect.equal (Numbers.multiplyP (2L :> obj, 3L :> obj)) 6L "2*3=6"
+              Expect.equal (Numbers.multiplyP (2UL :> obj, 3UL :> obj)) 6UL "2*3=6 unsigned"
+
+              Expect.floatClose
+                  Accuracy.medium
+                  ((Numbers.multiplyP (1.2 :> obj, 2.3 :> obj)) :?> float)
+                  2.76
+                  "1.2*2.3=2.76"
+
+              Expect.equal (Numbers.multiplyP (1.2M :> obj, 2.3M :> obj)) 2.76M "1.2*2.3=2.76 M"
+
+              // Edge cases should promote
+              Expect.equal (Numbers.multiplyP (Int64.MaxValue, 2L)) biMVm2 "multiplyP promotes"
+              Expect.equal (Numbers.multiplyP (Int64.MaxValue :> obj, 2L :> obj)) biMVm2 "multiplyP promotes"
+              Expect.equal (Numbers.multiplyP (UInt64.MaxValue, 2UL)) biUMVm2 "multiplyP promotes"
+              Expect.equal (Numbers.multiplyP (UInt64.MaxValue :> obj, 2UL :> obj)) biUMVm2 "multiplyP promotes"
+              Expect.equal (Numbers.multiplyP (Decimal.MaxValue, 2M)) bdMVm2 "multiplyP promotes"
+              Expect.equal (Numbers.multiplyP (Decimal.MaxValue :> obj, 2M :> obj)) bdMVm2 "multiplyP promotes"
+
+              // unchecked_multiply
+
+              Expect.equal (Numbers.unchecked_multiply (2L, 3L)) 6L "2*3=6"
+              Expect.equal (Numbers.unchecked_multiply (2UL, 3UL)) 6UL "2*3=6 unsigned"
+              Expect.floatClose Accuracy.medium (Numbers.unchecked_multiply (1.2, 2.3)) 2.76 "1.2*2.3=2.76"
+              Expect.equal (Numbers.unchecked_multiply (r1, r2)) r3 "2/3+4/5=8/15"
+              Expect.equal (Numbers.unchecked_multiply (bi1, bi2)) bi3 "2*3=6 bigint"
+              Expect.equal (Numbers.unchecked_multiply (bd1, bd2)) bd3 "2*3=6 bigdec"
+              Expect.equal (Numbers.unchecked_multiply (1.2M, 2.3M)) 2.76M "1.2*2.3=2.76 M"
+
+              // Check indirect calls on primitive args
+              Expect.equal (Numbers.unchecked_multiply (2L :> obj, 3L :> obj)) 6L "2*3=6"
+              Expect.equal (Numbers.unchecked_multiply (2UL :> obj, 3UL :> obj)) 6UL "2*3=6 unsigned"
+
+              Expect.floatClose
+                  Accuracy.medium
+                  ((Numbers.unchecked_multiply (1.2 :> obj, 2.3 :> obj)) :?> float)
+                  2.76
+                  "1.2*2.3=2.76"
+
+              Expect.equal (Numbers.unchecked_multiply (1.2M :> obj, 2.3M :> obj)) 2.76M "1.2*2.3=2.76 M"
+
+              // Edge cases should promote
+              Expect.equal (Numbers.unchecked_multiply (Int64.MaxValue, 2L)) -2L "unchecked_multiply wraps around"
+
+              Expect.equal
+                  (Numbers.unchecked_multiply (Int64.MaxValue :> obj, 2L :> obj))
+                  -2L
+                  "unchecked_multiply wraps around"
+
+              Expect.equal
+                  (Numbers.unchecked_multiply (UInt64.MaxValue, 2UL))
+                  (UInt64.MaxValue - 1UL)
+                  "unchecked_multiply wraps around"
+
+              Expect.equal
+                  (Numbers.unchecked_multiply (UInt64.MaxValue :> obj, 2UL :> obj))
+                  ((UInt64.MaxValue - 1UL) :> obj)
+                  "unchecked_multiply wraps around"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.unchecked_multiply (Decimal.MaxValue, 2M) |> ignore)
+                  "unchecked_multiply on decimal overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.unchecked_multiply (Decimal.MaxValue :> obj, 2M :> obj) |> ignore)
+                  "unchecked_multiply on decimal overflows"
+
+
 
           ]
