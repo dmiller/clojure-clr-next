@@ -417,7 +417,13 @@ type Numbers() =
 
     static member minus(x: obj, y: obj) =
         let yops = Numbers.getOps (y)
-        Numbers.getOps(x, y).add (x, yops.negate (y))
+        let xyops = Numbers.getOps(x,y)
+        // Only one Ops implementation does not support negate: ULong (except on arg 0UL)
+        // Special case that one
+        match yops, xyops with
+        | :? ULongOps, :? ULongOps -> Numbers.minus(convertToULong(x),convertToULong(y)) :> obj
+        | :? ULongOps, _ -> xyops.add(x,xyops.negate(y))
+        | _ ->  Numbers.getOps(x, y).add (x, yops.negate (y))
 
     static member minus(x: double, y: double) = x - y
 
@@ -429,7 +435,7 @@ type Numbers() =
         else
             ret
 
-    static member minus(x: uint64, y: uint64) =
+    static member minus(x: uint64, y: uint64)  =
         if y > x then raise <| Numbers.IntOverflow() else x - y
 
     static member minus(x: decimal, y: decimal) =
@@ -458,9 +464,21 @@ type Numbers() =
 
 
     static member minusP(x: obj, y: obj) =
+        // the straightforward code:
+        //      let yops = Numbers.getOps (y)
+        //      let negativeY = yops.negateP (y)
+        //      Numbers.getOps(x, negativeY).addP (x, negativeY)
+        // causes perhaps unnecessary promotion when x,y are ULong.
+        // Again, we need to special case that
+
         let yops = Numbers.getOps (y)
-        let negativeY = yops.negate (y)
-        Numbers.getOps(x, negativeY).addP (x, negativeY)
+        let xyops = Numbers.getOps(x,y)
+        // Only one Ops implementation does not support negate: ULong (except on arg 0UL)
+        // Special case that one
+        match yops, xyops with
+        | :? ULongOps, :? ULongOps -> Numbers.minusP(convertToULong(x),convertToULong(y)) :> obj
+        | :? ULongOps, _ -> xyops.addP(x,xyops.negateP(y))
+        | _ ->  Numbers.getOps(x, y).addP (x, yops.negateP (y))
 
     static member minusP(x: double, y: double) = x - y
 
@@ -474,7 +492,7 @@ type Numbers() =
 
     static member minusP(x: uint64, y: uint64) =
         if y > x then
-            Numbers.minusP (x :> obj, y :> obj)
+            Numbers.BIGINT_OPS.addP (x, Numbers.BIGINT_OPS.negateP(y))
         else
             (x - y) :> obj
 
@@ -504,13 +522,23 @@ type Numbers() =
     static member minusP(x: uint64, y: int64) = Numbers.minusP (x :> obj, y :> obj)
 
     static member unchecked_minus(x: obj, y: obj) =
+        // once again, need special case ULongs
         let yops = Numbers.getOps (y)
-        Numbers.getOps(x, y).unchecked_add (x, yops.unchecked_negate (y))
+        let xyops = Numbers.getOps(x,y)
+        match yops, xyops with
+        | :? ULongOps, :? ULongOps -> Numbers.unchecked_minus(convertToULong(x),convertToULong(y)) :> obj
+        | :? ULongOps, _ -> xyops.unchecked_negate(x,xyops.unchecked_negate(y))
+        | _ ->  Numbers.getOps(x, y).unchecked_add (x, yops.unchecked_negate (y))
+
+        //let yops = Numbers.getOps (y)
+        //match yops with
+        //| :? ULongOps -> 
+        //Numbers.getOps(x, y).unchecked_add (x, yops.unchecked_negate (y))
 
     static member unchecked_minus(x: double, y: double) = Numbers.minus (x, y)
-    static member unchecked_minus(x: int64, y: int64) = x + y
-    static member unchecked_minus(x: uint64, y: uint64) = x + y
-    static member unchecked_minus(x: decimal, y: decimal) = x + y
+    static member unchecked_minus(x: int64, y: int64) = x - y
+    static member unchecked_minus(x: uint64, y: uint64) = x - y
+    static member unchecked_minus(x: decimal, y: decimal) = x - y
     static member unchecked_minus(x: double, y: obj) = Numbers.minus (x, y)
     static member unchecked_minus(x: obj, y: double) = Numbers.minus (x, y)
     static member unchecked_minus(x: double, y: int64) = Numbers.minus (x, y)
@@ -1541,7 +1569,7 @@ and [<Sealed>] LongOps() =
         member this.negateP(x: obj) : obj =
             let lx = convertToLong (x)
 
-            if lx > Int64.MaxValue then
+            if lx > Int64.MinValue then
                 -lx
             else
                 BigInt.fromBigInteger (- BigInteger(lx))
@@ -1672,7 +1700,11 @@ and [<Sealed>] ULongOps() =
                 <| ArithmeticException("Checked operation error: negation of non-zero unsigned")
 
         member this.negateP(x: obj) : obj =
-            BigInt.fromBigInteger (- BigInteger(convertToULong (x)))
+            let lx = convertToULong(x)
+            if lx = 0UL then
+                x
+            else 
+                BigInt.fromBigInteger (- BigInteger(lx))
 
         member this.unchecked_negate(x: obj) : obj =
             Numbers.unchecked_minus (convertToULong (x))
