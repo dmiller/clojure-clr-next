@@ -395,6 +395,120 @@ let testAdd =
                   (fun () -> Numbers.unchecked_multiply (Decimal.MaxValue :> obj, 2M :> obj) |> ignore)
                   "unchecked_multiply on decimal overflows"
 
+          testCase "subtraction"
+          <| fun _ ->
+              let r1 = Ratio(BigInteger(22), BigInteger(15))
+              let r2 = Ratio(BigInteger(4), BigInteger(5))
+              let r3 = Ratio(BigInteger(2), BigInteger(3))
 
+
+              let bi3 = BigInt.fromBigInteger(BigInteger(1e10))
+              let bi2 = BigInteger(2e10)
+              let bi1 = BigInt.fromBigInteger (BigInteger(3e10))
+
+              let bd3 = BigDecimal.Create("11111111111111111.1111111111111")
+              let bd2 = BigDecimal.Create("22222222222222222.2222222222222")
+              let bd1 = BigDecimal.Create("33333333333333333.3333333333333")
+
+              let biMVm1 = BigInt.fromBigInteger (BigInteger(Int64.MinValue) - BigInteger.One)
+              let biUMVm1 = BigInt.fromBigInteger (BigInteger(UInt64.MinValue) - BigInteger.One)
+              let bdMVm1 = BigDecimal.Create(Decimal.MinValue) - BigDecimal.Create(1)
+
+              // minus
+
+              Expect.equal (Numbers.minus (3L, 2L)) 1L "3-2=1"
+              Expect.equal (Numbers.minus (3UL, 2UL)) 1UL "3-2=1 unsigned"
+              Expect.floatClose Accuracy.medium (Numbers.minus (3.5, 2.3)) 1.2 "3.5-2.3=1.2"
+              Expect.equal (Numbers.minus (r1, r2)) r3 "22/15-4/5=2/3"
+              Expect.equal (Numbers.minus (bi1, bi2)) bi3 "3-2=1 bigint"
+              Expect.equal (Numbers.minus (bd1, bd2)) bd3 "3-2=1 bigdec"
+              Expect.equal (Numbers.minus (3.5M, 2.3M)) 1.2M "3.5-2.3=1.2 M"
+               
+              // Check indirect calls on primitive args
+              Expect.equal (Numbers.minus (3L :> obj, 2L :> obj)) 1L "3-2=1"
+              Expect.equal (Numbers.minus (3UL :> obj, 2UL :> obj)) 1UL "3-2=1 unsigned"
+              Expect.floatClose Accuracy.medium ((Numbers.minus (3.5 :> obj, 2.3 :> obj)) :?> float) 1.2 "3.5-2.3=1.2"
+              Expect.equal (Numbers.minus (3.5M :> obj, 2.3M :> obj)) 1.2M "3.5-2.3=1.2 M"
+
+              // check edge cases
+              Expect.throwsT<OverflowException> (fun () -> Numbers.minus (Int64.MinValue, 1L) |> ignore) "minus overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.minus (Int64.MinValue :> obj, 1L :> obj) |> ignore)
+                  "minus overflows"
+
+              Expect.throwsT<OverflowException> (fun () -> Numbers.minus (UInt64.MinValue, 1UL) |> ignore) "minus overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.minus (UInt64.MinValue :> obj, 1UL :> obj) |> ignore)
+                  "minus overflows"
+
+              Expect.throwsT<OverflowException> (fun () -> Numbers.minus (Decimal.MinValue, 1M) |> ignore) "minus overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.minus (Decimal.MinValue :> obj, 1M :> obj) |> ignore)
+                  "minus overflows"
+
+              // minusP
+
+              Expect.equal (Numbers.minusP (3L, 2L)) 1L "3-2=1"
+              Expect.equal (Numbers.minusP (3UL, 2UL)) 1UL "3-2=1 unsigned"
+              Expect.floatClose Accuracy.medium (Numbers.minusP (3.5, 2.3)) 1.2 "3.5-2.3=1.2"
+              Expect.equal (Numbers.minusP (r1, r2)) r3 "22/15-4/5=2/3"
+              Expect.equal (Numbers.minusP (bi1, bi2)) bi3 "3-2=1 bigint"
+              Expect.equal (Numbers.minusP (bd1, bd2)) bd3 "3-2=1 bigdec"
+              Expect.equal (Numbers.minusP (3.5M, 2.3M)) 1.2M "3.5-2.3=1.2 M"
+               
+              // Check indirect calls on primitive args
+              Expect.equal (Numbers.minusP (3L :> obj, 2L :> obj)) 1L "3-2=1"
+              Expect.equal (Numbers.minusP (3UL :> obj, 2UL :> obj)) 1UL "3-2=1 unsigned"
+              Expect.floatClose Accuracy.medium ((Numbers.minusP (3.5 :> obj, 2.3 :> obj)) :?> float) 1.2 "3.5-2.3=1.2"
+              Expect.equal (Numbers.minusP (3.5M :> obj, 2.3M :> obj)) 1.2M "3.5-2.3=1.2 M"
+
+
+              // Edge cases should promote
+              Expect.equal (Numbers.minusP (Int64.MinValue, 1L)) biMVm1 "minusP promotes"
+              Expect.equal (Numbers.minusP (Int64.MinValue :> obj, 1L :> obj)) biMVm1 "minusP promotes"
+              Expect.equal (Numbers.minusP (UInt64.MinValue, 1UL)) biUMVm1 "minusP promotes"
+              Expect.equal (Numbers.minusP (UInt64.MinValue :> obj, 1UL :> obj)) biUMVm1 "minusP promotes"
+              Expect.equal (Numbers.minusP (Decimal.MinValue, 1M)) bdMVm1 "minusP promotes"
+              Expect.equal (Numbers.minusP (Decimal.MinValue :> obj, 1M :> obj)) bdMVm1 "minusP promotes"
+
+              // unchecked_minus
+
+
+              Expect.equal (Numbers.unchecked_minus (3L, 2L)) 1L "3-2=1"
+              Expect.equal (Numbers.unchecked_minus (3UL, 2UL)) 1UL "3-2=1 unsigned"
+              Expect.floatClose Accuracy.medium (Numbers.unchecked_minus (3.5, 2.3)) 1.2 "3.5-2.3=1.2"
+              Expect.equal (Numbers.unchecked_minus (r1, r2)) r3 "22/15-4/5=2/3"
+              Expect.equal (Numbers.unchecked_minus (bi1, bi2)) bi3 "3-2=1 bigint"
+              Expect.equal (Numbers.unchecked_minus (bd1, bd2)) bd3 "3-2=1 bigdec"
+              Expect.equal (Numbers.unchecked_minus (3.5M, 2.3M)) 1.2M "3.5-2.3=1.2 M"
+               
+
+              // Check indirect calls on primitive args
+              Expect.equal (Numbers.unchecked_minus (3L :> obj, 2L :> obj)) 1L "3-2=1"
+              Expect.equal (Numbers.unchecked_minus (3UL :> obj, 2UL :> obj)) 1UL "3-2=1 unsigned"
+              Expect.floatClose Accuracy.medium ((Numbers.unchecked_minus (3.5 :> obj, 2.3 :> obj)) :?> float) 1.2 "3.5-2.3=1.2"
+              Expect.equal (Numbers.unchecked_minus (3.5M :> obj, 2.3M :> obj)) 1.2M "3.5-2.3=1.2 M"
+
+              // Edge cases should promote
+              Expect.equal (Numbers.unchecked_minus (Int64.MinValue, 1L)) Int64.MaxValue "unchecked_minus wraps around"
+
+              Expect.equal
+                  (Numbers.unchecked_minus (Int64.MinValue :> obj, 1L :> obj))
+                  Int64.MaxValue
+                  "unchecked_minus wraps around"
+
+              Expect.equal (Numbers.unchecked_minus (0UL, 1UL)) UInt64.MaxValue "unchecked_minus wraps around"
+              Expect.equal (Numbers.unchecked_minus (0UL :> obj, 1UL :> obj)) UInt64.MaxValue "unchecked_minus wraps around"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.unchecked_minus (Decimal.MinValue, 1M) |> ignore)
+                  "unchecked_minus on decimal overflows"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.unchecked_minus (Decimal.MinValue :> obj, 1M :> obj) |> ignore)
+                  "unchecked_minus on decimal overflows"
 
           ]
