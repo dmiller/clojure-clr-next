@@ -378,7 +378,9 @@ type Numbers() =
             -x
 
     static member minus(x: uint64) =
-        if x = 0UL then x else raise <| Numbers.IntOverflow()
+        if x = 0UL then x 
+        else raise <| ArithmeticException("Checked operation error: negation of non-zero unsigned")
+
 
     static member minus(x: decimal) = -x
 
@@ -407,7 +409,8 @@ type Numbers() =
         if x = 0UL then
             x
         else
-            raise <| ArithmeticException("Minus not supported on unsigned integer types")
+            raise <| ArithmeticException("negation of non-zero unsigned")
+
 
     static member unchecked_minus(x: decimal) = -x
 
@@ -2137,13 +2140,3 @@ and [<AbstractClass; Sealed>] OpsImpls =
     static member BigInt = BigIntOps()
     static member BigDecimal = BigDecimalOps()
     static member ClrDecimal = ClrDecimalOps()
-
-
-
-// |          Method |     Mean |   Error |   StdDev | Ratio | RatioSD |
-// |---------------- |---------:|--------:|---------:|------:|--------:|
-// |     TypeCombine | 349.9 us | 6.98 us | 10.23 us |  1.00 |    0.00 |
-// |   LookupCombine | 178.9 us | 2.81 us |  2.63 us |  0.51 |    0.02 |
-// | LookupCombine2D | 168.9 us | 2.04 us |  1.91 us |  0.48 |    0.02 |
-
-//let combinerArray = Array2D.create

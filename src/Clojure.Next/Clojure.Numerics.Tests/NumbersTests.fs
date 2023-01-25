@@ -8,9 +8,6 @@ open System
 open System.Text
 
 
-
-
-
 [<Tests>]
 let testOpsSelect =
     testList
@@ -510,5 +507,81 @@ let testAdd =
               Expect.throwsT<OverflowException>
                   (fun () -> Numbers.unchecked_minus (Decimal.MinValue :> obj, 1M :> obj) |> ignore)
                   "unchecked_minus on decimal overflows"
+
+
+          testCase "unary minus"
+          <| fun _ ->
+
+            let biMinVm = BigInt.fromBigInteger(-BigInteger(Int64.MinValue))
+            let bi = BigInteger(1e30)
+            let bim = BigInteger(-1e30)
+            let bi2 = BigInteger(3e50)
+            let r = Ratio(bi,bi2)
+            let rm = Ratio(bim,bi2)
+            let bd = BigDecimal.Create("111111111111.11111111111")
+            let bdm = BigDecimal.Create("-111111111111.11111111111")
+            let bbi = BigInt.fromBigInteger(bi)
+            let bbim = BigInt.fromBigInteger(bim)
+
+            Expect.equal (Numbers.minus(12.0)) -12.0 "12 -> -12 D"
+            Expect.equal (Numbers.minus(12L)) -12L "12 -> -12 L"
+            Expect.equal (Numbers.minus(0UL)) 0UL "0 -> 0 UL"
+            Expect.equal (Numbers.minus(12M)) -12M " 12 -> -12 M)"
+            Expect.throwsT<ArithmeticException> (fun () -> Numbers.minus(12UL) |> ignore) "Can't negate UL"
+            Expect.throwsT<OverflowException> (fun () -> Numbers.minus(Int64.MinValue) |> ignore) "Can't negate L -inf"
+
+            Expect.equal (Numbers.minus(12.0 :> obj)) -12.0 "12 -> -12 D"
+            Expect.equal (Numbers.minus(12L :> obj)) -12L "12 -> -12 L"
+            Expect.equal (Numbers.minus(0UL :> obj)) 0UL "0 -> 0 UL"
+            Expect.equal (Numbers.minus(12M :> obj)) -12M " 12 -> -12 M)"
+            Expect.throwsT<ArithmeticException> (fun () -> Numbers.minus(12UL :> obj) |> ignore) "Can't negate UL"
+            Expect.throwsT<OverflowException> (fun () -> Numbers.minus(Int64.MinValue :> obj) |> ignore) "Can't negate L -inf"
+
+            Expect.equal (Numbers.minusP(12.0)) -12.0 "12 -> -12 D"
+            Expect.equal (Numbers.minusP(12L)) -12L "12 -> -12 L"
+            Expect.equal (Numbers.minusP(0UL)) 0UL "0 -> 0 UL"
+            Expect.equal (Numbers.minusP(12M)) -12M " 12 -> -12 M)"
+            Expect.equal (Numbers.minusP(Int64.MinValue)) biMinVm "-inf(L) -> BI"
+            Expect.equal (Numbers.minusP(12UL)) (BigInt.fromLong(-12)) "12 UL -> -12 BI"
+
+            Expect.equal (Numbers.minusP(12.0 :> obj)) -12.0 "12 -> -12 D"
+            Expect.equal (Numbers.minusP(12L :> obj)) -12L "12 -> -12 L"
+            Expect.equal (Numbers.minusP(0UL :> obj)) 0UL "0 -> 0 UL"
+            Expect.equal (Numbers.minusP(12M :> obj)) -12M " 12 -> -12 M"
+            Expect.equal (Numbers.minusP(Int64.MinValue :> obj)) biMinVm "-inf(L) -> BI"
+            Expect.equal (Numbers.minusP(12UL:> obj)) (BigInt.fromLong(-12)) "12 UL -> -12 BI"
+
+            Expect.equal (Numbers.unchecked_minus(12.0)) -12.0 "12 -> -12 D"
+            Expect.equal (Numbers.unchecked_minus(12L)) -12L "12 -> -12 L"
+            Expect.equal (Numbers.unchecked_minus(0UL)) 0UL "0 -> 0 UL"
+            Expect.equal (Numbers.unchecked_minus(12M)) -12M " 12 -> -12 M)"
+            Expect.throwsT<ArithmeticException> (fun () -> Numbers.unchecked_minus(12UL) |> ignore) "Can't negate UL"
+            Expect.equal (Numbers.unchecked_minus(Int64.MinValue)) Int64.MinValue  "Can't negate L -inf"
+
+            Expect.equal (Numbers.unchecked_minus(12.0 :> obj)) -12.0 "12 -> -12 D"
+            Expect.equal (Numbers.unchecked_minus(12L :> obj)) -12L "12 -> -12 L"
+            Expect.equal (Numbers.unchecked_minus(0UL :> obj)) 0UL "0 -> 0 UL"
+            Expect.equal (Numbers.unchecked_minus(12M :> obj)) -12M " 12 -> -12 M)"
+            Expect.throwsT<ArithmeticException> (fun () -> Numbers.unchecked_minus(12UL :> obj) |> ignore) "Can't negate UL"
+            Expect.equal (Numbers.unchecked_minus(Int64.MinValue) :> obj) Int64.MinValue  "Can't negate L -inf"
+
+
+
+            Expect.equal (Numbers.minus(bbi)) bbim "BI minus"
+            Expect.equal (Numbers.minus(r)) rm "Ration minus"
+            Expect.equal (Numbers.minus(bd)) bdm "BD minus"
+
+            Expect.equal (Numbers.minusP(bbi)) bbim "BI minus"
+            Expect.equal (Numbers.minusP(r)) rm "Ration minus"
+            Expect.equal (Numbers.minusP(bd)) bdm "BD minus"
+
+            Expect.equal (Numbers.unchecked_minus(bbi)) bbim "BI minus"
+            Expect.equal (Numbers.unchecked_minus(r)) rm "Ration minus"
+            Expect.equal (Numbers.unchecked_minus(bd)) bdm "BD minus"
+
+
+
+
+
 
           ]
