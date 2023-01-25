@@ -223,7 +223,7 @@ If you look across all the code for `Number.ops`, `Ops.combine`, and `Ops.combin
 | __BI >__ |  BI  |   D  |   R  |  BI  |  BD  |
 | __BD >__ |  BD  |   D  |  BD  |  BD  |  BD  |
 
-where _L_ = `Long`, _D_ = `Double`, _R_ = `Ratio`, _BI_ = `BigInteger` and _BD_ = 'BigDouble`.
+where _L_ = `Long`, _D_ = `Double`, _R_ = `Ratio`, _BI_ = `BigInteger` and _BD_ = `BigDouble`.
 
 As I mentioned before, `Double` contaminates everything.
 The other conversions are _widening_: the wider type can represent faithfully all the values of the narrower type.
