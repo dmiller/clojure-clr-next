@@ -565,8 +565,6 @@ let testAdd =
             Expect.throwsT<ArithmeticException> (fun () -> Numbers.unchecked_minus(12UL :> obj) |> ignore) "Can't negate UL"
             Expect.equal (Numbers.unchecked_minus(Int64.MinValue) :> obj) Int64.MinValue  "Can't negate L -inf"
 
-
-
             Expect.equal (Numbers.minus(bbi)) bbim "BI minus"
             Expect.equal (Numbers.minus(r)) rm "Ration minus"
             Expect.equal (Numbers.minus(bd)) bdm "BD minus"
@@ -581,7 +579,51 @@ let testAdd =
 
 
 
+          testCase "isPos, isZero, isNeg"
+          <| fun _ ->
+                
+                let snums : obj array array = [|
+                    [| 2y; 0y; -2y  |]
+                    [| 2s; 0s; -2s |]
+                    [| 2;  0;   -2 |]
+                    [| 2L; 0L; -2L |]
+                    [| 2M; 0M; -2M |]
+                    [| BigInteger(2); BigInteger.Zero; BigInteger(-2) |]
+                    [| BigDecimal.Create(2); BigDecimal.Zero; BigDecimal.Create(-2) |]
+                    [| Ratio(BigInteger(2),BigInteger(1));
+                       Ratio(BigInteger(0),BigInteger(1));
+                       Ratio(BigInteger(-2),BigInteger(1)) |]                
+                |]
 
+                let unums : obj array array = [|
+                    [| 2uy :> obj; 0uy; |]
+                    [| 2us:> obj; 0us;|]
+                    [| 2u;  0u;  |]
+                    [| 2UL; 0UL  |]
+                 |]
 
+                for a in snums do
+                    let vs = Array.map (fun v -> Numbers.isPos(v:> obj)) a
+                    Expect.equal vs [| true; false; false |] "Checking parity"
+
+                for a in snums do
+                    let vs = Array.map (fun v -> Numbers.isZero(v:> obj)) a
+                    Expect.equal vs [| false; true; false |] "Checking parity"
+
+                for a in snums do
+                    let vs = Array.map (fun v -> Numbers.isNeg(v:> obj)) a
+                    Expect.equal vs [| false; false; true |] "Checking parity"
+
+                for a in unums do
+                    let vs = Array.map (fun v -> Numbers.isPos(v:> obj)) a
+                    Expect.equal vs [| true; false |] "Checking parity"
+
+                for a in unums do
+                    let vs = Array.map (fun v -> Numbers.isZero(v:> obj)) a
+                    Expect.equal vs [| false; true |] "Checking parity"
+
+                for a in unums do
+                    let vs = Array.map (fun v -> Numbers.isNeg(v:> obj)) a
+                    Expect.equal vs [| false; false |] "Checking parity"
 
           ]
