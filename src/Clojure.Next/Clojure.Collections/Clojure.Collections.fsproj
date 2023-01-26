@@ -6,8 +6,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="GenerateRestFnSource.fsx" />
     <Compile Include="Interfaces.fs" />
+    <Compile Include="Util.fs" />
+    <Compile Include="RT0.fs" />
     <Compile Include="SmallThings.fs" />
+    <Compile Include="Fn.fs" />
+    <Compile Include="SeqEnumerator.fs" />
+    <Compile Include="StarterSequences.fs" />
+    <Compile Include="ArraySeq.fs" />
+    <Compile Include="LazySeq.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Clojure.Numerics\Clojure.Numerics.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -58,7 +58,7 @@ type Murmur3 =
         let h = h ^^^ (h >>> 16)
         h
 
-    static member internal finalizeCollHash (hash: uint) (count: int) : uint =
+    static member finalizeCollHash (hash: uint) (count: int) : uint =
         let h1 = Murmur3.Seed
         let k1 = Murmur3.mixKey hash
         let h = Murmur3.mixHash h1 k1
