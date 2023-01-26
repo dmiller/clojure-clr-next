@@ -768,4 +768,62 @@ let testAdd =
               Expect.throwsT<ArithmeticException> (fun () -> (Numbers.quotient (1.0, 0.0)) |> ignore) "throws"
               Expect.throwsT<ArithmeticException> (fun () -> (Numbers.quotient (1.0M, 0.0M)) |> ignore) "throws"
 
+
+
+          testCase "remainder"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              let r12 = Ratio(BigInteger(1), BigInteger(2))
+              let r23 = Ratio(BigInteger(2), BigInteger(3))
+              let r16 = Ratio(BigInteger(1), BigInteger(6))
+              let r13 = Ratio(BigInteger(1), BigInteger(3))
+              let bi4 = BigInteger(4)
+              let bi0 = BigInt.fromLong(0)
+
+
+              Expect.equal (Numbers.remainder (4L, 2L)) 0L "x"
+              Expect.equal (Numbers.remainder (3L, 2L)) 1L "x"
+              Expect.equal (Numbers.remainder (6L, 4L)) 2L "x"
+              Expect.equal (Numbers.remainder (0L, 5L)) 0L "x"
+
+              Expect.equal (Numbers.remainder (2L, r12)) bi0 "x"
+              Expect.equal (Numbers.remainder (r23, r12)) r16 "x"
+              Expect.equal (Numbers.remainder (1L, r23)) r13 "x"
+
+              Expect.equal (Numbers.remainder (4.0, 2.0)) 0.0 "x"
+              Expect.equal (Numbers.remainder (4.5, 2.0)) 0.5 "x"
+
+              Expect.equal (Numbers.remainder (42L, 5L)) 2L "x"
+              Expect.equal (Numbers.remainder (42L, -5L)) 2L "x"
+              Expect.equal (Numbers.remainder (-42L, 5L)) -2L "x"
+              Expect.equal (Numbers.remainder (-42L, -5L)) -2L "x"
+
+              Expect.equal (Numbers.remainder (9L, 3L)) 0L "x"
+              Expect.equal (Numbers.remainder (9L, -3L)) 0L "x"
+              Expect.equal (Numbers.remainder (-9L, 3L)) 0L "x"
+              Expect.equal (Numbers.remainder (-9L, -3L)) 0L "x"
+
+              Expect.equal (Numbers.remainder (2L, 5L)) 2L "x"
+              Expect.equal (Numbers.remainder (2L, -5L)) 2L "x"
+              Expect.equal (Numbers.remainder (-2L, 5L)) -2L "x"
+              Expect.equal (Numbers.remainder (-2L, -5L)) -2L "x"
+
+              Expect.equal (Numbers.remainder (0L, 3L)) 0L "x"
+              Expect.equal (Numbers.remainder (0L, -3L)) 0L "x"
+
+
+              // and some extra tests
+              Expect.equal (Numbers.remainder (4UL, 2UL)) 0UL "x"
+              Expect.equal (Numbers.remainder (3UL, 2UL)) 1UL "x"
+              Expect.equal (Numbers.remainder (6UL, 4UL)) 2UL "x"
+              Expect.equal (Numbers.remainder (0UL, 5UL)) 0UL "x"
+
+              Expect.equal (Numbers.remainder (4.0M, 2.0M)) 0.0M "x"
+              Expect.equal (Numbers.remainder (4.5M, 2.0M)) 0.5M "x"
+
+              Expect.throwsT<ArithmeticException> (fun () -> (Numbers.remainder (1.0, 0.0)) |> ignore) "throws"
+              Expect.throwsT<ArithmeticException> (fun () -> (Numbers.quotient (1.0M, 0.0M)) |> ignore) "throws"
+
+
           ]

@@ -16,6 +16,7 @@
     <PackageReference Include="Expecto" Version="9.0.4" />
     <PackageReference Include="Microsoft.TestPlatform.ObjectModel" Version="17.4.1" />
     <PackageReference Include="Mono.Cecil" Version="0.11.4" />
+    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.13.3" />
   </ItemGroup>
 
   <ItemGroup>
