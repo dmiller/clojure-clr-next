@@ -742,9 +742,9 @@ type Numbers() =
             let q = x / y
 
             if q <= decimal (Int64.MaxValue) && q >= decimal (Int64.MinValue) then
-                decimal (int64 (q)) :> obj
+                decimal (int64 (q))
             else
-                (BigDecimal.Create(q).ToBigInteger())
+                decimal (BigDecimal.Create(q).ToBigInteger())
 
 
     static member quotient(x: int64, y: int64) = x / y

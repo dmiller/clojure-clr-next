@@ -768,14 +768,4 @@ let testAdd =
               Expect.throwsT<ArithmeticException> (fun () -> (Numbers.quotient (1.0, 0.0)) |> ignore) "throws"
               Expect.throwsT<ArithmeticException> (fun () -> (Numbers.quotient (1.0M, 0.0M)) |> ignore) "throws"
 
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
-
           ]
