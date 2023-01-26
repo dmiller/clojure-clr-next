@@ -252,13 +252,11 @@ let testAdd =
 
               //  9223372036854775807 * 2
               // 18446744073709551614
-              let biMVm2 =
-                  BigInt.fromBigInteger (BigInteger(Int64.MaxValue) * BigInteger(2))
+              let biMVm2 = BigInt.fromBigInteger (BigInteger(Int64.MaxValue) * BigInteger(2))
 
               // 18446744073709551615 * 2 =
               // 36893488147419103230
-              let biUMVm2 =
-                  BigInt.fromBigInteger (BigInteger(UInt64.MaxValue) * BigInteger(2))
+              let biUMVm2 = BigInt.fromBigInteger (BigInteger(UInt64.MaxValue) * BigInteger(2))
 
               //  79228162514264337593543950335 * 2 =
               // 158456325028528675187087900670
@@ -399,7 +397,7 @@ let testAdd =
               let r3 = Ratio(BigInteger(2), BigInteger(3))
 
 
-              let bi3 = BigInt.fromBigInteger(BigInteger(1e10))
+              let bi3 = BigInt.fromBigInteger (BigInteger(1e10))
               let bi2 = BigInteger(2e10)
               let bi1 = BigInt.fromBigInteger (BigInteger(3e10))
 
@@ -420,7 +418,7 @@ let testAdd =
               Expect.equal (Numbers.minus (bi1, bi2)) bi3 "3-2=1 bigint"
               Expect.equal (Numbers.minus (bd1, bd2)) bd3 "3-2=1 bigdec"
               Expect.equal (Numbers.minus (3.5M, 2.3M)) 1.2M "3.5-2.3=1.2 M"
-               
+
               // Check indirect calls on primitive args
               Expect.equal (Numbers.minus (3L :> obj, 2L :> obj)) 1L "3-2=1"
               Expect.equal (Numbers.minus (3UL :> obj, 2UL :> obj)) 1UL "3-2=1 unsigned"
@@ -428,19 +426,25 @@ let testAdd =
               Expect.equal (Numbers.minus (3.5M :> obj, 2.3M :> obj)) 1.2M "3.5-2.3=1.2 M"
 
               // check edge cases
-              Expect.throwsT<OverflowException> (fun () -> Numbers.minus (Int64.MinValue, 1L) |> ignore) "minus overflows"
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.minus (Int64.MinValue, 1L) |> ignore)
+                  "minus overflows"
 
               Expect.throwsT<OverflowException>
                   (fun () -> Numbers.minus (Int64.MinValue :> obj, 1L :> obj) |> ignore)
                   "minus overflows"
 
-              Expect.throwsT<OverflowException> (fun () -> Numbers.minus (UInt64.MinValue, 1UL) |> ignore) "minus overflows"
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.minus (UInt64.MinValue, 1UL) |> ignore)
+                  "minus overflows"
 
               Expect.throwsT<OverflowException>
                   (fun () -> Numbers.minus (UInt64.MinValue :> obj, 1UL :> obj) |> ignore)
                   "minus overflows"
 
-              Expect.throwsT<OverflowException> (fun () -> Numbers.minus (Decimal.MinValue, 1M) |> ignore) "minus overflows"
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.minus (Decimal.MinValue, 1M) |> ignore)
+                  "minus overflows"
 
               Expect.throwsT<OverflowException>
                   (fun () -> Numbers.minus (Decimal.MinValue :> obj, 1M :> obj) |> ignore)
@@ -455,7 +459,7 @@ let testAdd =
               Expect.equal (Numbers.minusP (bi1, bi2)) bi3 "3-2=1 bigint"
               Expect.equal (Numbers.minusP (bd1, bd2)) bd3 "3-2=1 bigdec"
               Expect.equal (Numbers.minusP (3.5M, 2.3M)) 1.2M "3.5-2.3=1.2 M"
-               
+
               // Check indirect calls on primitive args
               Expect.equal (Numbers.minusP (3L :> obj, 2L :> obj)) 1L "3-2=1"
               Expect.equal (Numbers.minusP (3UL :> obj, 2UL :> obj)) 1UL "3-2=1 unsigned"
@@ -481,12 +485,18 @@ let testAdd =
               Expect.equal (Numbers.unchecked_minus (bi1, bi2)) bi3 "3-2=1 bigint"
               Expect.equal (Numbers.unchecked_minus (bd1, bd2)) bd3 "3-2=1 bigdec"
               Expect.equal (Numbers.unchecked_minus (3.5M, 2.3M)) 1.2M "3.5-2.3=1.2 M"
-               
+
 
               // Check indirect calls on primitive args
               Expect.equal (Numbers.unchecked_minus (3L :> obj, 2L :> obj)) 1L "3-2=1"
               Expect.equal (Numbers.unchecked_minus (3UL :> obj, 2UL :> obj)) 1UL "3-2=1 unsigned"
-              Expect.floatClose Accuracy.medium ((Numbers.unchecked_minus (3.5 :> obj, 2.3 :> obj)) :?> float) 1.2 "3.5-2.3=1.2"
+
+              Expect.floatClose
+                  Accuracy.medium
+                  ((Numbers.unchecked_minus (3.5 :> obj, 2.3 :> obj)) :?> float)
+                  1.2
+                  "3.5-2.3=1.2"
+
               Expect.equal (Numbers.unchecked_minus (3.5M :> obj, 2.3M :> obj)) 1.2M "3.5-2.3=1.2 M"
 
               // Edge cases should promote
@@ -498,7 +508,11 @@ let testAdd =
                   "unchecked_minus wraps around"
 
               Expect.equal (Numbers.unchecked_minus (0UL, 1UL)) UInt64.MaxValue "unchecked_minus wraps around"
-              Expect.equal (Numbers.unchecked_minus (0UL :> obj, 1UL :> obj)) UInt64.MaxValue "unchecked_minus wraps around"
+
+              Expect.equal
+                  (Numbers.unchecked_minus (0UL :> obj, 1UL :> obj))
+                  UInt64.MaxValue
+                  "unchecked_minus wraps around"
 
               Expect.throwsT<OverflowException>
                   (fun () -> Numbers.unchecked_minus (Decimal.MinValue, 1M) |> ignore)
@@ -512,118 +526,256 @@ let testAdd =
           testCase "unary minus"
           <| fun _ ->
 
-            let biMinVm = BigInt.fromBigInteger(-BigInteger(Int64.MinValue))
-            let bi = BigInteger(1e30)
-            let bim = BigInteger(-1e30)
-            let bi2 = BigInteger(3e50)
-            let r = Ratio(bi,bi2)
-            let rm = Ratio(bim,bi2)
-            let bd = BigDecimal.Create("111111111111.11111111111")
-            let bdm = BigDecimal.Create("-111111111111.11111111111")
-            let bbi = BigInt.fromBigInteger(bi)
-            let bbim = BigInt.fromBigInteger(bim)
+              let biMinVm = BigInt.fromBigInteger (- BigInteger(Int64.MinValue))
+              let bi = BigInteger(1e30)
+              let bim = BigInteger(-1e30)
+              let bi2 = BigInteger(3e50)
+              let r = Ratio(bi, bi2)
+              let rm = Ratio(bim, bi2)
+              let bd = BigDecimal.Create("111111111111.11111111111")
+              let bdm = BigDecimal.Create("-111111111111.11111111111")
+              let bbi = BigInt.fromBigInteger (bi)
+              let bbim = BigInt.fromBigInteger (bim)
 
-            Expect.equal (Numbers.minus(12.0)) -12.0 "12 -> -12 D"
-            Expect.equal (Numbers.minus(12L)) -12L "12 -> -12 L"
-            Expect.equal (Numbers.minus(0UL)) 0UL "0 -> 0 UL"
-            Expect.equal (Numbers.minus(12M)) -12M " 12 -> -12 M)"
-            Expect.throwsT<ArithmeticException> (fun () -> Numbers.minus(12UL) |> ignore) "Can't negate UL"
-            Expect.throwsT<OverflowException> (fun () -> Numbers.minus(Int64.MinValue) |> ignore) "Can't negate L -inf"
+              Expect.equal (Numbers.minus (12.0)) -12.0 "12 -> -12 D"
+              Expect.equal (Numbers.minus (12L)) -12L "12 -> -12 L"
+              Expect.equal (Numbers.minus (0UL)) 0UL "0 -> 0 UL"
+              Expect.equal (Numbers.minus (12M)) -12M " 12 -> -12 M)"
+              Expect.throwsT<ArithmeticException> (fun () -> Numbers.minus (12UL) |> ignore) "Can't negate UL"
 
-            Expect.equal (Numbers.minus(12.0 :> obj)) -12.0 "12 -> -12 D"
-            Expect.equal (Numbers.minus(12L :> obj)) -12L "12 -> -12 L"
-            Expect.equal (Numbers.minus(0UL :> obj)) 0UL "0 -> 0 UL"
-            Expect.equal (Numbers.minus(12M :> obj)) -12M " 12 -> -12 M)"
-            Expect.throwsT<ArithmeticException> (fun () -> Numbers.minus(12UL :> obj) |> ignore) "Can't negate UL"
-            Expect.throwsT<OverflowException> (fun () -> Numbers.minus(Int64.MinValue :> obj) |> ignore) "Can't negate L -inf"
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.minus (Int64.MinValue) |> ignore)
+                  "Can't negate L -inf"
 
-            Expect.equal (Numbers.minusP(12.0)) -12.0 "12 -> -12 D"
-            Expect.equal (Numbers.minusP(12L)) -12L "12 -> -12 L"
-            Expect.equal (Numbers.minusP(0UL)) 0UL "0 -> 0 UL"
-            Expect.equal (Numbers.minusP(12M)) -12M " 12 -> -12 M)"
-            Expect.equal (Numbers.minusP(Int64.MinValue)) biMinVm "-inf(L) -> BI"
-            Expect.equal (Numbers.minusP(12UL)) (BigInt.fromLong(-12)) "12 UL -> -12 BI"
+              Expect.equal (Numbers.minus (12.0 :> obj)) -12.0 "12 -> -12 D"
+              Expect.equal (Numbers.minus (12L :> obj)) -12L "12 -> -12 L"
+              Expect.equal (Numbers.minus (0UL :> obj)) 0UL "0 -> 0 UL"
+              Expect.equal (Numbers.minus (12M :> obj)) -12M " 12 -> -12 M)"
+              Expect.throwsT<ArithmeticException> (fun () -> Numbers.minus (12UL :> obj) |> ignore) "Can't negate UL"
 
-            Expect.equal (Numbers.minusP(12.0 :> obj)) -12.0 "12 -> -12 D"
-            Expect.equal (Numbers.minusP(12L :> obj)) -12L "12 -> -12 L"
-            Expect.equal (Numbers.minusP(0UL :> obj)) 0UL "0 -> 0 UL"
-            Expect.equal (Numbers.minusP(12M :> obj)) -12M " 12 -> -12 M"
-            Expect.equal (Numbers.minusP(Int64.MinValue :> obj)) biMinVm "-inf(L) -> BI"
-            Expect.equal (Numbers.minusP(12UL:> obj)) (BigInt.fromLong(-12)) "12 UL -> -12 BI"
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.minus (Int64.MinValue :> obj) |> ignore)
+                  "Can't negate L -inf"
 
-            Expect.equal (Numbers.unchecked_minus(12.0)) -12.0 "12 -> -12 D"
-            Expect.equal (Numbers.unchecked_minus(12L)) -12L "12 -> -12 L"
-            Expect.equal (Numbers.unchecked_minus(0UL)) 0UL "0 -> 0 UL"
-            Expect.equal (Numbers.unchecked_minus(12M)) -12M " 12 -> -12 M)"
-            Expect.throwsT<ArithmeticException> (fun () -> Numbers.unchecked_minus(12UL) |> ignore) "Can't negate UL"
-            Expect.equal (Numbers.unchecked_minus(Int64.MinValue)) Int64.MinValue  "Can't negate L -inf"
+              Expect.equal (Numbers.minusP (12.0)) -12.0 "12 -> -12 D"
+              Expect.equal (Numbers.minusP (12L)) -12L "12 -> -12 L"
+              Expect.equal (Numbers.minusP (0UL)) 0UL "0 -> 0 UL"
+              Expect.equal (Numbers.minusP (12M)) -12M " 12 -> -12 M)"
+              Expect.equal (Numbers.minusP (Int64.MinValue)) biMinVm "-inf(L) -> BI"
+              Expect.equal (Numbers.minusP (12UL)) (BigInt.fromLong (-12)) "12 UL -> -12 BI"
 
-            Expect.equal (Numbers.unchecked_minus(12.0 :> obj)) -12.0 "12 -> -12 D"
-            Expect.equal (Numbers.unchecked_minus(12L :> obj)) -12L "12 -> -12 L"
-            Expect.equal (Numbers.unchecked_minus(0UL :> obj)) 0UL "0 -> 0 UL"
-            Expect.equal (Numbers.unchecked_minus(12M :> obj)) -12M " 12 -> -12 M)"
-            Expect.throwsT<ArithmeticException> (fun () -> Numbers.unchecked_minus(12UL :> obj) |> ignore) "Can't negate UL"
-            Expect.equal (Numbers.unchecked_minus(Int64.MinValue) :> obj) Int64.MinValue  "Can't negate L -inf"
+              Expect.equal (Numbers.minusP (12.0 :> obj)) -12.0 "12 -> -12 D"
+              Expect.equal (Numbers.minusP (12L :> obj)) -12L "12 -> -12 L"
+              Expect.equal (Numbers.minusP (0UL :> obj)) 0UL "0 -> 0 UL"
+              Expect.equal (Numbers.minusP (12M :> obj)) -12M " 12 -> -12 M"
+              Expect.equal (Numbers.minusP (Int64.MinValue :> obj)) biMinVm "-inf(L) -> BI"
+              Expect.equal (Numbers.minusP (12UL :> obj)) (BigInt.fromLong (-12)) "12 UL -> -12 BI"
 
-            Expect.equal (Numbers.minus(bbi)) bbim "BI minus"
-            Expect.equal (Numbers.minus(r)) rm "Ration minus"
-            Expect.equal (Numbers.minus(bd)) bdm "BD minus"
+              Expect.equal (Numbers.unchecked_minus (12.0)) -12.0 "12 -> -12 D"
+              Expect.equal (Numbers.unchecked_minus (12L)) -12L "12 -> -12 L"
+              Expect.equal (Numbers.unchecked_minus (0UL)) 0UL "0 -> 0 UL"
+              Expect.equal (Numbers.unchecked_minus (12M)) -12M " 12 -> -12 M)"
+              Expect.throwsT<ArithmeticException> (fun () -> Numbers.unchecked_minus (12UL) |> ignore) "Can't negate UL"
+              Expect.equal (Numbers.unchecked_minus (Int64.MinValue)) Int64.MinValue "Can't negate L -inf"
 
-            Expect.equal (Numbers.minusP(bbi)) bbim "BI minus"
-            Expect.equal (Numbers.minusP(r)) rm "Ration minus"
-            Expect.equal (Numbers.minusP(bd)) bdm "BD minus"
+              Expect.equal (Numbers.unchecked_minus (12.0 :> obj)) -12.0 "12 -> -12 D"
+              Expect.equal (Numbers.unchecked_minus (12L :> obj)) -12L "12 -> -12 L"
+              Expect.equal (Numbers.unchecked_minus (0UL :> obj)) 0UL "0 -> 0 UL"
+              Expect.equal (Numbers.unchecked_minus (12M :> obj)) -12M " 12 -> -12 M)"
 
-            Expect.equal (Numbers.unchecked_minus(bbi)) bbim "BI minus"
-            Expect.equal (Numbers.unchecked_minus(r)) rm "Ration minus"
-            Expect.equal (Numbers.unchecked_minus(bd)) bdm "BD minus"
+              Expect.throwsT<ArithmeticException>
+                  (fun () -> Numbers.unchecked_minus (12UL :> obj) |> ignore)
+                  "Can't negate UL"
+
+              Expect.equal (Numbers.unchecked_minus (Int64.MinValue) :> obj) Int64.MinValue "Can't negate L -inf"
+
+              Expect.equal (Numbers.minus (bbi)) bbim "BI minus"
+              Expect.equal (Numbers.minus (r)) rm "Ration minus"
+              Expect.equal (Numbers.minus (bd)) bdm "BD minus"
+
+              Expect.equal (Numbers.minusP (bbi)) bbim "BI minus"
+              Expect.equal (Numbers.minusP (r)) rm "Ration minus"
+              Expect.equal (Numbers.minusP (bd)) bdm "BD minus"
+
+              Expect.equal (Numbers.unchecked_minus (bbi)) bbim "BI minus"
+              Expect.equal (Numbers.unchecked_minus (r)) rm "Ration minus"
+              Expect.equal (Numbers.unchecked_minus (bd)) bdm "BD minus"
 
 
 
           testCase "isPos, isZero, isNeg"
           <| fun _ ->
-                
-                let snums : obj array array = [|
-                    [| 2y; 0y; -2y  |]
-                    [| 2s; 0s; -2s |]
-                    [| 2;  0;   -2 |]
-                    [| 2L; 0L; -2L |]
-                    [| 2M; 0M; -2M |]
-                    [| BigInteger(2); BigInteger.Zero; BigInteger(-2) |]
-                    [| BigDecimal.Create(2); BigDecimal.Zero; BigDecimal.Create(-2) |]
-                    [| Ratio(BigInteger(2),BigInteger(1));
-                       Ratio(BigInteger(0),BigInteger(1));
-                       Ratio(BigInteger(-2),BigInteger(1)) |]                
-                |]
 
-                let unums : obj array array = [|
-                    [| 2uy :> obj; 0uy; |]
-                    [| 2us:> obj; 0us;|]
-                    [| 2u;  0u;  |]
-                    [| 2UL; 0UL  |]
-                 |]
+              let snums: obj array array =
+                  [| [| 2y; 0y; -2y |]
+                     [| 2s; 0s; -2s |]
+                     [| 2; 0; -2 |]
+                     [| 2L; 0L; -2L |]
+                     [| 2M; 0M; -2M |]
+                     [| BigInteger(2); BigInteger.Zero; BigInteger(-2) |]
+                     [| BigDecimal.Create(2); BigDecimal.Zero; BigDecimal.Create(-2) |]
+                     [| Ratio(BigInteger(2), BigInteger(1))
+                        Ratio(BigInteger(0), BigInteger(1))
+                        Ratio(BigInteger(-2), BigInteger(1)) |] |]
 
-                for a in snums do
-                    let vs = Array.map (fun v -> Numbers.isPos(v:> obj)) a
-                    Expect.equal vs [| true; false; false |] "Checking parity"
+              let unums: obj array array =
+                  [| [| 2uy :> obj; 0uy |]; [| 2us :> obj; 0us |]; [| 2u; 0u |]; [| 2UL; 0UL |] |]
 
-                for a in snums do
-                    let vs = Array.map (fun v -> Numbers.isZero(v:> obj)) a
-                    Expect.equal vs [| false; true; false |] "Checking parity"
+              for a in snums do
+                  let vs = Array.map (fun v -> Numbers.isPos (v :> obj)) a
+                  Expect.equal vs [| true; false; false |] "Checking parity"
 
-                for a in snums do
-                    let vs = Array.map (fun v -> Numbers.isNeg(v:> obj)) a
-                    Expect.equal vs [| false; false; true |] "Checking parity"
+              for a in snums do
+                  let vs = Array.map (fun v -> Numbers.isZero (v :> obj)) a
+                  Expect.equal vs [| false; true; false |] "Checking parity"
 
-                for a in unums do
-                    let vs = Array.map (fun v -> Numbers.isPos(v:> obj)) a
-                    Expect.equal vs [| true; false |] "Checking parity"
+              for a in snums do
+                  let vs = Array.map (fun v -> Numbers.isNeg (v :> obj)) a
+                  Expect.equal vs [| false; false; true |] "Checking parity"
 
-                for a in unums do
-                    let vs = Array.map (fun v -> Numbers.isZero(v:> obj)) a
-                    Expect.equal vs [| false; true |] "Checking parity"
+              for a in unums do
+                  let vs = Array.map (fun v -> Numbers.isPos (v :> obj)) a
+                  Expect.equal vs [| true; false |] "Checking parity"
 
-                for a in unums do
-                    let vs = Array.map (fun v -> Numbers.isNeg(v:> obj)) a
-                    Expect.equal vs [| false; false |] "Checking parity"
+              for a in unums do
+                  let vs = Array.map (fun v -> Numbers.isZero (v :> obj)) a
+                  Expect.equal vs [| false; true |] "Checking parity"
+
+              for a in unums do
+                  let vs = Array.map (fun v -> Numbers.isNeg (v :> obj)) a
+                  Expect.equal vs [| false; false |] "Checking parity"
+
+          testCase "divide by zero"
+          <| fun _ ->
+              let lf () = Numbers.divide (2L, 0L) |> ignore
+              let ulf () = Numbers.divide (2UL, 0UL) |> ignore
+
+              let decf () = Numbers.divide (2M, 0M) |> ignore
+
+              let rf () =
+                  Numbers.divide (Ratio(BigInteger(2), BigInteger.One), BigInteger.Zero) |> ignore
+
+              let bif () =
+                  Numbers.divide (BigInteger.One, BigInteger.Zero) |> ignore
+
+              let bdf () =
+                  Numbers.divide (BigDecimal.One, BigDecimal.Zero) |> ignore
+
+              Expect.throwsT<ArithmeticException> lf "throws on divide by zero"
+              Expect.throwsT<ArithmeticException> ulf "throws on divide by zero"
+              Expect.throwsT<ArithmeticException> decf "throws on divide by zero"
+              Expect.throwsT<ArithmeticException> rf "throws on divide by zero"
+              Expect.throwsT<ArithmeticException> bif "throws on divide by zero"
+              Expect.throwsT<ArithmeticException> bdf "throws on divide by zero"
+
+              let df () = Numbers.divide (2.0, 0.0)
+              Expect.equal (df ()) Double.PositiveInfinity "guess who doesn'tthrows on divide by zero"
+
+          testCase "divide - regular cases"
+          <| fun _ ->
+
+              Expect.floatClose Accuracy.medium (Numbers.divide (3.0, 1.5)) 2.0 "3.0/1.5"
+              Expect.equal (Numbers.divide (3.0M, 1.5M)) 2.0M "3.0/1.5 M"
+
+              Expect.equal
+                  (Numbers.divide (BigDecimal.Create("3.0"), BigDecimal.Create("1.5")))
+                  (BigDecimal.Create("2"))
+                  "3.0/1.5 = 2 BigDec"
+
+              Expect.equal (Numbers.divide (6L, 2L)) 3L "6/2 L"
+              Expect.equal (Numbers.divide (6UL, 2UL)) 3UL "6/2 UL"
+
+              let r5d2 = Ratio(BigInteger(5), BigInteger(2))
+              Expect.equal (Numbers.divide (5L, 2L)) r5d2 "5/2 L"
+              Expect.equal (Numbers.divide (5UL, 2UL)) r5d2 "5/2 UL"
+
+              // Primitives in through obj interface
+              Expect.floatClose Accuracy.medium (Numbers.divide (3.0, 1.5)) 2.0 "3.0/1.5"
+              Expect.equal (Numbers.divide (3.0M :> obj, 1.5M :> obj)) 2.0M "3.0/1.5 M"
+              Expect.equal (Numbers.divide (6L :> obj, 2L :> obj)) 3L "6/2 L"
+              Expect.equal (Numbers.divide (6UL :> obj, 2UL :> obj)) 3UL "6/2 UL"
+              Expect.equal (Numbers.divide (5L :> obj, 2L :> obj)) r5d2 "5/2 L"
+              Expect.equal (Numbers.divide (5UL :> obj, 2UL :> obj)) r5d2 "5/2 UL"
+
+          testCase "divide - ratios"
+          <| fun _ ->
+              let r45 = Ratio(BigInteger(4), BigInteger(5))
+              let r23 = Ratio(BigInteger(2), BigInteger(3))
+              let r43 = Ratio(BigInteger(4), BigInteger(3))
+              let r65 = Ratio(BigInteger(6), BigInteger(5))
+              let bi2 = BigInt.fromLong (2)
+
+              Expect.equal (Numbers.divide (r45, r23)) r65 "Regular ratio"
+              Expect.equal (Numbers.divide (r43, r23)) bi2 "Ratio reduces"
+
+          testCase "divide - NaN"
+          <| fun _ ->
+
+              Expect.isTrue (Double.IsNaN(Numbers.divide (2.0, Double.NaN))) "Nan in, Nan out"
+              Expect.isTrue (Double.IsNaN(Numbers.divide (Double.NaN, 2.0))) "Nan in, Nan out"
+              Expect.isTrue (Double.IsNaN(Numbers.divide (2UL, Double.NaN))) "Nan in, Nan out"
+              Expect.isTrue (Double.IsNaN(Numbers.divide (Double.NaN, 2UL))) "Nan in, Nan out"
+
+          testCase "quotient"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              let r12 = Ratio(BigInteger(1), BigInteger(2))
+              let r23 = Ratio(BigInteger(2), BigInteger(3))
+              let bi4 = BigInteger(4)
+              let bi1 = BigInteger.One
+
+              Expect.equal (Numbers.quotient (4L, 2L)) 2L "x"
+              Expect.equal (Numbers.quotient (3L, 2L)) 1L "x"
+              Expect.equal (Numbers.quotient (6L, 4L)) 1L "x"
+              Expect.equal (Numbers.quotient (0L, 5L)) 0L "x"
+
+              Expect.equal (Numbers.quotient (2L, r12)) bi4 "x"
+              Expect.equal (Numbers.quotient (r23, r12)) bi1 "x"
+              Expect.equal (Numbers.quotient (1L, r23)) bi1 "x"
+
+              Expect.equal (Numbers.quotient (4.0, 2.0)) 2.0 "x"
+              Expect.equal (Numbers.quotient (4.5, 2.0)) 2.0 "x"
+
+              Expect.equal (Numbers.quotient (42L, 5L)) 8L "x"
+              Expect.equal (Numbers.quotient (42L, -5L)) -8L "x"
+              Expect.equal (Numbers.quotient (-42L, 5L)) -8L "x"
+              Expect.equal (Numbers.quotient (-42L, -5L)) 8L "x"
+
+              Expect.equal (Numbers.quotient (9L, 3L)) 3L "x"
+              Expect.equal (Numbers.quotient (9L, -3L)) -3L "x"
+              Expect.equal (Numbers.quotient (-9L, 3L)) -3L "x"
+              Expect.equal (Numbers.quotient (-9L, -3L)) 3L "x"
+
+              Expect.equal (Numbers.quotient (2L, 5L)) 0L "x"
+              Expect.equal (Numbers.quotient (2L, -5L)) 0L "x"
+              Expect.equal (Numbers.quotient (-2L, 5L)) 0L "x"
+              Expect.equal (Numbers.quotient (-2L, -5L)) 0L "x"
+
+              Expect.equal (Numbers.quotient (0L, 3L)) 0L "x"
+              Expect.equal (Numbers.quotient (0L, -3L)) 0L "x"
+
+
+              // and some extra tests
+              Expect.equal (Numbers.quotient (4UL, 2UL)) 2UL "x"
+              Expect.equal (Numbers.quotient (3UL, 2UL)) 1UL "x"
+              Expect.equal (Numbers.quotient (6UL, 4UL)) 1UL "x"
+              Expect.equal (Numbers.quotient (0UL, 5UL)) 0UL "x"
+
+              Expect.equal (Numbers.quotient (4.0M, 2.0M)) 2.0M "x"
+              Expect.equal (Numbers.quotient (4.5M, 2.0M)) 2.0M "x"
+
+              Expect.throwsT<ArithmeticException> (fun () -> (Numbers.quotient (1.0, 0.0)) |> ignore) "throws"
+              Expect.throwsT<ArithmeticException> (fun () -> (Numbers.quotient (1.0M, 0.0M)) |> ignore) "throws"
+
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
+          //Expect.equal (Numbers.quotient(4L,2L)) 2L "x"
 
           ]

@@ -735,9 +735,20 @@ type Numbers() =
             else
                 double (BigDecimal.Create(q).ToBigInteger())
 
+    static member quotient(x: decimal, y: decimal) =
+        if y = 0M then
+            raise <| ArithmeticException("Divide by zero")
+        else
+            let q = x / y
+
+            if q <= decimal (Int64.MaxValue) && q >= decimal (Int64.MinValue) then
+                decimal (int64 (q)) :> obj
+            else
+                (BigDecimal.Create(q).ToBigInteger())
+
+
     static member quotient(x: int64, y: int64) = x / y
     static member quotient(x: uint64, y: uint64) = x / y
-    static member quotient(x: decimal, y: decimal) = Numbers.quotient (x :> obj, y :> obj)
     static member quotient(x: double, y: obj) = Numbers.quotient (x :> obj, y)
     static member quotient(x: obj, y: double) = Numbers.quotient (x, y :> obj)
     static member quotient(x: double, y: int64) = Numbers.quotient (x, double (y))
@@ -1549,7 +1560,7 @@ and [<Sealed>] LongOps() =
                 match d with
                 | 1L -> n
                 | _ when d < 0L -> Ratio(BigInteger(-n), BigInteger(-d))
-                | _ -> Ratio(BigInteger(-n), BigInteger(-d))
+                | _ -> Ratio(BigInteger(n), BigInteger(d))
 
 
         member this.quotient(x: obj, y: obj) : obj =
@@ -1915,12 +1926,12 @@ and [<Sealed>] ClrDecimalOps() =
         member this.quotient(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
             let dy = convertToDecimal (y)
-            dx / dy :> obj
+            Numbers.quotient(dx,dy)
 
         member this.remainder(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
             let dy = convertToDecimal (y)
-            dx % dy :> obj
+            Numbers.remainder(dx,dy)
 
         member this.equiv(x: obj, y: obj) : bool = convertToDecimal (x) = convertToDecimal (y)
 
