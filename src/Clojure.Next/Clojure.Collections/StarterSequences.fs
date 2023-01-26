@@ -24,7 +24,7 @@ type ASeq(m) =
 
         step s 0
 
-    override this.ToString() = RT0.printString (this)
+    override this.ToString() = RTPrint.printString (this)
 
     override this.Equals(o) =
         if obj.ReferenceEquals(this, o) then

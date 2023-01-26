@@ -1,7 +1,6 @@
 ﻿module Clojure.Collections.RT0
 
 open System
-open System.IO
 open System.Collections
 
 let seq (o: obj) : ISeq =
@@ -11,13 +10,6 @@ let seq (o: obj) : ISeq =
     | _ ->
         raise
         <| ArgumentException($"Don't know how to create ISeq from: {o.GetType().FullName}")
-
-let print (x: obj, w: TextWriter) = ()
-
-let printString (x: obj) =
-    use sw = new StringWriter()
-    print (x, sw)
-    sw.ToString()
 
 // we will want to get all of this eventually:
 
@@ -80,3 +72,6 @@ let count (o: obj) : int =
     | _ ->
         raise
         <| InvalidOperationException($"count not supported on this type: {Util.nameForType (o.GetType())}")
+
+
+

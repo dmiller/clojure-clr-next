@@ -10,6 +10,7 @@
     <Compile Include="Interfaces.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="RT0.fs" />
+    <Compile Include="RTPrint.fs" />
     <Compile Include="SmallThings.fs" />
     <Compile Include="Fn.fs" />
     <Compile Include="SeqEnumerator.fs" />
