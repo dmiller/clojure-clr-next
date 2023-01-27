@@ -1371,7 +1371,7 @@ type Numbers() =
         Numbers.SetBit(x, Numbers.bitOpsCast (y))
 
     static member SetBit(x: int64, y: int64) = Numbers.SetBit(x, int (y))
-    static member SetBit(x: int64, y: int) = x ||| ~~~(1L <<< y)
+    static member SetBit(x: int64, y: int) = x ||| (1L <<< y)
 
     static member FlipBit(x: obj, y: obj) =
         Numbers.FlipBit(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))
@@ -1383,7 +1383,7 @@ type Numbers() =
         Numbers.FlipBit(x, Numbers.bitOpsCast (y))
 
     static member FlipBit(x: int64, y: int64) = Numbers.FlipBit(x, int (y))
-    static member FlipBit(x: int64, y: int) = x ^^^ ~~~(1L <<< y)
+    static member FlipBit(x: int64, y: int) = x ^^^ (1L <<< y)
 
     static member TestBit(x: obj, y: obj) =
         Numbers.TestBit(Numbers.bitOpsCast (x), Numbers.bitOpsCast (y))

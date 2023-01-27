@@ -1004,4 +1004,80 @@ let testAdd =
               Expect.throwsT<ArithmeticException> (fun () -> (Numbers.quotient (1.0M, 0.0M)) |> ignore) "throws"
 
 
+
+          testCase "test bit-shift-left"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              Expect.equal (Numbers.shiftLeft(0b1,1)) 0b10 "1 <<< 1 = 10"
+              Expect.equal (Numbers.shiftLeft(0b1,2)) 0b100 "1 <<< 2 = 100"
+              Expect.equal (Numbers.shiftLeft(0b1,3)) 0b1000 "1 <<< 3 = 1000"
+              Expect.equal (Numbers.shiftLeft(0b00010111,1)) 0b00101110 "0010111 <<< 1 = 00101110"
+              Expect.equal (Numbers.shiftLeft(0b10,-1)) 0b0 "10 <<< -1 = 0"  // truncated to least 6-bits, 16  ???
+              Expect.equal (Numbers.shiftLeft(0b1,32)) 0x100000000L "1 <<< 1 = 10"
+              Expect.equal (Numbers.shiftLeft(0b1,10000)) 0x10000 "1 <<< 10000 = ? " // truncated to least 6-bits, 16  ???
+
+              
+          testCase "test bit-shift-right"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              Expect.equal (Numbers.shiftRight(0b1,1)) 0b0 "1 >>> 1 = 0"
+              Expect.equal (Numbers.shiftRight(0b100,1)) 0b010 "100 >>> 1 = 010"
+              Expect.equal (Numbers.shiftRight(0b100,2)) 0b001 "100 >>> 2 = 001"
+              Expect.equal (Numbers.shiftRight(0b100,3)) 0b000 "100 >>> 3 = 000"
+
+              Expect.equal (Numbers.shiftRight(0b00010111,1)) 0b001011 "0010111 >>> 1 = 001011"
+              Expect.equal (Numbers.shiftRight(0b10,-1)) 0b0 "10 >>> -1 = 0"  // truncated to least 6-bits, 16  ???
+              Expect.equal (Numbers.shiftRight(0x100000000L,32)) 1 "1 >>> 1 = 10"
+              Expect.equal (Numbers.shiftRight(0x10000,10000)) 1 "1 >>> 10000 = ? " // truncated to least 6-bits, 16  ???
+              Expect.equal (Numbers.shiftRight(-0b10,1)) -1 "1 >>> 10000 = ? " 
+
+
+          testCase "test unsigned-bit-shift-right"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              Expect.equal (Numbers.unsignedShiftRight(0b1,1)) 0b0 "1 >>> 1 = 0"
+              Expect.equal (Numbers.unsignedShiftRight(0b100,1)) 0b010 "100 >>> 1 = 010"
+              Expect.equal (Numbers.unsignedShiftRight(0b100,2)) 0b001 "100 >>> 2 = 001"
+              Expect.equal (Numbers.unsignedShiftRight(0b100,3)) 0b000 "100 >>> 3 = 000"
+
+              Expect.equal (Numbers.unsignedShiftRight(0b00010111,1)) 0b001011 "0010111 >>> 1 = 001011"
+              Expect.equal (Numbers.unsignedShiftRight(0b10,-1)) 0b0 "10 >>> -1 = 0"  // truncated to least 6-bits, 16  ???
+              Expect.equal (Numbers.unsignedShiftRight(0x100000000L,32)) 1 "1 >>> 1 = 10"
+              Expect.equal (Numbers.unsignedShiftRight(0x10000,10000)) 1 "1 >>> 10000 = ? " // truncated to least 6-bits, 16  ???
+              Expect.equal (Numbers.unsignedShiftRight(-0b10,1)) (Int64.MaxValue) "1 >>> 10000 = ? " 
+
+          testCase "test test-bit-clear"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              Expect.equal (Numbers.ClearBit(0b1111,1)) 0b1101 "1111 clear 1 = 1101" 
+              Expect.equal (Numbers.ClearBit(0b1101,1)) 0b1101 "1101 clear 1 = 1101" 
+
+          testCase "test test-bit-set"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              Expect.equal (Numbers.SetBit(0b1111,1)) 0b1111 "1111 set 1 = 1111" 
+              Expect.equal (Numbers.SetBit(0b1101,1)) 0b1111 "1101 set 1 = 1111" 
+
+
+          testCase "test test-bit-flip"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              Expect.equal (Numbers.FlipBit(0b1111,1)) 0b1101 "1111 flip 1 = 1101" 
+              Expect.equal (Numbers.FlipBit(0b1101,1)) 0b1111 "1101 flip 1 = 1111" 
+
+
+          testCase "test test-bit-test"
+          <| fun _ ->
+              // these examples taken directly from the Clojure testing code
+
+              Expect.isTrue (Numbers.TestBit(0b1111,1))  "1111 test 1 = true" 
+              Expect.isFalse (Numbers.TestBit(0b1101,1))  "1101 test 1 = false" 
+
+
           ]
