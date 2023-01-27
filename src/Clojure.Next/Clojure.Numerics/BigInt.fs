@@ -35,7 +35,7 @@ type BigInt(lpart: int64, bipart: BigInteger option) =
     static member valueOf(n: int64) = BigInt(n, None)
 
     override this.Equals(o) : bool =
-        if Object.ReferenceEquals(o,this) then
+        if Object.ReferenceEquals(o, this) then
             true
         else
             match o with
@@ -45,10 +45,7 @@ type BigInt(lpart: int64, bipart: BigInteger option) =
                 | None -> obi.Bipart.IsNone && obi.Lpart = lpart
             | _ -> false
 
-    override this.GetHashCode() =
-        match bipart with
-        | Some bi -> bipart.GetHashCode()
-        | None -> lpart.GetHashCode()
+    override this.GetHashCode() = (this :> IHashEq).hasheq ()
 
     override this.ToString() =
         match bipart with
@@ -313,9 +310,10 @@ type BigInt(lpart: int64, bipart: BigInteger option) =
         else
             this.ToBigInteger().CompareTo(y.ToBigInteger()) < 0
 
-    // This should be interface IHashEq implementation, but we don't have the yet.
+    // This should be interface IHashEq implementation, but we don't have this yet.
 
-    member this.hasheq() : int =
-        match bipart with
-        | Some bi -> bi.GetHashCode()
-        | None -> Murmur3.HashLong(lpart)
+    interface IHashEq with
+        member this.hasheq() : int =
+            match bipart with
+            | Some bi -> bi.GetHashCode()
+            | None -> Murmur3.HashLong(lpart)

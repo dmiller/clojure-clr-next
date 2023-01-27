@@ -76,7 +76,6 @@ module OpsSelector =
         | TypeCode.Int32
         | TypeCode.Int64 -> OpsType.Long
 
-
         | TypeCode.Byte
         | TypeCode.UInt16
         | TypeCode.UInt32
@@ -229,6 +228,7 @@ type Numbers() =
     static member getOps(x: obj, y: obj) =
         Numbers.opsImplTable[int (OpsSelector.combine (OpsSelector.ops (x), OpsSelector.ops (y)))]
 
+
     // isZero, isPos, isNeg
 
     static member isZero(x: obj) = Numbers.getOps(x).isZero (x)
@@ -277,10 +277,8 @@ type Numbers() =
         else
             (x + y) :> obj
 
-    static member add(x: double, y: obj) = Numbers.add (x, convertToDouble (y))
-
-    static member add(x: obj, y: double) = Numbers.add (convertToDouble (x), y)
-
+    static member add(x: double, y: obj) = x + convertToDouble (y)
+    static member add(x: obj, y: double) = convertToDouble (x) + y
     static member add(x: double, y: int64) = x + double (y)
     static member add(x: int64, y: double) = double (x) + y
     static member add(x: double, y: uint64) = x + double (y)
@@ -324,10 +322,8 @@ type Numbers() =
         else
             (x + y) :> obj
 
-    static member addP(x: double, y: obj) = Numbers.addP (x, convertToDouble (y))
-
-    static member addP(x: obj, y: double) = Numbers.addP (convertToDouble (x), y)
-
+    static member addP(x: double, y: obj) = x + convertToDouble(y)
+    static member addP(x: obj, y: double) = convertToDouble (x) +  y
     static member addP(x: double, y: int64) = x + double (y)
     static member addP(x: int64, y: double) = double (x) + y
     static member addP(x: double, y: uint64) = x + double (y)
@@ -341,10 +337,11 @@ type Numbers() =
     static member addP(x: int64, y: uint64) = Numbers.addP (x :> obj, y :> obj)
     static member addP(x: uint64, y: int64) = Numbers.addP (x :> obj, y :> obj)
 
+
     static member unchecked_add(x: obj, y: obj) =
         Numbers.getOps(x, y).unchecked_add (x, y)
 
-    static member unchecked_add(x: double, y: double) = Numbers.add (x, y)
+    static member unchecked_add(x: double, y: double) = x + y
     static member unchecked_add(x: int64, y: int64) = x + y
     static member unchecked_add(x: uint64, y: uint64) = x + y
     static member unchecked_add(x: decimal, y: decimal) = x + y
@@ -426,7 +423,7 @@ type Numbers() =
         match yops, xyops with
         | :? ULongOps, :? ULongOps -> Numbers.minus(convertToULong(x),convertToULong(y)) :> obj
         | :? ULongOps, _ -> xyops.add(x,xyops.negate(y))
-        | _ ->  Numbers.getOps(x, y).add (x, yops.negate (y))
+        | _ ->  xyops.add (x, yops.negate (y))
 
     static member minus(x: double, y: double) = x - y
 
@@ -449,10 +446,8 @@ type Numbers() =
         else
             (x - y) :> obj
 
-    static member minus(x: double, y: obj) = Numbers.minus (x, convertToDouble (y))
-
-    static member minus(x: obj, y: double) = Numbers.minus (convertToDouble (x), y)
-
+    static member minus(x: double, y: obj) = x - convertToDouble (y)
+    static member minus(x: obj, y: double) = convertToDouble (x) -  y
     static member minus(x: double, y: int64) = x - double (y)
     static member minus(x: int64, y: double) = double (x) - y
     static member minus(x: double, y: uint64) = x - double (y)
@@ -481,7 +476,7 @@ type Numbers() =
         match yops, xyops with
         | :? ULongOps, :? ULongOps -> Numbers.minusP(convertToULong(x),convertToULong(y)) :> obj
         | :? ULongOps, _ -> xyops.addP(x,xyops.negateP(y))
-        | _ ->  Numbers.getOps(x, y).addP (x, yops.negateP (y))
+        | _ ->  xyops.addP (x, yops.negateP (y))
 
     static member minusP(x: double, y: double) = x - y
 
@@ -507,10 +502,8 @@ type Numbers() =
         else
             (x - y) :> obj
 
-    static member minusP(x: double, y: obj) = Numbers.minusP (x, convertToDouble (y))
-
-    static member minusP(x: obj, y: double) = Numbers.minusP (convertToDouble (x), y)
-
+    static member minusP(x: double, y: obj) = x - convertToDouble (y)
+    static member minusP(x: obj, y: double) = convertToDouble (x) - y
     static member minusP(x: double, y: int64) = x - double (y)
     static member minusP(x: int64, y: double) = double (x) - y
     static member minusP(x: double, y: uint64) = x - double (y)
@@ -531,12 +524,7 @@ type Numbers() =
         match yops, xyops with
         | :? ULongOps, :? ULongOps -> Numbers.unchecked_minus(convertToULong(x),convertToULong(y)) :> obj
         | :? ULongOps, _ -> xyops.unchecked_negate(x,xyops.unchecked_negate(y))
-        | _ ->  Numbers.getOps(x, y).unchecked_add (x, yops.unchecked_negate (y))
-
-        //let yops = Numbers.getOps (y)
-        //match yops with
-        //| :? ULongOps -> 
-        //Numbers.getOps(x, y).unchecked_add (x, yops.unchecked_negate (y))
+        | _ ->  xyops.unchecked_add (x, yops.unchecked_negate (y))
 
     static member unchecked_minus(x: double, y: double) = Numbers.minus (x, y)
     static member unchecked_minus(x: int64, y: int64) = x - y
@@ -559,6 +547,7 @@ type Numbers() =
 
     static member unchecked_minus(x: uint64, y: int64) =
         Numbers.unchecked_minus (x :> obj, y :> obj)
+
 
     // multiply, multiplyP, unchecked_multiply
 
@@ -586,12 +575,8 @@ type Numbers() =
 
     static member multiply(x: decimal, y: decimal) = x * y
 
-    static member multiply(x: double, y: obj) =
-        Numbers.multiply (x, convertToDouble (y))
-
-    static member multiply(x: obj, y: double) =
-        Numbers.multiply (convertToDouble (x), y)
-
+    static member multiply(x: double, y: obj) = x * convertToDouble(y)
+    static member multiply(x: obj, y: double) = convertToDouble (x) * y
     static member multiply(x: double, y: int64) = x * double (y)
     static member multiply(x: int64, y: double) = double (x) * y
     static member multiply(x: double, y: uint64) = x * double (y)
@@ -603,7 +588,6 @@ type Numbers() =
     static member multiply(x: obj, y: uint64) = Numbers.multiply (x, y :> obj)
     static member multiply(x: int64, y: uint64) = Numbers.multiply (x :> obj, y :> obj)
     static member multiply(x: uint64, y: int64) = Numbers.multiply (x :> obj, y :> obj)
-
 
     static member multiplyP(x: obj, y: obj) = Numbers.getOps(x, y).multiplyP (x, y)
     static member multiplyP(x: double, y: double) = x * y
@@ -633,12 +617,8 @@ type Numbers() =
         with :? OverflowException ->
             Numbers.BIGDEC_OPS.multiply (x, y)
 
-    static member multiplyP(x: double, y: obj) =
-        Numbers.multiplyP (x, convertToDouble (y))
-
-    static member multiplyP(x: obj, y: double) =
-        Numbers.multiplyP (convertToDouble (x), y)
-
+    static member multiplyP(x: double, y: obj) = x * convertToDouble (y)
+    static member multiplyP(x: obj, y: double) = convertToDouble (x) * y
     static member multiplyP(x: double, y: int64) = x * double (y)
     static member multiplyP(x: int64, y: double) = double (x) * y
     static member multiplyP(x: double, y: uint64) = x * double (y)
@@ -655,7 +635,7 @@ type Numbers() =
     static member unchecked_multiply(x: obj, y: obj) =
         Numbers.getOps(x, y).unchecked_multiply (x, y)
 
-    static member unchecked_multiply(x: double, y: double) = Numbers.multiply (x, y)
+    static member unchecked_multiply(x: double, y: double) = x * y
     static member unchecked_multiply(x: int64, y: int64) = x * y
     static member unchecked_multiply(x: uint64, y: uint64) = x * y
     static member unchecked_multiply(x: decimal, y: decimal) = x * y
@@ -760,6 +740,7 @@ type Numbers() =
     static member quotient(x: uint64, y: obj) = Numbers.quotient (x :> obj, y)
     static member quotient(x: obj, y: uint64) = Numbers.quotient (x, y :> obj)
 
+
     static member remainder(x: obj, y: obj) =
         let yops = Numbers.getOps (y)
 
@@ -837,6 +818,7 @@ type Numbers() =
     static member unchecked_inc(x: int64) = x + 1L
     static member unchecked_inc(x: uint64) = x + 1UL
     static member unchecked_inc(x: decimal) = Numbers.inc (x)
+
 
     static member dec(x: obj) = Numbers.getOps(x).dec (x)
     static member dec(x: double) = x - 1.0

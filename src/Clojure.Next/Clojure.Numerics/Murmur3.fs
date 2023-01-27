@@ -11,11 +11,11 @@ open System.Collections
 /// <para>The ClojureJVM version imported the Guava Murmur3 implementation and made some changes.</para>
 /// <para>I copied the API stubs, then implemented the API based on the algorithm description at
 ///     http://en.wikipedia.org/wiki/MurmurHash.
-///     See also: https://code.google.com/p/smhasher/wiki/MurmurHash3. </para>
+///     See also: https://github.com/aappleby/smhasher.</para>
 /// <para>Because the original algorithm was based on unsigned arithmetic,
 /// I built methods that implemented those directly, then built versions
 /// returning signed integers, as required by most users.</para>
-/// <para>Implementation of HashUnordered and HashOrdered taken from ClojureJVM.</para>
+/// <para>Implementation of HashUnordered and HashOrdered are deferred to Clojure.Collections.Util because as we use them, they require Clojure datatype info.</para>
 /// </remarks>
 
 // this could have been a module except it was orginally designed with overloaded methods

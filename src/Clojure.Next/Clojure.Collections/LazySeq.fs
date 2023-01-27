@@ -3,6 +3,7 @@
 open System
 open System.Collections
 open System.Runtime.CompilerServices
+open Clojure.Numerics
 
 
 
@@ -18,7 +19,7 @@ type LazySeq(m1, fn1, s1) =
     override this.GetHashCode() =
         match (this :> ISeq).seq () with
         | null -> 1
-        | s -> Util.hash s
+        | s -> Hashing.hash s
 
 
     override this.Equals(o: obj) =
@@ -105,7 +106,7 @@ type LazySeq(m1, fn1, s1) =
         member _.isRealized() = isNull fn
 
     interface IHashEq with
-        member this.hasheq() = Util.hashOrdered (this)
+        member this.hasheq() = Hashing.hashOrdered (this)
 
     interface IEnumerable with
         member this.GetEnumerator() = upcast new SeqEnumerator(this)

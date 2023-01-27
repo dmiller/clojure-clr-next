@@ -19,6 +19,7 @@ type TypedSeqEnumerator<'T when 'T: not struct>(o: obj) =
 
         // Allowing Reset means we hold on to the head of the seq.
         // This might be bad. So we do not implement it.
+        // (IEnumerator docs say Reset is for COM compatibility.)
         member _.Reset() =
             raise <| NotSupportedException("Reset not supported on EnumeratorSeq")
 
@@ -34,7 +35,6 @@ type TypedSeqEnumerator<'T when 'T: not struct>(o: obj) =
                 orig <- null
                 seqOption <- Some next
                 not <| isNull next
-
 
         member this.Current = (this :> IEnumerator<'T>).Current :> obj
 

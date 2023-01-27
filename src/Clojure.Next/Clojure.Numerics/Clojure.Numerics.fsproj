@@ -6,11 +6,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="IHashEq.fs" />
     <Compile Include="Murmur3.fs" />
     <Compile Include="Converters.fs" />
     <Compile Include="Ratio.fs" />
     <Compile Include="BigInt.fs" />
     <Compile Include="Numbers.fs" />
+    <Compile Include="Hashing.fs" />
   </ItemGroup>
 
   <ItemGroup>

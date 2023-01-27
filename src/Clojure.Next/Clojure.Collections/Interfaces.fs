@@ -109,10 +109,6 @@ type IPersistentVector =
     abstract count: unit -> int
 
 [<AllowNullLiteral>]
-type IHashEq =
-    abstract hasheq: unit -> int
-
-[<AllowNullLiteral>]
 type IMeta =
     abstract meta: unit -> IPersistentMap
 
@@ -123,7 +119,6 @@ type IObj =
 
 type IDeref =
     abstract deref: unit -> obj
-
 
 [<AllowNullLiteral>]
 type IFn =

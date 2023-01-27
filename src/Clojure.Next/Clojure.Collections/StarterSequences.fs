@@ -49,7 +49,7 @@ type ASeq(m) =
         member this.hasheq() =
             match hasheq with
             | None ->
-                let h = Util.hashOrdered (this)
+                let h = Hashing.hashOrdered (this)
                 hasheq <- Some h
                 h
             | Some h -> h
@@ -216,7 +216,7 @@ and [<Sealed>] EmptyList(m) =
 
     new() = EmptyList(null)
 
-    static member hasheq = Util.hashOrdered (Enumerable.Empty<Object>())
+    static member hasheq = Hashing.hashOrdered (Enumerable.Empty<Object>())
 
     static member Empty: EmptyList = EmptyList()
 

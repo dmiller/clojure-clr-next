@@ -116,7 +116,7 @@ let testOpsSelect =
 
 [<Tests>]
 let testAdd =
-    ftestList
+    testList
         "Test arithmetic operations"
         [ testCase "addition"
           <| fun _ ->

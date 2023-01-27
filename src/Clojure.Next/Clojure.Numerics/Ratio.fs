@@ -1,6 +1,7 @@
-﻿namespace System.Numerics
+﻿namespace Clojure.Numerics
 
 open System
+open System.Numerics
 open Clojure.BigArith
 
 [<Sealed>]
@@ -20,20 +21,18 @@ type Ratio(numerator: BigInteger, denominator: BigInteger) =
     override _.ToString() =
         numerator.ToString() + "/" + denominator.ToString()
 
-    interface IComparable with
-        member this.CompareTo(obj: obj) : int =
-            raise (System.NotImplementedException())
 
+    // This was not in the original, but BigInt supports it, so why not here.
+    interface IHashEq with
+        member this.hasheq() = this.GetHashCode()
+        
+    // The equivalent of this was in the origina.
+    // I'm not sure it is needed.  BigInt, e.g., does not implement it.
+    // If it is needed, we'd have to move Ratio in with Numbers and `and` it
+    //   due to the necessary mutual recursion.
 
-    //        #region IComparable Members
-
-    //        public int CompareTo(object obj)
-    //        {
-    //            return Numbers.compare(this, obj);
-    //        }
-
-    //        #endregion
-
+    //interface IComparable with
+    //    member this.CompareTo(obj: obj) : int = Numbers.complre(this,obj)
 
     interface IConvertible with
         member this.GetTypeCode() : TypeCode = TypeCode.Object
