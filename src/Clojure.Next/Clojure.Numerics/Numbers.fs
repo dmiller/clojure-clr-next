@@ -289,12 +289,13 @@ type Numbers() =
     static member add(x: uint64, y: obj) = Numbers.add ((x :> obj), y)
     static member add(x: obj, y: uint64) = Numbers.add (x, y :> obj)
 
-    // These are supposed to be non-promoting.
-    // It is not clear what to do here.
-    // Given that long is the default, let's just go that and hope.
-    // Or maybe we shouldn't even bother.
-    static member add(x: int64, y: uint64) = Numbers.add (x :> obj, y :> obj)
-    static member add(x: uint64, y: int64) = Numbers.add (x :> obj, y :> obj)
+    // The C# compiler declares long+ulong ambiguous and won't compile it.
+    // The F# compiler is even stricter.
+    static member add(x: int64, y: uint64) =
+        raise <| ArithmeticException("Ambiguous type: Cannot add Int64 and UInt64")
+
+    static member add(x: uint64, y: int64) =
+        raise <| ArithmeticException("Ambiguous type: Cannot add Int64 and UInt64")
 
 
     static member addP(x: obj, y: obj) = Numbers.getOps(x, y).addP (x, y)
@@ -322,8 +323,8 @@ type Numbers() =
         else
             (x + y) :> obj
 
-    static member addP(x: double, y: obj) = x + convertToDouble(y)
-    static member addP(x: obj, y: double) = convertToDouble (x) +  y
+    static member addP(x: double, y: obj) = x + convertToDouble (y)
+    static member addP(x: obj, y: double) = convertToDouble (x) + y
     static member addP(x: double, y: int64) = x + double (y)
     static member addP(x: int64, y: double) = double (x) + y
     static member addP(x: double, y: uint64) = x + double (y)
@@ -358,10 +359,10 @@ type Numbers() =
     static member unchecked_add(x: obj, y: uint64) = Numbers.unchecked_add (x, y :> obj)
 
     static member unchecked_add(x: int64, y: uint64) =
-        Numbers.unchecked_add (x :> obj, y :> obj)
+        raise <| ArithmeticException("Ambiguous type: Cannot add Int64 and UInt64")
 
     static member unchecked_add(x: uint64, y: int64) =
-        Numbers.unchecked_add (x :> obj, y :> obj)
+        raise <| ArithmeticException("Ambiguous type: Cannot add Int64 and UInt64")
 
     // unary minus, minusP, unchecked_minus
 
@@ -375,8 +376,11 @@ type Numbers() =
             -x
 
     static member minus(x: uint64) =
-        if x = 0UL then x 
-        else raise <| ArithmeticException("Checked operation error: negation of non-zero unsigned")
+        if x = 0UL then
+            x
+        else
+            raise
+            <| ArithmeticException("Checked operation error: negation of non-zero unsigned")
 
 
     static member minus(x: decimal) = -x
@@ -417,13 +421,13 @@ type Numbers() =
 
     static member minus(x: obj, y: obj) =
         let yops = Numbers.getOps (y)
-        let xyops = Numbers.getOps(x,y)
+        let xyops = Numbers.getOps (x, y)
         // Only one Ops implementation does not support negate: ULong (except on arg 0UL)
         // Special case that one
         match yops, xyops with
-        | :? ULongOps, :? ULongOps -> Numbers.minus(convertToULong(x),convertToULong(y)) :> obj
-        | :? ULongOps, _ -> xyops.add(x,xyops.negate(y))
-        | _ ->  xyops.add (x, yops.negate (y))
+        | :? ULongOps, :? ULongOps -> Numbers.minus (convertToULong (x), convertToULong (y)) :> obj
+        | :? ULongOps, _ -> xyops.add (x, xyops.negate (y))
+        | _ -> xyops.add (x, yops.negate (y))
 
     static member minus(x: double, y: double) = x - y
 
@@ -435,7 +439,7 @@ type Numbers() =
         else
             ret
 
-    static member minus(x: uint64, y: uint64)  =
+    static member minus(x: uint64, y: uint64) =
         if y > x then raise <| Numbers.IntOverflow() else x - y
 
     static member minus(x: decimal, y: decimal) =
@@ -447,7 +451,7 @@ type Numbers() =
             (x - y) :> obj
 
     static member minus(x: double, y: obj) = x - convertToDouble (y)
-    static member minus(x: obj, y: double) = convertToDouble (x) -  y
+    static member minus(x: obj, y: double) = convertToDouble (x) - y
     static member minus(x: double, y: int64) = x - double (y)
     static member minus(x: int64, y: double) = double (x) - y
     static member minus(x: double, y: uint64) = x - double (y)
@@ -457,8 +461,14 @@ type Numbers() =
     static member minus(x: obj, y: int64) = Numbers.minus (x, y :> obj)
     static member minus(x: uint64, y: obj) = Numbers.minus ((x :> obj), y)
     static member minus(x: obj, y: uint64) = Numbers.minus (x, y :> obj)
-    static member minus(x: int64, y: uint64) = Numbers.minus (x :> obj, y :> obj)
-    static member minus(x: uint64, y: int64) = Numbers.minus (x :> obj, y :> obj)
+
+    static member minus(x: int64, y: uint64) =
+        raise
+        <| ArithmeticException("Ambiguous type: Cannot subtract UInt64 from Int64")
+
+    static member minus(x: uint64, y: int64) =
+        raise
+        <| ArithmeticException("Ambiguous type: Cannot subtract Int64 from UInt64")
 
 
     static member minusP(x: obj, y: obj) =
@@ -470,13 +480,13 @@ type Numbers() =
         // Again, we need to special case that
 
         let yops = Numbers.getOps (y)
-        let xyops = Numbers.getOps(x,y)
+        let xyops = Numbers.getOps (x, y)
         // Only one Ops implementation does not support negate: ULong (except on arg 0UL)
         // Special case that one
         match yops, xyops with
-        | :? ULongOps, :? ULongOps -> Numbers.minusP(convertToULong(x),convertToULong(y)) :> obj
-        | :? ULongOps, _ -> xyops.addP(x,xyops.negateP(y))
-        | _ ->  xyops.addP (x, yops.negateP (y))
+        | :? ULongOps, :? ULongOps -> Numbers.minusP (convertToULong (x), convertToULong (y)) :> obj
+        | :? ULongOps, _ -> xyops.addP (x, xyops.negateP (y))
+        | _ -> xyops.addP (x, yops.negateP (y))
 
     static member minusP(x: double, y: double) = x - y
 
@@ -490,7 +500,7 @@ type Numbers() =
 
     static member minusP(x: uint64, y: uint64) =
         if y > x then
-            Numbers.BIGINT_OPS.addP (x, Numbers.BIGINT_OPS.negateP(y))
+            Numbers.BIGINT_OPS.addP (x, Numbers.BIGINT_OPS.negateP (y))
         else
             (x - y) :> obj
 
@@ -520,11 +530,12 @@ type Numbers() =
     static member unchecked_minus(x: obj, y: obj) =
         // once again, need special case ULongs
         let yops = Numbers.getOps (y)
-        let xyops = Numbers.getOps(x,y)
+        let xyops = Numbers.getOps (x, y)
+
         match yops, xyops with
-        | :? ULongOps, :? ULongOps -> Numbers.unchecked_minus(convertToULong(x),convertToULong(y)) :> obj
-        | :? ULongOps, _ -> xyops.unchecked_negate(x,xyops.unchecked_negate(y))
-        | _ ->  xyops.unchecked_add (x, yops.unchecked_negate (y))
+        | :? ULongOps, :? ULongOps -> Numbers.unchecked_minus (convertToULong (x), convertToULong (y)) :> obj
+        | :? ULongOps, _ -> xyops.unchecked_negate (x, xyops.unchecked_negate (y))
+        | _ -> xyops.unchecked_add (x, yops.unchecked_negate (y))
 
     static member unchecked_minus(x: double, y: double) = Numbers.minus (x, y)
     static member unchecked_minus(x: int64, y: int64) = x - y
@@ -575,7 +586,7 @@ type Numbers() =
 
     static member multiply(x: decimal, y: decimal) = x * y
 
-    static member multiply(x: double, y: obj) = x * convertToDouble(y)
+    static member multiply(x: double, y: obj) = x * convertToDouble (y)
     static member multiply(x: obj, y: double) = convertToDouble (x) * y
     static member multiply(x: double, y: int64) = x * double (y)
     static member multiply(x: int64, y: double) = double (x) * y
@@ -586,8 +597,12 @@ type Numbers() =
     static member multiply(x: obj, y: int64) = Numbers.multiply (x, y :> obj)
     static member multiply(x: uint64, y: obj) = Numbers.multiply ((x :> obj), y)
     static member multiply(x: obj, y: uint64) = Numbers.multiply (x, y :> obj)
-    static member multiply(x: int64, y: uint64) = Numbers.multiply (x :> obj, y :> obj)
-    static member multiply(x: uint64, y: int64) = Numbers.multiply (x :> obj, y :> obj)
+
+    static member multiply(x: int64, y: uint64) =
+        raise <| ArithmeticException("Ambiguous type: Cannot multiply UInt64 and Int64")
+
+    static member multiply(x: uint64, y: int64) =
+        raise <| ArithmeticException("Ambiguous type: Cannot multiply UInt64 and Int64")
 
     static member multiplyP(x: obj, y: obj) = Numbers.getOps(x, y).multiplyP (x, y)
     static member multiplyP(x: double, y: double) = x * y
@@ -659,10 +674,10 @@ type Numbers() =
         Numbers.unchecked_multiply (x, y :> obj)
 
     static member unchecked_multiply(x: int64, y: uint64) =
-        Numbers.unchecked_multiply (x :> obj, y :> obj)
+        raise <| ArithmeticException("Ambiguous type: Cannot multiply UInt64 and Int64")
 
     static member unchecked_multiply(x: uint64, y: int64) =
-        Numbers.unchecked_multiply (x :> obj, y :> obj)
+        raise <| ArithmeticException("Ambiguous type: Cannot multiply UInt64 and Int64")
 
 
     // divide, quotient, remainder
@@ -1120,50 +1135,51 @@ type Numbers() =
 
     //[<WarnedBoxMath(false)>]
     static member ToBigInt(x: obj) =
-        match OpsSelector.ops(x) with
+        match OpsSelector.ops (x) with
         | OpsType.BigInteger ->
             match x with
-                | :? BigInt as bi -> bi
-                | :? BigInteger as bi -> BigInt.fromBigInteger (bi)
-                | _ -> raise <| InvalidOperationException("Unkown BigInteger type")
-        | OpsType.Long -> BigInt.fromLong(convertToLong(x))
-        | OpsType.Double -> BigInt.fromBigInteger(BigInteger(convertToDouble(x)))
+            | :? BigInt as bi -> bi
+            | :? BigInteger as bi -> BigInt.fromBigInteger (bi)
+            | _ -> raise <| InvalidOperationException("Unkown BigInteger type")
+        | OpsType.Long -> BigInt.fromLong (convertToLong (x))
+        | OpsType.Double -> BigInt.fromBigInteger (BigInteger(convertToDouble (x)))
         | OpsType.ULong ->
-            let ul = convertToULong(x)
-            if ul <= uint64(Int64.MaxValue) then
-                BigInt.fromLong(int64(ul))
+            let ul = convertToULong (x)
+
+            if ul <= uint64 (Int64.MaxValue) then
+                BigInt.fromLong (int64 (ul))
             else
-                BigInt.fromBigInteger(BigInteger(ul))
-        | OpsType.Ratio -> 
+                BigInt.fromBigInteger (BigInteger(ul))
+        | OpsType.Ratio ->
             let r = x :?> Ratio
-            BigInt.fromBigInteger(r.ToBigDecimal().ToBigInteger())
-        | OpsType.ClrDecimal -> 
+            BigInt.fromBigInteger (r.ToBigDecimal().ToBigInteger())
+        | OpsType.ClrDecimal ->
             let d = x :?> decimal
-            BigInt.fromBigInteger(BigDecimal.Create(d).ToBigInteger())
-        | OpsType.BigDecimal -> 
+            BigInt.fromBigInteger (BigDecimal.Create(d).ToBigInteger())
+        | OpsType.BigDecimal ->
             let bd = x :?> BigDecimal
-            BigInt.fromBigInteger(bd.ToBigInteger())
+            BigInt.fromBigInteger (bd.ToBigInteger())
         | _ -> raise <| InvalidOperationException("Unkown numeric OpsType")
-                
+
 
     //[<WarnedBoxMath(false)>]
     static member ToBigInteger(x: obj) =
-        match OpsSelector.ops(x) with
+        match OpsSelector.ops (x) with
         | OpsType.BigInteger ->
             match x with
             | :? BigInteger as bi -> bi
             | :? BigInt as bi -> bi.ToBigInteger()
-                | _ -> raise <| InvalidOperationException("Unkown BigInteger type")
-        | OpsType.Long -> BigInteger(convertToLong(x))
-        | OpsType.Double -> BigInteger(convertToDouble(x))
-        | OpsType.ULong -> BigInteger(convertToULong(x))
-        | OpsType.Ratio -> 
+            | _ -> raise <| InvalidOperationException("Unkown BigInteger type")
+        | OpsType.Long -> BigInteger(convertToLong (x))
+        | OpsType.Double -> BigInteger(convertToDouble (x))
+        | OpsType.ULong -> BigInteger(convertToULong (x))
+        | OpsType.Ratio ->
             let r = x :?> Ratio
             r.ToBigDecimal().ToBigInteger()
-        | OpsType.ClrDecimal -> 
+        | OpsType.ClrDecimal ->
             let d = x :?> decimal
             BigDecimal.Create(d).ToBigInteger()
-        | OpsType.BigDecimal -> 
+        | OpsType.BigDecimal ->
             let bd = x :?> BigDecimal
             bd.ToBigInteger()
         | _ -> raise <| InvalidOperationException("Unkown numeric OpsType")
@@ -1696,10 +1712,11 @@ and [<Sealed>] ULongOps() =
                 <| ArithmeticException("Checked operation error: negation of non-zero unsigned")
 
         member this.negateP(x: obj) : obj =
-            let lx = convertToULong(x)
+            let lx = convertToULong (x)
+
             if lx = 0UL then
                 x
-            else 
+            else
                 BigInt.fromBigInteger (- BigInteger(lx))
 
         member this.unchecked_negate(x: obj) : obj =
@@ -1866,15 +1883,16 @@ and [<Sealed>] ClrDecimalOps() =
         member this.addP(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
             let dy = convertToDecimal (y)
+
             try
                 dx + dy :> obj
-            with
-            | :? OverflowException -> Numbers.BIGDEC_OPS.add(x,y)
+            with :? OverflowException ->
+                Numbers.BIGDEC_OPS.add (x, y)
 
         member this.unchecked_add(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
             let dy = convertToDecimal (y)
-            dx + dy :> obj           
+            dx + dy :> obj
 
 
         member this.multiply(x, y) : obj =
@@ -1885,10 +1903,11 @@ and [<Sealed>] ClrDecimalOps() =
         member this.multiplyP(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
             let dy = convertToDecimal (y)
+
             try
                 dx * dy :> obj
-            with
-            | :? OverflowException -> Numbers.BIGDEC_OPS.multiply(x,y)
+            with :? OverflowException ->
+                Numbers.BIGDEC_OPS.multiply (x, y)
 
         member this.unchecked_multiply(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
@@ -1899,29 +1918,34 @@ and [<Sealed>] ClrDecimalOps() =
         member this.divide(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
             let dy = convertToDecimal (y)
-            try 
+
+            try
                 dx / dy :> obj
-            with 
-            | :? OverflowException -> BigDecimal.Create(dx).Divide(BigDecimal.Create(dy))
+            with :? OverflowException ->
+                BigDecimal.Create(dx).Divide(BigDecimal.Create(dy))
 
 
         member this.quotient(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
             let dy = convertToDecimal (y)
-            Numbers.quotient(dx,dy)
+            Numbers.quotient (dx, dy)
 
         member this.remainder(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
             let dy = convertToDecimal (y)
-            Numbers.remainder(dx,dy)
+            Numbers.remainder (dx, dy)
 
-        member this.equiv(x: obj, y: obj) : bool = convertToDecimal (x) = convertToDecimal (y)
+        member this.equiv(x: obj, y: obj) : bool =
+            convertToDecimal (x) = convertToDecimal (y)
 
-        member this.lt(x: obj, y: obj) : bool = convertToDecimal (x) < convertToDecimal (y)
+        member this.lt(x: obj, y: obj) : bool =
+            convertToDecimal (x) < convertToDecimal (y)
 
-        member this.lte(x: obj, y: obj) : bool = convertToDecimal (x) <= convertToDecimal (y)
+        member this.lte(x: obj, y: obj) : bool =
+            convertToDecimal (x) <= convertToDecimal (y)
 
-        member this.gte(x: obj, y: obj) : bool = convertToDecimal (x) >= convertToDecimal (y)
+        member this.gte(x: obj, y: obj) : bool =
+            convertToDecimal (x) >= convertToDecimal (y)
 
 
         member this.negate(x: obj) : obj = - convertToDecimal(x)
@@ -1930,27 +1954,29 @@ and [<Sealed>] ClrDecimalOps() =
 
         member this.unchecked_negate(x: obj) : obj = - convertToDecimal(x)
 
-        member this.inc(x: obj) : obj = convertToDecimal(x) + 1M :> obj
+        member this.inc(x: obj) : obj = convertToDecimal (x) + 1M :> obj
 
         member this.incP(x: obj) : obj =
             let dx = convertToDecimal (x)
-            try 
+
+            try
                 dx + 1M :> obj
-            with 
-            | :? OverflowException -> Numbers.BIGDEC_OPS.inc(BigDecimal.Create(dx))
+            with :? OverflowException ->
+                Numbers.BIGDEC_OPS.inc (BigDecimal.Create(dx))
 
-        member this.unchecked_inc(x: obj) : obj = convertToDecimal(x) + 1M :> obj
+        member this.unchecked_inc(x: obj) : obj = convertToDecimal (x) + 1M :> obj
 
-        member this.dec(x: obj) : obj = convertToDecimal(x) - 1M :> obj
+        member this.dec(x: obj) : obj = convertToDecimal (x) - 1M :> obj
 
         member this.decP(x: obj) : obj =
             let dx = convertToDecimal (x)
-            try 
-                dx - 1M :> obj
-            with 
-            | :? OverflowException -> Numbers.BIGDEC_OPS.dec(BigDecimal.Create(dx))
 
-        member this.unchecked_dec(x: obj) : obj = convertToDecimal(x) + 1M :> obj
+            try
+                dx - 1M :> obj
+            with :? OverflowException ->
+                Numbers.BIGDEC_OPS.dec (BigDecimal.Create(dx))
+
+        member this.unchecked_dec(x: obj) : obj = convertToDecimal (x) - 1M :> obj
 
         member this.abs(x: obj) : obj = Math.Abs(convertToDecimal (x))
 
@@ -2024,22 +2050,22 @@ and [<Sealed>] BigIntOps() =
 and [<Sealed>] BigDecimalOps() =
     inherit OpsP()
 
-        // Eventually, need to modify this to pick up the value from RT.MathContextVar.deref()  -- TODO, TODO, TODO
-        static member GetContext() : Context option = None
+    // Eventually, need to modify this to pick up the value from RT.MathContextVar.deref()  -- TODO, TODO, TODO
+    static member GetContext() : Context option = None
 
     interface Ops with
 
-        member this.isNeg(x: obj) : bool = 
-            let bx = x :?> BigDecimal  // In JVM code, they cast here instead of calling Numbers.ToBigDecimal 
+        member this.isNeg(x: obj) : bool =
+            let bx = x :?> BigDecimal // In JVM code, they cast here instead of calling Numbers.ToBigDecimal
             bx.IsNegative
 
 
-        member this.isPos(x: obj) : bool = 
-            let bx = x :?> BigDecimal  // In JVM code, they cast here instead of calling Numbers.ToBigDecimal 
+        member this.isPos(x: obj) : bool =
+            let bx = x :?> BigDecimal // In JVM code, they cast here instead of calling Numbers.ToBigDecimal
             bx.IsPositive
 
-        member this.isZero(x: obj) : bool = 
-            let bx = x :?> BigDecimal  // In JVM code, they cast here instead of calling Numbers.ToBigDecimal 
+        member this.isZero(x: obj) : bool =
+            let bx = x :?> BigDecimal // In JVM code, they cast here instead of calling Numbers.ToBigDecimal
             bx.IsZero
 
 
@@ -2047,57 +2073,69 @@ and [<Sealed>] BigDecimalOps() =
             let bx = Numbers.ToBigDecimal(x)
             let by = Numbers.ToBigDecimal(y)
             let c = BigDecimalOps.GetContext()
+
             match c with
-            | Some cx -> bx.Add(by,cx)
+            | Some cx -> bx.Add(by, cx)
             | None -> bx.Add(by)
 
         member this.multiply(x, y) : obj =
             let bx = Numbers.ToBigDecimal(x)
             let by = Numbers.ToBigDecimal(y)
             let c = BigDecimalOps.GetContext()
+
             match c with
-            | Some cx -> bx.Multiply(by,cx)
+            | Some cx -> bx.Multiply(by, cx)
             | None -> bx.Multiply(by)
 
         member this.divide(x: obj, y: obj) : obj =
             let bx = Numbers.ToBigDecimal(x)
             let by = Numbers.ToBigDecimal(y)
             let c = BigDecimalOps.GetContext()
+
             match c with
-            | Some cx -> bx.Divide(by,cx)
+            | Some cx -> bx.Divide(by, cx)
             | None -> bx.Divide(by)
 
         member this.quotient(x: obj, y: obj) : obj =
             let bx = Numbers.ToBigDecimal(x)
             let by = Numbers.ToBigDecimal(y)
             let c = BigDecimalOps.GetContext()
+
             match c with
-            | Some cx -> bx.DivideInteger(by,cx)
+            | Some cx -> bx.DivideInteger(by, cx)
             | None -> bx.DivideInteger(by)
 
         member this.remainder(x: obj, y: obj) : obj =
             let bx = Numbers.ToBigDecimal(x)
             let by = Numbers.ToBigDecimal(y)
             let c = BigDecimalOps.GetContext()
+
             match c with
-            | Some cx -> bx.Mod(by,cx)
+            | Some cx -> bx.Mod(by, cx)
             | None -> bx.Mod(by)
 
         member this.equiv(x: obj, y: obj) : bool =
-            (Numbers.ToBigDecimal(x):>IComparable<BigDecimal>).CompareTo(Numbers.ToBigDecimal(y)) = 0
+            (Numbers.ToBigDecimal(x) :> IComparable<BigDecimal>)
+                .CompareTo(Numbers.ToBigDecimal(y)) = 0
 
         member this.lt(x: obj, y: obj) : bool =
-            (Numbers.ToBigDecimal(x):>IComparable<BigDecimal>).CompareTo(Numbers.ToBigDecimal(y)) < 0
+            (Numbers.ToBigDecimal(x) :> IComparable<BigDecimal>)
+                .CompareTo(Numbers.ToBigDecimal(y)) < 0
 
         member this.lte(x: obj, y: obj) : bool =
-            (Numbers.ToBigDecimal(x):>IComparable<BigDecimal>).CompareTo(Numbers.ToBigDecimal(y)) >= 0
+            (Numbers.ToBigDecimal(x) :> IComparable<BigDecimal>)
+                .CompareTo(Numbers.ToBigDecimal(y))
+            >= 0
 
         member this.gte(x: obj, y: obj) : bool =
-            (Numbers.ToBigDecimal(x):>IComparable<BigDecimal>).CompareTo(Numbers.ToBigDecimal(y)) >= 0
+            (Numbers.ToBigDecimal(x) :> IComparable<BigDecimal>)
+                .CompareTo(Numbers.ToBigDecimal(y))
+            >= 0
 
-        member this.negate(x: obj) : obj = 
+        member this.negate(x: obj) : obj =
             let bx = Numbers.ToBigDecimal(x)
             let c = BigDecimalOps.GetContext()
+
             match c with
             | Some cx -> bx.Negate(cx)
             | None -> bx.Negate()
@@ -2105,21 +2143,24 @@ and [<Sealed>] BigDecimalOps() =
         member this.inc(x: obj) : obj =
             let bx = Numbers.ToBigDecimal(x)
             let c = BigDecimalOps.GetContext()
+
             match c with
-            | Some cx -> bx.Add(BigDecimal.One,cx)
+            | Some cx -> bx.Add(BigDecimal.One, cx)
             | None -> bx.Add(BigDecimal.One)
 
-        member this.dec(x: obj) : obj = 
+        member this.dec(x: obj) : obj =
             let bx = Numbers.ToBigDecimal(x)
             let c = BigDecimalOps.GetContext()
+
             match c with
-            | Some cx -> bx.Subtract(BigDecimal.One,cx)
+            | Some cx -> bx.Subtract(BigDecimal.One, cx)
             | None -> bx.Subtract(BigDecimal.One)
 
 
-        member this.abs(x: obj) : obj = 
+        member this.abs(x: obj) : obj =
             let bx = Numbers.ToBigDecimal(x)
             let c = BigDecimalOps.GetContext()
+
             match c with
             | Some cx -> bx.Abs(cx)
             | None -> bx.Abs()

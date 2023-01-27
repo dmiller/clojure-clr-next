@@ -601,7 +601,185 @@ let testAdd =
               Expect.equal (Numbers.unchecked_minus (r)) rm "Ration minus"
               Expect.equal (Numbers.unchecked_minus (bd)) bdm "BD minus"
 
+          testCase "inc"
+          <| fun _ ->
 
+              let biMaxVp1 = BigInt.fromBigInteger (BigInteger(Int64.MaxValue)+BigInteger.One)
+              let biUMaxVp1 = BigInt.fromBigInteger (BigInteger(UInt64.MaxValue)+BigInteger.One)
+ 
+              Expect.equal (Numbers.inc 12.0) 13.0 "12 -> 13 D"
+              Expect.equal (Numbers.inc 12L) 13L "12 -> 13 L"
+              Expect.equal (Numbers.inc 12UL) 13UL "12 -> 13 UL"
+              Expect.equal (Numbers.inc 12M) 13M " 12 -> 13 M)"
+ 
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.inc (Int64.MaxValue) |> ignore)
+                  "Can't inc max"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.inc (UInt64.MaxValue) |> ignore)
+                  "Can't inc max"
+
+              Expect.equal (Numbers.inc (12.0 :> obj)) 13.0 "12 -> 13 D"
+              Expect.equal (Numbers.inc (12L :> obj)) 13L "12 -> 13 L"
+              Expect.equal (Numbers.inc (12UL :> obj)) 13UL "12 -> 13 UL"
+              Expect.equal (Numbers.inc (12M :> obj)) 13M " 12 -> 13 M)"
+ 
+              Expect.throwsT<OverflowException>
+                  (fun () -> (Numbers.inc (Int64.MaxValue :> obj)) |> ignore )
+                  "Can't inc max"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> (Numbers.inc (UInt64.MaxValue :> obj)) |> ignore)
+                  "Can't inc max"
+
+
+              Expect.equal (Numbers.incP 12.0) 13.0 "12 -> 13 D"
+              Expect.equal (Numbers.incP 12L) 13L "12 -> 13 L"
+              Expect.equal (Numbers.incP 12UL) 13UL "12 -> 13 UL"
+              Expect.equal (Numbers.incP 12M) 13M " 12 -> 13 M)"
+
+              Expect.equal (Numbers.incP Int64.MaxValue) biMaxVp1 "inc MaxValue -> bigint"
+              Expect.equal (Numbers.incP UInt64.MaxValue) biUMaxVp1 "inc MaxValue -> bigint"
+ 
+ 
+              Expect.equal (Numbers.incP (12.0 :> obj)) 13.0 "12 -> 13 D"
+              Expect.equal (Numbers.incP (12L :> obj)) 13L "12 -> 13 L"
+              Expect.equal (Numbers.incP (12UL :> obj)) 13UL "12 -> 13 UL"
+              Expect.equal (Numbers.incP (12M :> obj)) 13M " 12 -> 13 M)"
+
+              Expect.equal (Numbers.incP (Int64.MaxValue  :> obj)) biMaxVp1 "inc MaxValue -> bigint"
+              Expect.equal (Numbers.incP (UInt64.MaxValue :> obj)) biUMaxVp1 "inc MaxValue -> bigint"
+ 
+
+              Expect.equal (Numbers.unchecked_inc 12.0) 13.0 "12 -> 13 D"
+              Expect.equal (Numbers.unchecked_inc 12L) 13L "12 -> 13 L"
+              Expect.equal (Numbers.unchecked_inc 12UL) 13UL "12 -> 13 UL"
+              Expect.equal (Numbers.unchecked_inc 12M) 13M " 12 -> 13 M)"
+
+              Expect.equal (Numbers.unchecked_inc Int64.MaxValue) Int64.MinValue "inc MaxValue -> overflow"
+              Expect.equal (Numbers.unchecked_inc UInt64.MaxValue) 0UL "inc MaxValue -> overflow"
+ 
+ 
+              Expect.equal (Numbers.unchecked_inc (12.0 :> obj)) 13.0 "12 -> 13 D"
+              Expect.equal (Numbers.unchecked_inc (12L :> obj)) 13L "12 -> 13 L"
+              Expect.equal (Numbers.unchecked_inc (12UL :> obj)) 13UL "12 -> 13 UL"
+              Expect.equal (Numbers.unchecked_inc (12M :> obj)) 13M " 12 -> 13 M)"
+
+              Expect.equal (Numbers.unchecked_inc (Int64.MaxValue  :> obj)) Int64.MinValue "inc MaxValue -> overflow"
+              Expect.equal (Numbers.unchecked_inc (UInt64.MaxValue :> obj)) 0UL "inc MaxValue -> overflow"
+
+              let b = BigInteger(1e30)
+              let bp1 = b + BigInteger.One
+              let b7 = BigInteger(7)
+
+              let r = Ratio(b,b7)
+              let rp1 = Ratio(b+b7,b7)
+
+              let bd = BigDecimal.Create("111111111111.11111111111")
+              let bdp1 = BigDecimal.Create("111111111112.11111111111")
+
+              Expect.equal (Numbers.inc b) (BigInt.fromBigInteger(bp1)) "BI inc"
+              Expect.equal (Numbers.inc r) rp1 "Ratio inc"
+              Expect.equal (Numbers.inc bd) bdp1 "BD inc"
+
+              Expect.equal (Numbers.incP b) (BigInt.fromBigInteger(bp1)) "BI inc"
+              Expect.equal (Numbers.incP r) rp1 "Ratio inc"
+              Expect.equal (Numbers.incP bd) bdp1 "BD inc"
+
+              Expect.equal (Numbers.unchecked_inc b) (BigInt.fromBigInteger(bp1)) "BI inc"
+              Expect.equal (Numbers.unchecked_inc r) rp1 "Ratio inc"
+              Expect.equal (Numbers.unchecked_inc bd) bdp1 "BD inc"
+
+          testCase "dec"
+          <| fun _ ->
+
+              let biMinVm1 = BigInt.fromBigInteger (BigInteger(Int64.MinValue)-BigInteger.One)
+              let biUMinVm1 = BigInt.fromBigInteger (BigInteger(UInt64.MinValue)-BigInteger.One)
+ 
+              Expect.equal (Numbers.dec 12.0) 11.0 "12 -> 11 D"
+              Expect.equal (Numbers.dec 12L) 11L "12 -> 11 L"
+              Expect.equal (Numbers.dec 12UL) 11UL "12 -> 11 UL"
+              Expect.equal (Numbers.dec 12M) 11M " 12 -> 11 M)"
+ 
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.dec (Int64.MinValue) |> ignore)
+                  "Can't dec min"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> Numbers.dec (UInt64.MinValue) |> ignore)
+                  "Can't dec min"
+
+              Expect.equal (Numbers.dec (12.0 :> obj)) 11.0 "12 -> 11 D"
+              Expect.equal (Numbers.dec (12L :> obj)) 11L "12 -> 11 L"
+              Expect.equal (Numbers.dec (12UL :> obj)) 11UL "12 -> 11 UL"
+              Expect.equal (Numbers.dec (12M :> obj)) 11M " 12 -> 11 M)"
+ 
+              Expect.throwsT<OverflowException>
+                  (fun () -> (Numbers.dec (Int64.MinValue :> obj)) |> ignore )
+                  "Can't dec min"
+
+              Expect.throwsT<OverflowException>
+                  (fun () -> (Numbers.dec (UInt64.MinValue :> obj)) |> ignore)
+                  "Can't dec min"
+
+
+              Expect.equal (Numbers.decP 12.0) 11.0 "12 -> 11 D"
+              Expect.equal (Numbers.decP 12L) 11L "12 -> 11 L"
+              Expect.equal (Numbers.decP 12UL) 11UL "12 -> 11 UL"
+              Expect.equal (Numbers.decP 12M) 11M " 12 -> 11 M)"
+
+              Expect.equal (Numbers.decP Int64.MinValue) biMinVm1 "dec MinValue -> bigint"
+              Expect.equal (Numbers.decP UInt64.MinValue) biUMinVm1 "dec MinValue -> bigint"
+ 
+ 
+              Expect.equal (Numbers.decP (12.0 :> obj)) 11.0 "12 -> 11 D"
+              Expect.equal (Numbers.decP (12L :> obj)) 11L "12 -> 11 L"
+              Expect.equal (Numbers.decP (12UL :> obj)) 11UL "12 -> 11 UL"
+              Expect.equal (Numbers.decP (12M :> obj)) 11M " 12 -> 11 M)"
+
+              Expect.equal (Numbers.decP (Int64.MinValue :> obj)) biMinVm1 "dec MinValue -> bigint"
+              Expect.equal (Numbers.decP (UInt64.MinValue :> obj)) biUMinVm1 "dec MinValue -> bigint"
+ 
+
+              Expect.equal (Numbers.unchecked_dec 12.0) 11.0 "12 -> 11 D"
+              Expect.equal (Numbers.unchecked_dec 12L) 11L "12 -> 11 L"
+              Expect.equal (Numbers.unchecked_dec 12UL) 11UL "12 -> 11 UL"
+              Expect.equal (Numbers.unchecked_dec 12M) 11M " 12 -> 11 M)"
+
+              Expect.equal (Numbers.unchecked_dec Int64.MinValue) Int64.MaxValue "dec MaxValue -> overflow"
+              Expect.equal (Numbers.unchecked_dec 0UL) UInt64.MaxValue "dec MaxValue -> overflow"
+ 
+ 
+              Expect.equal (Numbers.unchecked_dec (12.0 :> obj)) 11.0 "12 -> 11 D"
+              Expect.equal (Numbers.unchecked_dec (12L :> obj)) 11L "12 -> 11 L"
+              Expect.equal (Numbers.unchecked_dec (12UL :> obj)) 11UL "12 -> 11 UL"
+              Expect.equal (Numbers.unchecked_dec (12M :> obj)) 11M " 12 -> 11 M)"
+
+              Expect.equal (Numbers.unchecked_dec (Int64.MinValue :> obj)) Int64.MaxValue "dec MaxValue -> overflow"
+              Expect.equal (Numbers.unchecked_dec (0UL :> obj)) UInt64.MaxValue "dec MaxValue -> overflow"
+
+              let b = BigInteger(1e30)
+              let bm1 = b - BigInteger.One
+              let b7 = BigInteger(7)
+
+              let r = Ratio(b,b7)
+              let rp1 = Ratio(b-b7,b7)
+
+              let bd = BigDecimal.Create("111111111111.11111111111")
+              let bdp1 = BigDecimal.Create("111111111110.11111111111")
+
+              Expect.equal (Numbers.dec b) (BigInt.fromBigInteger(bm1)) "BI dec"
+              Expect.equal (Numbers.dec r) rp1 "Ratio dec"
+              Expect.equal (Numbers.dec bd) bdp1 "BD dec"
+
+              Expect.equal (Numbers.decP b) (BigInt.fromBigInteger(bm1)) "BI dec"
+              Expect.equal (Numbers.decP r) rp1 "Ratio dec"
+              Expect.equal (Numbers.decP bd) bdp1 "BD dec"
+
+              Expect.equal (Numbers.unchecked_dec b) (BigInt.fromBigInteger(bm1)) "BI dec"
+              Expect.equal (Numbers.unchecked_dec r) rp1 "Ratio dec"
+              Expect.equal (Numbers.unchecked_dec bd) bdp1 "BD dec"
 
           testCase "isPos, isZero, isNeg"
           <| fun _ ->
