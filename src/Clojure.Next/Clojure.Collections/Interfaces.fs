@@ -5,7 +5,6 @@ open System.Collections
 open System.Collections.Generic
 
 
-
 // The mutually recursive triple that underlies most of the following interfaces.
 
 [<AllowNullLiteral>]
@@ -25,6 +24,9 @@ and [<AllowNullLiteral>] ISeq =
     abstract next: unit -> ISeq
     abstract more: unit -> ISeq
     abstract cons: obj -> ISeq
+
+
+// And everything else
 
 
 [<AllowNullLiteral>]

@@ -72,6 +72,3 @@ let count (o: obj) : int =
     | _ ->
         raise
         <| InvalidOperationException($"count not supported on this type: {Util.nameForType (o.GetType())}")
-
-
-
