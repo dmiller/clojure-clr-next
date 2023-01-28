@@ -7,7 +7,7 @@ categories: general
 
 I have to analyze the nature of circular references in the current Clojure implementations in order to avoid making an inelegant F# monolith -- massive quantities of code in one file with all the types mutually recursive.
 
-In [For your Cons-ideration]({% post_url 2023-01-08-consideration %}), I pointed out two places where mutual reference occurs:  the `Seqable`/`IPersitentCollection`/`ISeq` triple of interfaces and the `Cons`/`ASeq` pairing.
+In [For your Cons-ideration]({{site.baseurl}}{% post_url 2023-01-08-consideration %}), I pointed out two places where mutual reference occurs:  the `Seqable`/`IPersitentCollection`/`ISeq` triple of interfaces and the `Cons`/`ASeq` pairing.
 
 ## Triple play
 
@@ -146,4 +146,4 @@ I did an analysis of the overrides of `A` methods in `P` and `C`.  Looking at in
 
 Are there operational consequences?  The only places `ASeq` is mentioned directly in code is in the aforementioned `RT.seq` and in the definitions of `CollReduce` extensions in `protocols.clj`.  For `CollReduce`, we'll just have to make a note.
 
-Unfortunately, `RT.seq` holds some nasty surprises, as we will discover in [Circular Reasoning, part 2]({% post_url 2023-01-17-circular-reasoning-part-2 %}).
+Unfortunately, `RT.seq` holds some nasty surprises, as we will discover in [Circular Reasoning, part 2]({{site.baseurl}}{% post_url 2023-01-17-circular-reasoning-part-2 %}).

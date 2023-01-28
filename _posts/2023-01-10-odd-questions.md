@@ -5,7 +5,7 @@ date: 2023-01-10 00:00:00 -0500
 categories: general
 ---
 
-Now for some homework.  Let's see how well you absorbed the material in the [previous post]({% post_url 2023-01-09-a-minimal-implementation-of-cons %}).
+Now for some homework.  Let's see how well you absorbed the material in the [previous post]({{site.baseurl}}{% post_url 2023-01-09-a-minimal-implementation-of-cons %}).
 
 - __Exercise 1__: Implement a simple integer range type that implements the golden trio of interfaces.  You need only deal with increasing ranges. You should provide a `create` method that takes a start value and end value.  The resulting sequence should be `start  (start+1) (start+2) ...  (end-1)`.  Note that if `end <= start` you should return some representation of an empty sequence.
 

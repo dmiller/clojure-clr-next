@@ -321,7 +321,7 @@ while for `APersistentMap.hasheq()`, Murmur3 to the rescue again:
 Murmur3.hashUnordered(m)
 ```
 
-There were other factors in the change from the older `Equals/hashCode` approach to using `equiv/hasheq`, most prominent being the need to deal with numbers more effectively and consistently.  That is the topic of [the next post]({%  post_url 2023-01-19-a-numbers-game %}).
+There were other factors in the change from the older `Equals/hashCode` approach to using `equiv/hasheq`, most prominent being the need to deal with numbers more effectively and consistently.  That is the topic of [the next post]({{site.baseurl}}{% post_url 2023-01-19-a-numbers-game %}).
 
 I hope this explains some of the code we will see later on.  The constraints on `Equals/hashCode` and `equiv/hasheq` need to be kept in mind going forward.
 

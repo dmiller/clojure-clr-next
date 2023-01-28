@@ -5,7 +5,7 @@ date: 2023-01-09 00:00:00 -0500
 categories: general
 ---
 
-Seeing the complexity of the Clojure interface/data-structure ecosystem as we did in [the last post]({% post_url 2023-01-08-consideration %}) can be a bit daunting.  But if we start gently we can tease out some of the basic interactions and techniques that underlie how the real Clojure versions of these data structures are implemented.
+Seeing the complexity of the Clojure interface/data-structure ecosystem as we did in [the last post]({{site.baseurl}}{% post_url 2023-01-08-consideration %}) can be a bit daunting.  But if we start gently we can tease out some of the basic interactions and techniques that underlie how the real Clojure versions of these data structures are implemented.
 
 Despite perhaps putting the scare into you with the diagram of `Cons` in the last post, a simple cons cell is the place to start.   A cons cell is just a node for singly-linked list -- a field containing an item and a field pointing to the rest of the list, perhaps the simplest notion of _sequence_ we can come up with.  However, as we will see, we need more than just this node type to meet the needs of the Clojure interfaces. 
 
