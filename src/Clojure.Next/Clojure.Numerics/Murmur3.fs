@@ -66,7 +66,7 @@ type Murmur3 =
 
     static member internal mixCollHashU (hash: uint) (count: int) : uint = Murmur3.finalizeCollHash hash count
 
-    static member internal mixCollHash (hash: int) (count: int) : int =
+    static member mixCollHash (hash: int) (count: int) : int =
         Murmur3.mixCollHashU (uint hash) count |> int
 
 

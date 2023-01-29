@@ -63,6 +63,13 @@ type Indexed =
     abstract nth: i: int * notFound: obj -> obj
 
 [<AllowNullLiteral>]
+type IndexedSeq =
+    inherit ISeq
+    inherit Sequential
+    inherit Counted
+    abstract index: unit -> int
+
+[<AllowNullLiteral>]
 type Reversible =
     abstract rseq: unit -> ISeq
 

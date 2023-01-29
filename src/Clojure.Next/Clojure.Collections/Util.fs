@@ -33,3 +33,13 @@ let nameForType (t: Type) =
         fullName.Substring(index + 1)
     else
         t.Name
+
+
+let compare(k1:obj,k2:obj) =
+    match k1, k2 with
+    | _,_ when obj.ReferenceEquals(k1,k2) -> 0
+    | _, null -> 1
+    | null, _ -> -1
+    | _,_ when Numbers.IsNumeric(k1) -> Numbers.compare(k1,k2)
+    | _ -> (k1 :?> IComparable).CompareTo(k2)
+ 
