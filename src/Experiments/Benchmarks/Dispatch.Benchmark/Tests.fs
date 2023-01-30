@@ -18,13 +18,6 @@ type Tests() =
                     typeCombine(data[i], data[j]) |> ignore
               
     [<Benchmark>]   
-    member _.LookupCombine() = 
-        for iter in 0 .. numIters - 1 do 
-            for i in 0 .. 4 do
-                for j in 0 .. 4 do
-                    lookupCombine(data[i], data[j]) |> ignore
-              
-    [<Benchmark>]   
     member _.LookupCombine2D() = 
         for iter in 0 .. numIters - 1 do 
             for i in 0 .. 4 do

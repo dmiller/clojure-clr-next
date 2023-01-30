@@ -21,8 +21,8 @@ let data : obj array = [| for i in 1 .. numEntries -> generateRandomEntry(rnd) |
 [<GlobalSetup>]
 let globalSetup() = Console.WriteLine($"data has {data.Length}")
 
-[<MarkdownExporterAttribute.GitHub>]
-type Tests() = 
+
+type TestingConverters() = 
 
     [<Benchmark>]   
     member _.TypeCode() = 
@@ -50,3 +50,15 @@ type Tests() =
         for i in 0 .. data.Length - 1 do 
             convertToIntDirectly data[i] |> ignore
 
+
+type TestingCategorizers() = 
+
+    [<Benchmark(Baseline=true)>]    
+    member _.TypeCode() = 
+        for i in 0 .. data.Length - 1 do 
+            categorizeByTypeCode data[i] |> ignore
+        
+    [<Benchmark>]   
+    member _.Type() = 
+        for i in 0 .. data.Length - 1 do 
+            categorizeByType data[i] |> ignore

@@ -5,5 +5,6 @@ open Tests
 
 [<EntryPoint>]
 let main argv =
-    BenchmarkRunner.Run<Tests>() |> ignore
+    BenchmarkRunner.Run<TestingConverters>() |> ignore
+    BenchmarkRunner.Run<TestingCategorizers>() |> ignore
     0 // return an integer exit code

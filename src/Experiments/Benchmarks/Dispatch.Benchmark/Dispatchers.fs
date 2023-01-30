@@ -84,17 +84,19 @@ type Category =
     | C3 = 3
     | C4 = 4
 
-let row0 : Ops array = [| OpsImpl.Impl0; OpsImpl.Impl1; OpsImpl.Impl2; OpsImpl.Impl3; OpsImpl.Impl4 |]
-let row1 : Ops array = [| OpsImpl.Impl1; OpsImpl.Impl1; OpsImpl.Impl1; OpsImpl.Impl1; OpsImpl.Impl1 |]
-let row2 : Ops array = [| OpsImpl.Impl2; OpsImpl.Impl1; OpsImpl.Impl2; OpsImpl.Impl2; OpsImpl.Impl4 |]
-let row3 : Ops array = [| OpsImpl.Impl3; OpsImpl.Impl1; OpsImpl.Impl2; OpsImpl.Impl3; OpsImpl.Impl4 |]
-let row4 : Ops array = [| OpsImpl.Impl4; OpsImpl.Impl1; OpsImpl.Impl4; OpsImpl.Impl4; OpsImpl.Impl4 |]
-let categoryTable : Ops array array = [| row0; row1; row2; row3; row4 |]
+let row0 : Category array = [| Category.C0; Category.C1; Category.C2; Category.C3; Category.C4 |]
+let row1 : Category array = [| Category.C1; Category.C1; Category.C1; Category.C1; Category.C1 |]
+let row2 : Category array = [| Category.C2; Category.C1; Category.C2; Category.C2; Category.C4 |]
+let row3 : Category array = [| Category.C3; Category.C1; Category.C2; Category.C3; Category.C4 |]
+let row4 : Category array = [| Category.C4; Category.C1; Category.C4; Category.C4; Category.C4 |]
+let categoryTable : Category array array = [| row0; row1; row2; row3; row4 |]
 
 
-let lookitup (i:int) (j:int) : Ops = categoryTable[i][j]
+let lookitup (i:int) (j:int) : Category = categoryTable[i][j]
     
-let categoryTable2D = Array2D.init<Ops> 5 5 lookitup
+let categoryTable2D = Array2D.init<Category> 5 5 lookitup
+
+let categoryToOps : Ops array = [| OpsImpl.Impl0; OpsImpl.Impl1; OpsImpl.Impl2; OpsImpl.Impl3; OpsImpl.Impl4 |]
 
 let lookupOps(x:obj) : Category =
     match x with
@@ -104,5 +106,8 @@ let lookupOps(x:obj) : Category =
     | :? int32 -> Category.C3
     | :? decimal -> Category.C4
 
-let lookupCombine(x:obj, y:obj) : Ops = categoryTable[int(lookupOps(x))][int(lookupOps(y))]
-let lookupCombine2D(x:obj, y:obj) : Ops = categoryTable2D[int(lookupOps(x)),int(lookupOps(y))]
+let lookupCombine2D(x:obj, y:obj) : Ops = categoryToOps[int(categoryTable2D[int(lookupOps(x)),int(lookupOps(y))])]
+
+
+
+
