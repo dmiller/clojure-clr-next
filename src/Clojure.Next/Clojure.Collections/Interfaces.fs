@@ -368,7 +368,19 @@ type IFn =
         [<ParamArray>] args: obj array ->
             obj
 
+[<AllowNullLiteral>]
+type IChunk =
+    inherit Indexed
+    abstract dropFirst: unit -> IChunk
+    abstract reduce: f: IFn * start: obj -> obj
 
+[<AllowNullLiteral>]
+type IChunkedSeq =
+    inherit ISeq
+    inherit Sequential
+    abstract chunkedFirst: unit -> IChunk
+    abstract chunkedNext: unit -> ISeq
+    abstract chunkedMore: unit -> ISeq
 
 [<AllowNullLiteral>]
 type IReduceInit =
@@ -449,5 +461,6 @@ type ITransientVector =
 type IEditableCollection =
     abstract asTransient: unit -> ITransientCollection
 
+[<AllowNullLiteral>]
 type IDrop =
     abstract drop: n: int -> Sequential
