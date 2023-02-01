@@ -18,7 +18,7 @@ type Obj(meta: IPersistentMap) =
 
 
 
-// Needs to appear before the defintion of RT
+// Needs to appear before the defintion of RT.IsReduced, wherever that ends up
 
 [<Sealed>]
 type Reduced(value) =
