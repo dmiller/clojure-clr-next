@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Atomics.fs" />
     <None Include="GenerateRestFnSource.fsx" />
     <Compile Include="Interfaces.fs" />
     <Compile Include="Util.fs" />
@@ -17,6 +18,7 @@
     <Compile Include="StarterSequences.fs" />
     <Compile Include="ArraySeq.fs" />
     <Compile Include="LazySeq.fs" />
+    <Compile Include="ArrayChunk.fs" />
     <Compile Include="APersistentVector.fs" />
   </ItemGroup>
 
