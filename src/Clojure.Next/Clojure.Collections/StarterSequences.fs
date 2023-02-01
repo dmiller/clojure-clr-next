@@ -70,6 +70,11 @@ type ASeq(m) =
 
         member this.cons(o) = Cons(o, this) :> ISeq
 
+
+    static member  countsMismatch(o1:obj, o2:obj) = 
+        (o1 :? Counted) && (o2 :? Counted) && (o1:?>Counted).count() <> (o2:?>Counted).count()
+
+ 
     interface IPersistentCollection with
         member this.cons(o) =
             (this :> ISeq).cons (o) :> IPersistentCollection
@@ -90,8 +95,11 @@ type ASeq(m) =
                     | _, null -> false
                     | null, _ -> false
                     | _ -> Util.equiv (s1.first (), s2.first ()) && step (s1.next ()) (s2.next ())
-
-                step this (RT0.seq (o))
+                
+                if ASeq.countsMismatch(this,o) then
+                    false
+                else 
+                    step this (RT0.seq (o))
             | _ -> false
 
     interface Seqable with
@@ -193,23 +201,23 @@ and [<Sealed>] Cons(meta, f: obj, m: ISeq) =
     new(f: obj, m: ISeq) = Cons(null, f, m)
 
     interface IObj with
-        member this.withMeta(m) =
+        override this.withMeta(m) =
             if Object.ReferenceEquals(m, meta) then
                 (this :> IObj)
             else
                 Cons(m, first, more) :> IObj
 
     interface ISeq with
-        member _.first() = first
-        member this.next() = (this :> ISeq).more().seq ()
+        override _.first() = first
+        override this.next() = (this :> ISeq).more().seq ()
 
-        member _.more() =
+        override _.more() =
             match more with
             | null -> upcast EmptyList.Empty
             | _ -> more
 
     interface IPersistentCollection with
-        member _.count() = 1 + RT0.count (more)
+        override _.count() = 1 + RT0.count (more)
 
 and [<Sealed>] EmptyList(m) =
     inherit Obj(m)
@@ -229,36 +237,36 @@ and [<Sealed>] EmptyList(m) =
         | _ -> false
 
     interface IObj with
-        member this.withMeta(m) =
+        override this.withMeta(m) =
             if Object.ReferenceEquals(m, (this :> IMeta).meta ()) then
                 this :> IObj
             else
                 EmptyList(m) :> IObj
 
     interface ISeq with
-        member _.first() = null
-        member _.next() = null
-        member this.more() = this :> ISeq
+        override _.first() = null
+        override _.next() = null
+        override this.more() = this :> ISeq
 
-        member this.cons(o) =
+        override this.cons(o) =
             PersistentList((this :> IMeta).meta (), o, null, 1) :> ISeq
 
     interface IPersistentCollection with
-        member _.count() = 0
+        override _.count() = 0
 
-        member this.cons(o) =
+        override this.cons(o) =
             (this :> ISeq).cons (o) :> IPersistentCollection
 
-        member this.empty() = this :> IPersistentCollection
-        member this.equiv(o) = this.Equals(o)
+        override this.empty() = this :> IPersistentCollection
+        override this.equiv(o) = this.Equals(o)
 
     interface Seqable with
-        member _.seq() = null
+        override _.seq() = null
 
     interface IPersistentStack with
-        member _.peek() = null
+        override _.peek() = null
 
-        member _.pop() =
+        override _.pop() =
             raise <| InvalidOperationException("Attempt to pop an empty list")
 
     interface Sequential
@@ -266,44 +274,44 @@ and [<Sealed>] EmptyList(m) =
     interface IPersistentList
 
     interface IHashEq with
-        member _.hasheq() = EmptyList.hasheq
+        override _.hasheq() = EmptyList.hasheq
 
     interface ICollection with
-        member _.CopyTo(a: Array, idx: int) = () // no-op
-        member _.Count = 0
-        member _.IsSynchronized = true
-        member this.SyncRoot = upcast this
+        override _.CopyTo(a: Array, idx: int) = () // no-op
+        override _.Count = 0
+        override _.IsSynchronized = true
+        override this.SyncRoot = upcast this
 
     static member emptyEnumerator: IEnumerator = Seq.empty<obj>.GetEnumerator () :> IEnumerator
 
     interface IEnumerable with
-        member x.GetEnumerator() = EmptyList.emptyEnumerator
+        override x.GetEnumerator() = EmptyList.emptyEnumerator
 
     interface IList with
-        member _.Add(_) =
+        override _.Add(_) =
             raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
-        member _.Clear() =
+        override _.Clear() =
             raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
-        member _.Insert(i, v) =
+        override _.Insert(i, v) =
             raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
-        member _.Remove(v) =
+        override _.Remove(v) =
             raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
-        member _.RemoveAt(i) =
+        override _.RemoveAt(i) =
             raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
-        member _.IsFixedSize = true
-        member _.IsReadOnly = true
+        override _.IsFixedSize = true
+        override _.IsReadOnly = true
 
-        member _.Item
+        override _.Item
             with get index = raise <| ArgumentOutOfRangeException("index")
             and set _ _ = raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
-        member _.IndexOf(v) = -1
-        member _.Contains(v) = false
+        override _.IndexOf(v) = -1
+        override _.Contains(v) = false
 
 and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
     inherit ASeq(m1)
@@ -324,29 +332,29 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
         r
 
     interface IObj with
-        member this.withMeta(m) =
+        override this.withMeta(m) =
             if Object.ReferenceEquals(m, (this :> IMeta).meta ()) then
                 this :> IObj
             else
                 PersistentList(m, first, rest, count) :> IObj
 
     interface ISeq with
-        member _.first() = first
-        member _.next() = if count = 1 then null else rest.seq ()
+        override _.first() = first
+        override _.next() = if count = 1 then null else rest.seq ()
 
-        member this.cons(o) =
+        override this.cons(o) =
             PersistentList((this :> IObj).meta (), o, (this :> IPersistentList), count + 1) :> ISeq
 
     interface IPersistentCollection with
-        member _.count() = count
+        override _.count() = count
 
-        member this.empty() =
+        override this.empty() =
             (EmptyList.Empty :> IObj).withMeta ((this :> IMeta).meta ()) :?> IPersistentCollection
 
     interface IPersistentStack with
-        member _.peek() = first
+        override _.peek() = first
 
-        member this.pop() =
+        override this.pop() =
             match rest with
             | null -> (EmptyList.Empty :> IObj).withMeta ((this :> IMeta).meta ()) :?> IPersistentStack
             | _ -> rest :> IPersistentStack
@@ -354,7 +362,7 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
     interface IPersistentList
 
     interface IReduceInit with
-        member this.reduce(fn, start) =
+        override this.reduce(fn, start) =
             let rec step (s: ISeq) (value: obj) =
                 match s with
                 | null -> value
@@ -372,7 +380,7 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
             | _ -> ret
 
     interface IReduce with
-        member this.reduce(fn) =
+        override this.reduce(fn) =
             let rec step (s: ISeq) (value: obj) =
                 match s with
                 | null -> value

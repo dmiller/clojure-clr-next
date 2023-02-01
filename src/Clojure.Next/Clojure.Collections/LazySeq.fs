@@ -30,7 +30,7 @@ type LazySeq(m1, fn1, s1) =
         | s, _ -> s.Equals(o)
 
     interface IObj with
-        member this.withMeta(meta: IPersistentMap) =
+        override this.withMeta(meta: IPersistentMap) =
             if obj.ReferenceEquals((this :> IMeta).meta (), meta) then
                 this :> IObj
             else
