@@ -17,8 +17,10 @@
     <Compile Include="SeqEnumerator.fs" />
     <Compile Include="StarterSequences.fs" />
     <Compile Include="ArraySeq.fs" />
+    <Compile Include="MoreSequences.fs" />
     <Compile Include="LazySeq.fs" />
     <Compile Include="ArrayChunk.fs" />
+    <Compile Include="Ranges.fs" />
     <Compile Include="APersistentVector.fs" />
   </ItemGroup>
 

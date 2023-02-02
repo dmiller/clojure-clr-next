@@ -2,6 +2,8 @@
 
 open System.Threading
 
+
+[<Sealed>]
 type AtomicReference<'T when 'T : not struct >(r:'T) =
 
     let mutable ref = r

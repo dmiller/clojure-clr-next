@@ -829,6 +829,95 @@ and PersistentVector(meta:IPersistentMap, cnt:int, shift:int, root:PVNode, tail:
 
     override this.RangedIterator(first:int, terminal: int) = this.RangedIteratorT(first,terminal) :> IEnumerator
 
+    static member create(items:ISeq) : PersistentVector =
+        let arr : obj array = Array.zeroCreate 32
+
+        let rec insertInto (i:int) (s:ISeq) =
+            if not (isNull s) then    
+                arr[i] <- s.first()
+                insertInto (i+1) (s.next())
+            else
+                i, s
+
+        let i, s = insertInto 0 items
+        
+        if not (isNull s) then
+            // > 32 items, init with first 32 and keep going.
+
+            // when we have transients
+            //let rec conjOnto (tv:TransientVector) (s:ISeq) =
+            //    match s with
+            //    | null -> tv
+            //    | _ -> step (tv.conj(s.first()) :> TransientVector) (s.next())
+            //let ret = conjOnto (start.asTransient() :?> ITransientVector) s
+            //ret.persistent() :?> PersistentVector
+        
+            let rec consOnto (v:IPersistentVector) (s:ISeq) =
+                match s with
+                | null -> v
+                | _ -> consOnto (v.cons(s.first())) (s.next())
+
+            let ret = consOnto (PersistentVector(32, 5, PersistentVector.EmptyNode, arr))  s
+            ret :?> PersistentVector
+
+        elif i = 32 then
+            // exactly 32, skip copy
+            PersistentVector(32,5,PersistentVector.EmptyNode,arr)
+
+        else
+            // <32, copy to minimum array and construct
+            let arr2 = Array.zeroCreate i
+            Array.Copy(arr,0,arr2,0,i)
+            PersistentVector(i,5,PersistentVector.EmptyNode,arr2)
+            
+        
+
+
+
+//        /// <summary>
+//        /// Create a <see cref="PersistentVector">PersistentVector</see> from an array of items.
+//        /// </summary>
+//        /// <param name="items"></param>
+//        /// <returns></returns>
+//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
+//        static public PersistentVector create(params object[] items)
+//        {
+//            ITransientCollection ret = EMPTY.asTransient();
+//            foreach (object item in items)
+//                ret = ret.conj(item);
+//            return (PersistentVector)ret.persistent();
+//        }
+
+//        /// <summary>
+//        /// Create a <see cref="PersistentVector">PersistentVector</see> from an IEnumerable.
+//        /// </summary>
+//        /// <param name="items"></param>
+//        /// <returns></returns>
+//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
+//        static public PersistentVector create1(IEnumerable items)
+//        {
+//            // optimize common case
+//            if (items is IList ilist)
+//            {
+//                int size = ilist.Count;
+//                if (size <= 32)
+//                {
+//                    Object[] arr = new Object[size];
+//                    ilist.CopyTo(arr, 0);
+
+//                    return new PersistentVector(size, 5, PersistentVector.EmptyNode, arr);
+//                }
+//            }
+
+//            ITransientCollection ret = EMPTY.asTransient();
+//            foreach (object item in items)
+//            {
+//                ret = ret.conj(item);
+//            }
+//            return (PersistentVector)ret.persistent();
+//        }
+
+
 
 and [<Sealed;AllowNullLiteral>] PVChunkedSeq(m:IPersistentMap, vec:PersistentVector, node: obj array, idx:int, offset:int) =
     inherit ASeq(m)
@@ -931,6 +1020,7 @@ and [<Sealed;AllowNullLiteral>] PVChunkedSeq(m:IPersistentMap, vec:PersistentVec
 
     interface IEnumerable with
         override this.GetEnumerator() = upcast (this:>IEnumerable<obj>).GetEnumerator()
+
 
 
 
