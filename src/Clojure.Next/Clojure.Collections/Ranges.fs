@@ -136,393 +136,157 @@ type Range private (m:IPersistentMap, startV:obj, endV:obj, step:obj, boundsChec
         // the C# code has this virtual as 'new'. Why?
         override this.GetEnumerator() = (this:>IEnumerable<obj>).GetEnumerator()
 
+type internal LongChunk(start:int64, step:int64, count:int) =
+    
+    member _.first() = start
+
+//type Indexed =
+//    inherit Counted
+//    abstract nth: i: int -> obj
+//    abstract nth: i: int * notFound: obj -> obj
+
+    interface Counted with
+        member _.count() = count
+
+    interface Indexed with
+        member _.nth(i) =  start + (int64(i) * step) :> obj
+        member _.nth(i,nf) = 
+            if i >= 0 && i < count then 
+                start + (int64(i) * step) :> obj 
+            else
+                nf
+
+    interface IChunk with
+        member _.dropFirst() =
+            if count <= 1 then
+                raise <| InvalidOperationException("dropFirst of empty chunk")
+            else
+                LongChunk(start+step,step,count-1)
+
+        member _.reduce(f,init) =
+            let rec iter (acc:obj) (v:int64) (i:int64) =
+                match acc with
+                | :? Reduced as red -> (red:>IDeref).deref()
+                | _ when i >= count -> acc
+                | _ -> iter (f.invoke(acc,v)) (v+step) (i+1)
+            iter init start 0
 
 
-
-type LongRange private(m:IPersistentMap, start:int64, iend:int64, step:int64, count:int) =
+type LongRange private(m:IPersistentMap, startV:int64, endV:int64, step:int64, count:int) =
     inherit ASeq(m)
+
+    // Invariants guarantee this is never an empty or infinite seq
+    //   assert(start != end && step != 0)
 
     new(start,iend,step,count) = LongRange(null,start,iend,step,count)
 
-    static member rangeCount(start:int64, iend:int64, step:int64) =
+    static member rangeCount(startV:int64, endV:int64, step:int64) =
         // (1) count = ceiling ( (end - start) / step )
         // (2) ceiling(a/b) = (a+b+o)/b where o=-1 for positive stepping and +1 for negative stepping
         // thus: count = end - start + step + o / step
-        Numbers.add(Numbers.add(Numbers.minus(iend,start),step), if step > 0 then -1L else 1L) / step
+        // This is the original coding.  Just a cheap way to get checked arithmetic
+        // (given that these all call the int64*int64->int64 versions)
+        Numbers.add(Numbers.add(Numbers.minus(endV,startV),step), if step > 0 then -1L else 1L) / step
 
     static member toIntExact(value:int64) : int32 =
         Checked.int32(value)
 
-    static member create(iend:int64) : ISeq = 
-        if iend <= 0 then   
+    static member create(endV:int64) : ISeq = 
+        if endV <= 0 then   
             PersistentList.Empty
         else
             try 
-                LongRange(0L,iend,1L,LongRange.toIntExact(LongRange.rangeCount(0L,iend,1L)))
+                LongRange(0L,endV,1L,LongRange.toIntExact(LongRange.rangeCount(0L,endV,1L)))
             with 
-            | :? OverflowException ->  Range.create(iend)
+            | :? OverflowException ->  Range.create(endV)
 
 
+    static member create(startV:int64, endV:int64) : ISeq =
+        if startV >= endV then  
+            PersistentList.Empty
+        else
+            try
+                LongRange(startV,endV,1L,LongRange.toIntExact(LongRange.rangeCount(startV,endV,1L)))
+            with 
+            | :? OverflowException ->  Range.create(startV,endV)
 
-///**
-// *   Copyright (c) Rich Hickey. All rights reserved.
-// *   The use and distribution terms for this software are covered by the
-// *   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
-// *   which can be found in the file epl-v10.html at the root of this distribution.
-// *   By using this software in any fashion, you are agreeing to be bound by
-// * 	 the terms of this license.
-// *   You must not remove this notice, or any other, from this software.
-// **/
+    static member create(startV:int64, endV:int64, step:int64) : ISeq = 
+        if step > 0 then
+            if endV <= startV then
+                PersistentList.Empty
+            else
+                try
+                    LongRange(startV,endV,step,LongRange.toIntExact(LongRange.rangeCount(startV,endV,step)))
+                with 
+                | :? OverflowException ->  Range.create(startV,endV,step)
+        elif step < 0 then
+            if endV >= startV then
+                PersistentList.Empty
+            else
+                try
+                    LongRange(startV,endV,step,LongRange.toIntExact(LongRange.rangeCount(startV,endV,step)))
+                with 
+                | :? OverflowException ->  Range.create(startV,endV,step)
+        elif endV = startV then 
+            PersistentList.Empty
+        else
+            Repeat.create(startV)
 
-///**
-// *   Author: David Miller
-// **/
+    interface IObj with
+        override this.withMeta(m) =
+            if obj.ReferenceEquals(m,(this:>IMeta).meta()) then 
+                this
+            else
+                LongRange(m,startV,endV,step,count)
 
-//using System;
-//using System.Collections;
-//using System.Collections.Generic;
-//using System.Linq;
-//using System.Text;
+    interface ISeq with
+        override _.first() = startV
+        override _.next() =
+            if count > 1 then   
+                LongRange(startV+step,endV,step,count-1)
+            else
+                null
 
-//namespace clojure.lang
-//{
-//    /// <summary>
-//    /// Implements the special common case of a finite range based on long start, end, and step,
-//    /// with no more than Int32.MaxValue items.
-//    /// </summary>
-//    [Serializable]
-//    public class LongRange: ASeq, Counted, IChunkedSeq, IReduce, IDrop, IEnumerable, IEnumerable<Object>
-//    {
-//        #region Data
+    interface IPersistentCollection with
+        override _.count() = count
 
-//        // Invariants guarantee this is never an empty or infinite seq
-//        //   assert(start != end && step != 0)
-//        readonly long _start;
-//        readonly long _end;
-//        readonly long _step;
-//        readonly int _count;
+    interface IChunkedSeq with
+        member _.chunkedFirst() = LongChunk(startV,step,count);
+        member _.chunkedNext() = null
+        member _.chunkedMore() = PersistentList.Empty
 
-//        #endregion
+    interface IDrop with
+        member this.drop(n) =
+            match n with
+            | _ when n <= 0 -> this
+            | _ when n < count -> LongRange(startV+(step*int64(n)),endV,step,count-n)
+            | _ -> null
 
-//        #region Ctors and facxtories
-
-//        LongRange(long start, long end, long step, int count)
-//        {
-//            _start = start;
-//            _end = end;
-//            _step = step;
-//            _count= count;
-//        }
-
-//        private LongRange(IPersistentMap meta, long start, long end, long step, int count)
-//            : base(meta)
-//        {
-//            _start = start;
-//            _end = end;
-//            _step = step;
-//            _count = count;
-//        }
-
-//        // Captures 
-//        private static int ToIntExact(long value)
-//        {
-//            checked
-//            {
-//                return (int)value;
-//            }
-//        }
+    member this.reducer (f:IFn) (acc:obj) (v:int64) (cnt:int) =
+        let rec iter (acc:obj) (v:int64) (cnt:int) =
+            match acc with
+            | :? Reduced as red -> (red:>IDeref).deref()
+            | _ when cnt <= 0 -> acc
+            | _ -> iter (f.invoke(acc,v)) (v+step) (cnt-1)
+        iter acc v cnt
 
 
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static ISeq create(long end)
-//        {
-//            if (end > 0)
-//                try
-//                {
-//                    return new LongRange(0L, end, 1L, ToIntExact(RangeCount(0L, end, 1L)));
-//                }
-//                catch (ArithmeticException)
-//                {
-//                    return Range.create(end);  // count > Int32.MaxValue
-//                }
-//            return PersistentList.EMPTY;
-//        }
+    interface IReduce with
+        member this.reduce(f) = this.reducer f startV (startV+step) (count-1)
 
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static ISeq create(long start, long end)
-//        {
-//            if (start >= end)
-//                return PersistentList.EMPTY;
-//            else
-//            {
-//                try
-//                {
-//                    return new LongRange(start, end, 1L, ToIntExact(RangeCount(start, end, 1L)));
-//                }
-//                catch (ArithmeticException)
-//                {
-//                    return Range.create(start,end);  // count > Int32.MaxValue
-//                }
-//            }
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static ISeq create(long start, long end, long step)
-//        {
-//            if (step > 0)
-//            {
-//                if (end <= start) return PersistentList.EMPTY;
-//                try
-//                {
-//                    return new LongRange(start, end, step, ToIntExact(RangeCount(start, end, step)));
-//                }
-//                catch (ArithmeticException)
-//                {
-//                    return Range.create(start, end, step);
-//                }
-//            }
-//            else if (step < 0)
-//            {
-//                if (end >= start) return PersistentList.EMPTY;
-//                try
-//                {
-//                    return new LongRange(start, end, step, ToIntExact(RangeCount(start, end, step)));
-//                }
-//                catch (ArithmeticException)
-//                {
-//                    return Range.create(start, end, step);
-//                }
-//            }
-//            else
-//            {
-//                if (end == start) return PersistentList.EMPTY;
-//                return Repeat.create(start);
-//            }
-//        }
-
-//        #endregion
-
-//        #region IObj methods
-
-//        public override IObj withMeta(IPersistentMap meta)
-//        {
-//            if (meta == _meta)
-//                return this;
-//            return new LongRange(meta, _start, _end, _step, _count);
-//        }
-
-//        #endregion
-
-//        #region ISeq methods
-
-//        public override object first()
-//        {
-//            return _start;
-//        }
-
-//        public override ISeq next()
-//        {
-//            if (_count > 1)
-//                return new LongRange(_start + _step, _end, _step, _count - 1);
-//            else
-//                return null;
-//        }
-
-//        #endregion
-
-//        #region Counted methods
-        
-//        // returns exact size of remaining items OR throws ArithmeticException for overflow case
-//        static long RangeCount(long start, long end, long step)
-//        {
-//            // (1) count = ceiling ( (end - start) / step )
-//            // (2) ceiling(a/b) = (a+b+o)/b where o=-1 for positive stepping and +1 for negative stepping
-//            // thus: count = end - start + step + o / step
-//            return Numbers.add(Numbers.add(Numbers.minus(end, start), step), step > 0 ? -1 : 1) / step;
-//        }
-
-//        public override int count()
-//        {
-//            return _count;
-//        }
+    interface IReduceInit with
+        member this.reduce(f,start) = this.reducer f start startV count
   
-//        #endregion
 
-//        #region IChunkedSeq methods
+    interface IEnumerable<obj> with
+        override _.GetEnumerator() =
+            let generator (next:int64, remaining:int64) : (obj * (int64*int64)) option =
+                if remaining > 0 then
+                    Some (next, (next+step,remaining-1L))
+                else
+                    None
+            let s = Seq.unfold generator (startV, count)
+            s.GetEnumerator()
 
-//        public IChunk chunkedFirst()
-//        {
-//            return new LongChunk(_start, _step, _count);
-//        }
-
-//        public ISeq chunkedNext()
-//        {
-//            return null;
-//        }
-
-//        public ISeq chunkedMore()
-//        {
-//            return PersistentList.EMPTY;
-//        }
-
-//        #endregion
-
-//        #region IDrop methods
-
-//        public Sequential drop(int n)
-//        {
-//            if (n <= 0)
-//            {
-//                return this;
-//            }
-//            else if (n < _count)
-//            {
-//                return new LongRange(_start + (_step * n), _end, _step, _count - n);
-//            }
-//            else
-//            {
-//                return null;
-//            }
-//        }
-
-//        #endregion
-
-//        #region IReduce methods
-
-//        public object reduce(IFn f)
-//        {
-//            Object acc = _start;
-//            long i = _start + _step;
-//            int n = _count;
-
-//            while (n > 1)
-//            {
-//                acc = f.invoke(acc, i);
-//                if (acc is Reduced accRed)
-//                    return accRed.deref();
-//                i += _step;
-//                n--;
-//            }
-//            return acc;
-//        }
-
-//        public object reduce(IFn f, object val)
-//        {
-//            Object acc = val;
-//            long i = _start;
-//            int n = _count;
-//            do
-//            {
-//                acc = f.invoke(acc, i);
-//                if (RT.isReduced(acc)) return ((Reduced)acc).deref();
-//                i += _step;
-//                n--;
-//            } while (n > 0);
-//            return acc;
-//        }
-
-//        #endregion
-
-//        #region IEnumerable
-
-//        public new IEnumerator GetEnumerator()
-//        {
-//            long next = _start;
-//            int remaining = _count;
-//            while (remaining > 0)
-//            {
-//                yield return next;
-//                next += _step;
-//                remaining--;
-//            }
-//        }
-
-//        IEnumerator IEnumerable.GetEnumerator()
-//        {
-//            return GetEnumerator();
-//        }
-
-//        #endregion
-
-//        #region LongChunk
-
-//        [Serializable]
-//        class LongChunk: IChunk
-//        {
-//            #region Data
-
-//            readonly long _start;
-//            readonly long _step;
-//            readonly int _count;
-
-//            #endregion
-
-//            #region Ctors and factories
-
-//            public LongChunk(long start, long step, int count)
-//            {
-//                _start = start;
-//                _step = step;
-//                _count = count;
-//            }
-
-//            #endregion
-
-//            #region Misc
-
-//            [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//            public long first()
-//            {
-//                return _start;
-//            }
-
-//            #endregion
-
-//            #region IChunk implementation
-
-//            public IChunk dropFirst()
-//            {
-//                if (_count <= 1)
-//                    throw new InvalidOperationException("dropFirst of empty chunk");
-//                return new LongChunk(_start + _step, _step, _count - 1);
-//            }
-
-//            public object reduce(IFn f, object init)
-//            {
-//                long x = _start;
-//                Object ret = init;
-//                for (int i = 0; i < _count; i++)
-//                {
-//                    ret = f.invoke(ret, x);
-//                    if (RT.isReduced(ret))
-//                        return ret;
-//                    x += _step;
-//                }
-//                return ret;
-//            }
-
-//            public object nth(int i)
-//            {
-//                return _start + (i * _step);
-//            }
-
-//            public object nth(int i, object notFound)
-//            {
-//                if (i >= 0 && i < _count)
-//                    return _start + (i * _step);
-//                return notFound;
-//            }
-
-//            public int count()
-//            {
-//                return _count;
-//            }
-
-//            #endregion
-//        }
-
-//        #endregion
-//    }
-//}
-
-
+    interface IEnumerable with
+        override this.GetEnumerator() = (this:>IEnumerable<obj>).GetEnumerator()
