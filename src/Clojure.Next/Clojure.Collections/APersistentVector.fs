@@ -465,7 +465,8 @@ type APersistentVector() =
 
     // Ranged iterator
 
-    abstract RangedIteratorT : first:int *  terminal: int -> IEnumerator<obj>
+    abstract RangedIteratorT: first: int * terminal: int -> IEnumerator<obj>
+
     default this.RangedIteratorT(first: int, terminal: int) : IEnumerator<obj> =
         let v = this :> IPersistentVector
 
@@ -477,7 +478,8 @@ type APersistentVector() =
 
         s.GetEnumerator()
 
-    abstract RangedIterator : first:int *  terminal: int -> IEnumerator
+    abstract RangedIterator: first: int * terminal: int -> IEnumerator
+
     default this.RangedIterator(first, terminal) =
         this.RangedIteratorT(first, terminal) :> IEnumerator
 
@@ -570,23 +572,23 @@ and MapEntry(key, value) =
 
 // doesn't have to be mutually dependent, could move above.
 
-and [<AllowNullLiteral>] PVNode(edit:AtomicReference<Thread>, array: obj array) = 
+and [<AllowNullLiteral>] PVNode(edit: AtomicReference<Thread>, array: obj array) =
 
     member _.Edit = edit
     member _.Array = array
 
-    new(edit) = PVNode(edit,(Array.zeroCreate 32))
+    new(edit) = PVNode(edit, (Array.zeroCreate 32))
 
-and PersistentVector(meta:IPersistentMap, cnt:int, shift:int, root:PVNode, tail: obj array) =
+and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, tail: obj array) =
     inherit APersistentVector()
 
-//    public class PersistentVector: APersistentVector, IObj, IEditableCollection, IEnumerable, IReduce, IKVReduce, IDrop
-    
-    new(cnt,shift,root,tail) = PersistentVector(null,cnt,shift,root,tail)
+    //    public class PersistentVector: APersistentVector, IObj, IEditableCollection, IEnumerable, IReduce, IKVReduce, IDrop
+
+    new(cnt, shift, root, tail) = PersistentVector(null, cnt, shift, root, tail)
 
     static member NoEdit = AtomicReference<Thread>()
     static member private EmptyNode = PVNode(PersistentVector.NoEdit)
-    static member EMPTY = PersistentVector(0,5,PersistentVector.EmptyNode,Array.zeroCreate 32)
+    static member EMPTY = PersistentVector(0, 5, PersistentVector.EmptyNode, Array.zeroCreate 32)
 
     member _.Shift = shift
     member _.Root = root
@@ -597,214 +599,225 @@ and PersistentVector(meta:IPersistentMap, cnt:int, shift:int, root:PVNode, tail:
 
     interface IObj with
         member this.withMeta(newMeta) =
-            if newMeta = meta then  
+            if newMeta = meta then
                 this
             else
-                PersistentVector(newMeta,cnt,shift,root,tail)
-        
+                PersistentVector(newMeta, cnt, shift, root, tail)
+
     member _.tailoff() =
-        if cnt < 32 then
-            0
-        else
-            ((cnt-1) >>> 5) <<< 5
+        if cnt < 32 then 0 else ((cnt - 1) >>> 5) <<< 5
 
 
-    member this.arrayFor(i)  =
+    member this.arrayFor(i) =
         if 0 <= i && i < cnt then
-            if i >= this.tailoff() then 
+            if i >= this.tailoff () then
                 tail
             else
-                let rec step (node:PVNode) level =
+                let rec step (node: PVNode) level =
                     if level <= 0 then
                         node.Array
                     else
                         let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
                         step node (level - 5)
+
                 step root shift
         else
             raise <| ArgumentOutOfRangeException("i")
 
     interface Indexed with
-        override this.nth(i) = 
-            let node = this.arrayFor(i)
+        override this.nth(i) =
+            let node = this.arrayFor (i)
             node[i &&& 0x1f]
-        override this.nth(i,nf) =
-            if  0 <= i && i < cnt then 
-                (this:>Indexed).nth(i)
-            else
-                nf
+
+        override this.nth(i, nf) =
+            if 0 <= i && i < cnt then (this :> Indexed).nth (i) else nf
 
     interface IPersistentVector with
         override _.count() = cnt
-        override this.assocN(i,v) =
-            if ( 0 <= i && i < cnt) then
-                if i >= this.tailoff() then
-                    let newTail = Array.copy(tail)
+
+        override this.assocN(i, v) =
+            if (0 <= i && i < cnt) then
+                if i >= this.tailoff () then
+                    let newTail = Array.copy (tail)
                     newTail[i &&& 0x1f] <- v
-                    PersistentVector(meta,cnt,shift,root,newTail)
+                    PersistentVector(meta, cnt, shift, root, newTail)
                 else
-                    PersistentVector(meta,cnt,shift,PersistentVector.doAssoc(shift,root,i,v),tail)
+                    PersistentVector(meta, cnt, shift, PersistentVector.doAssoc (shift, root, i, v), tail)
             elif i = cnt then
-                (this:>IPersistentVector).cons(v)
+                (this :> IPersistentVector).cons (v)
             else
                 raise <| ArgumentOutOfRangeException("i")
 
         override this.cons(o) =
-            if cnt - this.tailoff() < 32 then
+            if cnt - this.tailoff () < 32 then
                 // room in the tail
-                let newTail = Array.zeroCreate (tail.Length+1)
-                Array.Copy(tail,newTail,tail.Length)
+                let newTail = Array.zeroCreate (tail.Length + 1)
+                Array.Copy(tail, newTail, tail.Length)
                 newTail[tail.Length] <- o
-                PersistentVector(meta,cnt+1,shift,root,newTail)
+                PersistentVector(meta, cnt + 1, shift, root, newTail)
             else
                 // tail is full, push into tree
-                let tailNode = PVNode(root.Edit,tail)
-                let newroot, newshift = 
+                let tailNode = PVNode(root.Edit, tail)
+
+                let newroot, newshift =
                     // overflow root?
                     if (cnt >>> 5) > (1 <<< shift) then
                         let newroot = PVNode(root.Edit)
                         newroot.Array[0] <- root
-                        newroot.Array[1] <- PersistentVector.newPath(root.Edit,shift,tailNode)
-                        newroot, shift+5
+                        newroot.Array[1] <- PersistentVector.newPath (root.Edit, shift, tailNode)
+                        newroot, shift + 5
                     else
-                        this.pushTail(shift,root,tailNode), shift
-                PersistentVector(meta,cnt+1,newshift,newroot,[| o |])
-                    
+                        this.pushTail (shift, root, tailNode), shift
+
+                PersistentVector(meta, cnt + 1, newshift, newroot, [| o |])
 
 
-    static member doAssoc(level,node:PVNode,i,v) =
-        let ret = PVNode(node.Edit, Array.copy(node.Array))
+
+    static member doAssoc(level, node: PVNode, i, v) =
+        let ret = PVNode(node.Edit, Array.copy (node.Array))
+
         if level = 0 then
             ret.Array[i &&& 0x1f] <- v
         else
-            let subidx = ( i >>> level ) &&& 0x1f
-            ret.Array[subidx] <- PersistentVector.doAssoc(level-5,node.Array[subidx]:?>PVNode,i,v)
+            let subidx = (i >>> level) &&& 0x1f
+            ret.Array[subidx] <- PersistentVector.doAssoc (level - 5, node.Array[subidx] :?> PVNode, i, v)
+
         ret
 
-     member this.pushTail(level,parent:PVNode,tailNode:PVNode) : PVNode =
+    member this.pushTail(level, parent: PVNode, tailNode: PVNode) : PVNode =
         // Original JVM comment:
         // if parent is leaf, insert node
         // else does it map to existing child? -> nodeToInsert = pushNode one more level
         // else alloc new path
         // return notToINsert placed in copy of parent
-        let subidx = ((cnt-1) >>> level) &&& 0x1f
+        let subidx = ((cnt - 1) >>> level) &&& 0x1f
+
         let nodeToInsert =
             if level = 5 then
                 tailNode
             else
                 match parent.Array[subidx] with
-                | :? PVNode as child -> this.pushTail(level-5,child,tailNode)
-                | _ -> PersistentVector.newPath(root.Edit,level-5,tailNode)
-        let ret = PVNode(parent.Edit,Array.copy(parent.Array))
-        let m = 
-            ret.Array[subidx] <- nodeToInsert  // TODO: figure out why it wan't take this at the top level
+                | :? PVNode as child -> this.pushTail (level - 5, child, tailNode)
+                | _ -> PersistentVector.newPath (root.Edit, level - 5, tailNode)
+
+        let ret = PVNode(parent.Edit, Array.copy (parent.Array))
+
+        let m =
+            ret.Array[subidx] <- nodeToInsert // TODO: figure out why it wan't take this at the top level
             12
+
         ret
 
 
-    static member newPath(edit,level,node) =
+    static member newPath(edit, level, node) =
         if level = 0 then
             node
         else
             let ret = PVNode(edit)
-            ret.Array[0] <- PersistentVector.newPath(edit,level-5,node)
+            ret.Array[0] <- PersistentVector.newPath (edit, level - 5, node)
             ret
 
     interface IPersistentCollection with
-        override _.empty() = (PersistentVector.EMPTY :> IObj).withMeta(meta) :?> IPersistentCollection
+        override _.empty() =
+            (PersistentVector.EMPTY :> IObj).withMeta (meta) :?> IPersistentCollection
 
     interface IPersistentStack with
         override this.pop() =
-            if cnt = 0 then 
-                raise <| InvalidOperationException("Can't pop empty vector");
+            if cnt = 0 then
+                raise <| InvalidOperationException("Can't pop empty vector")
             elif cnt = 1 then
-                (PersistentVector.EMPTY :> IObj).withMeta(meta) :?> IPersistentStack
-            elif cnt-this.tailoff() > 1 then
-                let newTail = Array.zeroCreate (tail.Length-1)
-                Array.Copy(tail,newTail,newTail.Length)
-                PersistentVector(meta,cnt-1,shift,root,newTail)
+                (PersistentVector.EMPTY :> IObj).withMeta (meta) :?> IPersistentStack
+            elif cnt - this.tailoff () > 1 then
+                let newTail = Array.zeroCreate (tail.Length - 1)
+                Array.Copy(tail, newTail, newTail.Length)
+                PersistentVector(meta, cnt - 1, shift, root, newTail)
             else
-                let newTail = this.arrayFor(cnt-2)
-                let newRoot, newShift =
-                    match this.popTail(shift,root) with
-                    | null -> PersistentVector.EmptyNode, shift
-                    | _ as x when shift > 5 &&  isNull x.Array[1] -> (x.Array[0]:?>PVNode), shift-5
-                    | _ as x -> x,shift
-                PersistentVector(meta,cnt-1,newShift,newRoot,newTail)
+                let newTail = this.arrayFor (cnt - 2)
 
-    member this.popTail(level,node:PVNode) : PVNode =
-        let subidx = ((cnt-2) >>> level) &&& 0x01f
+                let newRoot, newShift =
+                    match this.popTail (shift, root) with
+                    | null -> PersistentVector.EmptyNode, shift
+                    | _ as x when shift > 5 && isNull x.Array[1] -> (x.Array[0] :?> PVNode), shift - 5
+                    | _ as x -> x, shift
+
+                PersistentVector(meta, cnt - 1, newShift, newRoot, newTail)
+
+    member this.popTail(level, node: PVNode) : PVNode =
+        let subidx = ((cnt - 2) >>> level) &&& 0x01f
+
         if level > 5 then
-            let newChild = this.popTail(level-5,node.Array[subidx] :?> PVNode)
+            let newChild = this.popTail (level - 5, node.Array[subidx] :?> PVNode)
+
             if isNull newChild && subidx = 0 then
                 null
             else
-                let ret = PVNode(root.Edit,Array.copy(node.Array))
+                let ret = PVNode(root.Edit, Array.copy (node.Array))
                 ret.Array[subidx] <- newChild
                 ret
         elif subidx = 0 then
             null
         else
-            let ret = PVNode(root.Edit,Array.copy(node.Array))
+            let ret = PVNode(root.Edit, Array.copy (node.Array))
             ret.Array[subidx] <- null
             ret
 
     interface Seqable with
-        override this.seq() = this.chunkedSeq()
+        override this.seq() = this.chunkedSeq ()
 
     member this.chunkedSeq() =
         match cnt with
         | 0 -> null
-        | _ -> PVChunkedSeq(this,0,0)
+        | _ -> PVChunkedSeq(this, 0, 0)
 
 
-    member this.reducer(f:IFn, start:obj, startIdx:int) =
-        let rec stepThroughChunk (acc:obj) (arr:obj array) (idx:int) =
+    member this.reducer(f: IFn, start: obj, startIdx: int) =
+        let rec stepThroughChunk (acc: obj) (arr: obj array) (idx: int) =
             match acc with
-            | :? Reduced as red -> (red:>IDeref).deref(), true
+            | :? Reduced as red -> (red :> IDeref).deref (), true
             | _ when idx >= arr.Length -> acc, false
-            | _ -> stepThroughChunk (f.invoke(acc,arr[idx])) arr (idx+1)
-        let rec step (acc:obj) (idx:int) (offset:int) =
-            let arr = this.arrayFor(idx)
+            | _ -> stepThroughChunk (f.invoke (acc, arr[idx])) arr (idx + 1)
+
+        let rec step (acc: obj) (idx: int) (offset: int) =
+            let arr = this.arrayFor (idx)
             let newAcc, isReduced = stepThroughChunk acc arr offset
-            if isReduced then
-                newAcc
-            elif idx >= (this:>IPersistentVector).count() then
-                newAcc
-            else
-                step newAcc (idx+arr.Length) 0
+
+            if isReduced then newAcc
+            elif idx >= (this :> IPersistentVector).count () then newAcc
+            else step newAcc (idx + arr.Length) 0
+
         step start startIdx
 
-    member this.kvreducer(f:IFn, start:obj) =
-        let rec stepThroughChunk (acc:obj) (arr:obj array) offset (idx:int) =
+    member this.kvreducer(f: IFn, start: obj) =
+        let rec stepThroughChunk (acc: obj) (arr: obj array) offset (idx: int) =
             match acc with
-            | :? Reduced as red -> (red:>IDeref).deref(), true
+            | :? Reduced as red -> (red :> IDeref).deref (), true
             | _ when idx >= arr.Length -> acc, false
-            | _ -> stepThroughChunk (f.invoke(acc,offset+idx,arr[idx])) arr offset (idx+1)
-        let rec step (acc:obj) (idx:int) =
-            let arr = this.arrayFor(idx)
+            | _ -> stepThroughChunk (f.invoke (acc, offset + idx, arr[idx])) arr offset (idx + 1)
+
+        let rec step (acc: obj) (idx: int) =
+            let arr = this.arrayFor (idx)
             let newAcc, isReduced = stepThroughChunk acc arr idx 0
-            if isReduced then
-                newAcc
-            elif idx >= (this:>IPersistentVector).count() then
-                newAcc
-            else
-                step newAcc (idx+arr.Length) 
+
+            if isReduced then newAcc
+            elif idx >= (this :> IPersistentVector).count () then newAcc
+            else step newAcc (idx + arr.Length)
+
         step start 0
 
 
     interface IReduce with
-        member this.reduce(f) = 
+        member this.reduce(f) =
             if cnt <= 0 then
-                f.invoke()
-            else this.reducer(f,this.arrayFor(0)[0],1)
+                f.invoke ()
+            else
+                this.reducer (f, this.arrayFor (0)[0], 1)
 
     interface IReduceInit with
-        member this.reduce(f,start) = this.reducer(f,start,0)
-      
+        member this.reduce(f, start) = this.reducer (f, start, 0)
+
 
     interface IKVReduce with
-        member this.kvreduce(f,start) = this.kvreducer(f,start)
+        member this.kvreduce(f, start) = this.kvreducer (f, start)
 
     interface IDrop with
         member this.drop(n) =
@@ -812,35 +825,38 @@ and PersistentVector(meta:IPersistentMap, cnt:int, shift:int, root:PVNode, tail:
                 this
             elif n < cnt then
                 let offset = n % 32
-                PVChunkedSeq(this, this.arrayFor(n), n-offset,offset)
+                PVChunkedSeq(this, this.arrayFor (n), n - offset, offset)
             else
                 null
 
-    override this.RangedIteratorT(first:int, terminal: int) =
+    override this.RangedIteratorT(first: int, terminal: int) =
         let generator (state: int * (obj array)) : (obj * (int * (obj array))) option =
             let idx, arr = state
-            let arrToUse = if idx % 32 = 0 then this.arrayFor(idx) else arr
-            if idx < terminal then 
-                Some ( arrToUse[idx &&& 0x01f] , (idx+1 , arrToUse) )
+            let arrToUse = if idx % 32 = 0 then this.arrayFor (idx) else arr
+
+            if idx < terminal then
+                Some(arrToUse[idx &&& 0x01f], (idx + 1, arrToUse))
             else
                 None
-        let s = Seq.unfold generator (first,this.arrayFor(first))
+
+        let s = Seq.unfold generator (first, this.arrayFor (first))
         s.GetEnumerator()
 
-    override this.RangedIterator(first:int, terminal: int) = this.RangedIteratorT(first,terminal) :> IEnumerator
+    override this.RangedIterator(first: int, terminal: int) =
+        this.RangedIteratorT(first, terminal) :> IEnumerator
 
-    static member create(items:ISeq) : PersistentVector =
-        let arr : obj array = Array.zeroCreate 32
+    static member create(items: ISeq) : PersistentVector =
+        let arr: obj array = Array.zeroCreate 32
 
-        let rec insertInto (i:int) (s:ISeq) =
-            if not (isNull s) then    
-                arr[i] <- s.first()
-                insertInto (i+1) (s.next())
+        let rec insertInto (i: int) (s: ISeq) =
+            if not (isNull s) then
+                arr[i] <- s.first ()
+                insertInto (i + 1) (s.next ())
             else
                 i, s
 
         let i, s = insertInto 0 items
-        
+
         if not (isNull s) then
             // > 32 items, init with first 32 and keep going.
 
@@ -851,26 +867,26 @@ and PersistentVector(meta:IPersistentMap, cnt:int, shift:int, root:PVNode, tail:
             //    | _ -> step (tv.conj(s.first()) :> TransientVector) (s.next())
             //let ret = conjOnto (start.asTransient() :?> ITransientVector) s
             //ret.persistent() :?> PersistentVector
-        
-            let rec consOnto (v:IPersistentVector) (s:ISeq) =
+
+            let rec consOnto (v: IPersistentVector) (s: ISeq) =
                 match s with
                 | null -> v
-                | _ -> consOnto (v.cons(s.first())) (s.next())
+                | _ -> consOnto (v.cons (s.first ())) (s.next ())
 
-            let ret = consOnto (PersistentVector(32, 5, PersistentVector.EmptyNode, arr))  s
+            let ret = consOnto (PersistentVector(32, 5, PersistentVector.EmptyNode, arr)) s
             ret :?> PersistentVector
 
         elif i = 32 then
             // exactly 32, skip copy
-            PersistentVector(32,5,PersistentVector.EmptyNode,arr)
+            PersistentVector(32, 5, PersistentVector.EmptyNode, arr)
 
         else
             // <32, copy to minimum array and construct
             let arr2 = Array.zeroCreate i
-            Array.Copy(arr,0,arr2,0,i)
-            PersistentVector(i,5,PersistentVector.EmptyNode,arr2)
-            
-        
+            Array.Copy(arr, 0, arr2, 0, i)
+            PersistentVector(i, 5, PersistentVector.EmptyNode, arr2)
+
+
 
 
 
@@ -919,107 +935,120 @@ and PersistentVector(meta:IPersistentMap, cnt:int, shift:int, root:PVNode, tail:
 
 
 
-and [<Sealed;AllowNullLiteral>] PVChunkedSeq(m:IPersistentMap, vec:PersistentVector, node: obj array, idx:int, offset:int) =
+and [<Sealed; AllowNullLiteral>] PVChunkedSeq
+    (
+        m: IPersistentMap,
+        vec: PersistentVector,
+        node: obj array,
+        idx: int,
+        offset: int
+    ) =
     inherit ASeq(m)
 
-    new(vec,node,idx,offset) = PVChunkedSeq(null,vec,node,idx,offset)
-    new(vec,idx,offset) = PVChunkedSeq(null,vec,vec.arrayFor(idx),idx,offset)
+    new(vec, node, idx, offset) = PVChunkedSeq(null, vec, node, idx, offset)
+    new(vec, idx, offset) = PVChunkedSeq(null, vec, vec.arrayFor (idx), idx, offset)
 
     member this.Offset = offset
     member this.Vec = vec
 
 
-//        [Serializable]
-//        sealed public class ChunkedSeq : ASeq, IChunkedSeq, Counted, IReduce, IDrop, IEnumerable
+    //        [Serializable]
+    //        sealed public class ChunkedSeq : ASeq, IChunkedSeq, Counted, IReduce, IDrop, IEnumerable
 
-    interface IObj with 
+    interface IObj with
         override this.withMeta(newMeta) =
-            if obj.ReferenceEquals(newMeta,(this:>IMeta).meta()) then   
+            if obj.ReferenceEquals(newMeta, (this :> IMeta).meta ()) then
                 this
             else
-                PVChunkedSeq(newMeta,vec,node,idx,offset)
+                PVChunkedSeq(newMeta, vec, node, idx, offset)
 
     interface IChunkedSeq with
-        member this.chunkedFirst() = ArrayChunk(node,offset)
+        member this.chunkedFirst() = ArrayChunk(node, offset)
+
         member this.chunkedNext() =
-            if idx + node.Length < (vec:>IPersistentVector).count()  then
-                PVChunkedSeq(vec,idx+node.Length,0)
-             else
+            if idx + node.Length < (vec :> IPersistentVector).count () then
+                PVChunkedSeq(vec, idx + node.Length, 0)
+            else
                 null
+
         member this.chunkedMore() =
-            let s = (this:>IChunkedSeq).chunkedNext()
+            let s = (this :> IChunkedSeq).chunkedNext ()
+
             match s with
             | null -> PersistentList.Empty
             | _ -> s
 
-    
+
     interface ISeq with
         override _.first() = node[offset]
+
         override this.next() =
-            if offset+1 < node.Length then
-                PVChunkedSeq(vec,node,idx,offset+1)
+            if offset + 1 < node.Length then
+                PVChunkedSeq(vec, node, idx, offset + 1)
             else
-                (this:>IChunkedSeq).chunkedNext()
+                (this :> IChunkedSeq).chunkedNext ()
 
     interface Counted with
-        member this.count() = (vec:>IPersistentVector).count() - (idx+offset)
+        member this.count() =
+            (vec :> IPersistentVector).count () - (idx + offset)
 
     interface IPersistentCollection with
-        override this.count() = (this:>Counted).count()
+        override this.count() = (this :> Counted).count ()
 
-    member _.reducer(f:IFn,start:obj,initIdx:int) =
-        let rec stepThroughNode (acc:obj) (arr: obj array) (j:int) =
+    member _.reducer(f: IFn, start: obj, initIdx: int) =
+        let rec stepThroughNode (acc: obj) (arr: obj array) (j: int) =
             match acc with
-            | :? Reduced as red -> ((red :> IDeref).deref()), true
+            | :? Reduced as red -> ((red :> IDeref).deref ()), true
             | _ when j >= arr.Length -> acc, false
-            | _ -> stepThroughNode (f.invoke(acc,node[j])) arr (j+1)
+            | _ -> stepThroughNode (f.invoke (acc, node[j])) arr (j + 1)
 
-        let rec stepThroughTail (acc:obj) (ii:int) =
+        let rec stepThroughTail (acc: obj) (ii: int) =
             let node = (vec.arrayFor ii)
             let nextAcc, isReduced = stepThroughNode acc node 0
-            if isReduced then   
-                nextAcc
-            elif ii > (vec:>IPersistentVector).count() then
-                nextAcc
+
+            if isReduced then nextAcc
+            elif ii > (vec :> IPersistentVector).count () then nextAcc
             else stepThroughTail nextAcc (ii + node.Length)
 
 
         let acc, isReduced = stepThroughNode start node initIdx
-        if isReduced then   
-            acc
-        else stepThroughTail acc 
+        if isReduced then acc else stepThroughTail acc
 
     interface IReduce with
-        member this.reduce(f) = 
-            if idx+offset >= (vec:>IPersistentVector).count() then 
-                f.invoke()
+        member this.reduce(f) =
+            if idx + offset >= (vec :> IPersistentVector).count () then
+                f.invoke ()
             else
-                this.reducer(f,node[offset],offset+1)
-                
+                this.reducer (f, node[offset], offset + 1)
+
     interface IReduceInit with
-        member this.reduce(f,start) = this.reducer(f,start,offset)
+        member this.reduce(f, start) = this.reducer (f, start, offset)
 
 
     interface IDrop with
         member _.drop(n) =
-            let o = offset+n
+            let o = offset + n
+
             if o < node.Length then // in current array
-                PVChunkedSeq(vec,node,idx,o)
+                PVChunkedSeq(vec, node, idx, o)
             else
-                let i = idx+o
-                if i < (vec:>IPersistentVector).count() then
-                    let arr = vec.arrayFor(i)
+                let i = idx + o
+
+                if i < (vec :> IPersistentVector).count () then
+                    let arr = vec.arrayFor (i)
                     let newOffset = i % 32
-                    PVChunkedSeq(vec,arr,i-newOffset,newOffset)
+                    PVChunkedSeq(vec, arr, i - newOffset, newOffset)
                 else
                     null
-            
-        
+
+
     interface IEnumerable<obj> with
-        override _.GetEnumerator() = vec.RangedIteratorT(idx+offset,(vec:>IPersistentVector).count())
+        override _.GetEnumerator() =
+            vec.RangedIteratorT(idx + offset, (vec :> IPersistentVector).count ())
 
     interface IEnumerable with
-        override this.GetEnumerator() = upcast (this:>IEnumerable<obj>).GetEnumerator()
+        override this.GetEnumerator() =
+            upcast (this :> IEnumerable<obj>).GetEnumerator()
 
 
 
@@ -1385,7 +1414,7 @@ and [<Sealed;AllowNullLiteral>] PVChunkedSeq(m:IPersistentMap, vec:PersistentVec
 
 //            #endregion
 //        }
- 
+
 //        #endregion
 
 
@@ -1595,4 +1624,3 @@ and [<Sealed;AllowNullLiteral>] PVChunkedSeq(m:IPersistentMap, vec:PersistentVec
 //            }
 //            return (PersistentVector)ret.persistent();
 //        }
-
