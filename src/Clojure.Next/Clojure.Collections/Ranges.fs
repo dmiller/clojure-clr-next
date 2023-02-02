@@ -180,15 +180,11 @@ type internal LongChunk(start: int64, step: int64, count: int) =
 
     member _.first() = start
 
-    //type Indexed =
-    //    inherit Counted
-    //    abstract nth: i: int -> obj
-    //    abstract nth: i: int * notFound: obj -> obj
-
     interface Counted with
         member _.count() = count
 
     interface Indexed with
+        // only used internally, no need to guard.
         member _.nth(i) = start + (int64 (i) * step) :> obj
 
         member _.nth(i, nf) =
@@ -209,7 +205,7 @@ type internal LongChunk(start: int64, step: int64, count: int) =
                 match acc with
                 | :? Reduced as red -> (red :> IDeref).deref ()
                 | _ when i >= count -> acc
-                | _ -> iter (f.invoke (acc, v)) (v + step) (i + 1)
+                | _ -> iter (f.invoke (acc, v)) (v + step) (i + 1L)
 
             iter init start 0
 

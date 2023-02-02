@@ -810,7 +810,7 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
             if cnt <= 0 then
                 f.invoke ()
             else
-                this.reducer (f, this.arrayFor (0)[0], 1)
+                this.reducer (f, (this.arrayFor (0))[0], 1)
 
     interface IReduceInit with
         member this.reduce(f, start) = this.reducer (f, start, 0)

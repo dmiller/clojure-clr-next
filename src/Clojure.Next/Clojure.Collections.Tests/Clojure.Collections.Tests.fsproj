@@ -10,6 +10,8 @@
     <Compile Include="TestHelpers.fs" />
     <Compile Include="ConsTests.fs" />
     <Compile Include="PersistentListTests.fs" />
+    <Compile Include="RepeatTests.fs" />
+    <Compile Include="RangeTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
