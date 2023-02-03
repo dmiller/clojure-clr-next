@@ -19,9 +19,9 @@
     <Compile Include="ArraySeq.fs" />
     <Compile Include="MoreSequences.fs" />
     <Compile Include="LazySeq.fs" />
-    <Compile Include="ArrayChunk.fs" />
+    <Compile Include="Chunking.fs" />
     <Compile Include="Ranges.fs" />
-    <Compile Include="APersistentVector.fs" />
+    <Compile Include="PersistentVector.fs" />
   </ItemGroup>
 
   <ItemGroup>
