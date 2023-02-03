@@ -143,13 +143,13 @@ type Range
             if isNull chunkNext then PersistentList.Empty else chunkNext
 
     member this.reducer (f: IFn) (acc: obj) (v: obj) =
-        let rec step (acc: obj) (v: obj) =
-            match v with
+        let rec iter (acc: obj) (v: obj) =
+            match acc with
             | :? Reduced as red -> (red :> IDeref).deref ()
-            | _ when boundsCheck (v) -> v
-            | _ -> step (f.invoke (acc, v)) (Numbers.addP (v, step))
+            | _ when boundsCheck (v) -> acc
+            | _ -> iter (f.invoke (acc, v)) (Numbers.addP (v, step))
 
-        step acc v
+        iter acc v
 
     interface IReduce with
         member this.reduce(f) =

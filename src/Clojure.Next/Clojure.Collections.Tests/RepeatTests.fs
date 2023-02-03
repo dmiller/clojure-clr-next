@@ -7,7 +7,7 @@ open TestHelpers
 
 [<Tests>]
 let consTests =
-    ftestList
+    testList
         "RepeatTests"
         [
 
