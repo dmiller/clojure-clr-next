@@ -8,13 +8,14 @@ open Clojure.Numerics
 
 
 [<Sealed; AllowNullLiteral>]
-type LazySeq(m1, fn1, s1) =
+type LazySeq private (m1, fn1, s1) =
     inherit Obj(m1)
     let mutable fn: IFn = fn1
     let mutable s: ISeq = s1
     let mutable sv: obj = null
+
+    private new(m1: IPersistentMap, s1: ISeq) = LazySeq(m1, null, s1)
     new(fn: IFn) = LazySeq(null, fn, null)
-    new(m1: IPersistentMap, s1: ISeq) = LazySeq(m1, null, s1)
 
     override this.GetHashCode() =
         match (this :> ISeq).seq () with
@@ -50,17 +51,19 @@ type LazySeq(m1, fn1, s1) =
 
         [<MethodImpl(MethodImplOptions.Synchronized)>]
         override this.seq() =
-            let rec getNext (x: obj) =
-                match x with
-                | :? LazySeq as ls -> getNext (ls.sval ())
-                | _ -> this
 
             this.sval () |> ignore
 
             if not (isNull sv) then
+
+                let rec getNext (x: obj) =
+                    match x with
+                    | :? LazySeq as ls -> getNext (ls.sval ())
+                    | _ -> x
+
                 let ls = sv
                 sv <- null
-                s <- RT0.seq (getNext (ls))
+                s <- RT0.seq (getNext ls)
 
             s
 
