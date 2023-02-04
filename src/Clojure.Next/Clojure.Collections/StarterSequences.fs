@@ -362,7 +362,7 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
     interface IPersistentList
 
     interface IReduceInit with
-        override this.reduce(fn, start) =
+        member this.reduce(fn, start) =
             let rec step (s: ISeq) (value: obj) =
                 match s with
                 | null -> value
@@ -380,7 +380,7 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
             | _ -> ret
 
     interface IReduce with
-        override this.reduce(fn) =
+        member this.reduce(fn) =
             let rec step (s: ISeq) (value: obj) =
                 match s with
                 | null -> value

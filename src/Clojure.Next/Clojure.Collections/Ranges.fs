@@ -144,10 +144,12 @@ type Range
 
     member this.reducer (f: IFn) (acc: obj) (v: obj) =
         let rec iter (acc: obj) (v: obj) =
-            match acc with
-            | :? Reduced as red -> (red :> IDeref).deref ()
-            | _ when boundsCheck (v) -> acc
-            | _ -> iter (f.invoke (acc, v)) (Numbers.addP (v, step))
+            if boundsCheck (v) then
+                acc
+            else
+                match f.invoke (acc, v) with
+                | :? Reduced as red -> (red :> IDeref).deref ()
+                | nextAcc -> iter nextAcc (Numbers.addP (v, step))
 
         iter acc v
 
@@ -301,15 +303,17 @@ type LongRange private (m: IPersistentMap, startV: int64, endV: int64, step: int
             | _ when n < count -> LongRange(startV + (step * int64 (n)), endV, step, count - n)
             | _ -> null
 
+
     member this.reducer (f: IFn) (acc: obj) (v: int64) (cnt: int) =
         let rec iter (acc: obj) (v: int64) (cnt: int) =
-            match acc with
-            | :? Reduced as red -> (red :> IDeref).deref ()
-            | _ when cnt <= 0 -> acc
-            | _ -> iter (f.invoke (acc, v)) (v + step) (cnt - 1)
+            if cnt <= 0 then
+                acc
+            else
+                match f.invoke (acc, v) with
+                | :? Reduced as red -> (red :> IDeref).deref ()
+                | nextAcc -> iter nextAcc (v + step) (cnt - 1)
 
         iter acc v cnt
-
 
     interface IReduce with
         member this.reduce(f) =

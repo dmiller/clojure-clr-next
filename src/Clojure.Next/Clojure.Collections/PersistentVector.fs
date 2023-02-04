@@ -41,28 +41,24 @@ type IPVecSeq(meta: IPersistentMap, vec: IPersistentVector, index: int) =
             else
                 IPVecSeq(meta, vec, index)
 
-
-    // IReduce not in Java original
+    member this.reducer(f:IFn, acc:obj, idx:int) =
+        if idx >= vec.count() then
+            acc
+        else
+            match f.invoke(acc,vec.nth(idx)) with
+            | :? Reduced as red -> (red:>IDeref).deref()
+            | nextAcc -> this.reducer(f,nextAcc,idx+1)
 
     interface IReduceInit with
-        member _.reduce(f, init) =
-            let rec step (i: int) (ret: obj) =
-                match ret with
-                | :? Reduced as red -> (red :> IDeref).deref ()
-                | _ when i >= vec.count () -> ret
-                | _ -> step (i + 1) (f.invoke (ret, vec.nth (i)))
-
-            step (index + 1) (f.invoke (init, vec.nth (index)))
+        member this.reduce(f, init) = 
+            match this.reducer(f,f.invoke(init,vec.nth(index)),index+1) with
+            | :? Reduced as red -> (red:>IDeref).deref()
+            | finalAcc -> finalAcc
+                
 
     interface IReduce with
-        member _.reduce(f) =
-            let rec step (i: int) (ret: obj) =
-                match ret with
-                | :? Reduced as red -> (red :> IDeref).deref ()
-                | _ when i >= vec.count () -> ret
-                | _ -> step (i + 1) (f.invoke (ret, vec.nth (i)))
+        member this.reduce(f) = this.reducer(f,vec.nth(index),index+1)
 
-            step (index + 1) (f.invoke (vec.nth (index)))
 
 
 [<Sealed>]
@@ -98,25 +94,22 @@ type IPVecRSeq(meta: IPersistentMap, vec: IPersistentVector, index: int) =
 
     // IReduce not in Java original
 
-    interface IReduceInit with
-        member _.reduce(f, init) =
-            let rec step (i: int) (ret: obj) =
-                match ret with
-                | :? Reduced as red -> (red :> IDeref).deref ()
-                | _ when i < 0 -> ret
-                | _ -> step (i - 1) (f.invoke (ret, vec.nth (i)))
+    member this.reducer(f:IFn, acc:obj, idx:int) =
+        if idx < 0 then
+            acc
+        else
+            match f.invoke(acc,vec.nth(idx)) with
+            | :? Reduced as red -> (red:>IDeref).deref()
+            | nextAcc -> this.reducer(f,nextAcc,idx-1)
 
-            step (index + 1) (f.invoke (init, vec.nth (index)))
+    interface IReduceInit with
+        member this.reduce(f, init) = 
+            match this.reducer(f,f.invoke(init,vec.nth(index)),index+1) with
+            | :? Reduced as red -> (red:>IDeref).deref()
+            | finalAcc -> finalAcc                
 
     interface IReduce with
-        member _.reduce(f) =
-            let rec step (i: int) (ret: obj) =
-                match ret with
-                | :? Reduced as red -> (red :> IDeref).deref ()
-                | _ when i < 0 -> ret
-                | _ -> step (i - 1) (f.invoke (ret, vec.nth (i)))
-
-            step (index + 1) (f.invoke (vec.nth (index)))
+        member this.reduce(f) = this.reducer(f,vec.nth(index),index+1)
 
 
 [<AbstractClass>]
