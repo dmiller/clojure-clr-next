@@ -73,7 +73,7 @@ Having worked backwards from the desired to the necessary, we can write it up in
 
 
 
-- Take a look at laziness and chunking.  I had thought to delay that for a while--my own laziness--but in all the collections, it happens that `Range`, `LongRange`, and `PersistentVector` are the only places it comes up, so we might as well get it donw now.  (There's also `ChunkedCons`, which we'll cover, but I consider that more of the support machinery for chunking rather than a standalone collection of importance.)
+- Take a look at laziness and chunking.  I had thought to delay that for a while--my own laziness--but of all the collections, it happens that `Range`, `LongRange`, and `PersistentVector` are the only places it comes up, so we might as well get it donw now.  (There's also `ChunkedCons`, which we'll cover, but I consider that more of the support machinery for chunking rather than a standalone collection of importance.)
 
 - Take a look at how to write code for `IReduce`.  We're going to be doing this over and over.  There is a pattern that works for most implementations.  With that pattern in hand, implementing reduction just takes a little work to adapt to the collection under consideration.
 
