@@ -40,19 +40,20 @@ let rec baseMetaPrinter (x: obj, w: TextWriter) : unit =
     match x with
     | :? IMeta as xo -> // original code has Obj here, but not sure why this is correct.  We only need an IMeta to have metadata.
         let meta = xo.meta () // the real version will check for a meta with count=1 and just a tag key and special case that.
-        w.Write("#^")
-        print (meta, w)
-        w.Write(' ')
+        if meta.count() > 0 then
+            w.Write("#^")
+            print (meta, w)
+            w.Write(' ')
     | _ -> ()
 
 and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
     let printInnerSeq readably (s: ISeq) (w: TextWriter) =
         let rec step (s: ISeq) =
-            if s <> null then printBasic (readably, s, w)
-
-            if s.next () <> null then w.Write(' ')
-            s.next () |> step
-
+            if s <> null then 
+                 printBasic (readably, s.first(), w) 
+                 let next = s.next() 
+                 if next <> null then w.Write(' ')
+                 step next
         step s
 
     let baseCharPrinter readably (c: char) (w: TextWriter) =

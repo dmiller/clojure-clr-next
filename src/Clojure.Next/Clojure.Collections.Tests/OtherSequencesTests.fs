@@ -1,12 +1,12 @@
 ﻿module RepeatTests
 
 open Expecto
-open Clojure.Collections
 open TestHelpers
-
+open Clojure.Collections
+open Clojure.Numerics
 
 [<Tests>]
-let consTests =
+let repeatTests =
     testList
         "RepeatTests"
         [
@@ -89,7 +89,54 @@ let consTests =
               let rr = r :> IReduce
               Expect.equal (rr.reduce (adderStopsShort 20)) 21 "Add some"
               Expect.equal (rr.reduce (adderStopsShort 50)) 56 "Add some"
-
-
-
           ]
+
+
+[<Tests>]
+let iterateTests =
+    ftestList
+        "IterateTests"
+        [
+
+          testCase "Iterate goes on for a while"
+          <| fun _ ->
+            let inc = 
+                { new AFn() with
+                    member this.ToString() = "a"
+                  interface IFn with
+                    member this.invoke(arg1) = Numbers.incP(arg1) 
+                    }
+            let iter = Iterate.create(inc,0L)
+            Expect.sequenceEqual (takeEager 0 iter) [] "No elements -> empty seq" 
+            Expect.sequenceEqual (takeEager 1 iter) [ 0L ]  "enough elements"
+            Expect.sequenceEqual (takeEager 2 iter) [ 0L; 1L ]  "enough elements"
+            Expect.sequenceEqual (takeEager 5 iter) [ 0L; 1L; 2L; 3L; 4L ]  "enough elements"
+
+
+          ftestCase "Iterate reduces"
+          <| fun _ ->
+            let inc = 
+                { new AFn() with
+                    member this.ToString() = "a"
+                  interface IFn with
+                    member this.invoke(arg1) = Numbers.incP(arg1) 
+                    }
+            let adderStopsShort n =
+                  { new AFn() with
+                      member this.ToString() = ""
+                    interface IFn with
+                        member this.invoke(x, y) =
+                            if Numbers.gte(y ,n:>obj) then Reduced(x) else Numbers.add(x,y) }
+
+            let iter = Iterate.create(inc,0L) :?> IReduce
+            Expect.equal (iter.reduce (adderStopsShort 10)) 45L "Add them up for a while"
+            Expect.equal (iter.reduce ((adderStopsShort 10),100L)) 145L "Add them up for a while"
+
+              
+          //                  let r100 = Range.create(100) :?> IReduce
+          //    let r1000 = Range.create(1000) :?> IReduce
+
+          //    Expect.equal (r100.reduce (adder)) 4950L "Add them all"
+          //    Expect.equal (r100.reduce (adder, 200)) 5150L "Add them all"
+
+            ]

@@ -105,6 +105,7 @@ let rangeTests =
               
           testCase "Enumerator"
           <| fun _ ->
+            let r5 = Range.create(5)
             let r5 = Range.create(5):?>IEnumerable
             let e5 = r5.GetEnumerator()
             let l5 = Seq.cast<obj> r5
@@ -118,7 +119,7 @@ let rangeTests =
 
 [<Tests>]
 let longRangeTests =
-    ftestList
+    testList
         "LongRangeTests"
         [
 

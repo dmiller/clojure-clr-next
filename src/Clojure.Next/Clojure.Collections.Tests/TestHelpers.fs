@@ -37,17 +37,31 @@ let verifyISeqRestTypes (s: ISeq) (t: Type) =
     step s
 
 let verifyIseqRestMaintainsMeta (s: ISeq) =
-    let m = (s :?> IMeta).meta()
+    let m = (s :?> IMeta).meta ()
 
     let rec step (s: ISeq) =
         match s.next () with
         | null -> ()
         | _ ->
-            Expect.isTrue (Object.ReferenceEquals((s.next () :?> IMeta).meta(), m)) "Next should have same meta"
+            Expect.isTrue (Object.ReferenceEquals((s.next () :?> IMeta).meta (), m)) "Next should have same meta"
             step (s.next ())
 
     step s
 
+
+let takeEager (n: int) (s: ISeq) =
+    let arr: obj array = Array.zeroCreate n
+
+    let rec step (i: int) (s: ISeq) =
+        if isNull s || i >= n then
+            i
+        else
+            arr[i] <- s.first ()
+            step (i + 1) (s.next ())
+
+    let cnt = step 0 s
+
+    arr |> Seq.cast<obj> |> Seq.take cnt
 
 // Some Helpers for testing IObj
 

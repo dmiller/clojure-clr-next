@@ -7,7 +7,6 @@ open Clojure.Numerics
 
 type BoundsChecker = obj -> bool
 
-
 type Range
     private
     (
@@ -168,7 +167,7 @@ type Range
                 if boundsCheck (state) then
                     None
                 else
-                    Some(state, (Numbers.addP (state, obj)))
+                    Some(state, (Numbers.addP (state, step)))
 
             let s = Seq.unfold generator startV
             s.GetEnumerator()

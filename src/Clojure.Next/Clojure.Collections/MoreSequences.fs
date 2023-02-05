@@ -161,127 +161,60 @@ type Cycle private (meta:IPersistentMap, all:ISeq, prev:ISeq, c:ISeq, n:ISeq) =
         member _.isRealized() = not <| isNull current
 
 
-type Iterate private (meta:IPersistentMap, fn: IFn, prevSeed:obj, see:obj, next:I)
+type Iterate private (meta:IPersistentMap, fn: IFn, prevSeed:obj, s:obj, n:ISeq) =
+    inherit ASeq(meta)
 
-IPersistentMap meta, IFn f, Object prevSeed, Object seed, ISeq next)
-//            :base(meta)
+    // fn -- never null
 
+    [<VolatileField>]
+    let mutable seed : obj = s  // lazily realized
 
+    [<VolatileField>]
+    let mutable next : ISeq = n  // cached
 
-//namespace clojure.lang
-//{
-//    public class Iterate : ASeq, IReduce, IPending
-//    {
-//        #region Data
+    static member val private UNREALIZED_SEED : obj = System.Object()
 
-//        static readonly Object UNREALIZED_SEED = new Object();
-//        readonly IFn _f;      // never null
-//        readonly Object _prevSeed;
-//        volatile Object _seed; // lazily realized
-//        volatile ISeq _next;  // cached
+    new(fn,prevSeed,seed) = Iterate(null,fn,prevSeed,seed,null)
 
-//        #endregion
+    static member create(f:IFn, seed:obj) :ISeq = Iterate(f,null,seed)
 
-//        #region Ctors and factories
+    interface ISeq with
+        member _.first() =
+            if obj.ReferenceEquals(seed,Iterate.UNREALIZED_SEED) then
+                seed <- fn.invoke(prevSeed)
+            else
+                ()
+            seed
 
-//        Iterate(IFn f, Object prevSeed, Object seed)
-//        {
-//            _f = f;
-//            _prevSeed = prevSeed;
-//            _seed = seed;
-//        }
+        member this.next() =
+            if isNull next then
+                next <- Iterate(fn,(this:>ISeq).first(),Iterate.UNREALIZED_SEED)
+            else
+                ()
+            next
 
-//        private Iterate(IPersistentMap meta, IFn f, Object prevSeed, Object seed, ISeq next)
-//            :base(meta)
-//        {
-//            _f = f;
-//            _prevSeed = prevSeed;
-//            _seed = seed;
-//            _next = next;
-//        }
+    interface IObj with
+        member this.withMeta(m) =
+            if obj.ReferenceEquals(m,meta) then
+                this
+            else
+                Iterate(m,fn,prevSeed,seed,next)
 
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static ISeq create(IFn f, Object seed)
-//        {
-//            return new Iterate(f, null, seed);
-//        }
+    member this.reducer(rf:IFn, start:obj, v:obj) =
+        let rec step (acc:obj) (v:obj) =
+            match rf.invoke(acc,v) with
+            | :? Reduced as red -> (red:>IDeref).deref()
+            | nextAcc -> step nextAcc (fn.invoke(v))
 
-//        #endregion
+        step start v
 
-//        #region ISeq
+    interface IReduce with
+        member this.reduce(rf) = 
+            let ff = (this:>ISeq).first()
+            this.reducer(rf,ff,fn.invoke(ff))
 
-//        public override object first()
-//        {
-//            if (_seed == UNREALIZED_SEED)
-//                _seed = _f.invoke(_prevSeed);
+    interface IReduceInit with
+        member this.reduce(rf, start) = this.reducer(rf,start,(this:>ISeq).first())
 
-//            return _seed;
-//        }
-
-//        public override ISeq next()
-//        {
-//            if (_next == null)
-//            {
-//                _next = new Iterate(_f, first(), UNREALIZED_SEED);
-//            }
-//            return _next;
-//        }
-
-//        #endregion
-
-//        #region IObj
-
-//        public override IObj withMeta(IPersistentMap meta)
-//        {
-//            if (_meta == meta)
-//                return this;
-
-//            return new Iterate(meta, _f, _prevSeed, _seed, _next);
-//        }
-
-//        #endregion
-
-//        #region IReduce
-
-
-//        public object reduce(IFn rf)
-//        {
-//            Object ff = first();
-//            Object ret = ff;
-//            Object v = _f.invoke(ff);
-//            while (true)
-//            {
-//                ret = rf.invoke(ret, v);
-//                if (RT.isReduced(ret))
-//                    return ((IDeref)ret).deref();
-//                v = _f.invoke(v);
-//            }
-//        }
-
-
-//        public object reduce(IFn rf, object start)
-//        {
-//            Object ret = start;
-//            Object v = first();
-//            while (true)
-//            {
-//                ret = rf.invoke(ret, v);
-//                if (RT.isReduced(ret))
-//                    return ((IDeref)ret).deref();
-//                v = _f.invoke(v);
-//            }
-
-//        }
-
-//        #endregion
-
-//        #region IPending methods
-
-//        public bool isRealized()
-//        {
-//            return _seed != UNREALIZED_SEED;
-//        }
-
-//        #endregion
-//    }
-//}
+    interface IPending with
+        member _.isRealized() = seed <> Iterate.UNREALIZED_SEED
