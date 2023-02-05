@@ -141,11 +141,11 @@ type Cycle private (meta:IPersistentMap, all:ISeq, prev:ISeq, c:ISeq, n:ISeq) =
                   | x -> x
 
         let rec step( acc: obj) =
-            match f.invoke(s.first()) with
+            match f.invoke(acc,s.first()) with
             | :? Reduced as red -> (red:>IDeref).deref()
             | nextAcc -> advance(); step nextAcc
 
-        if advanceFirst then advance() else ()
+        if advanceFirst then advance()
         step start 
 
     interface IReduce with

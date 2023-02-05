@@ -94,7 +94,7 @@ let repeatTests =
 
 [<Tests>]
 let iterateTests =
-    ftestList
+    testList
         "IterateTests"
         [
 
@@ -132,11 +132,40 @@ let iterateTests =
             Expect.equal (iter.reduce (adderStopsShort 10)) 45L "Add them up for a while"
             Expect.equal (iter.reduce ((adderStopsShort 10),100L)) 145L "Add them up for a while"
 
-              
-          //                  let r100 = Range.create(100) :?> IReduce
-          //    let r1000 = Range.create(1000) :?> IReduce
 
-          //    Expect.equal (r100.reduce (adder)) 4950L "Add them all"
-          //    Expect.equal (r100.reduce (adder, 200)) 5150L "Add them all"
+            ]
+
+
+[<Tests>]
+let cycleTests =
+    testList
+        "Cycle Tests"
+        [
+
+          testCase "Cycle goes on for a while"
+          <| fun _ ->
+            ////let c0 = Cycle.create(null)
+            ////Expect.equal c0 PersistentList.Empty "null seq should yield PersistentList.Empty"
+
+            ////let c1 = Cycle.create(LongRange.create(1))
+            ////Expect.sequenceEqual (takeEager 3 c1) [ 0L; 0L; 0L ] "same"
+            
+            let c3 = Cycle.create(LongRange.create(3))
+            Expect.sequenceEqual (takeEager 5 c3) [ 0L; 1L; 2L; 0L; 1L ] "same"
+
+
+          ftestCase "Cycle reduces"
+          <| fun _ ->
+            let adderStopsShort n =
+                  { new AFn() with
+                      member this.ToString() = ""
+                    interface IFn with
+                        member this.invoke(x, y) =
+                            if Numbers.gte(y ,n:>obj) then Reduced(x) else Numbers.add(x,y) }
+
+            let iter = Cycle.create(LongRange.create(100)) :?> IReduce
+            Expect.equal (iter.reduce (adderStopsShort 10)) 45L "Add them up for a while"
+            Expect.equal (iter.reduce ((adderStopsShort 10),100L)) 145L "Add them up for a while"
+
 
             ]
