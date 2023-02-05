@@ -98,7 +98,7 @@ let iterateTests =
         "IterateTests"
         [
 
-          testCase "Iterate goes on for a while"
+          ftestCase "Iterate goes on for a while"
           <| fun _ ->
             let inc = 
                 { new AFn() with
@@ -113,7 +113,7 @@ let iterateTests =
             Expect.sequenceEqual (takeEager 5 iter) [ 0L; 1L; 2L; 3L; 4L ]  "enough elements"
 
 
-          ftestCase "Iterate reduces"
+          testCase "Iterate reduces"
           <| fun _ ->
             let inc = 
                 { new AFn() with
@@ -154,7 +154,7 @@ let cycleTests =
             Expect.sequenceEqual (takeEager 5 c3) [ 0L; 1L; 2L; 0L; 1L ] "same"
 
 
-          ftestCase "Cycle reduces"
+          testCase "Cycle reduces"
           <| fun _ ->
             let adderStopsShort n =
                   { new AFn() with

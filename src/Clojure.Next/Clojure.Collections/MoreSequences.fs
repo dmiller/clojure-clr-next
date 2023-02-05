@@ -1,8 +1,6 @@
 ﻿namespace Clojure.Collections
 
 
-
-
 type Repeat private (m: IPersistentMap, count: int64 option, value: obj) =
     inherit ASeq(m)
 
@@ -29,8 +27,6 @@ type Repeat private (m: IPersistentMap, count: int64 option, value: obj) =
                 | Some c when c > 1 -> next <- Repeat(Some(c - 1L), value)
                 | None -> next <- this
                 | _ -> ()
-            else
-                ()
 
             next
 
@@ -112,8 +108,6 @@ type Cycle private (meta:IPersistentMap, all:ISeq, prev:ISeq, c:ISeq, n:ISeq) =
         if isNull current then
             let c = prev.next()
             current <- if isNull c then all else c
-        else 
-            ()
 
         current
 
@@ -122,8 +116,7 @@ type Cycle private (meta:IPersistentMap, all:ISeq, prev:ISeq, c:ISeq, n:ISeq) =
         override this.next() =
             if isNull next then
                 next <- Cycle(all,this.Current(),null)
-            else
-                ()
+
             next
 
     interface IObj with
@@ -182,15 +175,13 @@ type Iterate private (meta:IPersistentMap, fn: IFn, prevSeed:obj, s:obj, n:ISeq)
         member _.first() =
             if obj.ReferenceEquals(seed,Iterate.UNREALIZED_SEED) then
                 seed <- fn.invoke(prevSeed)
-            else
-                ()
+
             seed
 
         member this.next() =
             if isNull next then
                 next <- Iterate(fn,(this:>ISeq).first(),Iterate.UNREALIZED_SEED)
-            else
-                ()
+
             next
 
     interface IObj with
