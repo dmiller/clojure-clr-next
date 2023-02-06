@@ -9,7 +9,7 @@ You can be a boss at reducers if you know this one weird trick!
 
 At least at one point I had hoped that was true.   It turns out that getting reducers right requires thinking it through _every single time_ you are confronted with new one.  But I think we can come up with enough guidance so that after a few examples, we won't really need to look at the reducers in collections to come;  you'll be able to understand them and verify them yourself.
 
-Maybe I should repeat the following in every post:  You will see lots of great design and clever coding in these posts.  There have been very smart people working on this language for a long time.  You'd need to dig through the commits, and JIRA issue discussion, the patches, etc. to get an idea of all the contributors.  I am not one of those people.  If I'm praising some particularly elegant construction, it's not my back I'm patting.   I'm just seeking a level of understanding of the product of all that effort good enough to write some (I hope) kinda-sorta-mostly-idiomatic F# code. (It's actually kinda amazing now little one has to know to do a port from Java to C#.  I'm making up for that now.)  'nuff said?
+
 
 ## Background
 
@@ -90,7 +90,7 @@ It is hard to find information about `Reduced`.  I checked five books on Clojure
 >
 > ...
 >
->A process that uses transducers must check for and stop when the step function returns a reduced value (more on that in Creating Transducible Processes). Additionally, a transducer step function that uses a nested reduce must check for and convey reduced values when they are encountered. (See the implementation of cat for an example.)
+>A process that uses transducers must check for and stop when the step function returns a reduced value (more on that in Creating Transducible Processes). Additionally, a transducer step function that uses a nested reduce must check for and convey reduced values when they are encountered.
 
 A _reduced value_ is literally an object of type `Reduced`.  It just wraps a value, making it available through the `deref` method of the `IDeref` interface:
 
@@ -303,7 +303,7 @@ type Cycle private (meta:IPersistentMap, all:ISeq, prev:ISeq, c:ISeq, n:ISeq) =
             next
 ```
 
-A couple of small details.  If `Cycle.create(s)` is called with an empty sequence, we return an empty list, not a `Cycle`.  If we have `Cycle` object in our hand, we are guaranteed that its base sequence is not empty.  Note that both `first()` and `next()` access the 'current' sequence through a call to `Current`; that method takes care of noticing if the underlying field `current` is occupied -- `null` indicates we haven't done the work of calling `next` on the underlying sequence yet.  When you access `Current`, it will do that computation and save the result.  This code also handles cycling back to the beginning if we have reached the end.  It's pretty slick.
+A couple of small details.  If `Cycle.create(s)` is called with an empty sequence, we return an empty list, not a `Cycle`.  If we have `Cycle` object in our hand, we are guaranteed that its base sequence is not empty.  Note that both `first()` and `next()` access the 'current' sequence through a call to `Current`; that method takes care of noticing if the underlying field `current` is occupied -- `null` indicates we haven't done the work of calling `next` on the underlying sequence yet.  When you access `Current`, it will do that computation and save the result.  This code also handles cycling back to the beginning if we have reached the end.  It's pretty slick.  (Note: the cleverness is in the Java code.  I didn't come up with it. Little tricks to promote laziness pop up all over the place.)
 
 On to `reduce`. We will need to advance through the underlying sequence to access successive items.  We do _not_ need to use `Cycle.next()` to do this -- that would create a bunch of unnecessary `Cycle` items.  We just need to compute on the underlying sequence directly, performing the action that is done in `Cycle.Current()`.  The following method does this.
 
