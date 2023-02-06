@@ -98,7 +98,7 @@ let iterateTests =
         "IterateTests"
         [
 
-          ftestCase "Iterate goes on for a while"
+          testCase "Iterate goes on for a while"
           <| fun _ ->
             let inc = 
                 { new AFn() with

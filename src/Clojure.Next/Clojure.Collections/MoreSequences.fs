@@ -85,127 +85,128 @@ type Repeat private (m: IPersistentMap, count: int64 option, value: obj) =
 
 
 
-type Cycle private (meta:IPersistentMap, all:ISeq, prev:ISeq, c:ISeq, n:ISeq) = 
+type Cycle private (meta: IPersistentMap, all: ISeq, prev: ISeq, c: ISeq, n: ISeq) =
     inherit ASeq(meta)
 
     // all - never null
-    
-    [<VolatileField>]
-    let mutable current : ISeq = c   // lazily realized
 
     [<VolatileField>]
-    let mutable next : ISeq = n  // cached
-    
-    private new(all,prev,current) = Cycle(null,all,prev,current,null)
+    let mutable current: ISeq = c // lazily realized
 
-    static member create(vals:ISeq) : ISeq =
+    [<VolatileField>]
+    let mutable next: ISeq = n // cached
+
+    private new(all, prev, current) = Cycle(null, all, prev, current, null)
+
+    static member create(vals: ISeq) : ISeq =
         if isNull vals then
             PersistentList.Empty
         else
-            Cycle(vals,null,vals)
+            Cycle(vals, null, vals)
 
     member this.Current() =
         if isNull current then
-            let c = prev.next()
+            let c = prev.next ()
             current <- if isNull c then all else c
 
         current
 
     interface ISeq with
-        override this.first() = this.Current().first()
+        override this.first() = this.Current().first ()
+
         override this.next() =
             if isNull next then
-                next <- Cycle(all,this.Current(),null)
+                next <- Cycle(all, this.Current(), null)
 
             next
 
     interface IObj with
-        override this.withMeta(m) = 
-            if obj.ReferenceEquals(m,meta) then 
+        override this.withMeta(m) =
+            if obj.ReferenceEquals(m, meta) then
                 this
             else
-                Cycle(m, all,prev,current,next)
+                Cycle(m, all, prev, current, next)
 
-    member this.reducer(advanceFirst:bool, f:IFn, start:obj, startSeq:ISeq) =
-        let mutable s = startSeq
-        let advance() =
-            s <-  match s.next() with
-                  | null -> all
-                  | x -> x
 
-        let rec step( acc: obj) =
-            match f.invoke(acc,s.first()) with
-            | :? Reduced as red -> (red:>IDeref).deref()
-            | nextAcc -> advance(); step nextAcc
+    member this.advance(s: ISeq) =
+        match s.next () with
+        | null -> all
+        | x -> x
 
-        if advanceFirst then advance()
-        step start 
+    member this.reducer(f: IFn, startVal: obj, startSeq: ISeq) =
+        let rec step (acc: obj) (s: ISeq) =
+            match f.invoke (acc, s.first ()) with
+            | :? Reduced as red -> (red :> IDeref).deref ()
+            | nextAcc -> step nextAcc (this.advance s)
+
+        step startVal startSeq
 
     interface IReduce with
-        member this.reduce(f) = 
+        member this.reduce(f) =
             let s = this.Current()
-            this.reducer(true,f,s.first(),s)
+            this.reducer (f, s.first (), this.advance (s))
 
     interface IReduceInit with
-        member this.reduce(f,v) = this.reducer(false,f,v,this.Current())
+        member this.reduce(f, v) = this.reducer (f, v, this.Current())
 
 
     interface IPending with
         member _.isRealized() = not <| isNull current
 
 
-type Iterate private (meta:IPersistentMap, fn: IFn, prevSeed:obj, s:obj, n:ISeq) =
+type Iterate private (meta: IPersistentMap, fn: IFn, prevSeed: obj, s: obj, n: ISeq) =
     inherit ASeq(meta)
 
     // fn -- never null
 
     [<VolatileField>]
-    let mutable seed : obj = s  // lazily realized
+    let mutable seed: obj = s // lazily realized
 
     [<VolatileField>]
-    let mutable next : ISeq = n  // cached
+    let mutable next: ISeq = n // cached
 
-    static member val private UNREALIZED_SEED : obj = System.Object()
+    static member val private UNREALIZED_SEED: obj = System.Object()
 
-    new(fn,prevSeed,seed) = Iterate(null,fn,prevSeed,seed,null)
+    new(fn, prevSeed, seed) = Iterate(null, fn, prevSeed, seed, null)
 
-    static member create(f:IFn, seed:obj) :ISeq = Iterate(f,null,seed)
+    static member create(f: IFn, seed: obj) : ISeq = Iterate(f, null, seed)
 
     interface ISeq with
         member _.first() =
-            if obj.ReferenceEquals(seed,Iterate.UNREALIZED_SEED) then
-                seed <- fn.invoke(prevSeed)
+            if obj.ReferenceEquals(seed, Iterate.UNREALIZED_SEED) then
+                seed <- fn.invoke (prevSeed)
 
             seed
 
         member this.next() =
             if isNull next then
-                next <- Iterate(fn,(this:>ISeq).first(),Iterate.UNREALIZED_SEED)
+                next <- Iterate(fn, (this :> ISeq).first (), Iterate.UNREALIZED_SEED)
 
             next
 
     interface IObj with
         member this.withMeta(m) =
-            if obj.ReferenceEquals(m,meta) then
+            if obj.ReferenceEquals(m, meta) then
                 this
             else
-                Iterate(m,fn,prevSeed,seed,next)
+                Iterate(m, fn, prevSeed, seed, next)
 
-    member this.reducer(rf:IFn, start:obj, v:obj) =
-        let rec step (acc:obj) (v:obj) =
-            match rf.invoke(acc,v) with
-            | :? Reduced as red -> (red:>IDeref).deref()
-            | nextAcc -> step nextAcc (fn.invoke(v))
+    member this.reducer(rf: IFn, start: obj, v: obj) =
+        let rec step (acc: obj) (v: obj) =
+            match rf.invoke (acc, v) with
+            | :? Reduced as red -> (red :> IDeref).deref ()
+            | nextAcc -> step nextAcc (fn.invoke (v))
 
         step start v
 
     interface IReduce with
-        member this.reduce(rf) = 
-            let ff = (this:>ISeq).first()
-            this.reducer(rf,ff,fn.invoke(ff))
+        member this.reduce(rf) =
+            let ff = (this :> ISeq).first ()
+            this.reducer (rf, ff, fn.invoke (ff))
 
     interface IReduceInit with
-        member this.reduce(rf, start) = this.reducer(rf,start,(this:>ISeq).first())
+        member this.reduce(rf, start) =
+            this.reducer (rf, start, (this :> ISeq).first ())
 
     interface IPending with
         member _.isRealized() = seed <> Iterate.UNREALIZED_SEED
