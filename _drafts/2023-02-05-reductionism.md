@@ -319,7 +319,51 @@ they are all met.
 
 Let's do one more.  There is a `cycle` function in Clojure that "[r]eturns a lazy (infinite!) sequence of repetitions of the items in coll."  It just calls a factory method on a the `Create` class.
 
-`Cycle` plays an interesting game to stay as lazy as possible.  A simple implementation of `Cycle` would 
+`Cycle` plays an interesting game to stay as lazy as possible.  A simple implementation of `Cycle` would hold the original sequence on the side so we could start over at the beginning if we have run through all the elements.  Then keep track of the 'current' sequence.  Calling `first()` on the `Cycle` would just call `first()` on the 'current' sequence.  Calling `next()` on the `Cycle`, we'd call `next()` on the underlying sequence and make that result the 'current' sequence in a new `Cycle` object.
+
+This implementation is not as efficient as it could be. One does not really need to know the `next()` on the underlying sequence until you either call `first()` or `next()` on the cycle object.  At that point you can compute `next()`.  This delays calling `next` on the underlying sequence until we know it actually needed.   We will need a mutable field in our `Cycle` to save the 'current' when it computed.  But this will not be visible from the outside, so `Cycle` is immutable outwardly.
+
+It's probably easier just to look at the code.
+
+```F#
+type Cycle private (meta:IPersistentMap, all:ISeq, prev:ISeq, c:ISeq, n:ISeq) = 
+    inherit ASeq(meta)
+    
+    [<VolatileField>]
+    let mutable current : ISeq = c   // lazily realized
+
+    [<VolatileField>]
+    let mutable next : ISeq = n  // cached
+    
+    private new(all,prev,current) = Cycle(null,all,prev,current,null)
+
+    static member create(vals:ISeq) : ISeq =
+        if isNull vals then
+            PersistentList.Empty
+        else
+            Cycle(vals,null,vals)
+
+    member this.Current() =
+        if isNull current then
+            let c = prev.next()
+            current <- if isNull c then all else c
+
+        current
+
+    interface ISeq with
+        override this.first() = this.Current().first()
+        override this.next() =
+            if isNull next then
+                next <- Cycle(all,this.Current(),null)
+
+            next
+```
+
+A couple of small details.  If `Cycle.create(s)` is called with an empty sequence, we return an empty list, not a `Cycle`.  So we are guaranteed that our base sequence is not empty.  Note that both `first()` and `next()` access the 'current' sequence through a call to `Current`; that method takes care of noticing if the underlying field `current` is occupied -- `null` indicates we haven't done the work yet -- and calling `next` on the previous sequence to get the value for `current`.  This also handles cycling back to the beginning if we have reached the end.  It's pretty slick.
+
+As for reduce, 
+
+
 
 
 
