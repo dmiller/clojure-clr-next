@@ -21,7 +21,7 @@ There are two forms of `reduce`, with two and three parameters.  The two-paramet
 ```Clojure
 (reduce '+ [1 2 3 4 5] ; =>15
 ```
-Effectivly it computes `(((1+2)+3)+4+5)`.
+Effectively it computes `(((1+2)+3)+4+5)`.
 
 The three-paremeter version supplies a starting value that is supplied to the reducing function along with the first item, and so on.
 
@@ -84,7 +84,7 @@ Before we get to code, we need to have a little chat about `Reduced`.  It figure
 
 It is hard to find information about `Reduced`.  I checked five books on Clojure and found nary a mention.  The most prominent mention of `Reduced` is in the reference on [Transducers](https://clojure.org/reference/transducers#_early_termination).
 
- `Reduced` is used to stop reductions early. It was introduced back in 2012 when Rich was redesigning the reduce mechanism.  (Here is the [commit](https://github.com/clojure/clojure/commit/96e8596cfdd29a2bb245d958683ee5fc1353b87a).)  From the _Transducers_ article:
+ `Reduced` is used to stop reductions early. From the _Transducers_ article:
 
 > Clojure has a mechanism for specifying early termination of a reduce:
 >
@@ -107,6 +107,9 @@ type Reduced(value) =
 You can read the _Transducers_ article for reasons for using this.  For one thing, it is the only way to run a reduction over an infinite collection -- you have to send a signal that you've had enough. 
 
 __One essential rule when writing a `reduce` method (for `IReduce` and `IReduceInit`):__  after each invocation of the reduction function, check the result to see if it is an instance of `Reduced`; if so, stop immediately and return the `deref` value.
+
+Note: if you are actually writing transducers, you might need to be passing back the `Reduced` object itself.  This is not our concern.  Our rule is only for `IReduceInit.reduce` and `IReduce.reduce`.
+
 
 ## Some code
 
@@ -404,6 +407,6 @@ My head hurts.
 
 ## End note
 
-If you want to get a sense of the history of reduce, reducers, and transducers, check out the [Clojure change log](https://github.com/clojure/clojure/blob/master/changes.md).  These things take time to develop.  Changes sometimes work through the code slowly.  `clojure.lang.Reduced` was introduced in 2012 and incorporated into _some_ of the `reduce` methods at that time.  But other edits came later.  For example, it was two years later that `IReduceInit` was split off from `IReduce` ([this commit](https://github.com/clojure/clojure/commit/4c963fb0f9ef9e4fc68b8b167729d857ced4b530)) and checking for a `Reduce`'d value was added to `PersistentList.reduce()` ([this commit](https://github.com/clojure/clojure/commit/3e4bf71f455a5fae665420d10c9ebdebd52b823b)).
+If you want to get a sense of the history of reduce, reducers, and transducers, check out the [Clojure change log](https://github.com/clojure/clojure/blob/master/changes.md).  These things take time to develop.  Changes sometimes work through the code slowly.  `clojure.lang.Reduced` was introduced in 2012 and incorporated into _some_ of the `reduce` methods at that time. (Here is the [commit](https://github.com/clojure/clojure/commit/96e8596cfdd29a2bb245d958683ee5fc1353b87a).)  But other edits came later.  For example, it was two years later that `IReduceInit` was split off from `IReduce` ([this commit](https://github.com/clojure/clojure/commit/4c963fb0f9ef9e4fc68b8b167729d857ced4b530)) and checking for a `Reduce`'d value was added to `PersistentList.reduce()` ([this commit](https://github.com/clojure/clojure/commit/3e4bf71f455a5fae665420d10c9ebdebd52b823b)).
 
 If you've made it this far, you're likely someone who would check these things out. 
