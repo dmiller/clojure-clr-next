@@ -106,7 +106,7 @@ type Reduced(value) =
 
 You can read the _Transducers_ article for reasons for using this.  For one thing, it is the only way to run a reduction over an infinite collection -- you have to send a signal that you've had enough. 
 
-__One essential rule when writing a `reduce` method:__  after each invocation of the reduction function, check the result to see if it is an instance of `Reduced`; if so, stop immediately and return the `deref` value.
+__One essential rule when writing a `reduce` method (for `IReduce` and `IReduceInit`):__  after each invocation of the reduction function, check the result to see if it is an instance of `Reduced`; if so, stop immediately and return the `deref` value.
 
 ## Some code
 
@@ -303,7 +303,7 @@ type Cycle private (meta:IPersistentMap, all:ISeq, prev:ISeq, c:ISeq, n:ISeq) =
             next
 ```
 
-A couple of small details.  If `Cycle.create(s)` is called with an empty sequence, we return an empty list, not a `Cycle`.  If we have `Cycle` object in our hand, we are guaranteed that its base sequence is not empty.  Note that both `first()` and `next()` access the 'current' sequence through a call to `Current`; that method takes care of noticing if the underlying field `current` is occupied -- `null` indicates we haven't done the work of calling `next` on the underlying sequence yet.  When you access `Current`, it will do that computation and save the result.  This code also handles cycling back to the beginning if we have reached the end.  It's pretty slick.  (Note: the cleverness is in the Java code.  I didn't come up with it. Little tricks to promote laziness pop up all over the place.)
+A couple of small details.  If `Cycle.create(s)` is called with an empty sequence, we return an empty list, not a `Cycle`.  If we have `Cycle` object in our hand, we are guaranteed that its base sequence is not empty.  Note that both `first()` and `next()` access the 'current' sequence through a call to `Current`; that method takes care of noticing if the underlying field `current` is occupied -- `null` indicates we haven't done the work of calling `next` on the underlying sequence yet.  When you access `Current`, it will do that computation and save the result.  This code also handles cycling back to the beginning if we have reached the end.  It's pretty slick.  (Note: the cleverness is in the Java code.  I didn't come up with it.  Authorship note in that file credits Alex Miller.   Little tricks to promote laziness pop up all over the place.)
 
 On to `reduce`. We will need to advance through the underlying sequence to access successive items.  We do _not_ need to use `Cycle.next()` to do this -- that would create a bunch of unnecessary `Cycle` items.  We just need to compute on the underlying sequence directly, performing the action that is done in `Cycle.Current()`.  The following method does this.
 
@@ -377,6 +377,30 @@ Our cycle is based on a 100-element `LongRange`.  `addStopsShort` called on a  s
 (The override of `ToString` in the object expression is necesary.  It seems you can't just override an inteface only.)
 
 And with that, let's quit.
+
+## Behind the scenes
+
+What I've not talked about is all the machinery behind the `CollReduce` protocol.   That all lies out in the Clojure source code and is not our present concern.  Mostly.  I did have to dig into it to solve one problem.  There is a `reduce` method in `ArrayChunk`.   That actually is the reduce method for the `IChunk` interface.  (See previous post [Laziness and Chunking]({{site.baseurl}}{% post_url 2023-02-03-laziness-and-chunking %}.)  The `reduce` method in `ArrayChunk` does stop early when it gets a `Reduced` object back from the reducer function, but it returns the `Reduced` object, not the wrapped value.  I struggled with this for a while until finally getting set on the correct track by Alex Miller over in the #clr-dev channel in the Clojurian slack.  First is to note that this `reduce` is for `IChunk`.  Then you have to figure out where it gets called from.  And that's where the protocol comes in. `reduce` will through the `CollReduce` protocol, which in this case will end up going through the `InternalReduce` protocol, wherein we find a handler for `IChunkedSeq`:
+
+```Clojure
+  clojure.lang.IChunkedSeq
+  (internal-reduce
+   [s f val]
+   (if-let [s (seq s)]
+    (if (chunked-seq? s)
+       (let [ret (.reduce (chunk-first s) f val)]
+         (if (reduced? ret)
+           @ret
+           (recur (chunk-next s)
+                  f
+                  ret)))
+       (interface-or-naive-reduce s f val))
+	 val))
+```
+
+It is this handler that calls `Chunk.reduce`. It notes the returned `Reduced` value, stops the iteration, and does the `deref`.  If `ArrayChunk` did the `deref`, this handler woudn't know to stop.
+
+My head hurts.
 
 ## End note
 
