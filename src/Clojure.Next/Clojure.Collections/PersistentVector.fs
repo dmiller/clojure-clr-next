@@ -611,7 +611,7 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
                         node.Array
                     else
                         let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
-                        step node (level - 5)
+                        step newNode (level - 5)
 
                 step root shift
         else
@@ -694,11 +694,7 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
                 | _ -> PersistentVector.newPath (root.Edit, level - 5, tailNode)
 
         let ret = PVNode(parent.Edit, Array.copy (parent.Array))
-
-        let m =
-            ret.Array[subidx] <- nodeToInsert // TODO: figure out why it wan't take this at the top level
-            12
-
+        ret.Array[subidx] <- nodeToInsert // TODO: figure out why it wan't take this at the top level
         ret
 
 
@@ -771,14 +767,14 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
             | _ -> stepThroughChunk (f.invoke (acc, arr[idx])) arr (idx + 1)
 
         let rec step (acc: obj) (idx: int) (offset: int) =
-            let arr = this.arrayFor (idx)
-            let newAcc, isReduced = stepThroughChunk acc arr offset
+            if idx >= (this :> IPersistentVector).count () then acc
+            else 
+                let arr = this.arrayFor (idx)
+                let newAcc, isReduced = stepThroughChunk acc arr offset
+                if isReduced then newAcc     
+                else step newAcc (idx + arr.Length) 0
 
-            if isReduced then newAcc
-            elif idx >= (this :> IPersistentVector).count () then newAcc
-            else step newAcc (idx + arr.Length) 0
-
-        step start startIdx
+        step start 0 startIdx
 
     member this.kvreducer(f: IFn, start: obj) =
         let rec stepThroughChunk (acc: obj) (arr: obj array) offset (idx: int) =
@@ -842,7 +838,7 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
         let arr: obj array = Array.zeroCreate 32
 
         let rec insertInto (i: int) (s: ISeq) =
-            if not (isNull s) then
+            if not (isNull s) && (i < 32) then
                 arr[i] <- s.first ()
                 insertInto (i + 1) (s.next ())
             else

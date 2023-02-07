@@ -20,6 +20,16 @@ let verifyISeqContents (s: ISeq) (vals: obj list) =
     let cnt = step s 0
     Expect.equal cnt avals.Length "Should have same number of elements"
 
+let compareISeqs (s1:ISeq) (s2:ISeq) =
+    let rec step (s1:ISeq) (s2:ISeq) =
+        match s1, s2 with
+        | null, null -> true
+        | null, _ -> false
+        | _, null -> true
+        | _, _ when s1.first() = s2.first() -> step (s1.next()) (s2.next())
+        | _ -> false
+    step s1 s2
+
 
 let verifyISeqCons (s: ISeq) (newVal: obj) (vals: obj list) =
     let newSeq = s.cons (newVal)

@@ -12,6 +12,7 @@
     <Compile Include="PersistentListTests.fs" />
     <Compile Include="OtherSequencesTests.fs" />
     <Compile Include="RangeTests.fs" />
+    <Compile Include="PersistentVectorTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
