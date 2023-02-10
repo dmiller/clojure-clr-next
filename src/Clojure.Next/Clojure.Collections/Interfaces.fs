@@ -82,8 +82,7 @@ type IPersistentMap =
     abstract assocEx: key: obj * value: obj -> IPersistentMap
     abstract without: key: obj -> IPersistentMap
     abstract cons: o: obj -> IPersistentMap
-
-    abstract count: unit -> int // do we need this?
+    abstract count: unit -> int 
 
 type IPersistentSet =
     inherit IPersistentCollection
@@ -91,8 +90,7 @@ type IPersistentSet =
     abstract disjoin: key: obj -> IPersistentSet
     abstract contains: key: obj -> bool
     abstract get: key: obj -> obj
-
-    abstract count: unit -> int // do we need this?
+    abstract count: unit -> int
 
 [<AllowNullLiteral>]
 type IPersistentStack =
@@ -413,6 +411,11 @@ type MapEquivalence =
 type IMapEnumerable =
     abstract keyEnumerator: unit -> IEnumerator
     abstract valEnumerator: unit -> IEnumerator
+
+[<AllowNullLiteral>]
+type IMapEnumerableTyped<'t1,'t2> =
+    abstract tkeyEnumerator: unit -> IEnumerator<'t1>
+    abstract tvalEnumerator: unit -> IEnumerator<'t2>
 
 
 // The transients

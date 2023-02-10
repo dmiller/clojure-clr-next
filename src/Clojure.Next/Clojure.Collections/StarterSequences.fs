@@ -2,6 +2,7 @@
 
 open System
 open System.Collections
+open System.Collections.Generic
 open Clojure.Numerics
 open System.Linq
 
@@ -161,15 +162,37 @@ type ASeq(m) =
 
             step ((this :> ISeq).seq ())
 
+    // I don't know a workaround for getting the enumerator from a base class call in a derived class
+
+    member this.GetMyEnumeratorT() =
+        (this: IEnumerable<obj>).GetEnumerator()
+
+    interface IEnumerable<obj> with
+        member x.GetEnumerator() = new SeqEnumerator(x) :> IEnumerator<obj>
+
     interface IEnumerable with
         member x.GetEnumerator() = new SeqEnumerator(x) :> IEnumerator
 
-    interface ICollection with
-        member x.Count = (x :> IPersistentCollection).count ()
-        member x.IsSynchronized = true
-        member x.SyncRoot = upcast x
+    interface ICollection<obj> with
+        member this.Count = (this :> IPersistentCollection).count ()
+        member _.IsReadOnly = true
+        member _.Add(_) =
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
+        member _.Clear() =
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
+        member _.Remove(_) = 
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
+        member this.Contains(x) = (this:>IList).Contains(x)
+        member this.CopyTo(arr,idx) = (this:>ICollection).CopyTo(arr,idx)
+        
 
-        member x.CopyTo(arr: Array, idx) =
+
+    interface ICollection with
+        member this.Count = (this :> IPersistentCollection).count ()
+        member _.IsSynchronized = true
+        member this.SyncRoot = upcast this
+
+        member this.CopyTo(arr: Array, idx) =
             if isNull arr then
                 raise <| ArgumentNullException("array")
 
@@ -179,7 +202,7 @@ type ASeq(m) =
             if idx < 0 then
                 raise <| ArgumentOutOfRangeException("arrayIndex", "must be non-negative")
 
-            if arr.Length - idx < (x :> IPersistentCollection).count () then
+            if arr.Length - idx < (this :> IPersistentCollection).count () then
                 raise
                 <| InvalidOperationException(
                     "The number of elements in source is greater than the available space in the array."
@@ -190,7 +213,7 @@ type ASeq(m) =
                     arr.SetValue(s.first (), i)
                     step (i + 1) (s.next ())
 
-            step idx (x :> ISeq)
+            step idx (this :> ISeq)
 
 and [<Sealed>] Cons(meta, f: obj, m: ISeq) =
     inherit ASeq(meta)
