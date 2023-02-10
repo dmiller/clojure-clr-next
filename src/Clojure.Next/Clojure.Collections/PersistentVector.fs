@@ -583,9 +583,10 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
     static member private EmptyNode = PVNode(PersistentVector.NoEdit)
     static member EMPTY = PersistentVector(0, 5, PersistentVector.EmptyNode, Array.zeroCreate 32)
 
-    member _.Shift = shift
-    member _.Root = root
-    member _.Tail = tail
+    member internal _.Count = cnt
+    member internal _.Shift = shift
+    member internal _.Root = root
+    member internal _.Tail = tail
 
     interface IMeta with
         member _.meta() = meta
@@ -834,6 +835,10 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
     override this.RangedIterator(first: int, terminal: int) =
         this.RangedIteratorT(first, terminal) :> IEnumerator
 
+    interface IEditableCollection with
+        member this.asTransient() = TransientVector(this)
+
+
     static member create(items: ISeq) : PersistentVector =
         let arr: obj array = Array.zeroCreate 32
 
@@ -1040,371 +1045,272 @@ and [<Sealed; AllowNullLiteral>] PVChunkedSeq
             upcast (this :> IEnumerable<obj>).GetEnumerator()
 
 
+and TransientVector private (_cnt, _shift,_root,_tail) =
+    inherit AFn()
+        
+    [<VolatileField>]
+    let mutable cnt : int = _cnt
+
+    [<VolatileField>]
+    let mutable shift : int = _shift
+
+    [<VolatileField>]
+    let mutable root : PVNode = _root
+
+    [<VolatileField>]
+    let mutable tail : obj array = _tail
+
+    new(v:PersistentVector) = TransientVector(v.Count,v.Shift,TransientVector.editableRoot(v.Root),TransientVector.editableTail(v.Tail))
+
+    static member editableRoot(node:PVNode) =
+        PVNode(AtomicReference(Thread.CurrentThread),node.Array.Clone() :?> obj array)
+    
+    static member editableTail(tl : obj array) =
+        let arr : obj array = Array.zeroCreate 32
+        Array.Copy(tl,arr,tl.Length)
+        arr
 
 
-//        #region IEditableCollection Members
+    member this.ensureEditable() =
+        if isNull <| root.Edit.Get() then
+            raise <| InvalidOperationException("Transient used after persistent! call")
 
-//        public ITransientCollection asTransient()
-//        {
-//            return new TransientVector(this);
-//        }
-
-//        #endregion
-
-//        #region TransientVector class
-
-//        class TransientVector : AFn, ITransientVector, ITransientAssociative2, Counted
-//        {
-//            #region Data
-
-//            volatile int _cnt;
-//            volatile int _shift;
-//            volatile Node _root;
-//            volatile object[] _tail;
-
-//            #endregion
-
-//            #region Ctors
-
-//            TransientVector(int cnt, int shift, Node root, Object[] tail)
-//            {
-//                _cnt = cnt;
-//                _shift = shift;
-//                _root = root;
-//                _tail = tail;
-//            }
-
-//            public TransientVector(PersistentVector v)
-//                : this(v._cnt, v._shift, EditableRoot(v._root), EditableTail(v._tail))
-//            {
-//            }
-
-//            #endregion
-
-//            #region Counted Members
-
-//            public int count()
-//            {
-//                EnsureEditable();
-//                return _cnt;
-//            }
-
-//            #endregion
-
-//            #region Implementation
-
-//            void EnsureEditable()
-//            {
-//                Thread owner = _root.Edit.Get();
-//                if (owner == null)
-//                    throw new InvalidOperationException("Transient used after persistent! call");
-//            }
+    member this.ensureEditable(node:PVNode) =
+        if node.Edit = root.Edit then
+            node
+        else
+            PVNode(root.Edit,node.Array.Clone() :?> obj array)
 
 
-//            Node EnsureEditable(Node node)
-//            {
-//                if (node.Edit == _root.Edit)
-//                    return node;
-//                return new Node(_root.Edit, (object[])node.Array.Clone());
-//            }
-
-//            static Node EditableRoot(Node node)
-//            {
-//                return new Node(new AtomicReference<Thread>(Thread.CurrentThread), (object[])node.Array.Clone());
-//            }
-
-//            static object[] EditableTail(object[] tl)
-//            {
-//                object[] ret = new object[32];
-//                Array.Copy(tl, ret, tl.Length);
-//                return ret;
-//            }
-
-//            Node PushTail(int level, Node parent, Node tailnode)
-//            {
-//                //if parent is leaf, insert node,
-//                // else does it map to an existing child? -> nodeToInsert = pushNode one more level
-//                // else alloc new path
-//                //return  nodeToInsert placed in copy of parent
-//                int subidx = ((_cnt - 1) >> level) & 0x01f;
-//                Node ret = new Node(parent.Edit, (object[])parent.Array.Clone());
-//                Node nodeToInsert;
-//                if (level == 5)
-//                {
-//                    nodeToInsert = tailnode;
-//                }
-//                else
-//                {
-//                    Node child = (Node)parent.Array[subidx];
-//                    nodeToInsert = (child != null)
-//                        ? PushTail(level - 5, child, tailnode)
-//                                                   : newPath(_root.Edit, level - 5, tailnode);
-//                }
-//                ret.Array[subidx] = nodeToInsert;
-//                return ret;
-//            }
-
-//            int Tailoff()
-//            {
-//                if (_cnt < 32)
-//                    return 0;
-//                return ((_cnt - 1) >> 5) << 5;
-//            }
-
-//            object[] ArrayFor(int i)
-//            {
-//                if (i >= 0 && i < _cnt)
-//                {
-//                    if (i >= Tailoff())
-//                        return _tail;
-//                    Node node = _root;
-//                    for (int level = _shift; level > 0; level -= 5)
-//                        node = (Node)node.Array[(i >> level) & 0x01f];
-//                    return node.Array;
-//                }
-//                throw new ArgumentOutOfRangeException("i");
-//            }
-
-//            object[] EditableArrayFor(int i)
-//            {
-//                if (i >= 0 && i < _cnt)
-//                {
-//                    if (i >= Tailoff())
-//                        return _tail;
-//                    Node node = _root;
-//                    for (int level = _shift; level > 0; level -= 5)
-//                        node = EnsureEditable((Node)node.Array[(i >> level) & 0x01f]);
-//                    return node.Array;
-//                }
-//                throw new ArgumentOutOfRangeException("i");
-//            }
-
-//            #endregion
-
-//            #region ITransientVector Members
-
-//            public object nth(int i)
-//            {
-//                object[] node = ArrayFor(i);
-//                return node[i & 0x01f];
-//            }
+    member _.tailoff() =
+            if cnt < 32 then 0 else ((cnt - 1) >>> 5) <<< 5
 
 
-//            public object nth(int i, object notFound)
-//            {
-//                if (i >= 0 && i < count())
-//                    return nth(i);
-//                return notFound;
-//            }
+    member this.arrayFor(i) =
+        if 0 <= i && i < cnt then
+            if i >= this.tailoff () then
+                tail
+            else
+                let rec step (node: PVNode) level =
+                    if level <= 0 then
+                        node.Array
+                    else
+                        let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
+                        step newNode (level - 5)
 
-//            public ITransientVector assocN(int i, object val)
-//            {
-//                EnsureEditable();
-//                if (i >= 0 && i < _cnt)
-//                {
-//                    if (i >= Tailoff())
-//                    {
-//                        _tail[i & 0x01f] = val;
-//                        return this;
-//                    }
-
-//                    _root = doAssoc(_shift, _root, i, val);
-//                    return this;
-//                }
-//                if (i == _cnt)
-//                    return (ITransientVector)conj(val);
-//                throw new ArgumentOutOfRangeException("i");
-//            }
-
-//            [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//            Node doAssoc(int level, Node node, int i, Object val)
-//            {
-//                node = EnsureEditable(node);
-//                Node ret = new Node(node.Edit, (object[])node.Array.Clone());
-//                if (level == 0)
-//                {
-//                    ret.Array[i & 0x01f] = val;
-//                }
-//                else
-//                {
-//                    int subidx = (i >> level) & 0x01f;
-//                    ret.Array[subidx] = doAssoc(level - 5, (Node)node.Array[subidx], i, val);
-//                }
-//                return ret;
-//            }
-
-//            public ITransientVector pop()
-//            {
-//                EnsureEditable();
-//                if (_cnt == 0)
-//                    throw new InvalidOperationException("Can't pop empty vector");
-//                if (_cnt == 1)
-//                {
-//                    _cnt = 0;
-//                    return this;
-//                }
-//                int i = _cnt - 1;
-//                // pop in tail?
-//                if ((i & 0x01f) > 0)
-//                {
-//                    --_cnt;
-//                    return this;
-//                }
-//                object[] newtail = EditableArrayFor(_cnt - 2);
-
-//                Node newroot = PopTail(_shift, _root);
-//                int newshift = _shift;
-//                if (newroot == null)
-//                {
-//                    newroot = new Node(_root.Edit);
-//                }
-//                if (_shift > 5 && newroot.Array[1] == null)
-//                {
-//                    newroot = EnsureEditable((Node)newroot.Array[0]);
-//                    newshift -= 5;
-//                }
-//                _root = newroot;
-//                _shift = newshift;
-//                --_cnt;
-//                _tail = newtail;
-//                return this;
-//            }
+                step root shift
+        else
+            raise <| ArgumentOutOfRangeException("i")
 
 
-//            private Node PopTail(int level, Node node)
-//            {
-//                node = EnsureEditable(node);
-//                int subidx = ((_cnt - 2) >> level) & 0x01f;
-//                if (level > 5)
-//                {
-//                    Node newchild = PopTail(level - 5, (Node)node.Array[subidx]);
-//                    if (newchild == null && subidx == 0)
-//                        return null;
-//                    else
-//                    {
-//                        Node ret = node;
-//                        ret.Array[subidx] = newchild;
-//                        return ret;
-//                    }
-//                }
-//                else if (subidx == 0)
-//                    return null;
-//                else
-//                {
-//                    Node ret = node;
-//                    ret.Array[subidx] = null;
-//                    return ret;
-//                }
-//            }
+    member this.editableArrayFor(i) =
+        if 0 <= i && i < cnt then
+            if i >= this.tailoff () then
+                tail
+            else
+                let rec step (node: PVNode) level =
+                    if level <= 0 then
+                        if node.Edit = root.Edit then 
+                            node.Array
+                        else 
+                            node.Array.Clone() :?> obj array
+                    else
+                        let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
+                        step newNode (level - 5)
 
-//            #endregion
-
-//            #region ITransientAssociative Members
-
-//            public ITransientAssociative assoc(object key, object val)
-//            {
-//                if (Util.IsIntegerType(key.GetType()))
-//                {
-//                    int i = Util.ConvertToInt(key);
-//                    return assocN(i, val);
-//                }
-//                throw new ArgumentException("Key must be integer");
-//            }
-
-//            #endregion
-
-//            #region ITransientCollection Members
-
-//            public ITransientCollection conj(object val)
-//            {
-
-//                EnsureEditable();
-//                int i = _cnt;
-//                //room in tail?
-//                if (i - Tailoff() < 32)
-//                {
-//                    _tail[i & 0x01f] = val;
-//                    ++_cnt;
-//                    return this;
-//                }
-//                //full tail, push into tree
-//                Node newroot;
-//                Node tailnode = new Node(_root.Edit, _tail);
-//                _tail = new object[32];
-//                _tail[0] = val;
-//                int newshift = _shift;
-//                //overflow root?
-//                if ((_cnt >> 5) > (1 << _shift))
-//                {
-//                    newroot = new Node(_root.Edit);
-//                    newroot.Array[0] = _root;
-//                    newroot.Array[1] = newPath(_root.Edit, _shift, tailnode);
-//                    newshift += 5;
-//                }
-//                else
-//                    newroot = PushTail(_shift, _root, tailnode);
-//                _root = newroot;
-//                _shift = newshift;
-//                ++_cnt;
-//                return this;
-//            }
-
-//            public IPersistentCollection persistent()
-//            {
-//                EnsureEditable();
-//                _root.Edit.Set(null);
-//                object[] trimmedTail = new object[_cnt-Tailoff()];
-//                Array.Copy(_tail,trimmedTail,trimmedTail.Length);
-//                return new PersistentVector(_cnt, _shift, _root, trimmedTail);
-//            }
-
-//            #endregion
-
-//            #region ITransientAssociative2 methods
-
-//            private static readonly Object NOT_FOUND = new object();
-
-//            public bool containsKey(object key)
-//            {
-//                return valAt(key, NOT_FOUND) != NOT_FOUND;
-//            }
-
-//            public IMapEntry entryAt(object key)
-//            {
-//                Object v = valAt(key, NOT_FOUND);
-//                if (v != NOT_FOUND)
-//                    return MapEntry.create(key, v);
-//                return null;
-//            }
-
-//            #endregion
+                step root shift
+        else
+            raise <| ArgumentOutOfRangeException("i")
 
 
-//            #region ILookup Members
 
 
-//            public object valAt(object key)
-//            {
-//                // note - relies on EnsureEditable in 2-arg valAt
-//                return valAt(key, null);
-//            }
+    member this.pushTail(level, parent: PVNode, tailNode: PVNode) : PVNode =
+        // Original JVM comment:
+        // if parent is leaf, insert node
+        // else does it map to existing child? -> nodeToInsert = pushNode one more level
+        // else alloc new path
+        // return notToINsert placed in copy of parent
+        let subidx = ((cnt - 1) >>> level) &&& 0x1f
 
-//            public object valAt(object key, object notFound)
-//            {
-//                EnsureEditable();
-//                if (Util.IsIntegerType(key.GetType()))
-//                {
-//                    int i = Util.ConvertToInt(key);
-//                    if (i >= 0 && i < count())
-//                        return nth(i);
-//                }
-//                return notFound;
-//            }
+        let nodeToInsert =
+            if level = 5 then
+                tailNode
+            else
+                match parent.Array[subidx] with
+                | :? PVNode as child -> this.pushTail (level - 5, child, tailNode)
+                | _ -> PersistentVector.newPath (root.Edit, level - 5, tailNode)
 
-//            #endregion
-//        }
+        let ret = PVNode(parent.Edit, Array.copy (parent.Array))
+        ret.Array[subidx] <- nodeToInsert // TODO: figure out why it wan't take this at the top level
+        ret
 
-//        #endregion
+
+    static member newPath(edit, level, node) =
+        if level = 0 then
+            node
+        else
+            let ret = PVNode(edit)
+            ret.Array[0] <- PersistentVector.newPath (edit, level - 5, node)
+            ret
+
+
+
+
+    member this.popTail(level, node: PVNode) : PVNode =
+        let subidx = ((cnt - 2) >>> level) &&& 0x01f
+
+        if level > 5 then
+            let newChild = this.popTail (level - 5, node.Array[subidx] :?> PVNode)
+
+            if isNull newChild && subidx = 0 then
+                null
+            else
+                let ret = PVNode(root.Edit, Array.copy (node.Array))
+                ret.Array[subidx] <- newChild
+                ret
+        elif subidx = 0 then
+            null
+        else
+            let ret = PVNode(root.Edit, Array.copy (node.Array))
+            ret.Array[subidx] <- null
+            ret
+
+
+    interface Counted with
+        member this.count() = this.ensureEditable(); cnt
+
+
+    interface Indexed with
+        member this.nth(i) =
+            let node = this.arrayFor(i)
+            node[i &&& 0x1f]
+        member this.nth(i,nf) =
+            if ( 0 <= i && i < cnt) then (this:>Indexed).nth(i) else nf
+
+
+    interface ILookup with
+        member this.valAt(k) = (this:>ILookup).valAt(k,null)
+        member this.valAt(k,nf) =
+            this.ensureEditable()
+            if Numbers.IsIntegerType(k.GetType()) then
+                let i = Converters.convertToInt(k)
+                if 0 <= i && i < cnt then
+                    (this:>Indexed).nth(i)
+                else  
+                    nf
+            else
+                nf
+
+    interface ITransientCollection with
+        member this.conj(v) =
+            this.ensureEditable()
+            let n = cnt
+
+            // room in tail?
+            if n - this.tailoff() < 32 then 
+                tail[n &&& 0x01f] <- v
+                cnt <- n+1
+                this
+            else 
+                // full tail, push into tree
+                let tailNode = PVNode(root.Edit,tail)
+                tail <-  Array.zeroCreate 32
+                tail[0] <- v
+                let newRoot, newShift = 
+                    if (n >>> 5) > (1 <<< shift) then
+                        let newRoot = PVNode(root.Edit)
+                        newRoot.Array[0] <- root
+                        newRoot.Array[1] <- TransientVector.newPath(root.Edit,shift,tailNode)
+                        newRoot, shift+5
+                    else
+                        let newRoot = this.pushTail(shift, root, tailNode)
+                        newRoot, shift
+                root <- newRoot
+                shift <- newShift
+                cnt <- n+1
+                this
+        member this.persistent() =
+            this.ensureEditable()
+            root.Edit.Set(null) 
+            let trimmedTail : obj array = Array.zeroCreate (cnt-this.tailoff())
+            Array.Copy(tail,trimmedTail,trimmedTail.Length)
+            PersistentVector(cnt,shift,root,trimmedTail)
+                    
+
+    interface ITransientAssociative with
+        member this.assoc(k,v) =
+            if Numbers.IsIntegerType(k.GetType()) then
+                let i = Converters.convertToInt(k);
+                (this :> ITransientVector).assocN(i,v)
+            else
+                raise <| ArgumentException("Key must be integer","key")
+
+    static member val private NOT_FOUND: obj = System.Object()
+
+    interface ITransientAssociative2 with
+        member this.containsKey(k) = (this:>ILookup).valAt(k,TransientVector.NOT_FOUND) <> TransientVector.NOT_FOUND
+        member this.entryAt(k) = 
+            let v = (this:>ILookup).valAt(k,TransientVector.NOT_FOUND)
+            if v <> TransientVector.NOT_FOUND then
+                MapEntry.create(k,v)
+            else
+                null
+
+
+    interface ITransientVector with
+        member this.assocN(i, v) =
+            this.ensureEditable()
+            if (0 <= i && i < cnt) then
+                if i >= this.tailoff () then
+                    tail[i &&& 0x01f] <- v
+                    this
+                else   
+                    root <- this.doAssoc(shift,root,i,v)
+                    this
+
+            elif i = cnt then
+                (this :> ITransientVector).conj (v) :?> ITransientVector
+            else
+                raise <| ArgumentOutOfRangeException("i")
+        member this.pop() =
+            this.ensureEditable()
+            if cnt = 0 then
+                raise <| InvalidOperationException("Can't pop empty vector")
+            elif cnt = 1 then
+                cnt <- 0
+                this
+            elif (cnt-1) &&& 0x01f > 0 then
+                cnt <- cnt-1
+                this
+            else
+                let newTail = this.editableArrayFor(-cnt-2)
+                let newRoot, newShift =
+                    match this.popTail (shift, root) with
+                    | null -> PVNode(root.Edit), shift
+                    | _ as x when shift > 5 && isNull x.Array[1] -> (this.ensureEditable (x.Array[0] :?> PVNode)), shift - 5
+                    | _ as x -> x, shift
+                root <- newRoot
+                shift <- newShift
+                cnt <- cnt-1
+                tail <- newTail
+                this
+
+
+    member this.doAssoc(level, node: PVNode, i, v) =
+        this.ensureEditable()
+        let ret = PVNode(node.Edit, Array.copy (node.Array))
+
+        if level = 0 then
+            ret.Array[i &&& 0x1f] <- v
+        else
+            let subidx = (i >>> level) &&& 0x1f
+            ret.Array[subidx] <- this.doAssoc (level - 5, node.Array[subidx] :?> PVNode, i, v)
+
+        ret
+
+
+
 
 
 

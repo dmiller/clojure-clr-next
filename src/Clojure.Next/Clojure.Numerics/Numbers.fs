@@ -1454,6 +1454,11 @@ type Numbers() =
         | _ -> Numbers.IsNumericType(o.GetType())
 
 
+    static member IsIntegerType(t:Type) =
+        Numbers.IsPrimitiveIntegerType(t) || t = typeof<BigInt> || t = typeof<BigInteger>
+
+
+
     // hashing support
     // originally in Util
 

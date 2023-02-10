@@ -4,19 +4,20 @@ open System.Threading
 
 
 [<Sealed>]
-type AtomicReference<'T when 'T : not struct >(r:'T) =
+type AtomicReference<'T when 'T: not struct>(r: 'T) =
 
     let mutable ref = r
 
     new() = AtomicReference(Unchecked.defaultof<'T>)
 
-    member this.CompareAndSet(expect:'T,update:'T)  =
-        let oldVal = Interlocked.CompareExchange( &ref , expect, update)
-        obj.ReferenceEquals(oldVal,expect)
+    member this.CompareAndSet(expect: 'T, update: 'T) =
+        let oldVal = Interlocked.CompareExchange(&ref, expect, update)
+        obj.ReferenceEquals(oldVal, expect)
 
     member this.Get() = ref
 
-    member this.GetAndSet(update:'T) = Interlocked.Exchange(&ref,update)
+    member this.GetAndSet(update: 'T) = Interlocked.Exchange(&ref, update)
+
+    member this.Set(update: 'T) = Interlocked.Exchange(&ref, update) |> ignore
 
     override _.ToString() = ref.ToString()
-
