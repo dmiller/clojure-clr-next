@@ -22,6 +22,8 @@
     <Compile Include="Chunking.fs" />
     <Compile Include="Ranges.fs" />
     <Compile Include="PersistentVector.fs" />
+    <Compile Include="MapHelpers.fs" />
+    <Compile Include="PersistentMaps.fs" />
   </ItemGroup>
 
   <ItemGroup>

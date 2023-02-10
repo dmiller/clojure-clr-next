@@ -42,4 +42,24 @@ let compare(k1:obj,k2:obj) =
     | null, _ -> -1
     | _,_ when Numbers.IsNumeric(k1) -> Numbers.compare(k1,k2)
     | _ -> (k1 :?> IComparable).CompareTo(k2)
- 
+
+
+type EquivPred = (obj * obj) -> bool
+
+let private equivNull(k1,k2) = isNull k2
+let private equivEquals(k1,k2) = k1.Equals(k2)
+let private equivNumber(k1,k2) = Numbers.IsNumeric(k2) && Numbers.equal(k1,k2)
+let private equivColl(k1:obj,k2:obj) = 
+    if k1 :? IPersistentCollection || k2 :? IPersistentCollection then
+        pcequiv(k1,k2)
+    else
+        k1.Equals(k2)
+
+let getEquivPred(k1:obj) =
+    match k1 with
+    | null -> equivNull
+    | _ when Numbers.IsNumeric(k1) -> equivNumber
+    | :? String -> equivEquals                      // Java/C# has also Symbol here, but we don't have symbol at this point. will fall through to same at default
+    | :? ICollection
+    | :? IDictionary -> equivColl
+    | _ -> equivEquals
