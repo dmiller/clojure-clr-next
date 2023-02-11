@@ -288,9 +288,87 @@ type APersistentMap() =
             let s = Seq.unfold generator ((this :> Seqable).seq ())
             s.GetEnumerator()
 
+[<AbstractClass>]
+type ATransientMap() =
+    inherit AFn()
+
+    // methods to be supplied by derived classes
+    abstract ensureEditable : unit -> unit
+    abstract doAssoc : key:obj * value:obj -> ITransientMap
+    abstract doWithout : key:obj -> ITransientMap
+    abstract doValAt : key:obj * notFound:obj -> obj
+    abstract doCount : unit -> int
+    abstract doPersistent : unit -> IPersistentMap
 
 
-//    public class PersistentArrayMap : APersistentMap, IObj, IEditableCollection, IMapEnumerable, IMapEnumerableTyped<Object,Object>, IEnumerable, IEnumerable<IMapEntry>, IKVReduce, IDrop
+    //ITransientMap, ITransientAssociative2 
+
+    interface ITransientCollection with
+        member this.persistent() = (this:>ITransientMap).persistent()
+        member this.conj(o) = this.conj(o)
+
+    interface ITransientAssociative with
+        member this.assoc(k,v) = (this:>ITransientMap).assoc(k,v)
+
+    interface ILookup with
+        member this.valAt(k) = (this:>ILookup).valAt(k,null)
+        member this.valAt(k,nf) = 
+            this.ensureEditable()
+            this.doValAt(k,nf)
+
+    interface IFn with
+        member this.invoke(arg1) = (this:>ILookup).valAt(arg1)
+        member this.invoke(arg1,arg2) = (this :> ILookup).valAt(arg1, arg2)
+
+    interface ITransientMap with
+        member this.assoc(k,v) =
+            this.ensureEditable()
+            this.doAssoc(k,v)
+        member this.without(k) =
+            this.ensureEditable()
+            this.doWithout(k)
+        member this.persistent() =
+            this.ensureEditable()
+            this.doPersistent()
+
+    interface Counted with
+        member this.count() =
+            this.ensureEditable()
+            this.doCount()
+
+    static member val notFound = obj()
+
+    interface ITransientAssociative2 with
+        member this.containsKey(k) = 
+            (this:>ILookup).valAt(k,ATransientMap.notFound) <> ATransientMap.notFound
+        member this.entryAt(k) =
+            let v = (this:>ILookup).valAt(k,ATransientMap.notFound)
+            if v <> ATransientMap.notFound then
+                MapEntry.create(k,v)
+            else
+                null
+
+    member this.conj(o:obj) =
+        this.ensureEditable()
+        let tm = this :> ITransientMap
+        match o with
+        | :? IMapEntry as me -> tm.assoc(me.key(),me.value())
+        | :? DictionaryEntry as de -> tm.assoc(de.Key,de.Value)
+        | :? IPersistentVector as pv -> 
+            if pv.count() <> 2 then
+                raise <| ArgumentException("Vector arg to map conj must be a pair")
+            else
+                tm.assoc(pv.nth(0),pv.nth(1))
+        | :? KeyValuePair<_,_> as p -> tm.assoc(p.Key,p.Value)
+        | _ ->
+            let rec loop (ret:ITransientMap) (s:ISeq) =
+                if isNull s then ret
+                else 
+                    let me = s.first() :?> IMapEntry
+                    let nextRet = ret.assoc(me.key(),me.value())
+                    loop nextRet (s.next())
+            loop this (RT0.seq(o))
+            
 
 type PersistentArrayMap private (meta:IPersistentMap, arr: obj array) =
     inherit APersistentMap()
@@ -300,7 +378,7 @@ type PersistentArrayMap private (meta:IPersistentMap, arr: obj array) =
 
     
 
-    static member val private hashTableThreshold : int = 16
+    static member val internal hashtableThreshold : int = 16
 
     static member val public Empty = PersistentArrayMap()
 
@@ -343,7 +421,7 @@ type PersistentArrayMap private (meta:IPersistentMap, arr: obj array) =
         else
             this.indexOfObject(key)
 
-    static member equalKey(k1:obj, k2:obj) =
+    static member internal equalKey(k1:obj, k2:obj) =
         PersistentArrayMap.keywordCheck(k1) && k1 = k2 || Util.equiv(k1,k2)
 
     interface Associative with
@@ -356,7 +434,7 @@ type PersistentArrayMap private (meta:IPersistentMap, arr: obj array) =
                 null
 
     interface Seqable with
-        override this.seq() = if arr.Length > 0 then PersistentArrayMapSeq(arr,0) else null        
+        override this.seq() = if arr.Length > 0 then PAMSeq(arr,0) else null        
 
     interface IPersistentCollection with
         override this.empty() = (PersistentArrayMap.Empty :> IObj).withMeta(meta) :?> IPersistentCollection
@@ -364,7 +442,7 @@ type PersistentArrayMap private (meta:IPersistentMap, arr: obj array) =
     interface IPersistentMap with
         override _.count() = arr.Length/2
         override this.assoc(k,v) = 
-            let i = this.indexOfKey(i)
+            let i = this.indexOfKey(k)
             if i >= 0 then
                 if arr[i+1] = v then
                     this
@@ -372,11 +450,11 @@ type PersistentArrayMap private (meta:IPersistentMap, arr: obj array) =
                     let newArray = arr.Clone() :?> obj array
                     newArray[i+1] <- v
                     PersistentArrayMap.create(newArray)
-            elif arr.Length >= PersistentArrayMap.hashTableThreshold then
+            elif arr.Length >= PersistentArrayMap.hashtableThreshold then
                 this.createHashTree(arr).assoc(k,v)
             else
-                let newArray : obj array = Array.zeroCreate arr.Length + 2
-                if arr.Length > 0 then Array.Copy(arr,0,newArray,0,array.Length)
+                let newArray : obj array = Array.zeroCreate (arr.Length + 2)
+                if arr.Length > 0 then Array.Copy(arr,0,newArray,0,newArray.Length)
                 newArray[newArray.Length-2] <- k
                 newArray[newArray.Length-1] <- v
                 PersistentArrayMap.create(newArray)
@@ -420,7 +498,7 @@ type PersistentArrayMap private (meta:IPersistentMap, arr: obj array) =
     interface IDrop with
         member this.drop(n) =
             if arr.Length > 0 then
-                ((this:>Seqable).seq() :?> PersistentArrayMapSeq).drop(n)
+                ((this:>Seqable).seq() :?> PAMSeq).drop(n)
             else
                 null
 
@@ -604,54 +682,34 @@ type PersistentArrayMap private (meta:IPersistentMap, arr: obj array) =
 //            }
 //            return new PersistentArrayMap(init);
 //        }
-       
+    
+and TransientArrayMap(a: obj array) =
+    inherit ATransientMap()
 
-//        #region TransientArrayMap class
+    let arr : obj array = Array.zeroCreate (Math.Max(PersistentArrayMap.hashtableThreshold,a.Length))
 
-//        sealed class TransientArrayMap : ATransientMap
-//        {
-//            #region Data
+    [<NonSerialized;VolatileField>]
+    let mutable isTransient = true
 
-//            volatile int _len;
-//            readonly object[] _array;
-            
-//            [NonSerialized] volatile Thread _owner;
+    [<VolatileField>]
+    let mutable len = arr.Length
 
-//            #endregion
-
-//            #region Ctors
+    do
+        Array.Copy(a,arr,a.Length)
 
 
-//            public TransientArrayMap(object[] array)
-//            {
-//                _owner = Thread.CurrentThread;
-//                _array = new object[Math.Max(HashtableThreshold, array.Length)];
-//                Array.Copy(array, _array, array.Length);
-//                _len = array.Length;
-//            }
 
-//            #endregion
+    member this.indexOfKey(key:obj) =
+        let rec loop (i:int) =
+            if i >= arr.Length then -1
+            elif PersistentArrayMap.equalKey(arr[i],key) then i
+            else loop (i+2)
+        loop 0
 
-//            #region
+    override this.ensureEditable() =
+        if not isTransient then
+            raise <| InvalidOperationException("Transient used after persistent! call")
 
-//            /// <summary>
-//            /// Gets the index of the key in the array.
-//            /// </summary>
-//            /// <param name="key">The key to search for.</param>
-//            /// <returns>The index of the key if found; -1 otherwise.</returns>
-//            private int IndexOfKey(object key)
-//            {
-//                for (int i = 0; i < _len; i += 2)
-//                    if (EqualKey(_array[i], key))
-//                        return i;
-//                return -1;
-//            }
-
-//            protected override void EnsureEditable()
-//            {
-//                if (_owner == null )
-//                    throw new InvalidOperationException("Transient used after persistent! call");
-//            }
 
 //            protected override ITransientMap doAssoc(object key, object val)
 //            {
