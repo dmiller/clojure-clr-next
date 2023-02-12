@@ -6,6 +6,13 @@ open System.Collections.Generic
 open Clojure.Numerics
 open System.Threading
 
+
+////////////////////////////////
+//
+// IPVecSeq
+//
+////////////////////////////////
+
 [<Sealed>]
 type IPVecSeq(meta: IPersistentMap, vec: IPersistentVector, index: int) =
     inherit ASeq(meta)
@@ -13,8 +20,6 @@ type IPVecSeq(meta: IPersistentMap, vec: IPersistentVector, index: int) =
     new(vec, index) = IPVecSeq(null, vec, index)
 
     // TODO: something more efficient  (todo = from Java)
-
-    //        public sealed class Seq : ASeq, IndexedSeq, IReduce, Counted  // Counted left out of Java version
 
     interface ISeq with
         override _.first() = vec.nth (index)
@@ -61,14 +66,17 @@ type IPVecSeq(meta: IPersistentMap, vec: IPersistentVector, index: int) =
 
 
 
+////////////////////////////////
+//
+//  IPVecRSeq
+//
+////////////////////////////////
+
 [<Sealed>]
 type IPVecRSeq(meta: IPersistentMap, vec: IPersistentVector, index: int) =
     inherit ASeq(meta)
 
     new(vec, index) = IPVecRSeq(null, vec, index)
-
-
-    //        public sealed class Seq : ASeq, IndexedSeq, IReduce, Counted  // Counted left out of Java version
 
     interface ISeq with
         override _.first() = vec.nth (index)
@@ -112,6 +120,13 @@ type IPVecRSeq(meta: IPersistentMap, vec: IPersistentVector, index: int) =
         member this.reduce(f) = this.reducer(f,vec.nth(index),index+1)
 
 
+////////////////////////////////
+//
+// APersistentVector
+//
+////////////////////////////////
+
+
 [<AbstractClass>]
 type APersistentVector() =
     inherit AFn()
@@ -148,7 +163,7 @@ type APersistentVector() =
             else
                 pvEquals (0, v, ipv)
         | :? IList as ilist ->
-            if v.count () <> ilist.Count then
+            if  ((not (ilist :? IPersistentCollection)) || (ilist :? Counted)) && v.count () <> ilist.Count then
                 false
             else
                 plEquals (0, v, ilist)
@@ -240,30 +255,12 @@ type APersistentVector() =
             else
                 pvEquiv (0, v, ipv)
         | :? IList as ilist ->
-            if v.count () <> ilist.Count then
+            if  ((not (ilist :? IPersistentCollection)) || (ilist :? Counted)) && v.count () <> ilist.Count then
                 false
             else
                 plEquiv (0, v, ilist)
         | :? Sequential -> seqEquiv (0, v, RT0.seq (o))
         | _ -> false
-
-    // why is the IList case coded so diffently here?
-
-    //            if (obj is IList ilist)
-    //            {
-    //                if ((!(ilist is IPersistentCollection) || (ilist is Counted)) && (ilist.Count != v.count()))
-    //                    return false;
-
-    //                var i2 = ilist.GetEnumerator();
-
-    //                for (var i1 = ((IList)v).GetEnumerator(); i1.MoveNext();)
-    //                {
-    //                    if (!i2.MoveNext() || !Util.equiv(i1.Current,i2.Current))
-    //                        return false;
-    //                }
-
-    //                return !i2.MoveNext();
-    //            }
 
     interface ILookup with
         member this.valAt(k) = (this :> Associative).valAt (k, null)
@@ -487,8 +484,22 @@ type APersistentVector() =
         arr
 
 
+////////////////////////////////
+//
+// LazilyPersistentVector
+//
+////////////////////////////////
+
+
 and [<AbstractClass; Sealed>] LazilyPersistentVector() =
     static member createOwning([<ParamArray>] items: obj array) : IPersistentVector = null
+
+
+////////////////////////////////
+//
+// AMapEntry
+//
+////////////////////////////////
 
 and [<AbstractClass>] AMapEntry() =
     inherit APersistentVector()
@@ -553,6 +564,13 @@ and [<AbstractClass>] AMapEntry() =
         override this.cons(o) = this.AsVector().cons (o)
 
 
+////////////////////////////////
+//
+// MapEntry
+//
+////////////////////////////////
+
+
 and MapEntry(key, value) =
     inherit AMapEntry()
 
@@ -563,14 +581,29 @@ and MapEntry(key, value) =
         override this.value() = value
 
 
+////////////////////////////////
+//
+//  PVNode
+//
+////////////////////////////////
+
+
 // doesn't have to be mutually dependent, could move above.
 
-and [<AllowNullLiteral>] PVNode(edit: AtomicReference<Thread>, array: obj array) =
+and [<AllowNullLiteral>] PVNode(edit: AtomicBoolean, array: obj array) =
 
     member _.Edit = edit
     member _.Array = array
 
     new(edit) = PVNode(edit, (Array.zeroCreate 32))
+
+
+////////////////////////////////
+//
+//  APersistentVector 
+//
+////////////////////////////////
+
 
 and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, tail: obj array) =
     inherit APersistentVector()
@@ -579,7 +612,7 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
 
     new(cnt, shift, root, tail) = PersistentVector(null, cnt, shift, root, tail)
 
-    static member NoEdit = AtomicReference<Thread>()
+    static member NoEdit = AtomicBoolean(false)
     static member private EmptyNode = PVNode(PersistentVector.NoEdit)
     static member EMPTY = PersistentVector(0, 5, PersistentVector.EmptyNode, Array.zeroCreate 32)
 
@@ -854,21 +887,13 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
         if not (isNull s) then
             // > 32 items, init with first 32 and keep going.
 
-            // when we have transients
-            //let rec conjOnto (tv:TransientVector) (s:ISeq) =
-            //    match s with
-            //    | null -> tv
-            //    | _ -> step (tv.conj(s.first()) :> TransientVector) (s.next())
-            //let ret = conjOnto (start.asTransient() :?> ITransientVector) s
-            //ret.persistent() :?> PersistentVector
-
-            let rec consOnto (v: IPersistentVector) (s: ISeq) =
+            let rec conjOnto (tv:ITransientCollection) (s:ISeq) =
                 match s with
-                | null -> v
-                | _ -> consOnto (v.cons (s.first ())) (s.next ())
+                | null -> tv
+                | _ -> conjOnto (tv.conj(s.first())) (s.next())
 
-            let ret = consOnto (PersistentVector(32, 5, PersistentVector.EmptyNode, arr)) s
-            ret :?> PersistentVector
+            let ret = conjOnto ((PersistentVector(32, 5, PersistentVector.EmptyNode, arr):> IEditableCollection).asTransient()) s
+            ret.persistent() :?> PersistentVector
 
         elif i = 32 then
             // exactly 32, skip copy
@@ -881,52 +906,32 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
             PersistentVector(i, 5, PersistentVector.EmptyNode, arr2)
 
 
+    static member create([<ParamArray>] items : obj array) =
+        let mutable ret = (PersistentVector.EMPTY : IEditableCollection).asTransient()
+        for item in items do
+            ret <- ret.conj(item)
+        ret.persistent() :?> PersistentVector
+
+    static member create1(items:IEnumerable) =
+        // optimize common case
+        match items with
+        | :? IList as ilist when ilist.Count <= 32 ->
+            let size = ilist.Count
+            let arr : obj array = Array.zeroCreate size
+            ilist.CopyTo(arr,0)
+            PersistentVector(size,5,PersistentVector.EmptyNode,arr)
+        | _ ->
+            let mutable ret = (PersistentVector.EMPTY : IEditableCollection).asTransient()
+            for item in items do
+                ret <- ret.conj(item)
+            ret.persistent() :?> PersistentVector
 
 
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentVector">PersistentVector</see> from an array of items.
-//        /// </summary>
-//        /// <param name="items"></param>
-//        /// <returns></returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public PersistentVector create(params object[] items)
-//        {
-//            ITransientCollection ret = EMPTY.asTransient();
-//            foreach (object item in items)
-//                ret = ret.conj(item);
-//            return (PersistentVector)ret.persistent();
-//        }
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentVector">PersistentVector</see> from an IEnumerable.
-//        /// </summary>
-//        /// <param name="items"></param>
-//        /// <returns></returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public PersistentVector create1(IEnumerable items)
-//        {
-//            // optimize common case
-//            if (items is IList ilist)
-//            {
-//                int size = ilist.Count;
-//                if (size <= 32)
-//                {
-//                    Object[] arr = new Object[size];
-//                    ilist.CopyTo(arr, 0);
-
-//                    return new PersistentVector(size, 5, PersistentVector.EmptyNode, arr);
-//                }
-//            }
-
-//            ITransientCollection ret = EMPTY.asTransient();
-//            foreach (object item in items)
-//            {
-//                ret = ret.conj(item);
-//            }
-//            return (PersistentVector)ret.persistent();
-//        }
-
+////////////////////////////////
+//
+// PVChunkedSeq 
+//
+////////////////////////////////
 
 
 and [<Sealed; AllowNullLiteral>] PVChunkedSeq
@@ -1045,6 +1050,13 @@ and [<Sealed; AllowNullLiteral>] PVChunkedSeq
             upcast (this :> IEnumerable<obj>).GetEnumerator()
 
 
+////////////////////////////////
+//
+//  TransientVector
+//
+////////////////////////////////
+
+
 and TransientVector private (_cnt, _shift,_root,_tail) =
     inherit AFn()
         
@@ -1063,7 +1075,7 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
     new(v:PersistentVector) = TransientVector(v.Count,v.Shift,TransientVector.editableRoot(v.Root),TransientVector.editableTail(v.Tail))
 
     static member editableRoot(node:PVNode) =
-        PVNode(AtomicReference(Thread.CurrentThread),node.Array.Clone() :?> obj array)
+        PVNode(AtomicBoolean(true),node.Array.Clone() :?> obj array)
     
     static member editableTail(tl : obj array) =
         let arr : obj array = Array.zeroCreate 32
@@ -1072,7 +1084,7 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
 
 
     member this.ensureEditable() =
-        if isNull <| root.Edit.Get() then
+        if not <| root.Edit.Get() then
             raise <| InvalidOperationException("Transient used after persistent! call")
 
     member this.ensureEditable(node:PVNode) =
@@ -1123,8 +1135,6 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
             raise <| ArgumentOutOfRangeException("i")
 
 
-
-
     member this.pushTail(level, parent: PVNode, tailNode: PVNode) : PVNode =
         // Original JVM comment:
         // if parent is leaf, insert node
@@ -1153,8 +1163,6 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
             let ret = PVNode(edit)
             ret.Array[0] <- PersistentVector.newPath (edit, level - 5, node)
             ret
-
-
 
 
     member this.popTail(level, node: PVNode) : PVNode =
@@ -1232,7 +1240,7 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
                 this
         member this.persistent() =
             this.ensureEditable()
-            root.Edit.Set(null) 
+            root.Edit.Set(false) 
             let trimmedTail : obj array = Array.zeroCreate (cnt-this.tailoff())
             Array.Copy(tail,trimmedTail,trimmedTail.Length)
             PersistentVector(cnt,shift,root,trimmedTail)

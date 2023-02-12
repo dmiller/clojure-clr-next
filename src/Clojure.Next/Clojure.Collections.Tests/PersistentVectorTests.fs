@@ -150,7 +150,7 @@ let rangeTests =
                   "index out of range throws"
 
 
-          ftestCase "Reduce tests"
+          testCase "Reduce tests"
           <| fun _ ->
               let adder =
                   { new AFn() with
