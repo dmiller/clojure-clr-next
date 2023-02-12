@@ -1318,88 +1318,88 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
         ret
 
 
+type IPVecSubVector(meta: IPersistentMap, vec:IPersistentVector, start:int, finish:int) =
+    inherit APersistentVector()
+
+    member this.Start = start
+    member this.Finish = finish
+    member this.Vector = vec
 
 
+    static member Create(meta,vec:IPersistentVector,start,finish) =
+        match vec with
+        | :? IPVecSubVector as sv ->
+            IPVecSubVector(meta,sv,start+sv.Start,finish+sv.Finish)
+        | _ -> IPVecSubVector(meta,vec,start,finish)
+
+    interface IMeta with
+        member this.meta() = meta
+
+    interface IObj with
+        member this.withMeta(newMeta) =
+            if meta =  newMeta then
+                this
+            else
+                IPVecSubVector(newMeta,vec,start,finish)
+
+    interface IPersistentCollection with
+        override _.empty() =  (PersistentVector.EMPTY:>IObj).withMeta(meta) :?> IPersistentCollection
+
+    interface IPersistentStack with
+        override _.pop() =
+            if finish-1 = start then
+                upcast PersistentVector.EMPTY
+            else
+                IPVecSubVector(meta,vec,start,finish-1)
+
+    interface Indexed with
+        member _.nth(i) =
+            if start+i >= finish || i < 0 then
+                raise <| ArgumentOutOfRangeException("i")
+            else
+                vec.nth(start+i)
+        member _.nth(i,nf) = 
+            if start+i >= finish || i < 0 then
+                nf
+            else
+                vec.nth(start+i)
+
+    interface IPersistentVector with
+        override _.count() = finish-start
+        override _.cons(o) = IPVecSubVector(meta,vec.assocN(finish,o),start,finish+1)
+        override this.assocN(i,v) =
+            if start+i > finish then
+                 raise <| ArgumentOutOfRangeException("i")
+            elif start+i = finish then
+                (this:>IPersistentVector).cons(v)
+            else
+                IPVecSubVector(meta,vec.assocN(start+i,v),start,finish)
+
+    interface IEnumerable with
+        override _.GetEnumerator() =
+            match vec with
+            | :? APersistentVector as av ->
+                av.RangedIterator(start,finish)
+            | _ -> base.GetMyEnumerator()
+
+    interface IEnumerable<obj> with
+        override _.GetEnumerator() =
+            match vec with
+            | :? APersistentVector as av ->
+                av.RangedIteratorT(start,finish)
+            | _ -> base.GetMyEnumeratorT()
+
+    interface IKVReduce with
+        member this.kvreduce(f,init) =
+            let cnt = (this:>IPersistentVector).count()
+            let rec step (i:int) (ret:obj) =
+                match ret with
+                | :? Reduced as red -> (red:>IDeref).deref()
+                | _ when i <= cnt -> ret
+                | _ -> step (i+1) (f.invoke(ret,i,vec.nth(start+i)))
+            step 0 init
 
 
-
-// Move this after PersistentVector
-
-//type IPVecSubVector(meta: IPersistentMap, vec:IPersistentVector, start:int, finish:int) =
-//    inherit APersistentVector()
-
-//    member this.Start = start
-//    member this.Finish = finish
-//    member this.Vector = vec
-
-
-//    static member Create(meta,vec:IPersistentVector,start,finish) =
-//        match vec with
-//        | :? IPVecSubVector as sv ->
-//            IPVecSubVector(meta,sv,start+sv.Start,finish+sv.Finish)
-//        | _ -> IPVecSubVector(meta,vec,start,finish)
-
-//    interface IMeta with
-//        member this.meta() = meta
-
-//    interface IObj with
-//        member this.withMeta(newMeta) =
-//            if meta =  newMeta then
-//                this
-//            else
-//                IPVecSubVector(newMeta,vec,start,finish)
-
-//    interface IPersistentCollection with
-//        override _.empty() = upcast (PersistentVector.Empty:>IObj).withMeta(meta)
-
-//    interface IPersistentStack with
-//        override _.pop() =
-//            if finish-1 = start then
-//                upcast PersistentVector.Empty
-//            else
-//                IPVecSubVector(meta,vec,start,finish-1)
-
-//    interface Indexed with
-//        member _.nth(i) =
-//            if start+i >= finish || i < 0 then
-//                raise <| ArgumentOutOfRangeException("i")
-//            else
-//                vec.nth(start+i)
-
-//    interface IPersistentVector with
-//        override _.count() = finish-start
-//        override _.cons(o) = IPVecSubVector(meta,vec.assocN(finish,o),start,finish+1)
-//        override this.assocN(i,v) =
-//            if start+i > finish then
-//                 raise <| ArgumentOutOfRangeException("i")
-//            elif start+i = finish then
-//                (this:>IPersistentVector).cons(v)
-//            else
-//                IPVecSubVector(meta,vec.assocN(start+i,v),start,finish)
-
-//     interface IEnumerable with
-//        override _.GetEnumerator() =
-//            match vec with
-//            | :? APersistentVector as av ->
-//                av.RangedIterator(start,finish)
-//            | _ -> base.GetMyEnumerator()
-
-//     interface IEnumerable<obj> with
-//        override _.GetEnumerator() =
-//            match vec with
-//            | :? APersistentVector as av ->
-//                av.RangedIteratorT(start,finish)
-//            | _ -> base.GetMyEnumeratorT()
-
-//    interface IKVReduce with
-//        member this.kvreduce(f,init) =
-//            let cnt = (this:>IPersistentVector).count()
-//            let rec step (i:int) ret =
-//                match ret with
-//                | :? Reduced as red -> (red:>IDeref).deref()
-//                | _ when i <= cnt -> ret
-//                | _ -> step (i+1) (f.invoke(ret,i,vec.nth(start+i)))
-//            step 0 init
 
 //        /// <summary>
 //        /// An empty <see cref="PersistentVector">PersistentVector</see>.
