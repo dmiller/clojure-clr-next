@@ -926,6 +926,27 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
                 ret <- ret.conj(item)
             ret.persistent() :?> PersistentVector
 
+    static member val transientVectorConj =
+        { new AFn() with
+            member this.ToString() = "transientVectorConj"
+          interface IFn with
+            member this.invoke(coll:obj,value:obj) = (coll :?> ITransientVector).conj(value)
+            member this.invoke(coll:obj) = coll
+            }
+
+
+    static member create(items : IReduceInit) =
+        let ret = (PersistentVector.EMPTY :>IEditableCollection).asTransient() :?> TransientVector
+        items.reduce(PersistentVector.transientVectorConj, ret) |> ignore
+        (ret :> ITransientCollection).persistent() :?> PersistentVector
+
+    // Unused?
+    //        public static PersistentVector adopt(Object[] items)
+    //        {
+    //            return new PersistentVector(items.Length, 5, EmptyNode, items);
+    //        }
+
+
 
 ////////////////////////////////
 //
@@ -1398,132 +1419,3 @@ type IPVecSubVector(meta: IPersistentMap, vec:IPersistentVector, start:int, fini
                 | _ when i <= cnt -> ret
                 | _ -> step (i+1) (f.invoke(ret,i,vec.nth(start+i)))
             step 0 init
-
-
-
-//        /// <summary>
-//        /// An empty <see cref="PersistentVector">PersistentVector</see>.
-//        /// </summary>
-//        static public readonly PersistentVector EMPTY = new PersistentVector(0,5,EmptyNode, new object[0]);
-
-//        #endregion
-
-//        #region Transient vector conj
-
-//        private sealed class TransientVectorConjer : AFn
-//        {
-//            public override object invoke(object coll, object val)
-//            {
-//                return ((ITransientVector)coll).conj(val);
-//            }
-
-//            public override object invoke(object coll)
-//            {
-//                return coll;
-//            }
-//        }
-
-//        static readonly IFn _transientVectorConj = new TransientVectorConjer();
-
-//        #endregion
-
-//        #region C-tors and factory methods
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static PersistentVector adopt(Object[] items)
-//        {
-//            return new PersistentVector(items.Length, 5, EmptyNode, items);
-//        }
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentVector">PersistentVector</see> from an <see cref="ISeq">IReduceInit</see>.
-//        /// </summary>
-//        /// <param name="items"></param>
-//        /// <returns></returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public PersistentVector create(IReduceInit items)
-//        {
-//            TransientVector ret = (TransientVector)EMPTY.asTransient();
-//            items.reduce(_transientVectorConj, ret);
-//            return (PersistentVector)ret.persistent();
-//        }
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentVector">PersistentVector</see> from an <see cref="ISeq">ISeq</see>.
-//        /// </summary>
-//        /// <param name="items">A sequence of items.</param>
-//        /// <returns>An initialized vector.</returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public PersistentVector create(ISeq items)
-//        {
-//            Object[] arr = new Object[32];
-//            int i = 0;
-//            for (; items != null && i < 32; items = items.next())
-//                arr[i++] = items.first();
-
-//            if (items != null)
-//            {
-//                // >32, construct with array directly
-//                PersistentVector start = new PersistentVector(32, 5, EmptyNode, arr);
-//                TransientVector ret = (TransientVector)start.asTransient();
-//                for (; items != null; items = items.next())
-//                    ret = (TransientVector)ret.conj(items.first());
-//                return (PersistentVector)ret.persistent();
-//            }
-//            else if (i == 32)
-//            {
-//                // exactly 32, skip copy
-//                return new PersistentVector(32, 5, EmptyNode, arr);
-//            }
-//            else
-//            {
-//                // <32, copy to minimum array and construct
-//                Object[] arr2 = new Object[i];
-//                Array.Copy(arr, 0, arr2, 0, i);
-
-//                return new PersistentVector(i, 5, EmptyNode, arr2);
-//            }
-//        }
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentVector">PersistentVector</see> from an array of items.
-//        /// </summary>
-//        /// <param name="items"></param>
-//        /// <returns></returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public PersistentVector create(params object[] items)
-//        {
-//            ITransientCollection ret = EMPTY.asTransient();
-//            foreach (object item in items)
-//                ret = ret.conj(item);
-//            return (PersistentVector)ret.persistent();
-//        }
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentVector">PersistentVector</see> from an IEnumerable.
-//        /// </summary>
-//        /// <param name="items"></param>
-//        /// <returns></returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public PersistentVector create1(IEnumerable items)
-//        {
-//            // optimize common case
-//            if (items is IList ilist)
-//            {
-//                int size = ilist.Count;
-//                if (size <= 32)
-//                {
-//                    Object[] arr = new Object[size];
-//                    ilist.CopyTo(arr, 0);
-
-//                    return new PersistentVector(size, 5, PersistentVector.EmptyNode, arr);
-//                }
-//            }
-
-//            ITransientCollection ret = EMPTY.asTransient();
-//            foreach (object item in items)
-//            {
-//                ret = ret.conj(item);
-//            }
-//            return (PersistentVector)ret.persistent();
-//        }
