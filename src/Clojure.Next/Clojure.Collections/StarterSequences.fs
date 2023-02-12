@@ -55,6 +55,8 @@ type ASeq(m) =
                 h
             | Some h -> h
 
+    interface Sequential
+
     interface ISeq with
         member _.first() =
             raise
