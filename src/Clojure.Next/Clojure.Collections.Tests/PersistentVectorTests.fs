@@ -5,6 +5,7 @@ open TestHelpers
 open Clojure.Collections
 open Clojure.Numerics
 open System
+open System.Collections
 
 let pvFromRange (r: LongRange) =
     PersistentVector.create ((r :> Seqable).seq ())
@@ -22,7 +23,7 @@ let rangeSeq (r: LongRange) = (r :> Seqable).seq ()
 
 
 [<Tests>]
-let rangeTests =
+let persistentVectorTests =
     testList
         "PersistentVectorTests"
         [
@@ -195,6 +196,115 @@ let rangeTests =
 
               Expect.equal ((PersistentVector.create(null:ISeq):>IReduce).reduce (adder)) -100 "no items, no start"
               Expect.equal ((PersistentVector.create(null:ISeq):>IReduce).reduce((adder),-999)) -999 "no items, no start"
+
+
+
+          testCase "create tests"
+          <| fun _ ->
+
+              let r5 = LongRange.create (5) :?> LongRange
+              let v5 = PersistentVector.create(0L,1L,2L,3L,4L)
+
+              Expect.equal (pvCount (v5)) 5 "Create from multiple args has count n"
+              Expect.isTrue (compareISeqs (pvSeq (v5)) (rangeSeq (r5))) "create from multiple args has correct values"
+
+              let e100 = (seq { for i in 0 .. 99 -> int64(i)}) :> IEnumerable
+              let r100 = LongRange.create (100) :?> LongRange
+              let v100 = PersistentVector.create1(e100)
+              Expect.equal (pvCount(v100)) 100 "create from IEnumerable has correct count"
+              Expect.isTrue (compareISeqs (pvSeq (v100)) (rangeSeq (r100))) "create from IEnumerable has correct values"
+
+              let vr100 = PersistentVector.create(r100 :> IReduceInit)
+              Expect.equal (pvCount(vr100)) 100 "create from IEnumerable has correct count"
+              Expect.isTrue (compareISeqs (pvSeq (vr100)) (rangeSeq (r100))) "create from IEnumerable has correct values"
+        
+        
+          testCase "assocN tests"
+          <| fun _ ->
+                
+              let r0to99 = LongRange.create (100) :?> LongRange
+              let r0to100 = LongRange.create (101) :?> LongRange
+              let r1to100 = LongRange.create(1,101) :?> LongRange
+              let v100 = pvFromRange(r0to99)
+
+              let mutable mv100 = v100
+
+              for i in 0 .. 99 do
+                  mv100 <- (mv100 :> IPersistentVector).assocN(i,int64(i+1)) :?> PersistentVector
+
+              Expect.equal (pvCount(mv100)) 100 "assocN on existing has correct count"
+              Expect.isTrue (compareISeqs (pvSeq (mv100)) (rangeSeq (r1to100))) "after assocN on existing has correct values"
+ 
+
+              let v101 = (v100 :> IPersistentVector).assocN(100,100L) :?> PersistentVector
+              Expect.equal (pvCount(v101)) 101 "assocN to push has correct count"
+              Expect.isTrue (compareISeqs (pvSeq (v101)) (rangeSeq (r0to100))) "after assocN to push has correct values"
+              
+              Expect.throwsT<ArgumentOutOfRangeException> (fun () ->  (v100 :> IPersistentVector).assocN(1000,100L) |> ignore ) "assocN with index too large throws"
+    
+          testCase "cons tests"
+          <| fun _ ->
+                
+              let r100 = LongRange.create (100) :?> LongRange
+
+              let mutable mv100 = PersistentVector.EMPTY
+
+              for i in 0 .. 99 do
+                  mv100 <- (mv100 :> IPersistentVector).cons(int64(i)) :?> PersistentVector
+
+              Expect.equal (pvCount(mv100)) 100 "cons'd PV has correct count"
+              Expect.isTrue (compareISeqs (pvSeq (mv100)) (rangeSeq (r100))) "cons'd PV has correct values"
+  
+          testCase "pop tests"
+          <| fun _ ->
+                
+              let r500 = LongRange.create (500) :?> LongRange
+              let r1000 = LongRange.create (1000) :?> LongRange
+
+              let mutable mv1000 = pvFromRange(r1000) 
+              for i in 0 .. 499 do
+                mv1000 <- (mv1000 :>IPersistentStack).pop() :?> PersistentVector
+
+              Expect.equal (pvCount(mv1000)) 500 "pop'd PV has correct count"     
+              Expect.isTrue (compareISeqs (pvSeq (mv1000)) (rangeSeq (r500))) "pop'd PV has correct values"
+ 
+              for i in 0 .. 499 do
+                mv1000 <- (mv1000 :>IPersistentStack).pop() :?> PersistentVector
+
+              Expect.equal (pvCount(mv1000)) 0 "fully pop'd PV has correct count"  
+
+              Expect.throwsT<InvalidOperationException> (fun _ -> (mv1000 :>IPersistentStack).pop() |> ignore) "pop of empty vector throws"
+
+
+  
+          testCase "drop tests"
+          <| fun _ ->
+
+                let r100 = LongRange.create(100) :?> LongRange
+                let v100 = pvFromRange(r100)
+
+                let vDropNeg = (v100:>IDrop).drop(-10)
+                Expect.equal vDropNeg v100 "Drop neg should return original"
+
+                let s50 = (v100:>IDrop).drop(50) :?> ISeq
+                let r50to99 = LongRange.create(50,100) :?> LongRange
+
+                Expect.equal (s50.count()) 50 "Dropped PV should have correct count"
+                Expect.isTrue (compareISeqs s50 (rangeSeq r50to99)) "Dropped PV should have correct values"
+
+
+          testCase "persistent test"
+          <| fun _ ->
+          
+                let r100 = LongRange.create(100) :?> LongRange
+                let v100 = pvFromRange(r100)
+
+                let t100 = (v100 :> IEditableCollection).asTransient()
+                t100.persistent() |> ignore
+                Expect.throwsT<InvalidOperationException> (fun () -> (t100:?>Counted).count() |> ignore) "can's use transient after persistent!"
+
+
+            
 
 
           ]

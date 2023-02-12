@@ -600,7 +600,7 @@ and [<AllowNullLiteral>] PVNode(edit: AtomicBoolean, array: obj array) =
 
 ////////////////////////////////
 //
-//  APersistentVector 
+//  PersistentVector 
 //
 ////////////////////////////////
 
@@ -614,7 +614,7 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
 
     static member NoEdit = AtomicBoolean(false)
     static member private EmptyNode = PVNode(PersistentVector.NoEdit)
-    static member EMPTY = PersistentVector(0, 5, PersistentVector.EmptyNode, Array.zeroCreate 32)
+    static member EMPTY = PersistentVector(0, 5, PersistentVector.EmptyNode, Array.zeroCreate 0)
 
     member internal _.Count = cnt
     member internal _.Shift = shift
