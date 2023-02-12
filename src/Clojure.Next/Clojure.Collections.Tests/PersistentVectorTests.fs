@@ -37,7 +37,7 @@ let rangeTests =
                   Expect.isTrue (compareISeqs (pvSeq (v)) (rangeSeq (r))) "matches creating range"
 
               // create from null
-              let v0 = PersistentVector.create (null)
+              let v0 = PersistentVector.create (null:>ISeq)
               Expect.equal (pvCount (v0)) 0 "Create from null has no items"
               Expect.isNull (pvSeq (v0)) "empty vector should have null seq"
 
@@ -84,7 +84,7 @@ let rangeTests =
           testCase "PersistentVector Stack ops"
           <| fun _ ->
 
-              let v0 = PersistentVector.create (null)
+              let v0 = PersistentVector.create (null:>ISeq)
 
               Expect.throwsT<InvalidOperationException>
                   (fun () -> (v0 :> IPersistentStack).pop () |> ignore)
@@ -127,7 +127,7 @@ let rangeTests =
                   else
                       v
 
-              let firstV = PersistentVector.create (null)
+              let firstV = PersistentVector.create (null:>ISeq)
               let bigV = stepPush firstV 0 1000
               let finalV = stepPop bigV 999
               Expect.equal (pvCount (finalV)) 0 "should end up empty"
@@ -193,8 +193,8 @@ let rangeTests =
                   (rr1000.reduce ((adderStopsShort 100)))
                   "Add first 100"
 
-              Expect.equal ((PersistentVector.create(null):>IReduce).reduce (adder)) -100 "no items, no start"
-              Expect.equal ((PersistentVector.create(null):>IReduce).reduce((adder),-999)) -999 "no items, no start"
+              Expect.equal ((PersistentVector.create(null:ISeq):>IReduce).reduce (adder)) -100 "no items, no start"
+              Expect.equal ((PersistentVector.create(null:ISeq):>IReduce).reduce((adder),-999)) -999 "no items, no start"
 
 
           ]
