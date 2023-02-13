@@ -6,18 +6,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="PersistentVectorBenchmarks.fs" />
+    <Compile Include="ArrayCreation.fs" />
+    <Compile Include="Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.13.4" />
-    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.4" />
-    <PackageReference Include="Clojure" Version="1.12.0-alpha3" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+    <ProjectReference Include="..\ArrayCreation.CSharp\ArrayCreation.CSharp.csproj" />
   </ItemGroup>
 
 </Project>

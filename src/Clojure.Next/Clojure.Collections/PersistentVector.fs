@@ -690,6 +690,31 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
             else
                 raise <| ArgumentOutOfRangeException("i")
 
+
+        //override this.cons(o) =
+        //    if cnt - this.tailoff () < 32 then
+        //        // room in the tail
+        //        let newTail = Array.zeroCreate (tail.Length + 1)
+        //        Array.Copy(tail, newTail, tail.Length)
+        //        newTail[tail.Length] <- o
+        //        PersistentVector(meta, cnt + 1, shift, root, newTail)
+        //    else
+        //        // tail is full, push into tree
+        //        let tailNode = PVNode(root.Edit, tail)
+        //        let mutable newroot : PVNode = null
+        //        let mutable newshift = shift
+
+        //        // overflow root?
+        //        if (cnt >>> 5) > (1 <<< shift) then
+        //            newroot <- PVNode(root.Edit)
+        //            newroot.Array[0] <- root
+        //            newroot.Array[1] <- PersistentVector.newPath (root.Edit, shift, tailNode)
+        //            newshift <- newshift+5
+        //        else
+        //            newroot <- this.pushTail (shift, root, tailNode)
+
+        //        PersistentVector(meta, cnt + 1, newshift, newroot, [| o |])
+
         override this.cons(o) =
             if cnt - this.tailoff () < 32 then
                 // room in the tail
@@ -739,13 +764,13 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
                 tailNode
             else
                 match parent.Array[subidx] with
-                | :? PVNode as child -> this.pushTail (level - 5, child, tailNode)
-                | _ -> PersistentVector.newPath (root.Edit, level - 5, tailNode)
+                | null -> PersistentVector.newPath (root.Edit, level - 5, tailNode)
+                | child -> this.pushTail (level - 5, (child :?>PVNode), tailNode)
+              
 
         let ret = PVNode(parent.Edit, Array.copy (parent.Array))
         ret.Array[subidx] <- nodeToInsert // TODO: figure out why it wan't take this at the top level
         ret
-
 
     static member newPath(edit, level, node) =
         if level = 0 then

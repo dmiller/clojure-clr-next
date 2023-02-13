@@ -1,0 +1,939 @@
+TransientConj
+
+
+|             Method |   size |           Mean |        Error |       StdDev | Ratio | RatioSD |     Gen0 |     Gen1 |  Allocated | Alloc Ratio |
+|------------------- |------- |---------------:|-------------:|-------------:|------:|--------:|---------:|---------:|-----------:|------------:|
+| FirstTransientConj |    100 |       909.5 ns |     16.40 ns |     15.34 ns |  1.00 |    0.00 |   0.3872 |   0.0105 |    4.95 KB |        1.00 |
+|  NextTransientConj |    100 |       951.3 ns |     17.82 ns |     15.80 ns |  1.05 |    0.03 |   0.4196 |   0.0114 |    5.36 KB |        1.08 |
+|                    |        |                |              |              |       |         |          |          |            |             |
+| FirstTransientConj |   1000 |     8,502.6 ns |    164.85 ns |    270.86 ns |  1.00 |    0.00 |   3.3722 |   0.5798 |   43.14 KB |        1.00 |
+|  NextTransientConj |   1000 |     8,191.6 ns |    160.00 ns |    249.10 ns |  0.96 |    0.04 |   3.4027 |   0.6256 |   43.55 KB |        1.01 |
+|                    |        |                |              |              |       |         |          |          |            |             |
+| FirstTransientConj |  10000 |   110,798.0 ns |  2,170.12 ns |  2,228.55 ns |  1.00 |    0.00 |  39.9170 |  19.8975 |  510.69 KB |        1.00 |
+|  NextTransientConj |  10000 |   109,310.5 ns |  2,123.07 ns |  2,271.66 ns |  0.99 |    0.02 |  40.0391 |  20.0195 |  511.09 KB |        1.00 |
+|                    |        |                |              |              |       |         |          |          |            |             |
+| FirstTransientConj | 100000 | 2,524,123.1 ns | 41,623.03 ns | 38,934.21 ns |  1.00 |    0.00 | 453.1250 | 226.5625 | 5831.35 KB |        1.00 |
+|  NextTransientConj | 100000 | 2,596,691.2 ns | 49,836.30 ns | 68,216.50 ns |  1.03 |    0.03 | 453.1250 | 226.5625 | 5831.75 KB |        1.00 |
+
+[<MemoryDiagnoser>]
+type PVTransientConj() =
+
+    [<Params(100,1_000,10_000,100_000)>]
+    member val size : int = 0 with get, set
+
+
+    [<Benchmark(Baseline=true)>]
+    member this.FirstTransientConj() =
+        let mutable pv = clojure.lang.PersistentVector.EMPTY.asTransient()
+        for i in 0 .. this.size do
+            pv <- pv.conj(i) 
+        pv.persistent()
+    
+    [<Benchmark>]
+    member this.NextTransientConj() =
+        let mutable pv = (Clojure.Collections.PersistentVector.EMPTY :> Clojure.Collections.IEditableCollection).asTransient()
+        for i in 0 .. this.size do
+            pv <- pv.conj(i)
+        pv.persistent()
+		
+		
+Nth
+
+before
+
+|   Method |   size |          Mean |         Error |        StdDev | Ratio | RatioSD | BranchInstructions/Op | BranchMispredictions/Op | Allocated | Alloc Ratio |
+|--------- |------- |--------------:|--------------:|--------------:|------:|--------:|----------------------:|------------------------:|----------:|------------:|
+| FirstNth |     10 |      34.32 ns |      0.452 ns |      0.423 ns |  1.00 |    0.00 |                   141 |                       0 |         - |          NA |
+|  NextNth |     10 |      31.59 ns |      0.441 ns |      0.412 ns |  0.92 |    0.02 |                   141 |                       0 |         - |          NA |
+|          |        |               |               |               |       |         |                       |                         |           |             |
+| FirstNth |    100 |     385.30 ns |      5.716 ns |      5.347 ns |  1.00 |    0.00 |                 1,784 |                       2 |         - |          NA |
+|  NextNth |    100 |     504.02 ns |      8.902 ns |      8.327 ns |  1.31 |    0.03 |                 2,074 |                       2 |         - |          NA |
+|          |        |               |               |               |       |         |                       |                         |           |             |
+| FirstNth |   1000 |   3,747.78 ns |     57.367 ns |     50.855 ns |  1.00 |    0.00 |                18,004 |                       8 |         - |          NA |
+|  NextNth |   1000 |   4,966.74 ns |     97.188 ns |     99.805 ns |  1.33 |    0.03 |                20,995 |                       9 |         - |          NA |
+|          |        |               |               |               |       |         |                       |                         |           |             |
+| FirstNth |  10000 |  51,141.67 ns |    974.536 ns |  1,000.777 ns |  1.00 |    0.00 |               220,453 |                      73 |         - |          NA |
+|  NextNth |  10000 |  68,569.16 ns |    925.032 ns |    820.017 ns |  1.34 |    0.03 |               260,628 |                      93 |         - |          NA |
+|          |        |               |               |               |       |         |                       |                         |           |             |
+| FirstNth | 100000 | 632,040.21 ns | 10,741.023 ns | 10,047.159 ns |  1.00 |    0.00 |             2,607,578 |                     838 |       1 B |        1.00 |
+|  NextNth | 100000 | 747,017.44 ns | 14,831.016 ns | 13,872.942 ns |  1.18 |    0.03 |             3,108,628 |                   1,012 |       1 B |        1.00 |
+
+First code
+
+
+
+
+Next code
+
+virtual object Indexed.nth(int i)
+{
+	return arrayFor(i)[i & 0x1F];
+}
+
+
+.method private hidebysig newslot virtual 
+	instance object Clojure.Collections.Indexed.nth (
+		int32 i
+	) cil managed 
+{
+	.override method instance object Clojure.Collections.Indexed::nth(int32)
+	// Method begins at RVA 0x6304
+	// Header size: 1
+	// Code size: 17 (0x11)
+	.maxstack 8
+
+	// return arrayFor(i)[i & 0x1F];
+	IL_0000: ldarg.0
+	IL_0001: ldarg.1
+	IL_0002: callvirt instance object[] Clojure.Collections.PersistentVector::arrayFor(int32)
+	IL_0007: ldarg.1
+	IL_0008: ldc.i4.s 31
+	IL_000a: and
+	IL_000b: ldelem [System.Runtime]System.Object
+	IL_0010: ret
+} // end of method PersistentVector::Clojure.Collections.Indexed.nth
+
+
+
+// BEFORE
+
+public object[] arrayFor(int i)
+{
+	if (0 <= i && i < cnt)
+	{
+		if (i >= tailoff())
+		{
+			return tail;
+		}
+		return $PersistentVector.step@658-35(i, root, shift);
+	}
+	ArgumentOutOfRangeException ex = new ArgumentOutOfRangeException("i");
+	throw ex;
+}
+
+
+.method public hidebysig 
+	instance object[] arrayFor (
+		int32 i
+	) cil managed 
+{
+	// Method begins at RVA 0x5de8
+	// Header size: 12
+	// Code size: 65 (0x41)
+	.maxstack 5
+	.locals init (
+		[0] int32,
+		[1] class [System.Runtime]System.ArgumentOutOfRangeException
+	)
+
+	// {
+	IL_0000: nop
+	// if (0 <= i && i < cnt)
+	IL_0001: ldc.i4.0
+	IL_0002: ldarg.1
+	IL_0003: bgt.s IL_0034
+
+	IL_0005: ldarg.1
+	IL_0006: ldarg.0
+	IL_0007: ldfld int32 Clojure.Collections.PersistentVector::cnt
+	IL_000c: bge.s IL_0034
+
+	// if (i >= tailoff())
+	IL_000e: nop
+	IL_000f: ldarg.1
+	IL_0010: ldarg.0
+	IL_0011: callvirt instance int32 Clojure.Collections.PersistentVector::tailoff()
+	IL_0016: blt.s IL_001f
+
+	// return tail;
+	IL_0018: ldarg.0
+	IL_0019: ldfld object[] Clojure.Collections.PersistentVector::tail
+	IL_001e: ret
+
+	// return $PersistentVector.step@658-35(i, root, shift);
+	IL_001f: ldarg.1
+	IL_0020: stloc.0
+	IL_0021: ldarg.1
+	IL_0022: ldarg.0
+	IL_0023: ldfld class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::root
+	IL_0028: ldarg.0
+	IL_0029: ldfld int32 Clojure.Collections.PersistentVector::shift
+	IL_002e: call object[] '<StartupCode$Clojure-Collections>.$PersistentVector'::'step@658-35'(int32, class Clojure.Collections.PVNode, int32)
+	IL_0033: ret
+
+	// ArgumentOutOfRangeException ex = new ArgumentOutOfRangeException("i");
+	IL_0034: ldstr "i"
+	IL_0039: newobj instance void [System.Runtime]System.ArgumentOutOfRangeException::.ctor(string)
+	IL_003e: stloc.1
+	// throw ex;
+	IL_003f: ldloc.1
+	IL_0040: throw
+} // end of method PersistentVector::arrayFor
+
+
+
+internal static object[] step@658-35(int i, PVNode node, int level)
+{
+	while (level > 0)
+	{
+		int num = i;
+		PVNode obj = (PVNode)node.array[(i >> level) & 0x1F];
+		level -= 5;
+		node = obj;
+		i = num;
+	}
+	return node.array;
+}
+
+.method assembly static 
+	object[] 'step@658-35' (
+		int32 i,
+		class Clojure.Collections.PVNode node,
+		int32 level
+	) cil managed 
+{
+	// Method begins at RVA 0xa2b4
+	// Header size: 1
+	// Code size: 49 (0x31)
+	.maxstack 8
+
+	// loop start
+		// {
+		IL_0000: nop
+		// while (level > 0)
+		IL_0001: ldarg.2
+		IL_0002: ldc.i4.0
+		IL_0003: bgt.s IL_000c
+
+		// return node.array;
+		IL_0005: ldarg.1
+		IL_0006: ldfld object[] Clojure.Collections.PVNode::'array'
+		IL_000b: ret
+
+		// int num = i;
+		IL_000c: ldarg.0
+		// PVNode obj = (PVNode)node.array[(i >> level) & 0x1F];
+		IL_000d: ldarg.1
+		IL_000e: ldfld object[] Clojure.Collections.PVNode::'array'
+		IL_0013: ldarg.0
+		IL_0014: ldarg.2
+		// (no C# code)
+		IL_0015: ldc.i4.s 31
+		IL_0017: and
+		IL_0018: shr
+		IL_0019: ldc.i4.s 31
+		IL_001b: and
+		IL_001c: ldelem [System.Runtime]System.Object
+		IL_0021: unbox.any Clojure.Collections.PVNode
+		// level -= 5;
+		IL_0026: ldarg.2
+		IL_0027: ldc.i4.5
+		IL_0028: sub
+		IL_0029: starg.s level
+		// node = obj;
+		IL_002b: starg.s node
+		// i = num;
+		IL_002d: starg.s i
+		// (no C# code)
+		IL_002f: br.s IL_0000
+	// end loop
+} // end of method $PersistentVector::'step@658-35'
+
+
+// AFTER
+
+
+|   Method |   size |          Mean |         Error |        StdDev | Ratio | RatioSD | BranchInstructions/Op | BranchMispredictions/Op | Allocated | Alloc Ratio |
+|--------- |------- |--------------:|--------------:|--------------:|------:|--------:|----------------------:|------------------------:|----------:|------------:|
+| FirstNth |     10 |      34.01 ns |      0.709 ns |      0.844 ns |  1.00 |    0.00 |                   141 |              0 |         - |          NA |
+|  NextNth |     10 |      31.01 ns |      0.667 ns |      0.891 ns |  0.91 |    0.04 |                   141 |              0 |         - |          NA |
+|          |        |               |               |               |       |         |                       |                |           |             |
+| FirstNth |    100 |     385.56 ns |      5.522 ns |      5.165 ns |  1.00 |    0.00 |                 1,785 |              2 |         - |          NA |
+|  NextNth |    100 |     396.11 ns |      7.824 ns |      7.685 ns |  1.03 |    0.02 |                 1,785 |              2 |         - |          NA |
+|          |        |               |               |               |       |         |                       |                |           |             |
+| FirstNth |   1000 |   3,763.27 ns |     69.594 ns |     65.099 ns |  1.00 |    0.00 |                18,003 |              8 |         - |          NA |
+|  NextNth |   1000 |   3,891.33 ns |     52.325 ns |     48.945 ns |  1.03 |    0.03 |                18,006 |              8 |         - |          NA |
+|          |        |               |               |               |       |         |                       |                |           |             |
+| FirstNth |  10000 |  50,540.77 ns |    923.644 ns |    863.978 ns |  1.00 |    0.00 |               220,584 |             79 |         - |          NA |
+|  NextNth |  10000 |  56,087.60 ns |    571.911 ns |    534.966 ns |  1.11 |    0.02 |               220,546 |             73 |         - |          NA |
+|          |        |               |               |               |       |         |                       |                |           |             |
+| FirstNth | 100000 | 628,617.81 ns | 10,679.131 ns |  9,989.265 ns |  1.00 |    0.00 |             2,606,788 |            826 |       1 B |        1.00 |
+|  NextNth | 100000 | 600,595.01 ns | 11,359.984 ns | 12,155.056 ns |  0.95 |    0.02 |             2,606,907 |            804 |       1 B |        1.00 |
+
+
+
+public object[] arrayFor(int i)
+{
+	if (0 <= i && i < cnt)
+	{
+		if (i >= tailoff())
+		{
+			return tail;
+		}
+		PVNode node = root;
+		for (int sh = shift; sh > 0; sh -= 5)
+		{
+			object[] array = node.array;
+			int num = sh;
+			node = (PVNode)array[(i >> num) & 0x1F];
+		}
+		return node.array;
+	}
+	ArgumentOutOfRangeException ex = new ArgumentOutOfRangeException("i");
+	throw ex;
+}
+
+
+.method public hidebysig 
+	instance object[] arrayFor (
+		int32 i
+	) cil managed 
+{
+	// Method begins at RVA 0x5de8
+	// Header size: 12
+	// Code size: 103 (0x67)
+	.maxstack 6
+	.locals init (
+		[0] class Clojure.Collections.PVNode node,
+		[1] int32 sh,
+		[2] int32,
+		[3] class [System.Runtime]System.ArgumentOutOfRangeException
+	)
+
+	// {
+	IL_0000: nop
+	// if (0 <= i && i < cnt)
+	IL_0001: ldc.i4.0
+	IL_0002: ldarg.1
+	IL_0003: bgt.s IL_005a
+
+	IL_0005: ldarg.1
+	IL_0006: ldarg.0
+	IL_0007: ldfld int32 Clojure.Collections.PersistentVector::cnt
+	IL_000c: bge.s IL_005a
+
+	// if (i >= tailoff())
+	IL_000e: nop
+	IL_000f: ldarg.1
+	IL_0010: ldarg.0
+	IL_0011: callvirt instance int32 Clojure.Collections.PersistentVector::tailoff()
+	IL_0016: blt.s IL_001f
+
+	// return tail;
+	IL_0018: ldarg.0
+	IL_0019: ldfld object[] Clojure.Collections.PersistentVector::tail
+	IL_001e: ret
+
+	// PVNode pVNode = root;
+	IL_001f: ldarg.0
+	IL_0020: ldfld class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::root
+	IL_0025: stloc.0
+	// for (int num = shift; num > 0; num -= 5)
+	IL_0026: ldarg.0
+	IL_0027: ldfld int32 Clojure.Collections.PersistentVector::shift
+	IL_002c: stloc.1
+	// object[] array = pVNode.array;
+	IL_002d: br.s IL_004f
+	// loop start (head: IL_004f)
+		IL_002f: ldloc.0
+		IL_0030: ldfld object[] Clojure.Collections.PVNode::'array'
+		// int num2 = num;
+		IL_0035: ldloc.1
+		IL_0036: stloc.2
+		// pVNode = (PVNode)array[(i >> num2) & 0x1F];
+		IL_0037: ldarg.1
+		IL_0038: ldloc.2
+		IL_0039: ldc.i4.s 31
+		IL_003b: and
+		IL_003c: shr
+		IL_003d: ldc.i4.s 31
+		IL_003f: and
+		IL_0040: ldelem [System.Runtime]System.Object
+		IL_0045: unbox.any Clojure.Collections.PVNode
+		IL_004a: stloc.0
+		// for (int num = shift; num > 0; num -= 5)
+		IL_004b: ldloc.1
+		IL_004c: ldc.i4.5
+		IL_004d: sub
+		IL_004e: stloc.1
+
+		// for (int num = shift; num > 0; num -= 5)
+		IL_004f: ldloc.1
+		IL_0050: ldc.i4.0
+		IL_0051: bgt.s IL_002f
+	// end loop
+
+	// return pVNode.array;
+	IL_0053: ldloc.0
+	IL_0054: ldfld object[] Clojure.Collections.PVNode::'array'
+	IL_0059: ret
+
+	// ArgumentOutOfRangeException ex = new ArgumentOutOfRangeException("i");
+	IL_005a: ldstr "i"
+	IL_005f: newobj instance void [System.Runtime]System.ArgumentOutOfRangeException::.ctor(string)
+	IL_0064: stloc.3
+	// throw ex;
+	IL_0065: ldloc.3
+	IL_0066: throw
+} // end of method PersistentVector::arrayFor
+
+
+
+Cons
+
+|    Method |   size |          Mean |       Error |      StdDev | Ratio | RatioSD |      Gen0 |     Gen1 |     Gen2 |   Allocated | Alloc Ratio |
+|---------- |------- |--------------:|------------:|------------:|------:|--------:|----------:|---------:|---------:|------------:|------------:|
+| FirstCons |    100 |      2.409 us |   0.0469 us |   0.0687 us |  1.00 |    0.00 |    1.8578 |   0.0381 |        - |    23.76 KB |        1.00 |
+|  NextCons |    100 |      2.594 us |   0.0517 us |   0.0530 us |  1.07 |    0.03 |    1.8921 |   0.0420 |        - |    24.16 KB |        1.02 |
+|           |        |               |             |             |       |         |           |          |          |             |             |
+| FirstCons |   1000 |     24.471 us |   0.3936 us |   0.3682 us |  1.00 |    0.00 |   18.7988 |   2.8076 |        - |    240.3 KB |        1.00 |
+|  NextCons |   1000 |     26.581 us |   0.3954 us |   0.3699 us |  1.09 |    0.03 |   18.8599 |   2.8076 |        - |   240.71 KB |        1.00 |
+|           |        |               |             |             |       |         |           |          |          |             |             |
+| FirstCons |  10000 |    410.706 us |   6.3855 us |   4.9854 us |  1.00 |    0.00 |  195.3125 |  97.6563 |        - |  2494.05 KB |        1.00 |
+|  NextCons |  10000 |    438.763 us |   8.7221 us |   9.3326 us |  1.07 |    0.03 |  195.3125 |  97.6563 |        - |  2494.45 KB |        1.00 |
+|           |        |               |             |             |       |         |           |          |          |             |             |
+| FirstCons | 100000 | 12,322.450 us | 208.8327 us | 195.3423 us |  1.00 |    0.00 | 2187.5000 | 593.7500 | 187.5000 | 25679.42 KB |        1.00 |
+|  NextCons | 100000 | 12,389.234 us | 129.5075 us | 121.1414 us |  1.01 |    0.02 | 2187.5000 | 593.7500 | 187.5000 | 25679.82 KB |        1.00 |
+
+
+|    Method |   size |            Mean |         Error |        StdDev | Ratio | RatioSD |      Gen0 | BranchInstructions/Op | BranchMispredictions/Op |     Gen1 |     Gen2 |   Allocated | Alloc Ratio |
+|---------- |------- |----------------:|--------------:|--------------:|------:|--------:|----------:|----------------------:|------------------------:|---------:|---------:|------------:|------------:|
+| FirstCons |     10 |        251.6 ns |       5.02 ns |       4.93 ns |  1.00 |    0.00 |    0.1278 |                   748 |                       1 |        - |        - |     1.63 KB |        1.00 |
+|  NextCons |     10 |        308.6 ns |       5.99 ns |       6.15 ns |  1.23 |    0.04 |    0.1597 |                   951 |                       2 |   0.0005 |        - |     2.04 KB |        1.25 |
+|           |        |                 |               |               |       |         |           |                       |                         |          |          |             |             |
+| FirstCons |    100 |      2,999.8 ns |      58.46 ns |      69.59 ns |  1.00 |    0.00 |    1.8578 |                 8,082 |                      28 |   0.0381 |        - |    23.76 KB |        1.00 |
+|  NextCons |    100 |      3,347.3 ns |      64.89 ns |      66.64 ns |  1.12 |    0.03 |    1.8921 |                 9,256 |                      29 |   0.0420 |        - |    24.16 KB |        1.02 |
+|           |        |                 |               |               |       |         |           |                       |                         |          |          |             |             |
+| FirstCons |   1000 |     31,297.8 ns |     609.71 ns |     702.15 ns |  1.00 |    0.00 |   18.7988 |                85,149 |                     273 |   2.8076 |        - |    240.3 KB |        1.00 |
+|  NextCons |   1000 |     34,284.7 ns |     674.95 ns |     901.04 ns |  1.10 |    0.03 |   18.8599 |                96,407 |                     296 |   2.7466 |        - |   240.71 KB |        1.00 |
+|           |        |                 |               |               |       |         |           |                       |                         |          |          |             |             |
+| FirstCons |  10000 |    517,919.8 ns |   9,709.88 ns |  10,389.46 ns |  1.00 |    0.00 |  195.3125 |             1,325,886 |                   5,835 |  97.6563 |        - |  2494.05 KB |        1.00 |
+|  NextCons |  10000 |    535,926.1 ns |  10,280.63 ns |   9,616.50 ns |  1.04 |    0.03 |  195.3125 |             1,440,583 |                   6,094 |  97.6563 |        - |  2494.45 KB |        1.00 |
+|           |        |                 |               |               |       |         |           |                       |                         |          |          |             |             |
+| FirstCons | 100000 | 13,020,719.1 ns | 258,088.94 ns | 297,215.61 ns |  1.00 |    0.00 | 2187.5000 |            28,360,755 |                 117,814 | 593.7500 | 187.5000 | 25679.42 KB |        1.00 |
+|  NextCons | 100000 | 13,550,527.7 ns | 267,141.22 ns | 533,509.88 ns |  1.05 |    0.04 | 2187.5000 |            29,578,340 |                 120,491 | 593.7500 | 187.5000 | 25679.82 KB |        1.00 |
+
+First
+
+
+public override IPersistentVector cons(object o)
+{
+	if (_cnt - tailoff() < 32)
+	{
+		object[] newTail = new object[_tail.Length + 1];
+		Array.Copy(_tail, newTail, _tail.Length);
+		newTail[_tail.Length] = o;
+		return new PersistentVector(meta(), _cnt + 1, _shift, _root, newTail);
+	}
+	Node tailnode = new Node(_root.Edit, _tail);
+	int newshift = _shift;
+	Node newroot;
+	if (_cnt >> 5 > 1 << _shift)
+	{
+		newroot = new Node(_root.Edit);
+		newroot.Array[0] = _root;
+		newroot.Array[1] = newPath(_root.Edit, _shift, tailnode);
+		newshift += 5;
+	}
+	else
+	{
+		newroot = pushTail(_shift, _root, tailnode);
+	}
+	return new PersistentVector(meta(), _cnt + 1, newshift, newroot, new object[1] { o });
+}
+
+
+.method public hidebysig virtual 
+	instance class clojure.lang.IPersistentVector cons (
+		object o
+	) cil managed 
+{
+	// Method begins at RVA 0x1f0e4
+	// Header size: 12
+	// Code size: 268 (0x10c)
+	.maxstack 8
+	.locals init (
+		[0] class clojure.lang.PersistentVector/Node newroot,
+		[1] class clojure.lang.PersistentVector/Node tailnode,
+		[2] int32 newshift,
+		[3] object[] newTail
+	)
+
+	// if (_cnt - tailoff() < 32)
+	IL_0000: ldarg.0
+	IL_0001: ldfld int32 clojure.lang.PersistentVector::_cnt
+	IL_0006: ldarg.0
+	IL_0007: call instance int32 clojure.lang.PersistentVector::tailoff()
+	IL_000c: sub
+	IL_000d: ldc.i4.s 32
+	IL_000f: bge.s IL_0061
+
+	// object[] array = new object[_tail.Length + 1];
+	IL_0011: ldarg.0
+	IL_0012: ldfld object[] clojure.lang.PersistentVector::_tail
+	IL_0017: ldlen
+	IL_0018: conv.i4
+	IL_0019: ldc.i4.1
+	IL_001a: add
+	IL_001b: newarr [netstandard]System.Object
+	IL_0020: stloc.3
+	// Array.Copy(_tail, array, _tail.Length);
+	IL_0021: ldarg.0
+	IL_0022: ldfld object[] clojure.lang.PersistentVector::_tail
+	IL_0027: ldloc.3
+	IL_0028: ldarg.0
+	IL_0029: ldfld object[] clojure.lang.PersistentVector::_tail
+	IL_002e: ldlen
+	IL_002f: conv.i4
+	IL_0030: call void [netstandard]System.Array::Copy(class [netstandard]System.Array, class [netstandard]System.Array, int32)
+	// array[_tail.Length] = o;
+	IL_0035: ldloc.3
+	IL_0036: ldarg.0
+	IL_0037: ldfld object[] clojure.lang.PersistentVector::_tail
+	IL_003c: ldlen
+	IL_003d: conv.i4
+	IL_003e: ldarg.1
+	IL_003f: stelem.ref
+	// return new PersistentVector(meta(), _cnt + 1, _shift, _root, array);
+	IL_0040: ldarg.0
+	IL_0041: call instance class clojure.lang.IPersistentMap clojure.lang.PersistentVector::meta()
+	IL_0046: ldarg.0
+	IL_0047: ldfld int32 clojure.lang.PersistentVector::_cnt
+	IL_004c: ldc.i4.1
+	IL_004d: add
+	IL_004e: ldarg.0
+	IL_004f: ldfld int32 clojure.lang.PersistentVector::_shift
+	IL_0054: ldarg.0
+	IL_0055: ldfld class clojure.lang.PersistentVector/Node clojure.lang.PersistentVector::_root
+	IL_005a: ldloc.3
+	IL_005b: newobj instance void clojure.lang.PersistentVector::.ctor(class clojure.lang.IPersistentMap, int32, int32, class clojure.lang.PersistentVector/Node, object[])
+	IL_0060: ret
+
+	// Node node = new Node(_root.Edit, _tail);
+	IL_0061: ldarg.0
+	IL_0062: ldfld class clojure.lang.PersistentVector/Node clojure.lang.PersistentVector::_root
+	IL_0067: callvirt instance class clojure.lang.AtomicReference`1<class [netstandard]System.Threading.Thread> clojure.lang.PersistentVector/Node::get_Edit()
+	IL_006c: ldarg.0
+	IL_006d: ldfld object[] clojure.lang.PersistentVector::_tail
+	IL_0072: newobj instance void clojure.lang.PersistentVector/Node::.ctor(class clojure.lang.AtomicReference`1<class [netstandard]System.Threading.Thread>, object[])
+	IL_0077: stloc.1
+	// int num = _shift;
+	IL_0078: ldarg.0
+	IL_0079: ldfld int32 clojure.lang.PersistentVector::_shift
+	IL_007e: stloc.2
+	// if (_cnt >> 5 > 1 << _shift)
+	IL_007f: ldarg.0
+	IL_0080: ldfld int32 clojure.lang.PersistentVector::_cnt
+	IL_0085: ldc.i4.5
+	IL_0086: shr
+	IL_0087: ldc.i4.1
+	IL_0088: ldarg.0
+	IL_0089: ldfld int32 clojure.lang.PersistentVector::_shift
+	IL_008e: ldc.i4.s 31
+	IL_0090: and
+	IL_0091: shl
+	IL_0092: ble.s IL_00d8
+
+	// node2 = new Node(_root.Edit);
+	IL_0094: ldarg.0
+	IL_0095: ldfld class clojure.lang.PersistentVector/Node clojure.lang.PersistentVector::_root
+	IL_009a: callvirt instance class clojure.lang.AtomicReference`1<class [netstandard]System.Threading.Thread> clojure.lang.PersistentVector/Node::get_Edit()
+	IL_009f: newobj instance void clojure.lang.PersistentVector/Node::.ctor(class clojure.lang.AtomicReference`1<class [netstandard]System.Threading.Thread>)
+	IL_00a4: stloc.0
+	// node2.Array[0] = _root;
+	IL_00a5: ldloc.0
+	IL_00a6: callvirt instance object[] clojure.lang.PersistentVector/Node::get_Array()
+	IL_00ab: ldc.i4.0
+	IL_00ac: ldarg.0
+	IL_00ad: ldfld class clojure.lang.PersistentVector/Node clojure.lang.PersistentVector::_root
+	IL_00b2: stelem.ref
+	// node2.Array[1] = newPath(_root.Edit, _shift, node);
+	IL_00b3: ldloc.0
+	IL_00b4: callvirt instance object[] clojure.lang.PersistentVector/Node::get_Array()
+	IL_00b9: ldc.i4.1
+	IL_00ba: ldarg.0
+	IL_00bb: ldfld class clojure.lang.PersistentVector/Node clojure.lang.PersistentVector::_root
+	IL_00c0: callvirt instance class clojure.lang.AtomicReference`1<class [netstandard]System.Threading.Thread> clojure.lang.PersistentVector/Node::get_Edit()
+	IL_00c5: ldarg.0
+	IL_00c6: ldfld int32 clojure.lang.PersistentVector::_shift
+	IL_00cb: ldloc.1
+	IL_00cc: call class clojure.lang.PersistentVector/Node clojure.lang.PersistentVector::newPath(class clojure.lang.AtomicReference`1<class [netstandard]System.Threading.Thread>, int32, class clojure.lang.PersistentVector/Node)
+	IL_00d1: stelem.ref
+	// num += 5;
+	IL_00d2: ldloc.2
+	IL_00d3: ldc.i4.5
+	IL_00d4: add
+	IL_00d5: stloc.2
+	// node2 = pushTail(_shift, _root, node);
+	IL_00d6: br.s IL_00ec
+
+	IL_00d8: ldarg.0
+	IL_00d9: ldarg.0
+	IL_00da: ldfld int32 clojure.lang.PersistentVector::_shift
+	IL_00df: ldarg.0
+	IL_00e0: ldfld class clojure.lang.PersistentVector/Node clojure.lang.PersistentVector::_root
+	IL_00e5: ldloc.1
+	IL_00e6: call instance class clojure.lang.PersistentVector/Node clojure.lang.PersistentVector::pushTail(int32, class clojure.lang.PersistentVector/Node, class clojure.lang.PersistentVector/Node)
+	IL_00eb: stloc.0
+
+	// return new PersistentVector(meta(), _cnt + 1, num, node2, new object[1] { o });
+	IL_00ec: ldarg.0
+	IL_00ed: call instance class clojure.lang.IPersistentMap clojure.lang.PersistentVector::meta()
+	IL_00f2: ldarg.0
+	IL_00f3: ldfld int32 clojure.lang.PersistentVector::_cnt
+	IL_00f8: ldc.i4.1
+	IL_00f9: add
+	IL_00fa: ldloc.2
+	IL_00fb: ldloc.0
+	// (no C# code)
+	IL_00fc: ldc.i4.1
+	IL_00fd: newarr [netstandard]System.Object
+	IL_0102: dup
+	IL_0103: ldc.i4.0
+	IL_0104: ldarg.1
+	IL_0105: stelem.ref
+	IL_0106: newobj instance void clojure.lang.PersistentVector::.ctor(class clojure.lang.IPersistentMap, int32, int32, class clojure.lang.PersistentVector/Node, object[])
+	IL_010b: ret
+} // end of method PersistentVector::cons
+
+
+
+
+Next
+
+
+virtual IPersistentVector IPersistentVector.cons(object o)
+{
+	if (cnt - tailoff() < 32)
+	{
+		object[] newTail = ArrayModule.ZeroCreate<object>(tail.Length + 1);
+		Array.Copy(tail, newTail, tail.Length);
+		newTail[tail.Length] = o;
+		return new PersistentVector(meta@608, cnt + 1, shift, root, newTail);
+	}
+	PVNode tailNode = new PVNode(root.edit, tail);
+	PVNode newroot = null;
+	int newshift = 0;
+	int num = cnt >> 5;
+	int num2 = shift;
+	if (num > 1 << num2)
+	{
+		PVNode newroot2 = new PVNode(root.edit);
+		newroot2.array[0] = root;
+		newroot2.array[1] = newPath(root.edit, shift, tailNode);
+		newroot = newroot2;
+		newshift = shift + 5;
+	}
+	else
+	{
+		newroot = pushTail(shift, root, tailNode);
+		newshift = shift;
+	}
+	return new PersistentVector(meta@608, cnt + 1, newshift, newroot, new object[1] { o });
+}
+
+.method private hidebysig newslot virtual 
+	instance class Clojure.Collections.IPersistentVector Clojure.Collections.IPersistentVector.cons (
+		object o
+	) cil managed 
+{
+	.override method instance class Clojure.Collections.IPersistentVector Clojure.Collections.IPersistentVector::cons(object)
+	// Method begins at RVA 0x6410
+	// Header size: 12
+	// Code size: 307 (0x133)
+	.maxstack 10
+	.locals init (
+		[0] object[] newTail,
+		[1] class Clojure.Collections.PVNode tailNode,
+		[2] class Clojure.Collections.PVNode newroot,
+		[3] int32 newshift,
+		[4] int32,
+		[5] class Clojure.Collections.PVNode newroot
+	)
+
+	// {
+	IL_0000: nop
+	// if (cnt - tailoff() < 32)
+	IL_0001: ldarg.0
+	IL_0002: ldfld int32 Clojure.Collections.PersistentVector::cnt
+	IL_0007: ldarg.0
+	IL_0008: callvirt instance int32 Clojure.Collections.PersistentVector::tailoff()
+	IL_000d: sub
+	IL_000e: ldc.i4.s 32
+	IL_0010: bge.s IL_0066
+
+	// object[] array = ArrayModule.ZeroCreate<object>(tail.Length + 1);
+	IL_0012: ldarg.0
+	IL_0013: ldfld object[] Clojure.Collections.PersistentVector::tail
+	IL_0018: ldlen
+	IL_0019: conv.i4
+	IL_001a: ldc.i4.1
+	IL_001b: add
+	IL_001c: call !!0[] [FSharp.Core]Microsoft.FSharp.Collections.ArrayModule::ZeroCreate<object>(int32)
+	IL_0021: stloc.0
+	// Array.Copy(tail, array, tail.Length);
+	IL_0022: ldarg.0
+	IL_0023: ldfld object[] Clojure.Collections.PersistentVector::tail
+	IL_0028: ldloc.0
+	IL_0029: ldarg.0
+	IL_002a: ldfld object[] Clojure.Collections.PersistentVector::tail
+	IL_002f: ldlen
+	IL_0030: conv.i4
+	IL_0031: call void [System.Runtime]System.Array::Copy(class [System.Runtime]System.Array, class [System.Runtime]System.Array, int32)
+	// array[tail.Length] = o;
+	IL_0036: ldloc.0
+	IL_0037: ldarg.0
+	IL_0038: ldfld object[] Clojure.Collections.PersistentVector::tail
+	IL_003d: ldlen
+	IL_003e: conv.i4
+	IL_003f: ldarg.1
+	IL_0040: stelem [System.Runtime]System.Object
+	// return new PersistentVector(meta@608, cnt + 1, shift, root, array);
+	IL_0045: ldarg.0
+	IL_0046: ldfld class Clojure.Collections.IPersistentMap Clojure.Collections.PersistentVector::meta@608
+	IL_004b: ldarg.0
+	IL_004c: ldfld int32 Clojure.Collections.PersistentVector::cnt
+	IL_0051: ldc.i4.1
+	IL_0052: add
+	IL_0053: ldarg.0
+	IL_0054: ldfld int32 Clojure.Collections.PersistentVector::shift
+	IL_0059: ldarg.0
+	IL_005a: ldfld class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::root
+	IL_005f: ldloc.0
+	IL_0060: newobj instance void Clojure.Collections.PersistentVector::.ctor(class Clojure.Collections.IPersistentMap, int32, int32, class Clojure.Collections.PVNode, object[])
+	IL_0065: ret
+
+	// PVNode pVNode = new PVNode(root.edit, tail);
+	IL_0066: ldarg.0
+	IL_0067: ldfld class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::root
+	IL_006c: ldfld class Clojure.Collections.AtomicBoolean Clojure.Collections.PVNode::edit
+	IL_0071: ldarg.0
+	IL_0072: ldfld object[] Clojure.Collections.PersistentVector::tail
+	IL_0077: newobj instance void Clojure.Collections.PVNode::.ctor(class Clojure.Collections.AtomicBoolean, object[])
+	IL_007c: stloc.1
+	// PVNode pVNode2 = null;
+	IL_007d: ldnull
+	IL_007e: stloc.2
+	// int num = 0;
+	IL_007f: ldc.i4.0
+	IL_0080: stloc.3
+	// int num2 = cnt >> 5;
+	IL_0081: nop
+	IL_0082: ldarg.0
+	IL_0083: ldfld int32 Clojure.Collections.PersistentVector::cnt
+	IL_0088: ldc.i4.5
+	IL_0089: shr
+	// int num3 = shift;
+	IL_008a: ldarg.0
+	IL_008b: ldfld int32 Clojure.Collections.PersistentVector::shift
+	IL_0090: stloc.s 4
+	// if (num2 > 1 << num3)
+	IL_0092: ldc.i4.1
+	IL_0093: ldloc.s 4
+	IL_0095: ldc.i4.s 31
+	IL_0097: and
+	IL_0098: shl
+	IL_0099: ble.s IL_00f3
+
+	// PVNode pVNode3 = new PVNode(root.edit);
+	IL_009b: ldarg.0
+	IL_009c: ldfld class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::root
+	IL_00a1: ldfld class Clojure.Collections.AtomicBoolean Clojure.Collections.PVNode::edit
+	IL_00a6: newobj instance void Clojure.Collections.PVNode::.ctor(class Clojure.Collections.AtomicBoolean)
+	IL_00ab: stloc.s 5
+	// pVNode3.array[0] = root;
+	IL_00ad: ldloc.s 5
+	IL_00af: ldfld object[] Clojure.Collections.PVNode::'array'
+	IL_00b4: ldc.i4.0
+	IL_00b5: ldarg.0
+	IL_00b6: ldfld class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::root
+	IL_00bb: stelem [System.Runtime]System.Object
+	// pVNode3.array[1] = newPath(root.edit, shift, pVNode);
+	IL_00c0: ldloc.s 5
+	IL_00c2: ldfld object[] Clojure.Collections.PVNode::'array'
+	IL_00c7: ldc.i4.1
+	IL_00c8: ldarg.0
+	IL_00c9: ldfld class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::root
+	IL_00ce: ldfld class Clojure.Collections.AtomicBoolean Clojure.Collections.PVNode::edit
+	IL_00d3: ldarg.0
+	IL_00d4: ldfld int32 Clojure.Collections.PersistentVector::shift
+	IL_00d9: ldloc.1
+	IL_00da: call class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::newPath(class Clojure.Collections.AtomicBoolean, int32, class Clojure.Collections.PVNode)
+	IL_00df: stelem [System.Runtime]System.Object
+	// pVNode2 = pVNode3;
+	IL_00e4: ldloc.s 5
+	IL_00e6: stloc.2
+	// num = shift + 5;
+	IL_00e7: ldarg.0
+	IL_00e8: ldfld int32 Clojure.Collections.PersistentVector::shift
+	IL_00ed: ldc.i4.5
+	IL_00ee: add
+	IL_00ef: stloc.3
+	// (no C# code)
+	IL_00f0: nop
+	// pVNode2 = pushTail(shift, root, pVNode);
+	IL_00f1: br.s IL_010f
+
+	IL_00f3: ldarg.0
+	IL_00f4: ldarg.0
+	IL_00f5: ldfld int32 Clojure.Collections.PersistentVector::shift
+	IL_00fa: ldarg.0
+	IL_00fb: ldfld class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::root
+	IL_0100: ldloc.1
+	IL_0101: callvirt instance class Clojure.Collections.PVNode Clojure.Collections.PersistentVector::pushTail(int32, class Clojure.Collections.PVNode, class Clojure.Collections.PVNode)
+	IL_0106: stloc.2
+	// num = shift;
+	IL_0107: ldarg.0
+	IL_0108: ldfld int32 Clojure.Collections.PersistentVector::shift
+	IL_010d: stloc.3
+	// return new PersistentVector(meta@608, cnt + 1, num, pVNode2, new object[1] { o });
+	IL_010e: nop
+
+	IL_010f: ldarg.0
+	IL_0110: ldfld class Clojure.Collections.IPersistentMap Clojure.Collections.PersistentVector::meta@608
+	IL_0115: ldarg.0
+	IL_0116: ldfld int32 Clojure.Collections.PersistentVector::cnt
+	IL_011b: ldc.i4.1
+	IL_011c: add
+	IL_011d: ldloc.3
+	IL_011e: ldloc.2
+	// (no C# code)
+	IL_011f: ldc.i4.1
+	IL_0120: newarr [System.Runtime]System.Object
+	IL_0125: dup
+	IL_0126: ldc.i4.0
+	IL_0127: ldarg.1
+	IL_0128: stelem [System.Runtime]System.Object
+	IL_012d: newobj instance void Clojure.Collections.PersistentVector::.ctor(class Clojure.Collections.IPersistentMap, int32, int32, class Clojure.Collections.PVNode, object[])
+	IL_0132: ret
+} // end of method PersistentVector::Clojure.Collections.IPersistentVector.cons
+
+
+Modification:  Get rid of double-assign
+Effect: no real difference
+
+|    Method |   size |            Mean |         Error |        StdDev | Ratio | RatioSD |      Gen0 | BranchInstructions/Op | BranchMispredictions/Op |     Gen1 |     Gen2 |   Allocated | Alloc Ratio |
+|---------- |------- |----------------:|--------------:|--------------:|------:|--------:|----------:|----------------------:|------------------------:|---------:|---------:|------------:|------------:|
+| FirstCons |     10 |        251.4 ns |       4.49 ns |       4.81 ns |  1.00 |    0.00 |    0.1278 |                   748 |                       1 |        - |        - |     1.63 KB |        1.00 |
+|  NextCons |     10 |        314.2 ns |       6.11 ns |       7.50 ns |  1.25 |    0.04 |    0.1597 |                   952 |                       2 |   0.0005 |        - |     2.04 KB |        1.25 |
+|           |        |                 |               |               |       |         |           |                       |                         |          |          |             |             |
+| FirstCons |    100 |      2,907.8 ns |      50.39 ns |      44.67 ns |  1.00 |    0.00 |    1.8578 |                 8,035 |                      26 |   0.0381 |        - |    23.76 KB |        1.00 |
+|  NextCons |    100 |      3,320.5 ns |      66.02 ns |      58.52 ns |  1.14 |    0.03 |    1.8921 |                 9,256 |                      29 |   0.0420 |        - |    24.16 KB |        1.02 |
+|           |        |                 |               |               |       |         |           |                       |                         |          |          |             |             |
+| FirstCons |   1000 |     31,271.7 ns |     604.17 ns |     885.58 ns |  1.00 |    0.00 |   18.7988 |                85,150 |                     271 |   2.8076 |        - |    240.3 KB |        1.00 |
+|  NextCons |   1000 |     34,758.3 ns |     670.68 ns |     772.35 ns |  1.11 |    0.04 |   18.8599 |                96,432 |                     296 |   2.7466 |        - |   240.71 KB |        1.00 |
+|           |        |                 |               |               |       |         |           |                       |                         |          |          |             |             |
+| FirstCons |  10000 |    516,467.5 ns |  10,280.21 ns |  11,838.71 ns |  1.00 |    0.00 |  195.3125 |             1,327,495 |                   5,885 |  97.6563 |        - |  2494.05 KB |        1.00 |
+|  NextCons |  10000 |    542,276.4 ns |   6,762.99 ns |   5,647.41 ns |  1.04 |    0.03 |  195.3125 |             1,441,041 |                   6,067 |  97.6563 |        - |  2494.45 KB |        1.00 |
+|           |        |                 |               |               |       |         |           |                       |                         |          |          |             |             |
+| FirstCons | 100000 | 13,094,087.5 ns | 259,087.87 ns | 327,663.19 ns |  1.00 |    0.00 | 2187.5000 |            28,360,866 |                 117,891 | 593.7500 | 187.5000 | 25679.42 KB |        1.00 |
+|  NextCons | 100000 | 13,527,008.1 ns | 270,202.20 ns | 587,397.34 ns |  1.04 |    0.05 | 2187.5000 |            29,572,172 |                 120,237 | 593.7500 | 187.5000 | 25679.83 KB |        1.00 |
+        //override this.cons(o) =
+        //    if cnt - this.tailoff () < 32 then
+        //        // room in the tail
+        //        let newTail = Array.zeroCreate (tail.Length + 1)
+        //        Array.Copy(tail, newTail, tail.Length)
+        //        newTail[tail.Length] <- o
+        //        PersistentVector(meta, cnt + 1, shift, root, newTail)
+        //    else
+        //        // tail is full, push into tree
+        //        let tailNode = PVNode(root.Edit, tail)
+        //        let mutable newroot : PVNode = null
+        //        let mutable newshift = shift
+
+        //        // overflow root?
+        //        if (cnt >>> 5) > (1 <<< shift) then
+        //            newroot <- PVNode(root.Edit)
+        //            newroot.Array[0] <- root
+        //            newroot.Array[1] <- PersistentVector.newPath (root.Edit, shift, tailNode)
+        //            newshift <- newshift+5
+        //        else
+        //            newroot <- this.pushTail (shift, root, tailNode)
+
+        //        PersistentVector(meta, cnt + 1, newshift, newroot, [| o |])
+
+        override this.cons(o) =
+            if cnt - this.tailoff () < 32 then
+                // room in the tail
+                let newTail = Array.zeroCreate (tail.Length + 1)
+                Array.Copy(tail, newTail, tail.Length)
+                newTail[tail.Length] <- o
+                PersistentVector(meta, cnt + 1, shift, root, newTail)
+            else
+                // tail is full, push into tree
+                let tailNode = PVNode(root.Edit, tail)
+
+                let newroot, newshift =
+                    // overflow root?
+                    if (cnt >>> 5) > (1 <<< shift) then
+                        let newroot = PVNode(root.Edit)
+                        newroot.Array[0] <- root
+                        newroot.Array[1] <- PersistentVector.newPath (root.Edit, shift, tailNode)
+                        newroot, shift + 5
+                    else
+                        this.pushTail (shift, root, tailNode), shift
+
+                PersistentVector(meta, cnt + 1, newshift, newroot, [| o |])
+
+
+
+Looking at pushtail / newpath
+
+newarr vs call to zeroCreate
+
+
+
+| Method |     Mean |    Error |   StdDev | Ratio | RatioSD |     Gen0 |   Gen1 | Allocated | Alloc Ratio |
+|------- |---------:|---------:|---------:|------:|--------:|---------:|-------:|----------:|------------:|
+| CSharp | 89.70 us | 1.754 us | 1.802 us |  1.00 |    0.00 | 214.2334 | 0.1221 |   2.67 MB |        1.00 |
+| FSharp | 96.70 us | 1.306 us | 1.020 us |  1.07 |    0.02 | 214.2334 | 0.1221 |   2.67 MB |        1.00 |
+
+
+C#
+    .method public hidebysig static 
+        object[] CreateArray (
+            int32 n
+        ) cil managed 
+    {
+        .custom instance void System.Runtime.CompilerServices.NullableContextAttribute::.ctor(uint8) = (
+            01 00 01 00 00
+        )
+        // Method begins at RVA 0x209d
+        // Code size 7 (0x7)
+        .maxstack 8
+
+        IL_0000: ldarg.0
+        IL_0001: newarr [System.Runtime]System.Object
+        IL_0006: ret
+    } // end of method CreateArrayLib::CreateArray
+	
+	CreateArrayLib.CreateArray(Int32)
+    L0000: sub rsp, 0x28
+    L0004: movsxd rdx, ecx
+    L0007: mov rcx, 0x7ffb87b5aa50
+    L0011: call 0x00007ffbe76df360
+    L0016: nop
+    L0017: add rsp, 0x28
+    L001b: ret
+
+	
+	
+        .method public hidebysig 
+            instance object[] ZeroCreateArray (
+                int32 n
+            ) cil managed 
+        {
+            // Method begins at RVA 0x205c
+            // Code size 9 (0x9)
+            .maxstack 8
+
+            IL_0000: ldarg.1
+            IL_0001: tail.
+            IL_0003: call !!0[] [FSharp.Core]Microsoft.FSharp.Collections.ArrayModule::ZeroCreate<object>(int32)
+            IL_0008: ret
+        } // end of method C::ZeroCreateArray	
+
+_+C.ZeroCreateArray(Int32)
+    L0000: mov rcx, 0x1990619b5e8
+    L000a: mov rax, 0x19905c2fae0
+    L0014: jmp qword ptr [rax]
