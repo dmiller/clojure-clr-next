@@ -9,11 +9,13 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Clojure.BigArith.Tests", "C
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Clojure.Collections", "Clojure.Collections\Clojure.Collections.fsproj", "{EC2C23B6-6736-4E67-BEBF-5736871447A5}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Numerics", "Clojure.Numerics\Clojure.Numerics.fsproj", "{DA1BBD6D-4190-4D27-AD7A-6DD32CF2AEE6}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Clojure.Numerics", "Clojure.Numerics\Clojure.Numerics.fsproj", "{DA1BBD6D-4190-4D27-AD7A-6DD32CF2AEE6}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Numerics.Tests", "Clojure.Numerics.Tests\Clojure.Numerics.Tests.fsproj", "{312214B0-0ED0-4126-89D3-5330B5CCED50}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Clojure.Numerics.Tests", "Clojure.Numerics.Tests\Clojure.Numerics.Tests.fsproj", "{312214B0-0ED0-4126-89D3-5330B5CCED50}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Collections.Tests", "Clojure.Collections.Tests\Clojure.Collections.Tests.fsproj", "{A63DAFF5-C664-4AAE-93B7-00D3C6A08BD8}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Clojure.Collections.Tests", "Clojure.Collections.Tests\Clojure.Collections.Tests.fsproj", "{A63DAFF5-C664-4AAE-93B7-00D3C6A08BD8}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Collections.Benchmarks", "Clojure.Collections.Benchmarks\Clojure.Collections.Benchmarks.fsproj", "{338490F0-0A4A-4F22-9689-2E9076F587EC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,6 +47,10 @@ Global
 		{A63DAFF5-C664-4AAE-93B7-00D3C6A08BD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A63DAFF5-C664-4AAE-93B7-00D3C6A08BD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A63DAFF5-C664-4AAE-93B7-00D3C6A08BD8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{338490F0-0A4A-4F22-9689-2E9076F587EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{338490F0-0A4A-4F22-9689-2E9076F587EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{338490F0-0A4A-4F22-9689-2E9076F587EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{338490F0-0A4A-4F22-9689-2E9076F587EC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

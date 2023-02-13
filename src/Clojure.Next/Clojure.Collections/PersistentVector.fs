@@ -128,7 +128,7 @@ type IPVecRSeq(meta: IPersistentMap, vec: IPersistentVector, index: int) =
 
 
 [<AbstractClass>]
-type APersistentVector() =
+type [<AllowNullLiteral>] APersistentVector() =
     inherit AFn()
 
     let mutable hasheq: int option = None
@@ -605,7 +605,7 @@ and [<AllowNullLiteral>] PVNode(edit: AtomicBoolean, array: obj array) =
 ////////////////////////////////
 
 
-and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, tail: obj array) =
+and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, tail: obj array) =
     inherit APersistentVector()
 
     //    public class PersistentVector: APersistentVector, IObj, IEditableCollection, IEnumerable, IReduce, IKVReduce, IDrop
@@ -640,16 +640,31 @@ and PersistentVector(meta: IPersistentMap, cnt: int, shift: int, root: PVNode, t
             if i >= this.tailoff () then
                 tail
             else
-                let rec step (node: PVNode) level =
-                    if level <= 0 then
-                        node.Array
-                    else
-                        let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
-                        step newNode (level - 5)
+                let mutable node = root
+                let mutable sh = shift
 
-                step root shift
+                while sh > 0 do
+                    node <- node.Array[(i >>> sh) &&& 0x1f] :?> PVNode
+                    sh <- sh-5
+                node.Array
         else
             raise <| ArgumentOutOfRangeException("i")
+
+    //member this.arrayFor(i) =
+    //    if 0 <= i && i < cnt then
+    //        if i >= this.tailoff () then
+    //            tail
+    //        else
+    //            let rec step (node: PVNode) level =
+    //                if level <= 0 then
+    //                    node.Array
+    //                else
+    //                    let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
+    //                    step newNode (level - 5)
+
+    //            step root shift
+    //    else
+    //        raise <| ArgumentOutOfRangeException("i")
 
     interface Indexed with
         override this.nth(i) =

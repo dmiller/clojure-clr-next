@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="PersistentVectorBenchmarks.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.4" />
+    <PackageReference Include="Clojure" Version="1.12.0-alpha3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+  </ItemGroup>
+
+</Project>
