@@ -146,4 +146,30 @@ type ArrayCreation() =
 
         acc
 
+[<MemoryDiagnoser; HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)>]
+type PersistentVsTransient() = 
 
+    [<Params(10, 100, 1_000, 10_000, 100_000)>]
+    member val size: int = 0 with get, set
+
+    [<Benchmark(Baseline=true)>]
+    member this.NextTransientConj() =
+        let mutable pv =
+            (Clojure.Collections.PersistentVector.EMPTY :> Clojure.Collections.IEditableCollection)
+                .asTransient ()
+
+        for i in 0 .. this.size do
+            pv <- pv.conj (i)
+
+        pv.persistent ()
+
+
+    [<Benchmark>]
+    member this.NextCons() =
+        let mutable pv =
+            Clojure.Collections.PersistentVector.EMPTY :> Clojure.Collections.IPersistentVector
+
+        for i in 0 .. this.size do
+            pv <- pv.cons (i)
+
+        pv
