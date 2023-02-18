@@ -17,13 +17,13 @@ type ASeq(m) =
     new() = ASeq(null)
 
     static member doCount(s: ISeq) =
-        let rec step (s: ISeq) cnt =
+        let rec loop (s: ISeq) cnt =
             match s with
             | null -> cnt
             | :? Counted as c -> cnt + c.count ()
-            | _ -> step (s.next ()) (cnt + 1)
+            | _ -> loop (s.next ()) (cnt + 1)
 
-        step s 0
+        loop s 0
 
     override this.ToString() = RTPrint.printString (this)
 
@@ -34,14 +34,14 @@ type ASeq(m) =
             match o with
             | :? Sequential
             | :? IList ->
-                let rec step (s1: ISeq) (s2: ISeq) =
+                let rec loop (s1: ISeq) (s2: ISeq) =
                     match s1, s2 with
                     | null, null -> true
                     | _, null -> false
                     | null, _ -> false
-                    | _ -> Util.equals (s1.first (), s2.first ()) && step (s1.next ()) (s2.next ())
+                    | _ -> Util.equals (s1.first (), s2.first ()) && loop (s1.next ()) (s2.next ())
 
-                step this (RT0.seq (o))
+                loop this (RT0.seq (o))
             | _ -> false
 
     override this.GetHashCode() = (this :> IHashEq).hasheq ()
@@ -92,17 +92,17 @@ type ASeq(m) =
             match o with
             | :? Sequential
             | :? IList ->
-                let rec step (s1: ISeq) (s2: ISeq) =
+                let rec loop (s1: ISeq) (s2: ISeq) =
                     match s1, s2 with
                     | null, null -> true
                     | _, null -> false
                     | null, _ -> false
-                    | _ -> Util.equiv (s1.first (), s2.first ()) && step (s1.next ()) (s2.next ())
+                    | _ -> Util.equiv (s1.first (), s2.first ()) && loop (s1.next ()) (s2.next ())
                 
                 if ASeq.countsMismatch(this,o) then
                     false
                 else 
-                    step this (RT0.seq (o))
+                    loop this (RT0.seq (o))
             | _ -> false
 
     interface Seqable with
@@ -137,32 +137,32 @@ type ASeq(m) =
                 if index < 0 then
                     raise <| ArgumentOutOfRangeException("index", "Index must be non-negative")
 
-                let rec step i (s: ISeq) =
+                let rec loop i (s: ISeq) =
                     if i = index then
                         s.first ()
                     elif s = null then
                         raise <| ArgumentOutOfRangeException("index", "Index past end of list")
                     else
-                        step (i + 1) (s.next ())
+                        loop (i + 1) (s.next ())
 
-                step 0 this // TODO: See IndexOf. Should this be called on x or x.seq() ??  Check original Java code.
+                loop 0 this // TODO: See IndexOf. Should this be called on x or x.seq() ??  Check original Java code.
             and set _ _ = raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
         member this.IndexOf(v) =
-            let rec step i (s: ISeq) =
+            let rec loop i (s: ISeq) =
                 if isNull s then -1
                 else if Util.equiv (s.first (), v) then i
-                else step (i + 1) (s.next ())
+                else loop (i + 1) (s.next ())
 
-            step 0 ((this :> ISeq).seq ())
+            loop 0 ((this :> ISeq).seq ())
 
         member this.Contains(v) =
-            let rec step (s: ISeq) =
+            let rec loop (s: ISeq) =
                 if isNull s then false
                 else if Util.equiv (s.first (), v) then true
-                else step (s.next ())
+                else loop (s.next ())
 
-            step ((this :> ISeq).seq ())
+            loop ((this :> ISeq).seq ())
 
     // I don't know a workaround for getting the enumerator from a base class call in a derived class
 
@@ -210,12 +210,12 @@ type ASeq(m) =
                     "The number of elements in source is greater than the available space in the array."
                 )
 
-            let rec step (i: int) (s: ISeq) =
+            let rec loop (i: int) (s: ISeq) =
                 if i < arr.Length && s <> null then
                     arr.SetValue(s.first (), i)
-                    step (i + 1) (s.next ())
+                    loop (i + 1) (s.next ())
 
-            step idx (this :> ISeq)
+            loop idx (this :> ISeq)
 
 and [<Sealed>] Cons(meta, f: obj, m: ISeq) =
     inherit ASeq(meta)
@@ -388,17 +388,17 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
 
     interface IReduceInit with
         member this.reduce(fn, start) =
-            let rec step (s: ISeq) (value: obj) =
+            let rec loop (s: ISeq) (value: obj) =
                 match s with
                 | null -> value
                 | _ ->
                     match value with
                     | :? Reduced as r -> (r :> IDeref).deref ()
-                    | _ -> step (s.next ()) (fn.invoke (value, s.first ()))
+                    | _ -> loop (s.next ()) (fn.invoke (value, s.first ()))
 
             let init = fn.invoke (start, (this :> ISeq).first ())
 
-            let ret = step ((this :> ISeq).next ()) init
+            let ret = loop ((this :> ISeq).next ()) init
 
             match ret with
             | :? Reduced as r -> (r :> IDeref).deref ()
@@ -406,7 +406,7 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
 
     interface IReduce with
         member this.reduce(fn) =
-            let rec step (s: ISeq) (value: obj) =
+            let rec loop (s: ISeq) (value: obj) =
                 match s with
                 | null -> value
                 | _ ->
@@ -414,9 +414,9 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
 
                     match nextVal with
                     | :? Reduced as r -> (r :> IDeref).deref ()
-                    | _ -> step (s.next ()) nextVal
+                    | _ -> loop (s.next ()) nextVal
 
-            step ((this :> ISeq).next ()) ((this :> ISeq).first ())
+            loop ((this :> ISeq).next ()) ((this :> ISeq).first ())
 
 // I'm not sure this is the final resting place for this
 module RT2 =

@@ -24,21 +24,21 @@ type AFn() =
 
     // This was in RT.  But only used in AFn and RestFn, so moving to here.
     static member boundedLength(list: ISeq, limit: int) : int =
-        let rec step (c: ISeq) i =
+        let rec loop (c: ISeq) i =
             if c <> null && i <= limit then
-                step (c.next ()) (i + 1)
+                loop (c.next ()) (i + 1)
             else
                 i
 
-        step list 0
+        loop list 0
 
 
     // This was in RT.  Should be in Helpers.  TODO: Maybe split Helpers?  It is used in a few other places in the code
     static member seqLength(list: ISeq) : int =
-        let rec step (c: ISeq) i =
-            if c <> null then step (c.next ()) (i + 1) else i
+        let rec loop (c: ISeq) i =
+            if c <> null then loop (c.next ()) (i + 1) else i
 
-        step list 0
+        loop list 0
 
 
     // This was in RT.  But only used in RestFn, so moving to here.
@@ -48,14 +48,14 @@ type AFn() =
         else
             let a = Array.zeroCreate<'a> (AFn.seqLength xs)
 
-            let rec step (s: ISeq) i =
+            let rec loop (s: ISeq) i =
                 if s <> null then
                     a.[i] <- downcast s.first ()
-                    step (s.next ()) (i + 1)
+                    loop (s.next ()) (i + 1)
                 else
                     ()
 
-            step xs 0
+            loop xs 0
             a
 
     member this.WrongArityException(reqArity: int) : ArityException =

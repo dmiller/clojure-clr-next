@@ -1502,8 +1502,8 @@ type Numbers() =
 and [<Sealed>] LongOps() =
 
     static member gcd(u: int64, v: int64) =
-        let rec step x y = if y <> 0L then step y (x % y) else x
-        step u v
+        let rec loop x y = if y <> 0L then loop y (x % y) else x
+        loop u v
 
     interface Ops with
 
@@ -1630,8 +1630,8 @@ and [<Sealed>] ULongOps() =
 
 
     static member gcd(u: uint64, v: uint64) =
-        let rec step x y = if y <> 0UL then step y (x % y) else x
-        step u v
+        let rec loop x y = if y <> 0UL then loop y (x % y) else x
+        loop u v
 
     interface Ops with
 

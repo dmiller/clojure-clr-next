@@ -10,25 +10,25 @@ open Clojure.Collections
 let verifyISeqContents (s: ISeq) (vals: obj list) =
     let avals = List.toArray vals
 
-    let rec step (s: ISeq) (idx: int) =
+    let rec loop (s: ISeq) (idx: int) =
         match s with
         | null -> idx
         | _ ->
             Expect.equal (s.first ()) avals.[idx] "Expected element"
-            step (s.next ()) (idx + 1)
+            loop (s.next ()) (idx + 1)
 
-    let cnt = step s 0
+    let cnt = loop s 0
     Expect.equal cnt avals.Length "Should have same number of elements"
 
 let compareISeqs (s1:ISeq) (s2:ISeq) =
-    let rec step (s1:ISeq) (s2:ISeq) =
+    let rec loop (s1:ISeq) (s2:ISeq) =
         match s1, s2 with
         | null, null -> true
         | null, _ -> false
         | _, null -> true
-        | _, _ when s1.first() = s2.first() -> step (s1.next()) (s2.next())
+        | _, _ when s1.first() = s2.first() -> loop (s1.next()) (s2.next())
         | _ -> false
-    step s1 s2
+    loop s1 s2
 
 
 let verifyISeqCons (s: ISeq) (newVal: obj) (vals: obj list) =
@@ -37,39 +37,39 @@ let verifyISeqCons (s: ISeq) (newVal: obj) (vals: obj list) =
     verifyISeqContents (newSeq.next ()) vals
 
 let verifyISeqRestTypes (s: ISeq) (t: Type) =
-    let rec step (s: ISeq) =
+    let rec loop (s: ISeq) =
         match s.next () with
         | null -> ()
         | _ ->
             Expect.equal (s.next().GetType()) t "Next should have given type"
-            step (s.next ())
+            loop (s.next ())
 
-    step s
+    loop s
 
 let verifyIseqRestMaintainsMeta (s: ISeq) =
     let m = (s :?> IMeta).meta ()
 
-    let rec step (s: ISeq) =
+    let rec loop (s: ISeq) =
         match s.next () with
         | null -> ()
         | _ ->
             Expect.isTrue (Object.ReferenceEquals((s.next () :?> IMeta).meta (), m)) "Next should have same meta"
-            step (s.next ())
+            loop (s.next ())
 
-    step s
+    loop s
 
 
 let takeEager (n: int) (s: ISeq) =
     let arr: obj array = Array.zeroCreate n
 
-    let rec step (i: int) (s: ISeq) =
+    let rec loop (i: int) (s: ISeq) =
         if isNull s || i >= n then
             i
         else
             arr[i] <- s.first ()
-            step (i + 1) (s.next ())
+            loop (i + 1) (s.next ())
 
-    let cnt = step 0 s
+    let cnt = loop 0 s
 
     arr |> Seq.cast<obj> |> Seq.take cnt
 

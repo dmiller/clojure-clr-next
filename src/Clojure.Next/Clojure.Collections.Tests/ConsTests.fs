@@ -8,10 +8,10 @@ open TestHelpers
 
 
 let makeConsChain (n: int) =
-    let rec step c i =
-        if i = n then c else step (Cons(i, c)) (i + 1)
+    let rec loop c i =
+        if i = n then c else loop (Cons(i, c)) (i + 1)
 
-    step (Cons(0, null)) 1
+    loop (Cons(0, null)) 1
 
 
 [<Tests>]

@@ -101,16 +101,16 @@ type Murmur3 =
 
     static member HashStringU(input: string) =
         // step through two characters at a time
-        let rec step idx h =
+        let rec loop idx h =
             if idx >= input.Length then
                 h
             else
                 let key = (uint input.[idx - 1]) ||| ((uint input.[idx]) <<< 16)
 
                 let key = Murmur3.mixKey key
-                step (idx + 2) (Murmur3.mixHash h key)
+                loop (idx + 2) (Murmur3.mixHash h key)
 
-        let hash = step 1 Murmur3.Seed
+        let hash = loop 1 Murmur3.Seed
 
         let hash =
             // deal with remaining character if length is odd

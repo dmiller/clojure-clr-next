@@ -39,23 +39,23 @@ type Repeat private (m: IPersistentMap, count: int64 option, value: obj) =
 
 
     member this.reduceCounted (f: IFn) (idx: int64) (cnt: int64) (start: obj) =
-        let rec step (acc: obj) (i: int64) =
+        let rec loop (acc: obj) (i: int64) =
             if i >= cnt then
                 acc
             else
                 match f.invoke (acc, value) with
                 | :? Reduced as red -> (red :> IDeref).deref ()
-                | nextAcc -> step nextAcc (i + 1L)
+                | nextAcc -> loop nextAcc (i + 1L)
 
-        step start idx
+        loop start idx
 
     member this.reduceInfinite (f: IFn) (start: obj) =
-        let rec step (acc: obj) =
+        let rec loop (acc: obj) =
             match (f.invoke (acc, value)) with
             | :? Reduced as red -> (red :> IDeref).deref ()
-            | nextAcc -> step nextAcc
+            | nextAcc -> loop nextAcc
 
-        step start
+        loop start
 
     interface IReduce with
         member this.reduce(f) =
@@ -134,12 +134,12 @@ type Cycle private (meta: IPersistentMap, all: ISeq, prev: ISeq, c: ISeq, n: ISe
         | x -> x
 
     member this.reducer(f: IFn, startVal: obj, startSeq: ISeq) =
-        let rec step (acc: obj) (s: ISeq) =
+        let rec loop (acc: obj) (s: ISeq) =
             match f.invoke (acc, s.first ()) with
             | :? Reduced as red -> (red :> IDeref).deref ()
-            | nextAcc -> step nextAcc (this.advance s)
+            | nextAcc -> loop nextAcc (this.advance s)
 
-        step startVal startSeq
+        loop startVal startSeq
 
     interface IReduce with
         member this.reduce(f) =
@@ -192,12 +192,12 @@ type Iterate private (meta: IPersistentMap, fn: IFn, prevSeed: obj, s: obj, n: I
                 Iterate(m, fn, prevSeed, seed, next)
 
     member this.reducer(rf: IFn, start: obj, v: obj) =
-        let rec step (acc: obj) (v: obj) =
+        let rec loop (acc: obj) (v: obj) =
             match rf.invoke (acc, v) with
             | :? Reduced as red -> (red :> IDeref).deref ()
-            | nextAcc -> step nextAcc (fn.invoke (v))
+            | nextAcc -> loop nextAcc (fn.invoke (v))
 
-        step start v
+        loop start v
 
     interface IReduce with
         member this.reduce(rf) =

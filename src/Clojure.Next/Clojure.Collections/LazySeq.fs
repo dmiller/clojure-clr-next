@@ -138,32 +138,32 @@ type LazySeq private (m1, fn1, s1) =
                 if index < 0 then
                     raise <| ArgumentOutOfRangeException("index", "Index must be non-negative")
 
-                let rec step i (s: ISeq) =
+                let rec loop i (s: ISeq) =
                     if i = index then
                         s.first ()
                     elif s = null then
                         raise <| ArgumentOutOfRangeException("index", "Index past end of list")
                     else
-                        step (i + 1) (s.next ())
+                        loop (i + 1) (s.next ())
 
-                step 0 this // TODO: See IndexOf. Should this be called on x or x.seq() ??  Check original Java code.
+                loop 0 this // TODO: See IndexOf. Should this be called on x or x.seq() ??  Check original Java code.
             and set _ _ = raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
         member this.IndexOf(v) =
-            let rec step i (s: ISeq) =
+            let rec loop i (s: ISeq) =
                 if isNull s then -1
                 else if Util.equiv (s.first (), v) then i
-                else step (i + 1) (s.next ())
+                else loop (i + 1) (s.next ())
 
-            step 0 ((this :> ISeq).seq ())
+            loop 0 ((this :> ISeq).seq ())
 
         member this.Contains(v) =
-            let rec step (s: ISeq) =
+            let rec loop (s: ISeq) =
                 if isNull s then false
                 else if Util.equiv (s.first (), v) then true
-                else step (s.next ())
+                else loop (s.next ())
 
-            step ((this :> ISeq).seq ())
+            loop ((this :> ISeq).seq ())
 
     interface ICollection with
         member this.Count = (this :> IPersistentCollection).count ()
@@ -187,9 +187,9 @@ type LazySeq private (m1, fn1, s1) =
                 raise
                 <| InvalidOperationException("Not enough available space from index to end of the array.")
 
-            let rec step (i: int) (s: ISeq) =
+            let rec loop (i: int) (s: ISeq) =
                 if not (isNull s) then
                     arr.SetValue(s.first (), i)
-                    step (i + 1) (s.next ())
+                    loop (i + 1) (s.next ())
 
-            step idx (this :> ISeq)
+            loop idx (this :> ISeq)

@@ -57,13 +57,13 @@ let count (o: obj) : int =
     | null -> 0
     | :? Counted as c -> c.count ()
     | :? IPersistentCollection as c ->
-        let rec step (s: ISeq) cnt =
+        let rec loop (s: ISeq) cnt =
             match s with
             | null -> cnt
             | :? Counted as c -> cnt + c.count ()
-            | _ -> step (s.next ()) (cnt + 1)
+            | _ -> loop (s.next ()) (cnt + 1)
 
-        step (seq c) 0
+        loop (seq c) 0
     | :? String as s -> s.Length
     | :? Array as a -> a.GetLength(0)
     | :? ICollection as c -> c.Count

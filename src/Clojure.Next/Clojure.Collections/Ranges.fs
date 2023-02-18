@@ -142,15 +142,15 @@ type Range
             if isNull chunkNext then PersistentList.Empty else chunkNext
 
     member this.reducer (f: IFn) (acc: obj) (v: obj) =
-        let rec iter (acc: obj) (v: obj) =
+        let rec loop (acc: obj) (v: obj) =
             if boundsCheck (v) then
                 acc
             else
                 match f.invoke (acc, v) with
                 | :? Reduced as red -> (red :> IDeref).deref ()
-                | nextAcc -> iter nextAcc (Numbers.addP (v, step))
+                | nextAcc -> loop nextAcc (Numbers.addP (v, step))
 
-        iter acc v
+        loop acc v
 
     interface IReduce with
         member this.reduce(f) =
@@ -202,13 +202,13 @@ type internal LongChunk(start: int64, step: int64, count: int) =
                 LongChunk(start + step, step, count - 1)
 
         member _.reduce(f, init) =
-            let rec iter (acc: obj) (v: int64) (i: int64) =
+            let rec loop (acc: obj) (v: int64) (i: int64) =
                 match acc with
                 | :? Reduced as red -> (red :> IDeref).deref ()
                 | _ when i >= count -> acc
-                | _ -> iter (f.invoke (acc, v)) (v + step) (i + 1L)
+                | _ -> loop (f.invoke (acc, v)) (v + step) (i + 1L)
 
-            iter init start 0
+            loop init start 0
 
 
 type LongRange private (m: IPersistentMap, startV: int64, endV: int64, step: int64, count: int) =
@@ -304,15 +304,15 @@ type LongRange private (m: IPersistentMap, startV: int64, endV: int64, step: int
 
 
     member this.reducer (f: IFn) (acc: obj) (v: int64) (cnt: int) =
-        let rec iter (acc: obj) (v: int64) (cnt: int) =
+        let rec loop (acc: obj) (v: int64) (cnt: int) =
             if cnt <= 0 then
                 acc
             else
                 match f.invoke (acc, v) with
                 | :? Reduced as red -> (red :> IDeref).deref ()
-                | nextAcc -> iter nextAcc (v + step) (cnt - 1)
+                | nextAcc -> loop nextAcc (v + step) (cnt - 1)
 
-        iter acc v cnt
+        loop acc v cnt
 
     interface IReduce with
         member this.reduce(f) =

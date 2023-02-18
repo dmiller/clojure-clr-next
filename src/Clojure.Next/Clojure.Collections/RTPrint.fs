@@ -48,13 +48,13 @@ let rec baseMetaPrinter (x: obj, w: TextWriter) : unit =
 
 and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
     let printInnerSeq readably (s: ISeq) (w: TextWriter) =
-        let rec step (s: ISeq) =
+        let rec loop (s: ISeq) =
             if s <> null then 
                  printBasic (readably, s.first(), w) 
                  let next = s.next() 
                  if next <> null then w.Write(' ')
-                 step next
-        step s
+                 loop next
+        loop s
 
     let baseCharPrinter readably (c: char) (w: TextWriter) =
         if not readably then
@@ -103,16 +103,16 @@ and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
         w.Write(')')
     | :? String as s -> baseStringPrinter readably s w
     | :? IPersistentMap ->
-        let rec step (s: ISeq) =
+        let rec loop (s: ISeq) =
             let e: IMapEntry = downcast s.first ()
             printBasic (readably, e.key (), w)
             w.Write(' ')
             printBasic (readably, e.value (), w)
             if s.next () <> null then w.Write(", ")
-            step (s.next ())
+            loop (s.next ())
 
         w.Write('{')
-        RT0.seq (x) |> step
+        RT0.seq (x) |> loop
         w.Write('}')
     | :? IPersistentVector as v ->
         let n = v.count ()
@@ -123,15 +123,15 @@ and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
 
         w.Write(']')
     | :? IPersistentSet ->
-        let rec step (s: ISeq) =
+        let rec loop (s: ISeq) =
             printBasic (readably, s.first (), w)
 
             if not (isNull (s.next ())) then w.Write(" ")
 
-            step (s.next ())
+            loop (s.next ())
 
         w.Write("#{")
-        RT0.seq (x) |> step
+        RT0.seq (x) |> loop
         w.Write('}')
     | :? Char as ch -> baseCharPrinter readably ch w
     | :? Type as t ->

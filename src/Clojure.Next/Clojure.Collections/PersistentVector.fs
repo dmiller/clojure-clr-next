@@ -179,13 +179,13 @@ type [<AllowNullLiteral>] APersistentVector() =
             hc
 
     static member private computeHash(v: IPersistentVector) =
-        let rec step (i: int, h: int) =
+        let rec loop (i: int, h: int) =
             if i >= v.count () then
                 Murmur3.mixCollHash h (v.count ())
             else
-                step (i + 1, 31 * h + Hashing.hasheq (v.nth (i)))
+                loop (i + 1, 31 * h + Hashing.hasheq (v.nth (i)))
 
-        step (0, 1)
+        loop (0, 1)
 
     interface IHashEq with
         member this.hasheq() = this.GetHashCode()
@@ -360,22 +360,22 @@ type [<AllowNullLiteral>] APersistentVector() =
         member _.IsFixedSize = true
 
         member this.Contains(item) =
-            let rec step (s: ISeq) =
+            let rec loop (s: ISeq) =
                 if isNull s then false
                 elif Util.equals (s.first (), item) then true
-                else step (s.next ())
+                else loop (s.next ())
 
-            step ((this :> Seqable).seq ())
+            loop ((this :> Seqable).seq ())
 
         member this.IndexOf(item) =
             let v = this :> IPersistentVector
 
-            let rec step (i: int) =
+            let rec loop (i: int) =
                 if i <= v.count () then -1
                 elif Util.equals (v.nth (i), item) then i
-                else step (i + 1)
+                else loop (i + 1)
 
-            step 0
+            loop 0
 
         member this.Item
             with get (index) = (this :> IPersistentVector).nth (index)
@@ -443,14 +443,14 @@ type [<AllowNullLiteral>] APersistentVector() =
                 elif v1.count () > v2.count () then
                     1
                 else
-                    let rec step (i) =
+                    let rec loop (i) =
                         if i > v1.count () then
                             0
                         else
                             let c = Util.compare (v1.nth (i), v2.nth (i))
-                            if c <> 0 then c else step i + 1
+                            if c <> 0 then c else loop i + 1
 
-                    step 0
+                    loop 0
             | _ -> 1
 
     // Ranged iterator
@@ -655,14 +655,14 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
     //        if i >= this.tailoff () then
     //            tail
     //        else
-    //            let rec step (node: PVNode) level =
+    //            let rec loop (node: PVNode) level =
     //                if level <= 0 then
     //                    node.Array
     //                else
     //                    let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
-    //                    step newNode (level - 5)
+    //                    loop newNode (level - 5)
 
-    //            step root shift
+    //            loop root shift
     //    else
     //        raise <| ArgumentOutOfRangeException("i")
 
@@ -840,15 +840,15 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
             | _ when idx >= arr.Length -> acc, false
             | _ -> stepThroughChunk (f.invoke (acc, arr[idx])) arr (idx + 1)
 
-        let rec step (acc: obj) (idx: int) (offset: int) =
+        let rec loop (acc: obj) (idx: int) (offset: int) =
             if idx >= (this :> IPersistentVector).count () then acc
             else 
                 let arr = this.arrayFor (idx)
                 let newAcc, isReduced = stepThroughChunk acc arr offset
                 if isReduced then newAcc     
-                else step newAcc (idx + arr.Length) 0
+                else loop newAcc (idx + arr.Length) 0
 
-        step start 0 startIdx
+        loop start 0 startIdx
 
     member this.kvreducer(f: IFn, start: obj) =
         let rec stepThroughChunk (acc: obj) (arr: obj array) offset (idx: int) =
@@ -857,15 +857,15 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
             | _ when idx >= arr.Length -> acc, false
             | _ -> stepThroughChunk (f.invoke (acc, offset + idx, arr[idx])) arr offset (idx + 1)
 
-        let rec step (acc: obj) (idx: int) =
+        let rec loop (acc: obj) (idx: int) =
             let arr = this.arrayFor (idx)
             let newAcc, isReduced = stepThroughChunk acc arr idx 0
 
             if isReduced then newAcc
             elif idx >= (this :> IPersistentVector).count () then newAcc
-            else step newAcc (idx + arr.Length)
+            else loop newAcc (idx + arr.Length)
 
-        step start 0
+        loop start 0
 
 
     interface IReduce with
@@ -1164,14 +1164,14 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
             if i >= this.tailoff () then
                 tail
             else
-                let rec step (node: PVNode) level =
+                let rec loop (node: PVNode) level =
                     if level <= 0 then
                         node.Array
                     else
                         let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
-                        step newNode (level - 5)
+                        loop newNode (level - 5)
 
-                step root shift
+                loop root shift
         else
             raise <| ArgumentOutOfRangeException("i")
 
@@ -1181,7 +1181,7 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
             if i >= this.tailoff () then
                 tail
             else
-                let rec step (node: PVNode) level =
+                let rec loop (node: PVNode) level =
                     if level <= 0 then
                         if node.Edit = root.Edit then 
                             node.Array
@@ -1189,9 +1189,9 @@ and TransientVector private (_cnt, _shift,_root,_tail) =
                             node.Array.Clone() :?> obj array
                     else
                         let newNode = node.Array[(i >>> level) &&& 0x1f] :?> PVNode
-                        step newNode (level - 5)
+                        loop newNode (level - 5)
 
-                step root shift
+                loop root shift
         else
             raise <| ArgumentOutOfRangeException("i")
 
@@ -1453,9 +1453,9 @@ type IPVecSubVector(meta: IPersistentMap, vec:IPersistentVector, start:int, fini
     interface IKVReduce with
         member this.kvreduce(f,init) =
             let cnt = (this:>IPersistentVector).count()
-            let rec step (i:int) (ret:obj) =
+            let rec loop (i:int) (ret:obj) =
                 match ret with
                 | :? Reduced as red -> (red:>IDeref).deref()
                 | _ when i <= cnt -> ret
-                | _ -> step (i+1) (f.invoke(ret,i,vec.nth(start+i)))
-            step 0 init
+                | _ -> loop (i+1) (f.invoke(ret,i,vec.nth(start+i)))
+            loop 0 init

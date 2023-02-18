@@ -29,12 +29,12 @@ type ArrayChunk(arr:obj array,offset:int ,iend:int) =
 
         member _.reduce(f,start) =
             let ret = f.invoke(start,arr[offset])
-            let rec step (ret:obj) idx =
+            let rec loop (ret:obj) idx =
                 match ret with  
                 | :? Reduced -> ret
                 | _ when idx >= iend -> ret
-                | _ -> step (f.invoke(ret,arr[idx])) (idx+1)
-            step ret (offset+1)
+                | _ -> loop (f.invoke(ret,arr[idx])) (idx+1)
+            loop ret (offset+1)
 
 
 
