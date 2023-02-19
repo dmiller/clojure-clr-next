@@ -27,6 +27,30 @@ type Tests() =
             x <- ZeroCreateArray(32)
         x
 
+    [<Benchmark>]
+    member _.CSharpFixed() =
+        let mutable x : obj array = null
+        for i = 0 to NumIters do
+            x <- CreateArrayLib.CreateArrayFixed()
+        x
+
+    [<Benchmark>]
+    member _.FSharpZeroCreateFixed() =
+        let mutable x : obj array = null
+        for i = 0 to NumIters do
+            x <- ZeroCreateArrayFixed()
+        x
+
+    [<Benchmark>]
+    member _.FSharpZeroCreateFixedDirect() =
+        let mutable x : obj array = null
+        for i = 0 to NumIters do
+            x <- Array.zeroCreate 32
+        x
+
+
+
+
     //[<Benchmark>]
     //member _.FSharpCreate() =
     //    let mutable x : obj array = null

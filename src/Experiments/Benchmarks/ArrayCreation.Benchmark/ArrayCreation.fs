@@ -2,6 +2,8 @@
 
 let ZeroCreateArray(n:int) : obj array = Array.zeroCreate n
 
+let ZeroCreateArrayFixed() : obj array = Array.zeroCreate 32
+
 let CreateArray(n:int) : obj array = Array.create n null
 
 let CloneArray(a:obj array) : obj array = a.Clone() :?> obj array
