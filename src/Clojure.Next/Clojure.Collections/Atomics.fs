@@ -10,7 +10,7 @@ open System.Threading
 ///////////////////////////////////////////////////////////////////
 
 
-[<Sealed>]
+[<Sealed;AllowNullLiteral>]
 type AtomicReference<'T when 'T: not struct>(r: 'T) =
 
     let mutable ref = r
@@ -32,7 +32,7 @@ type AtomicReference<'T when 'T: not struct>(r: 'T) =
 
 
 
-[<Sealed>]
+[<Sealed;AllowNullLiteral>]
 type AtomicBoolean private(v:int) = 
 
     let mutable value : int  = v
