@@ -375,7 +375,7 @@ type ATransientMap() =
                 raise <| ArgumentException("Vector arg to map conj must be a pair")
             else
                 tm.assoc (pv.nth (0), pv.nth (1))
-        | :? KeyValuePair<_, _> as p -> tm.assoc (p.Key :> obj, p.Value :> obj)
+        | :? KeyValuePair<obj, obj> as p -> tm.assoc (p.Key, p.Value)
         | _ ->
             let rec loop (ret: ITransientMap) (s: ISeq) =
                 if isNull s then
@@ -1006,13 +1006,22 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
 
     // factories
 
+    static member createD2(other: IDictionary<'TKey,'TValue>): IPersistentMap =
+        let mutable ret =
+            (PersistentHashMap.Empty :> IEditableCollection)
+                .asTransient() :?> ITransientMap
+
+        for de in Seq.cast<KeyValuePair<'TKey,'TValue>> other do
+            ret <- ret.assoc (de.Key, de.Value)
+
+        ret.persistent ()
+
     static member create(other: IDictionary): IPersistentMap =
         let mutable ret =
             (PersistentHashMap.Empty :> IEditableCollection)
                 .asTransient() :?> ITransientMap
 
-        for o in other do
-            let de = o :?> DictionaryEntry
+        for de in Seq.cast<DictionaryEntry> other do
             ret <- ret.assoc (de.Key, de.Value)
 
         ret.persistent ()
@@ -1117,16 +1126,13 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
             then upcast this
             else upcast PersistentHashMap(m, count, root, hasNull, nullValue)
 
-    interface Counted with
-        override _.count() = count
-
     interface ILookup with
         override this.valAt(k) = (this :> ILookup).valAt(k, null)
 
         override _.valAt(k, nf) =
             if isNull k then if hasNull then nullValue else nf
             elif isNull root then null
-            else root.find (0, hash (k), k, nf)
+            else root.find (0, NodeOps.hash (k), k, nf)
 
     interface Associative with
         override _.containsKey(k) =
@@ -1134,15 +1140,15 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
                 hasNull
             else
                 (not (isNull root))
-                && root.find (0, hash (k), k, PersistentHashMap.notFoundValue)
-                   <> (upcast PersistentHashMap.notFoundValue)
+                && root.find (0, NodeOps.hash (k), k, PersistentHashMap.notFoundValue)
+                   <> PersistentHashMap.notFoundValue
 
         override _.entryAt(k) =
             if isNull k
             then if hasNull then upcast MapEntry.create (null, nullValue) else null
             elif isNull root
             then null
-            else root.find (0, hash (k), k)
+            else root.find (0, NodeOps.hash (k), k)
 
 
     interface Seqable with
@@ -1161,6 +1167,8 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
         override _.empty() =
             (PersistentHashMap.Empty :> IObj).withMeta(meta) :?> IPersistentCollection
 
+    interface Counted with
+        override _.count() = count
 
     interface IPersistentMap with
         override this.assoc(k, v) =
@@ -1175,7 +1183,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
                     if isNull root then upcast BitmapIndexedNode.Empty else root
 
                 let newRoot =
-                    rootToUse.assoc (0, hash (k), k, v, addedLeaf)
+                    rootToUse.assoc (0, NodeOps.hash (k), k, v, addedLeaf)
 
                 if newRoot = root then
                     upcast this
@@ -1198,12 +1206,13 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
             elif isNull root then
                 upcast this
             else
-                let newRoot = root.without (0, hash (k), k)
+                let newRoot = root.without (0, NodeOps.hash (k), k)
 
                 if newRoot = root
                 then upcast this
                 else upcast PersistentHashMap(meta, count - 1, newRoot, hasNull, nullValue)
 
+        override _.count() = count
 
     interface IEditableCollection with
         member this.asTransient() = upcast TransientHashMap(this)
@@ -1293,7 +1302,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
         fjinvoke.invoke (top)
 
     static member internal createNode(shift: int, key1: obj, val1: obj, key2hash: int, key2: obj, val2: obj): INode =
-        let key1hash = hash (key1)
+        let key1hash = NodeOps.hash (key1)
 
         if key1hash = key2hash then
             upcast HashCollisionNode(null, key1hash, 2, [| key1; val1; key2; val2 |])
@@ -1313,7 +1322,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
                                       key2: obj,
                                       val2: obj)
                                       : INode =
-        let key1hash = hash (key1)
+        let key1hash = NodeOps.hash (key1)
 
         if key1hash = key2hash then
             upcast HashCollisionNode(null, key1hash, 2, [| key1; val1; key2; val2 |])
@@ -1361,7 +1370,7 @@ and private TransientHashMap(e, r, c, hn, nv) =
 
             let n =
                 (if isNull root then (BitmapIndexedNode.Empty :> INode) else root)
-                    .assoc(edit, 0, hash (k), k, v, leafFlag)
+                    .assoc(edit, 0, NodeOps.hash (k), k, v, leafFlag)
 
             if n <> root then root <- n
 
@@ -1378,7 +1387,7 @@ and private TransientHashMap(e, r, c, hn, nv) =
             leafFlag.reset ()
 
             let n =
-                root.without (edit, 0, hash (k), k, leafFlag)
+                root.without (edit, 0, NodeOps.hash (k), k, leafFlag)
 
             if n <> root then root <- n
 
@@ -1395,7 +1404,7 @@ and private TransientHashMap(e, r, c, hn, nv) =
     override _.doValAt(k, nf) =
         if isNull k then if hasNull then nullValue else nf
         elif isNull root then nf
-        else root.find (0, hash (k), k, nf)
+        else root.find (0, NodeOps.hash (k), k, nf)
 
     override _.ensureEditable() =
         if not <| edit.Get() then
