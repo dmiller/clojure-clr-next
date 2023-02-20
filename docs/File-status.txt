@@ -1,0 +1,279 @@
+
+## Numerics
+
+| 92770 | BigDecimal.cs               |  X  |
+| 22897 | BigInt.cs                   |  X  |
+|120753 | BigInteger.cs               |  X  |
+|  6415 | Murmur3.cs                  |  X  |
+|132278 | Numbers.cs                  |  X  |
+|  6750 | Ratio.cs                    |  X  |
+|   394 | WarnBoxedMathAttribute.cs   |     |                                            
+
+
+## Atomics
+
+|  3649 | AtomicBoolean.cs            |  X  |
+|  4773 | AtomicInteger.cs            |     |
+|  3938 | AtomicLong.cs               |     |
+|  3688 | AtomicReference.cs          |  X  |
+
+
+## Collections
+
+|  9295 | AMapEntry.cs                  |  X  |
+| 22067 | APersistentMap.cs             |     |
+|  9451 | APersistentSet.cs             |     |
+| 37529 | APersistentVector.cs          |  X  |
+|  2315 | ArrayChunk.cs                 |  X  |
+| 14679 | ASeq.cs                       |  X  |
+|  2116 | Associative.cs                |  X  |
+|  4848 | ATransientMap.cs              |     |
+|  2182 | ATransientSet.cs              |     |
+|  1354 | Box.cs                        |     |
+|  1616 | ChunkBuffer.cs                |  X  |
+|  2622 | ChunkedCons.cs                |  X  |
+|  3658 | Cons.cs                       |  X  |
+|  1234 | Counted.cs                    |  X  |
+|  3636 | Cycle.cs                      |  X  |
+|  4685 | EnumeratorSeq.cs              |  X  |
+|   962 | IChunk.cs                     |  X  |
+|  1128 | IChunkedSeq.cs                |  X  |
+|  1013 | IDeref.cs                     |  X  |
+|  1480 | IDrop.cs                      |  X  |
+|   800 | IEditableCollection.cs        |  X  |
+| 57001 | IFn.cs                        |  X  |
+|   856 | IHashEq.cs                    |  X  |
+|   813 | IKVReduce.cs                  |  X  |
+|  1674 | ILookup.cs                    |  X  |
+|  1639 | IMapEntry.cs                  |  X  |
+|  1662 | IMapEnumerable.cs             |  X  |
+|  1062 | IMeta.cs                      |  X  |
+|  1303 | Indexed.cs                    |  X  |
+|  1203 | IndexedSeq.cs                 |  X  |
+|  1133 | IObj.cs                       |  X  |
+|   789 | IPending.cs                   |  X  |
+|  2459 | IPersistentCollection.cs      |  X  |
+|   777 | IPersistentList.cs            |  X  |
+|  3735 | IPersistentMap.cs             |  X  |
+|  2608 | IPersistentSet.cs             |  X  |
+|  1393 | IPersistentStack.cs           |  X  |
+|  2850 | IPersistentVector.cs          |  X  |
+|  1185 | IReduce.cs                    |  X  |
+|  1266 | IReduceInit.cs                |  X  |
+|  2928 | ISeq.cs                       |  X  |
+|  3378 | Iterate.cs                    |  X  |
+|   851 | ITransientAssociative.cs      |  X  |
+|  1085 | ITransientAssociative2.cs     |  X  |
+|   985 | ITransientCollection.cs       |  X  |
+|  1799 | ITransientMap.cs              |  X  |
+|  1168 | ITransientSet.cs              |  X  |
+|  1007 | ITransientVector.cs           |  X  |
+|  3544 | LazilyPersistentVector.cs     | 1/2 |
+|  9688 | LazySeq.cs                    |  X  |
+|  9981 | LongRange.cs                  |  X  |
+|  2599 | MapEntry.cs                   |  X  |
+|  4292 | MapEnumerator.cs              |  X  |
+|   771 | MapEquivalence.cs             |  X  |
+|  2321 | Obj.cs                        |  X  |
+| 30967 | PersistentArrayMap.cs         |     |
+| 68282 | PersistentHashMap.cs          |     |
+|  8848 | PersistentHashSet.cs          |     |
+| 18834 | PersistentList.cs             |  X  |
+| 14033 | PersistentQueue.cs            |     |
+| 20198 | PersistentStructMap.cs        |     |
+| 44594 | PersistentTreeMap.cs          |     |
+|  8509 | PersistentTreeSet.cs          |     |
+| 40261 | PersistentVector.cs           |  X  |
+| 10293 | Range.cs                      |  X  |
+|  1749 | RecordEnumerable.cs           |     |
+|   834 | Reduced.cs                    |  X  |
+|  4531 | Repeat.cs                     |  X  |
+|  1199 | Reversible.cs                 |  X  |
+|  1217 | Seqable.cs                    |  X  |
+|  5142 | SeqEnumerator.cs              |  X  |
+|   858 | Sequential.cs                 |  X  |
+|  3294 | Sorted.cs                     |  X  |
+|  4904 | StringSeq.cs                  |  X  |
+ 
+## Functions
+
+| 24485 | AFn.cs                        |  X  |
+| 25065 | AFnImpl.cs                    |     |
+|  3430 | AFunction.cs                  |     |
+|  2580 | ArityException.cs             |     |
+|   891 | Fn.cs                         |     |
+| 12907 | FuncTypes.cs                  |     |
+|   848 | IFnArity.cs                   |     |
+|  1152 | IFnClosure.cs                 |     |
+|264517 | RestFn.cs                     |     |
+| 37450 | RestFnImpl.cs                 |     |
+
+## Library
+
+| 17630 | Agent.cs                     |     |
+|  5997 | ARef.cs                      |     |
+|  3305 | AReference.cs                |     |
+|  8590 | Atom.cs                      |     |
+|  2525 | CountDownLatch.cs            |     |
+|  3283 | Delay.cs                     |     |
+|  7079 | Future.cs                    |     |
+|  1739 | IAtom.cs                     |     |
+|  1672 | IAtom2.cs                    |     |
+|   818 | IBlockingDeref.cs            |     |
+|  1200 | IProxy.cs                    |     |
+|   607 | IRecord.cs                   |     |
+|  3750 | IRef.cs                      |     |
+|  1725 | IReference.cs                |     |
+|  2220 | JavaConcurrentDictionary.cs  | ? |
+| 17573 | Keyword.cs                   |     |
+| 28708 | LockingTransaction.cs        |     |
+|  5278 | MethodImplCache.cs           |     |
+| 37081 | MultiFn.cs                   |     |
+|  1543 | Named.cs                     |     |
+| 20376 | Namespace.cs                 |     |
+| 25230 | Ref.cs                       |     |
+|  1665 | Settable.cs                  |     |
+| 12143 | Symbol.cs                    |     |
+|  1057 | Volatile.cs                  |     |
+| 49305 | Var.cs                       |     |
+
+
+## Readers
+
+| 43256 | EdnReader.cs                 |     |
+| 91138 | LispReader.cs                |     |
+|  2734 | ReaderConditional.cs         |     |
+|   787 | IExceptionInfo.cs            |     |
+|  2704 | TaggedLiteral.cs             |     |
+|  4186 | LineNumberingTextReader.cs   |     |
+|  4113 | PushbackInputStream.cs       |     |
+|  2425 | PushbackTextReader.cs        |     |
+
+
+
+## Compiler or core.clj support
+
+| 18565 | ArraySeq.cs                  |     |
+|  4136 | ArrayHelper.cs               |     |
+|   799 | IKeywordLookup.cs            |     |
+|   751 | ILookupSite.cs               |     |
+|   788 | ILookupThunk.cs              |     |
+|   605 | IType.cs                     |     |
+|  2542 | KeywordLookupSite.cs         |     |
+|  9232 | TransformerEnumerator.cs     |     |
+|  2608 | Tuple.cs                     |     |
+|  2195 | TypeNotFoundException.cs     |     |
+|  5272 | JReMatcher.cs                |     |
+
+
+## Runtime
+| 14968 | ClrTypeSpec.cs               |     |
+|  3053 | ExceptionInfo.cs             |     |
+|113980 | RT.cs                        |     |
+| 32505 | Util.cs                      |     |
+
+
+|  1130 | ClojureException.cs          | ? |
+
+## Runtime
+
+|  3524 | ClojureContext.cs            |     |
+|   968 | ClojureOps.cs                |     |
+|  1391 | ClojureOptions.cs            |     |
+|  8898 | ConversionWrappers.cs        |     |
+| 27762 | Converter.cs                 |     |
+|  2329 | ImmutableDictionaryEnumerator.cs  |     |
+| 60639 | Printf.cs                    |     |
+|  2702 | Properties.cs                |     |
+| 29652 | Reflector.cs                 |     |
+   
+## Runtime Binding
+
+|  1220 | BindingHelpers.cs                   |     |
+|  3775 | ClojureBinder.cs                    |     |
+|  4335 | ClojureCreateInstanceBinder.cs      |     |
+|  5396 | ClojureGetZeroArityMemberBinder.cs  |     |
+|  6120 | ClojureInvokeMemberBinder.cs        |     |
+|  2486 | ClojureOverloadResolver.cs          |     |
+|  2655 | DynUtils.cs                         |     |
+|   890 | IClojureBinder.cs                   |     |
+|  2450 | MetaAFn.cs                          |     |
+
+ ## Compiler
+
+|  3390 | ArrayIter.cs                 |     |
+| 94934 | Compiler.cs                  |     |
+| 35661 | GenClass.cs                  |     |
+|  3011 | GenDelegate.cs               |     |
+|  9899 | GenInterface.cs              |     |
+| 20268 | GenProxy.cs                  |     |
+|  4793 | MethodSignature.cs           |     |
+
+
+# AST   
+     
+|   875 | AssignableExpr.cs            |     |
+|  2461 | AssignExpr.cs                |     |
+|  1829 | BindingInit.cs               |     |
+|  3652 | BodyExpr.cs                  |     |
+|  1637 | BooleanExpr.cs               |     |
+| 16325 | CaseExpr.cs                  |     |
+|  4065 | ConstantExpr.cs              |     |
+| 11245 | DefExpr.cs                   |     |
+| 12481 | DynInitHelper.cs             |     |
+|  3153 | EmptyExpr.cs                 |     |
+|   950 | Expr.cs                      |     |
+|   994 | FieldExpr.cs                 |     |
+| 14222 | FnExpr.cs                    |     |
+| 17965 | FnMethod.cs                  |     |
+|  9667 | GenContext.cs                |     |
+|  1498 | HostArg.cs                   |     |
+| 25402 | HostExpr.cs                  |     |
+|   902 | IdentityHashMap.cs           |     |
+|  6882 | IfExpr.cs                    |     |
+|  5931 | IlGen.cs                     |     |
+|  2345 | ImportExpr.cs                |     |
+| 10839 | InstanceFieldExpr.cs         |     |
+|  3455 | InstanceMethodExpr.cs        |     |
+|  2539 | InstanceOfExpr.cs            |     |
+|  5179 | InstanceZeroArityCallExpr.cs |     |
+| 16974 | Intrinsics.cs                |     |
+| 15980 | InvokeExpr.cs                |     |
+|   679 | IParser.cs                   |     |
+|  1639 | KeywordExpr.cs               |     |
+|  5910 | KeywordInvokeExpr.cs         |     |
+| 11903 | LetExpr.cs                   |     |
+|  5949 | LetFnExpr.cs                 |     |
+|  1066 | LiteralExpr.cs               |     |
+|  3223 | LocalBinding.cs              |     |
+|  2985 | LocalBindingExpr.cs          |     |
+|  6250 | MapExpr.cs                   |     |
+|   877 | MaybePrimitiveExpr.cs        |     |
+|  2058 | MetaExpr.cs                  |     |
+| 21111 | MethodExpr.cs                |     |
+|  1869 | MethodParamExpr.cs           |     |
+|  1778 | MonitorEnterExpr.cs          |     |
+|  1772 | MonitorExitExpr.cs           |     |
+| 11018 | NewExpr.cs                   |     |
+| 27437 | NewInstanceExpr.cs           |     |
+| 14244 | NewInstanceMethod.cs         |     |
+|  1310 | NilExpr.cs                   |     |
+|  1826 | Node.cs                      |     |
+|  2466 | NumberExpr.cs                |     |
+| 47016 | ObjExpr.cs                   |     |
+|  6887 | ObjMethod.cs                 |     |
+|   777 | ParseException.cs            |     |
+|  2690 | ParserContext.cs             |     |
+|  9515 | RecurExpr.cs                 |     |
+|  3200 | SetExpr.cs                   |     |
+|  8841 | StaticFieldExpr.cs           |     |
+|  5847 | StaticInvokeExpr.cs          |     |
+|  5272 | StaticMethodExpr.cs          |     |
+|  1419 | StringExpr.cs                |     |
+|  2129 | TheVarExpr.cs                |     |
+|  2557 | ThrowExpr.cs                 |     |
+|  9964 | TryExpr.cs                   |     |
+|  1647 | UnresolvedVarExpr.cs         |     |
+|  1079 | UntypedExpr.cs               |     |
+|  2466 | VarExpr.cs                   |     |
+|  3540 | VectorExpr.cs                |     |
