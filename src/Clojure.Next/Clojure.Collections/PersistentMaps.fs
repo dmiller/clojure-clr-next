@@ -869,1851 +869,1287 @@ and [<Sealed>] internal PAMSeq(meta: IPersistentMap, arr: obj array, index: int)
             (this :> IEnumerable<obj>).GetEnumerator()
 
 
-and PersistentHashMap() =
+and KVMangleFn<'T> = obj * obj -> 'T
+
+
+and [<AllowNullLiteral>] INode =
+
+    abstract assoc: shift: int * hash: int * key: obj * value: obj * addedLeaf: BoolBox -> INode
+    abstract without: shift: int * hash: int * key: obj -> INode
+    abstract find: shift: int * hash: int * key: obj -> IMapEntry
+    abstract find: shift: int * hash: int * key: obj * notFound: obj -> obj
+    abstract getNodeSeq: unit -> ISeq
+
+    abstract assoc: edit: AtomicBoolean * shift: int * hash: int * key: obj * value: obj * addedLeaf: BoolBox -> INode
+
+    abstract without: edit: AtomicBoolean * shift: int * hash: int * key: obj * removedLeaf: BoolBox -> INode
+    abstract kvReduce: fn: IFn * init: obj -> obj
+    abstract fold: combinef: IFn * reducef: IFn * fjtask: IFn * fjfork: IFn * fjjoin: IFn -> obj
+    abstract iterator: d: KVMangleFn<obj> -> IEnumerator
+    abstract iteratorT: d: KVMangleFn<'T> -> IEnumerator<'T>
+
+and [<AbstractClass; Sealed>] private NodeOps() =
+
+    static member cloneAndSet(arr: 'T array, i: int, a: 'T) : 'T array =
+        let clone: 'T array = downcast arr.Clone()
+        clone.[i] <- a
+        clone
+
+
+    static member cloneAndSet2(arr: 'T array, i: int, a: 'T, j: int, b: 'T) : 'T array =
+        let clone: 'T array = downcast arr.Clone()
+        clone.[i] <- a
+        clone.[j] <- b
+        clone
+
+    static member removePair(arr: 'T array, i: int) : 'T array =
+        let newArr: 'T array = Array.zeroCreate <| arr.Length - 2
+        Array.Copy(arr, 0, newArr, 0, 2 * i)
+        Array.Copy(arr, 2 * (i + 1), newArr, 2 * i, newArr.Length - 2 * i)
+        newArr
+
+    // Random goodness
+
+    static member hash(k) = Hashing.hasheq (k)
+    static member mask(hash:int, shift:int) = (hash >>> shift) &&& 0x01f
+    static member bitPos(hash, shift) = 1 <<< NodeOps.mask (hash, shift)
+    static member bitCount(x:int) = System.Numerics.BitOperations.PopCount(uint64(x))
+    static member bitIndex(bitmap, bit) =  NodeOps.bitCount(bitmap &&& (bit - 1)) // Not used?
+
+    static member findIndex(key: obj, items: obj[], count: int) : int =
+        seq { 0..2 .. 2 * count - 1 }
+        |> Seq.tryFindIndex (fun i -> Util.equiv (key, items.[i]))
+        |> Option.defaultValue -1
+
+and [<AbstractClass; Sealed>] private NodeIter() =
+    static member getEnumerator (array: obj [], d: KVMangleFn<obj>): IEnumerator =
+        let s =
+            seq {
+                for i in 0 .. 2 .. array.Length - 1 do
+                    let key = array.[i]
+                    let nodeOrVal = array.[i + 1]
+
+                    if not (isNull key) then
+                        yield d (key, nodeOrVal)
+                    elif not (isNull nodeOrVal) then
+                        let ie = (nodeOrVal :?> INode).iterator(d)
+
+                        while ie.MoveNext() do
+                            yield ie.Current
+            }
+        s.GetEnumerator() :> IEnumerator
+
+    static member getEnumeratorT (array: obj [], d: KVMangleFn<'T>): IEnumerator<'T> =
+        let s =
+            seq {
+                for i in 0 .. 2 .. array.Length - 1 do
+                    let key = array.[i]
+                    let nodeOrVal = array.[i + 1]
+
+                    if not (isNull key) then
+                        yield d (key, nodeOrVal)
+                    elif not (isNull nodeOrVal) then
+                        let ie = (nodeOrVal :?> INode).iteratorT(d)
+
+                        while ie.MoveNext() do
+                            yield ie.Current
+            }
+
+        s.GetEnumerator()
+
+
+
+and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, hasNull: bool, nullValue: obj) =
     inherit APersistentMap()
 
 
+// A persistent rendition of Phil Bagwell's Hash Array Mapped Trie
+//
+// Uses path copying for persistence.
+// HashCollision leaves vs extended hashing
+// Node polymorphism vs conditionals
+// No sub-tree pools or root-resizing
+// Any errors are Rich Hickey's (so he says), except those that I introduced
+
+// A PersistentHashMap consists of a head node representing the map that has a points to a tree of nodes containing the key/value pairs.
+// The head node indicated if null is a key and holds the associated value.
+// Thus the tree is guaranteed not to contain a null key, allowing null to be used as an 'empty field' indicator.
+// The tree contains three kinds of nodes:
+//     ArrayNode
+//     BitmapIndexedNode
+//     HashCollisionNode
+//
+// This arrangement seems ideal for a discriminated union, but we need mutable fields
+// (required to implement IEditableCollection and the ITransientXxx interfaces in-place)
+// and DUs don't support that.  Perhaps some smarter than me can do this someday.
+
+    new(count, root, hasNull, nullValue) = PersistentHashMap(null, count, root, hasNull, nullValue)
+
+    member internal _.Meta = meta
+    member internal _.Count = count
+    member internal _.Root = root
+    member internal _.HasNull = hasNull
+    member internal _.NullValue = nullValue
+
+    static member Empty = PersistentHashMap(null, 0, null, false, null)
+
+    static member val private notFoundValue = obj()
+
+    // factories
+
+    static member create(other: IDictionary): IPersistentMap =
+        let mutable ret =
+            (PersistentHashMap.Empty :> IEditableCollection)
+                .asTransient() :?> ITransientMap
+
+        for o in other do
+            let de = o :?> DictionaryEntry
+            ret <- ret.assoc (de.Key, de.Value)
+
+        ret.persistent ()
+
+    static member create([<ParamArray>] init: obj []): PersistentHashMap =
+        let mutable ret =
+            (PersistentHashMap.Empty :> IEditableCollection)
+                .asTransient() :?> ITransientMap
+
+        for i in 0 .. 2 .. init.Length - 1 do
+            ret <- ret.assoc (init.[i], init.[i + 1])
+        downcast ret.persistent ()
+
+    static member createWithCheck([<ParamArray>] init: obj []): PersistentHashMap =
+        let mutable ret =
+            (PersistentHashMap.Empty :> IEditableCollection)
+                .asTransient() :?> ITransientMap
+
+        for i in 0 .. 2 .. init.Length - 1 do
+            ret <- ret.assoc (init.[i], init.[i + 1])
+
+            if ret.count () <> i / 2 + 1 then
+                raise
+                <| ArgumentException("init", "Duplicate key: " + init.[i].ToString())
+        downcast ret.persistent ()
+
+    static member create1(init: IList): PersistentHashMap =
+        let mutable ret =
+            (PersistentHashMap.Empty :> IEditableCollection)
+                .asTransient() :?> ITransientMap
+
+        let ie = init.GetEnumerator()
+
+        while ie.MoveNext() do
+            let key = ie.Current
+
+            if not (ie.MoveNext()) then
+                raise
+                <| ArgumentException("init", "No value supplied for " + key.ToString())
+
+            let value = ie.Current
+            ret <- ret.assoc (key, value)
+        downcast ret.persistent ()
+
+    static member createWithCheck(items: ISeq): PersistentHashMap =
+        let mutable ret =
+            (PersistentHashMap.Empty :> IEditableCollection)
+                .asTransient() :?> ITransientMap
+
+        let rec loop (i: int) (s: ISeq) =
+            if not (isNull s) then
+                if isNull (s.next ()) then
+                    raise
+                    <| ArgumentException
+                        ("items",
+                         "No value supplied for key: "
+                         + items.first().ToString())
+
+                ret <- ret.assoc (items.first (), RTSeq.second (items))
+
+                if ret.count () <> i + 1 then
+                    raise
+                    <| ArgumentException("items", "Duplicate key: " + items.first().ToString())
 
+                loop (i + 1) (s.next().next())
 
-//    /// <summary>
-//    /// A persistent rendition of Phil Bagwell's Hash Array Mapped Trie
-//    /// </summary>
-//    /// <remarks>
-//    /// <para>Uses path copying for persistence.</para>
-//    /// <para>HashCollision leaves vs extended hashing</para>
-//    /// <para>Node polymorphism vs conditionals</para>
-//    /// <para>No sub-tree pools or root-resizing</para>
-//    /// <para>Any errors are Rich Hickey's (so he says), except those that I introduced.</para>
-//    /// </remarks>
-//    [Serializable]
-//    public class PersistentHashMap : APersistentMap, IEditableCollection, IObj, IMapEnumerable, IMapEnumerableTyped<Object, Object>, IEnumerable, IEnumerable<IMapEntry>, IKVReduce
-//    {
-//        #region Data
-
-//        /// <summary>
-//        /// The number of entries in the map.
-//        /// </summary>
-//        readonly int _count;
-
-//        /// <summary>
-//        /// The root of the trie.
-//        /// </summary>
-//        readonly INode _root;
-
-//        /// <summary>
-//        /// Indicates if the map has the null value as a key.
-//        /// </summary>
-//        readonly bool _hasNull;
-
-//        /// <summary>
-//        /// The value associated with the null key, if present.
-//        /// </summary>
-//        readonly object _nullValue;
-
-//        readonly IPersistentMap _meta;
-
-//        /// <summary>
-//        /// An empty <see cref="PersistentHashMap">PersistentHashMap</see>.
-//        /// </summary>
-//        public static readonly PersistentHashMap EMPTY = new PersistentHashMap(0, null, false, null);
-
-
-//        static readonly object NotFoundValue = new object();
-
-//        #endregion
-
-//        #region C-tors & factory methods
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentHashMap">PersistentHashMap</see> initialized from a CLR dictionary.
-//        /// </summary>
-//        /// <param name="other">The dictionary to copy from.</param>
-//        /// <returns>A <see cref="PersistentHashMap">PersistentHashMap</see>.</returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static IPersistentMap create(IDictionary other)
-//        {
-//            ITransientMap ret = (ITransientMap)EMPTY.asTransient();
-//            foreach (DictionaryEntry e in other)
-//                ret = ret.assoc(e.Key, e.Value);
-//            return ret.persistent();
-//        }
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentHashMap">PersistentHashMap</see> initialized from an array of alternating keys and values.
-//        /// </summary>
-//        /// <param name="init">An array of alternating keys and values.</param>
-//        /// <returns>A <see cref="PersistentHashMap">PersistentHashMap</see>.</returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static PersistentHashMap create(params object[] init)
-//        {
-//            ITransientMap ret = (ITransientMap)EMPTY.asTransient();
-//            for (int i = 0; i < init.Length; i += 2)
-//                ret = ret.assoc(init[i], init[i + 1]);
-//            return (PersistentHashMap)ret.persistent();
-//        }
-
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static PersistentHashMap createWithCheck(params object[] init)
-//        {
-//            ITransientMap ret = (ITransientMap)EMPTY.asTransient();
-//            for (int i = 0; i < init.Length; i += 2)
-//            {
-//                ret = ret.assoc(init[i], init[i + 1]);
-//                if (ret.count() != i / 2 + 1)
-//                    throw new ArgumentException("Duplicate key: " + init[i]);
-//            }
-//            return (PersistentHashMap)ret.persistent();
-//        }
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentHashMap">PersistentHashMap</see> initialized from an IList of alternating keys and values.
-//        /// </summary>
-//        /// <param name="init">An IList of alternating keys and values.</param>
-//        /// <returns>A <see cref="PersistentHashMap">PersistentHashMap</see>.</returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static PersistentHashMap create1(IList init)
-//        {
-//            ITransientMap ret = (ITransientMap)EMPTY.asTransient();
-//            for (IEnumerator i = init.GetEnumerator(); i.MoveNext(); )
-//            {
-//                object key = i.Current;
-//                if (!i.MoveNext())
-//                    throw new ArgumentException(String.Format("No value supplied for key: {0}", key));
-//                object val = i.Current;
-//                ret = ret.assoc(key, val);
-//            }
-//            return (PersistentHashMap)ret.persistent();
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public PersistentHashMap createWithCheck(ISeq items)
-//        {
-//            ITransientMap ret = (ITransientMap)EMPTY.asTransient();
-//            for (int i = 0; items != null; items = items.next().next(), ++i)
-//            {
-//                if (items.next() == null)
-//                    throw new ArgumentException(String.Format("No value supplied for key: {0}", items.first()));
-//                ret = ret.assoc(items.first(), RT.second(items));
-//                if (ret.count() != i + 1)
-//                    throw new ArgumentException("Duplicate key: " + items.first());
-//            }
-//            return (PersistentHashMap)ret.persistent();
-//        }
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentHashMap">PersistentHashMap</see> initialized from
-//        /// an <see cref="ISeq">ISeq</see> of alternating keys and values.
-//        /// </summary>
-//        /// <param name="items">An <see cref="ISeq">ISeq</see> of alternating keys and values.</param>
-//        /// <returns>A <see cref="PersistentHashMap">PersistentHashMap</see>.</returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static PersistentHashMap create(ISeq items)
-//        {
-//            ITransientMap ret = (ITransientMap)EMPTY.asTransient();
-//            for (; items != null; items = items.next().next())
-//            {
-//                if ( items.next() == null )
-//                    throw new ArgumentException(String.Format("No value supplied for key: {0}", items.first()));
-//                ret = ret.assoc(items.first(), RT.second(items) );
-//            }
-//            return (PersistentHashMap)ret.persistent();
-//        }
-
-
-//        /// <summary>
-//        /// Create a <see cref="PersistentHashMap">PersistentHashMap</see> with given metadata initialized from an array of alternating keys and values.
-//        /// </summary>
-//        /// <param name="meta">The metadata to attach.</param>
-//        /// <param name="init">An array of alternating keys and values.</param>
-//        /// <returns>A <see cref="PersistentHashMap">PersistentHashMap</see>.</returns>
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        public static PersistentHashMap create(IPersistentMap meta, params object[] init)
-//        {
-//            return (PersistentHashMap)create(init).withMeta(meta);
-//        }
-
-//        /// <summary>
-//        /// Initialize a <see cref="PersistentHashMap">PersistentHashMap</see> with a given count and root node.
-//        /// </summary>
-//        /// <param name="count">The count.</param>
-//        /// <param name="root">The root node.</param>
-//        /// <param name="hasNull"></param>
-//        /// <param name="nullValue"></param>
-//        PersistentHashMap(int count, INode root, bool hasNull, object nullValue)
-//        {
-//            _meta = null;
-//            _count = count;
-//            _root = root;
-//            _hasNull = hasNull;
-//            _nullValue = nullValue;
-//        }
-
-//        /// <summary>
-//        /// Initialize a <see cref="PersistentHashMap">PersistentHashMap</see> with given metadata, count and root node.
-//        /// </summary>
-//        /// <param name="meta">The metadata to attach</param>
-//        /// <param name="count">The count.</param>
-//        /// <param name="root">The root node.</param>
-//        /// <param name="hasNull"></param>
-//        /// <param name="nullValue"></param>
-//        PersistentHashMap(IPersistentMap meta, int count, INode root, bool hasNull, object nullValue)
-//        {
-//            _meta = meta;
-//            _count = count;
-//            _root = root;
-//            _hasNull = hasNull;
-//            _nullValue = nullValue;
-//        }
-
-//        #endregion
-
-//        #region hashing
-
-//        static int Hash(object k)
-//        {
-//            return Util.hasheq(k);
-//        }
-
-//        #endregion
-
-//        #region IObj members
-
-//        /// <summary>
-//        /// Create a copy with new metadata.
-//        /// </summary>
-//        /// <param name="meta">The new metadata.</param>
-//        /// <returns>A copy of the object with new metadata attached.</returns>
-//        public override IObj withMeta(IPersistentMap meta)
-//        {
-//            if (_meta == meta)
-//                return this;
-
-//            return new PersistentHashMap(meta, _count, _root, _hasNull, _nullValue);
-//        }
-
-//        #endregion
-
-//        #region IMeta Members
-
-//        public IPersistentMap meta()
-//        {
-//            return _meta;
-//        }
-
-//        #endregion
-
-//        #region Associative
-
-//         /// <summary>
-//         /// Test if the map contains a key.
-//         /// </summary>
-//         /// <param name="key">The key to test for membership</param>
-//         /// <returns>True if the key is in this map.</returns>
-//         public override bool containsKey(object key)
-//        {
-//            if (key == null)
-//                return _hasNull;
-//            return (_root != null) && _root.Find(0, Hash(key), key, NotFoundValue) != NotFoundValue;
-//        }
-
-//        /// <summary>
-//        /// Returns the key/value pair for this key.
-//        /// </summary>
-//        /// <param name="key">The key to retrieve</param>
-//        /// <returns>The key/value pair for the key, or null if the key is not in the map.</returns>
-//        public override IMapEntry entryAt(object key)
-//        {
-//            if (key == null)
-//                return _hasNull ? (IMapEntry)MapEntry.create(null, _nullValue) : null;
-//            return _root?.Find(0,Hash(key),key);
-//        }
-
-//        /// <summary>
-//        /// Gets the value associated with a key.
-//        /// </summary>
-//        /// <param name="key">The key to look up.</param>
-//        /// <returns>The associated value. (Throws an exception if key is not present.)</returns>
-//        public override object valAt(object key)
-//        {
-//            return valAt(key, null);
-//        }
-
-//        /// <summary>
-//        /// Gets the value associated with a key.
-//        /// </summary>
-//        /// <param name="key">The key to look up.</param>
-//        /// <param name="notFound">The value to return if the key is not present.</param>
-//        /// <returns>The associated value (or <c>notFound</c> if the key is not present.</returns>
-//        public override object valAt(object key, object notFound)
-//        {
-//            if (key == null)
-//                return _hasNull ? _nullValue : notFound;
-
-//            return (_root != null)
-//                ? _root.Find(0, Hash(key), key, notFound)
-//                : notFound;
-//        }
-
-//        #endregion
-
-//        #region IPersistentMap
-
-//        /// <summary>
-//        /// Add a new key/value pair.
-//        /// </summary>
-//        /// <param name="key">The key</param>
-//        /// <param name="val">The value</param>
-//        /// <returns>A new map with key+value added.</returns>
-//        /// <remarks>Overwrites an exising value for the <paramref name="key"/>, if present.</remarks>
-//        public override IPersistentMap assoc(object key, object val)
-//        {
-//            if (key == null)
-//            {
-//                if (_hasNull && val == _nullValue)
-//                    return this;
-//                return new PersistentHashMap(meta(), _hasNull ? _count : _count + 1, _root, true, val);
-//            }
-//            Box addedLeaf = new Box(null);
-//            INode newroot = (_root ?? BitmapIndexedNode.EMPTY)
-//                .Assoc(0, Hash(key), key, val, addedLeaf);
-//            return newroot == _root
-//                ? this
-//                : new PersistentHashMap(meta(), addedLeaf.Val == null ? _count : _count + 1, newroot, _hasNull, _nullValue);
-//        }
-
-
-//        /// <summary>
-//        /// Add a new key/value pair.
-//        /// </summary>
-//        /// <param name="key">The key</param>
-//        /// <param name="val">The value</param>
-//        /// <returns>A new map with key+value added.</returns>
-//        /// <remarks>Throws an exception if <paramref name="key"/> has a value already.</remarks>
-//        public override IPersistentMap assocEx(object key, object val)
-//        {
-//            if (containsKey(key))
-//                throw new InvalidOperationException("Key already present");
-//            return assoc(key, val);
-//        }
-
-
-//        /// <summary>
-//        /// Remove a key entry.
-//        /// </summary>
-//        /// <param name="key">The key to remove</param>
-//        /// <returns>A new map with the key removed (or the same map if the key is not contained).</returns>
-//        public override IPersistentMap without(object key)
-//        {
-//            if (key == null)
-//                return _hasNull ? new PersistentHashMap(meta(), _count - 1, _root, false, null) : this;
-//            if (_root == null)
-//                return this;
-//            INode newroot = _root.Without(0, Hash(key), key);
-//            if (newroot == _root)
-//                return this;
-//            return new PersistentHashMap(meta(), _count - 1, newroot, _hasNull, _nullValue);
-//        }
-
-//        #endregion
-
-//        #region IPersistentCollection
-
-//        /// <summary>
-//        /// Gets the number of items in the collection.
-//        /// </summary>
-//        /// <returns>The number of items in the collection.</returns>
-//        public override int count()
-//        {
-//            return _count;
-//        }
-
-//        /// <summary>
-//        /// Gets an ISeq to allow first/rest iteration through the collection.
-//        /// </summary>
-//        /// <returns>An ISeq for iteration.</returns>
-//        public override ISeq seq()
-//        {
-//            ISeq s = _root?.GetNodeSeq();
-//            return _hasNull ? new Cons(MapEntry.create(null, _nullValue), s) : s;
-//        }
-
-//        /// <summary>
-//        /// Gets an empty collection of the same type.
-//        /// </summary>
-//        /// <returns>An emtpy collection.</returns>
-//        public override IPersistentCollection empty()
-//        {
-//            return (IPersistentCollection) EMPTY.withMeta(meta());
-//        }
-
-//        #endregion
-
-//        #region IEditableCollection Members
-
-//        public ITransientCollection asTransient()
-//        {
-//            return new TransientHashMap(this);
-//        }
-
-//        #endregion
-
-//        #region TransientHashMap class
-
-//        sealed class TransientHashMap : ATransientMap
-//        {
-//            #region Data
-
-//            [NonSerialized] readonly AtomicReference<Thread> _edit;
-//            volatile INode _root;
-//            volatile int _count;
-//            volatile bool _hasNull;
-//            volatile object _nullValue;
-//            readonly Box _leafFlag = new Box(null);
-
-//            #endregion
-
-//            #region Ctors
-
-//            public TransientHashMap(PersistentHashMap m)
-//                : this(new AtomicReference<Thread>(Thread.CurrentThread), m._root, m._count, m._hasNull, m._nullValue)
-//            {
-//            }
-
-//            TransientHashMap(AtomicReference<Thread> edit, INode root, int count, bool hasNull, object nullValue)
-//            {
-//                _edit = edit;
-//                _root = root;
-//                _count = count;
-//                _hasNull = hasNull;
-//                _nullValue = nullValue;
-//            }
-
-//            #endregion
-
-//            #region ITransientMap Members
-
-//            protected override ITransientMap doAssoc(object key, object val)
-//            {
-//                if (key == null)
-//                {
-//                    if (_nullValue != val)
-//                        _nullValue = val;
-//                    if (!_hasNull)
-//                    {
-//                        _count++;
-//                        _hasNull = true;
-//                    }
-//                    return this;
-//                }
-//                _leafFlag.Val = null;
-//                INode n = (_root ?? BitmapIndexedNode.EMPTY)
-//                    .Assoc(_edit, 0, Hash(key), key, val, _leafFlag);
-//                if (n != _root)
-//                    _root = n;
-//                if (_leafFlag.Val != null)
-//                    _count++;
-//                return this;
-//            }
-
-//            protected override ITransientMap doWithout(object key)
-//            {
-//                if (key == null)
-//                {
-//                    if (!_hasNull)
-//                        return this;
-//                    _hasNull = false;
-//                    _nullValue = null;
-//                    _count--;
-//                    return this;
-//                }
-
-//                if (_root == null)
-//                    return this;
-
-//                _leafFlag.Val = null;
-//                INode n = _root.Without(_edit, 0, Hash(key), key, _leafFlag);
-//                if (n != _root)
-//                    _root = n;
-//               if (_leafFlag.Val != null)
-//                    _count--;
-//                return this;
-//            }
-
-//            protected override IPersistentMap doPersistent()
-//            {
-//                _edit.Set(null);
-//                return new PersistentHashMap(_count, _root, _hasNull, _nullValue);
-//            }
-
-//            #endregion
-
-//            #region ILookup Members
-
-//            protected override object doValAt(object key, object notFound)
-//            {
-//                if (key == null)
-//                    if (_hasNull)
-//                        return _nullValue;
-//                    else
-//                        return notFound;
-//                if (_root == null)
-//                    return notFound;
-//                return _root.Find(0, Hash(key), key, notFound);
-//            }
-
-//            //// not part of this interface, but I don't know a better place for it
-//            //IMapEntry entryAt(Object key)
-//            //{
-//            //    return (IMapEntry)_root.find(Hash(key), key);
-//            //}
-
-//            #endregion
-
-//            #region Counted Members
-
-//            protected override int doCount()
-//            {
-//                return _count;
-//            }
-
-//            #endregion
-
-//            #region Implementation details
-
-//            protected override void EnsureEditable()
-//            {
-//                if (_edit.Get() == null )
-//                    throw new InvalidOperationException("Transient used after persistent! call");
-//            }
-
-//            #endregion
-//         }
-
-//        #endregion
-
-//        #region IMapEnumerable, IMapEnumerableTyped, IEnumerable, ...
-
-//        public delegate T KVMangleDel<T>(object k, object v);
-
-//        static IEnumerator EmptyEnumerator()
-//        {
-//            return EmptyEnumeratorT<Object>();
-//        }
-
-//        static IEnumerator<T> EmptyEnumeratorT<T>()
-//        {
-//            yield break;
-//        }
-
-//        static IEnumerator NullIterator(KVMangleDel<Object> d, object nullValue, IEnumerator root)
-//        {
-//            yield return d(null, nullValue);
-//            while (root.MoveNext())
-//                yield return root.Current;
-//        }
-
-//        static IEnumerator<T> NullIteratorT<T>(KVMangleDel<T> d, object nullValue, IEnumerator<T> root)
-//        {
-//            yield return d(null, nullValue);
-//            while (root.MoveNext())
-//                yield return root.Current;
-//        }
-
-//        public IEnumerator MakeEnumerator(KVMangleDel<Object> d)
-//        {
-//            IEnumerator rootIter = (_root == null ? EmptyEnumerator() : _root.Iterator(d));
-//            if (!_hasNull)
-//                return rootIter;
-
-//            return NullIterator(d,_nullValue, rootIter);
-//        }
-
-//        public IEnumerator<T> MakeEnumeratorT<T>(KVMangleDel<T> d)
-//        {
-//            IEnumerator<T> rootIter = (_root == null ? EmptyEnumeratorT<T>() : _root.IteratorT<T>(d));
-//            if (!_hasNull)
-//                return rootIter;
-
-//            return NullIteratorT(d, _nullValue, rootIter);
-//        }
-
-//        public IEnumerator keyEnumerator()
-//        {
-//            return MakeEnumerator((k,v) => k);
-//        }
-
-//        public IEnumerator valEnumerator()
-//        {
-//            return MakeEnumerator((k, v) => v);
-//        }
-
-//        public IEnumerator<object> tkeyEnumerator()
-//        {
-//            return MakeEnumeratorT((k, v) => k);
-//        }
-
-//        public IEnumerator<object> tvalEnumerator()
-//        {
-//            return MakeEnumeratorT((k, v) => v);
-//        }
-
-//        public override IEnumerator<KeyValuePair<object, object>> GetEnumerator()
-//        {
-//            return MakeEnumeratorT((k, v) => new KeyValuePair<Object,Object>(k,v));
-//        }
-
-//        IEnumerator IEnumerable.GetEnumerator()
-//        {
-//            return MakeEnumeratorT((k, v) => MapEntry.create(k, v));
-//        }
-
-//        IEnumerator<IMapEntry> IEnumerable<IMapEntry>.GetEnumerator()
-//        {
-//            return MakeEnumeratorT((k, v) => (IMapEntry)MapEntry.create(k, v));
-//        }
-
-
-//        #endregion
-
-//        #region kvreduce & fold
-
-//        public object kvreduce(IFn f, object init)
-//        {
-//            init = _hasNull ? f.invoke(init,null,_nullValue) : init;
-//            if (RT.isReduced(init))
-//                return ((IDeref)init).deref();
-//            if (_root != null)
-//            {
-//                init = _root.KVReduce(f, init);
-//                if (RT.isReduced(init))
-//                    return ((IDeref)init).deref();
-//                else
-//                    return init;
-//            }
-//            return init;
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "Standard API")]
-//        public object fold(long n, IFn combinef, IFn reducef, IFn fjinvoke, IFn fjtask, IFn fjfork, IFn fjjoin)
-//        {
-//            // JVM: we are ignoring n for now
-//            Func<object> top = new Func<object>(() =>
-//            {
-//                object ret = combinef.invoke();
-//                if (_root != null)
-//                    ret = combinef.invoke(ret, _root.Fold(combinef, reducef, fjtask, fjfork, fjjoin));
-//                return _hasNull
-//                    ? combinef.invoke(ret, reducef.invoke(combinef.invoke(), null, _nullValue))
-//                    : ret;
-//            });
-
-//            return fjinvoke.invoke(top);
-//        }
-
-//        #endregion
-
-//        #region INode
-
-//        /// <summary>
-//        /// Interface for all nodes in the trie.
-//        /// </summary>
-//        public interface  INode
-//        {
-//            /// <summary>
-//            /// Return a trie with a new key/value pair.
-//            /// </summary>
-//            /// <param name="shift"></param>
-//            /// <param name="hash"></param>
-//            /// <param name="key"></param>
-//            /// <param name="val"></param>
-//            /// <param name="addedLeaf"></param>
-//            /// <returns></returns>
-//            INode Assoc(int shift, int hash, object key, object val, Box addedLeaf);
-
-//            /// <summary>
-//            /// Return a trie with the given key removed.
-//            /// </summary>
-//            /// <param name="shift"></param>
-//            /// <param name="hash"></param>
-//            /// <param name="key"></param>
-//            /// <returns></returns>
-//            INode Without(int shift, int hash, object key);
-
-//            /// <summary>
-//            /// Gets the entry containing a given key and its value.
-//            /// </summary>
-//            /// <param name="shift"></param>
-//            /// <param name="hash"></param>
-//            /// <param name="key"></param>
-//            /// <returns></returns>
-//            IMapEntry Find(int shift, int hash, object key);
-
-//            /// <summary>
-//            /// Gets the value associated with a given key, or return a default value if not found.
-//            /// </summary>
-//            /// <param name="shift"></param>
-//            /// <param name="hash"></param>
-//            /// <param name="key"></param>
-//            /// <param name="notFound"></param>
-//            /// <returns></returns>
-//            object Find(int shift, int hash, object key, object notFound);
-
-//            /// <summary>
-//            /// Return an <see cref="ISeq">ISeq</see> with iterating the tree defined by the current node.
-//            /// </summary>
-//            /// <returns>An <see cref="ISeq">ISeq</see> </returns>
-//            ISeq GetNodeSeq();
-
-//            ///// <summary>
-//            ///// Get the hash for the current ndoe.
-//            ///// </summary>
-//            ///// <returns></returns>
-//            //int getHash();
-
-//            /// <summary>
-//            /// Return a trie with a new key/value pair.
-//            /// </summary>
-//            /// <param name="edit"></param>
-//            /// <param name="shift"></param>
-//            /// <param name="hash"></param>
-//            /// <param name="key"></param>
-//            /// <param name="val"></param>
-//            /// <param name="addedLeaf"></param>
-//            /// <returns></returns>
-//            INode Assoc(AtomicReference<Thread> edit, int shift, int hash, object key, object val, Box addedLeaf);
-
-//            /// <summary>
-//            /// Return a trie with the given key removed.
-//            /// </summary>
-//            /// <param name="edit"></param>
-//            /// <param name="shift"></param>
-//            /// <param name="hash"></param>
-//            /// <param name="key"></param>
-//            /// <param name="removedLeaf"></param>
-//            /// <returns></returns>
-//            INode Without(AtomicReference<Thread> edit, int shift, int hash, object key, Box removedLeaf);
-
-//            /// <summary>
-//            /// Perform key-value reduce.
-//            /// </summary>
-//            /// <param name="f"></param>
-//            /// <param name="init"></param>
-//            /// <returns></returns>
-//            object KVReduce(IFn f, Object init);
-
-//            /// <summary>
-//            /// Fold
-//            /// </summary>
-//            /// <param name="combinef"></param>
-//            /// <param name="reducef"></param>
-//            /// <param name="fjtask"></param>
-//            /// <param name="fjfork"></param>
-//            /// <param name="fjjoin"></param>
-//            /// <returns></returns>
-//            object Fold(IFn combinef, IFn reducef, IFn fjtask, IFn fjfork, IFn fjjoin);
-
-//            IEnumerator Iterator(KVMangleDel<Object> d);
-//            IEnumerator<T> IteratorT<T>(KVMangleDel<T> d);
-//        }
-
-//        #endregion
-
-//        #region Array manipulation
-
-//        static INode[] CloneAndSet(INode[] array, int i, INode a)
-//        {
-//            INode[] clone = (INode[])array.Clone();
-//            clone[i] = a;
-//            return clone;
-//        }
-
-//        static object[] CloneAndSet(object[] array, int i, object a)
-//        {
-//            Object[] clone = (object[])array.Clone();
-//            clone[i] = a;
-//            return clone;
-//        }
-
-//        static object[] CloneAndSet(object[] array, int i, object a, int j, object b)
-//        {
-//            object[] clone = (object[])array.Clone();
-//            clone[i] = a;
-//            clone[j] = b;
-//            return clone;
-//        }
-
-//        private static object[] RemovePair(object[] array, int i)
-//        {
-//            object[] newArray = new Object[array.Length - 2];
-//            Array.Copy(array, 0, newArray, 0, 2 * i);
-//            Array.Copy(array, 2 * (i + 1), newArray, 2 * i, newArray.Length - 2 * i);
-//            return newArray;
-//        }
-
-
-
-//        #endregion
-
-//        #region Node factories
-
-//        private static INode CreateNode(int shift, object key1, object val1, int key2hash, object key2, object val2)
-//        {
-//            int key1hash = Hash(key1);
-//            if (key1hash == key2hash)
-//                return new HashCollisionNode(null, key1hash, 2, new object[] { key1, val1, key2, val2 });
-//            Box _ = new Box(null);
-//            AtomicReference<Thread> edit = new AtomicReference<Thread>();
-//            return BitmapIndexedNode.EMPTY
-//                .Assoc(edit, shift, key1hash, key1, val1, _)
-//                .Assoc(edit, shift, key2hash, key2, val2, _);
-//        }
-
-//        private static INode CreateNode(AtomicReference<Thread> edit, int shift, Object key1, Object val1, int key2hash, Object key2, Object val2)
-//        {
-//            int key1hash = Hash(key1);
-//            if (key1hash == key2hash)
-//                return new HashCollisionNode(null, key1hash, 2, new Object[] { key1, val1, key2, val2 });
-//            Box _ = new Box(null);
-//            return BitmapIndexedNode.EMPTY
-//                .Assoc(edit, shift, key1hash, key1, val1, _)
-//                .Assoc(edit, shift, key2hash, key2, val2, _);
-//        }
-
-//        #endregion
-
-//        #region Other details
-
-//        static int Bitpos(int hash, int shift)
-//        {
-//            return 1 << Util.Mask(hash, shift);
-//        }
-
-//        #endregion
-
-//        #region ArrayNode
-
-//        [Serializable]
-//        sealed class ArrayNode : INode
-//        {
-//            #region Data
-
-//            int _count;
-//            readonly INode[] _array;
-//            [NonSerialized]
-//            readonly AtomicReference<Thread> _edit;
-
-//            #endregion
-
-//            #region C-tors
-
-//            public ArrayNode(AtomicReference<Thread> edit, int count, INode[] array)
-//            {
-//                _array = array;
-//                _edit = edit;
-//                _count = count;
-//            }
-
-//            #endregion
-
-//            #region INode Members
-
-//            public INode Assoc(int shift, int hash, object key, object val, Box addedLeaf)
-//            {
-//                int idx = Util.Mask(hash, shift);
-//                INode node = _array[idx];
-//                if (node == null)
-//                    return new ArrayNode(null, _count + 1, CloneAndSet(_array, idx, BitmapIndexedNode.EMPTY.Assoc(shift + 5, hash, key, val, addedLeaf)));
-//                INode n = node.Assoc(shift + 5, hash, key, val, addedLeaf);
-//                if (n == node)
-//                    return this;
-//                return new ArrayNode(null, _count, CloneAndSet(_array, idx, n));
-//            }
-
-//            public INode Without(int shift, int hash, object key)
-//            {
-//                int idx = Util.Mask(hash, shift);
-//                INode node = _array[idx];
-//                if (node == null)
-//                    return this;
-//                INode n = node.Without(shift + 5, hash, key);
-//                if (n == node)
-//                    return this;
-//                if (n == null)
-//                {
-//                    if (_count <= 8) // shrink
-//                        return pack(null, idx);
-//                    return new ArrayNode(null, _count - 1, CloneAndSet(_array, idx, n));
-//                }
-//                else
-//                    return new ArrayNode(null, _count, CloneAndSet(_array, idx, n));
-//            }
-
-//            public IMapEntry Find(int shift, int hash, object key)
-//            {
-//                int idx = Util.Mask(hash, shift);
-//                INode node = _array[idx];
-//                if (node == null)
-//                    return null;
-//                return node.Find(shift + 5, hash, key);
-//            }
-
-//            public object Find(int shift, int hash, object key, object notFound)
-//            {
-//                int idx = Util.Mask(hash, shift);
-//                INode node = _array[idx];
-//                if (node == null)
-//                    return notFound;
-//                return node.Find(shift + 5, hash, key, notFound);
-//            }
-
-//            public ISeq GetNodeSeq()
-//            {
-//                return Seq.create(_array);
-//            }
-
-//            public INode Assoc(AtomicReference<Thread> edit, int shift, int hash, object key, object val, Box addedLeaf)
-//            {
-//                int idx = Util.Mask(hash, shift);
-//                INode node = _array[idx];
-//                if (node == null)
-//                {
-//                    ArrayNode editable = EditAndSet(edit, idx, BitmapIndexedNode.EMPTY.Assoc(edit, shift + 5, hash, key, val, addedLeaf));
-//                    editable._count++;
-//                    return editable;
-//                }
-//                INode n = node.Assoc(edit, shift + 5, hash, key, val, addedLeaf);
-//                if (n == node)
-//                    return this;
-//                return EditAndSet(edit, idx, n);
-//            }
-
-//            public INode Without(AtomicReference<Thread> edit, int shift, int hash, object key, Box removedLeaf)
-//            {
-//                int idx = Util.Mask(hash, shift);
-//                INode node = _array[idx];
-//                if (node == null)
-//                    return this;
-//                INode n = node.Without(edit, shift + 5, hash, key, removedLeaf);
-//                if (n == node)
-//                    return this;
-//                if (n == null)
-//                {
-//                    if (_count <= 8) // shrink
-//                        return pack(edit, idx);
-//                    ArrayNode editable = EditAndSet(edit, idx, n);
-//                    editable._count--;
-//                    return editable;
-//                }
-//                return EditAndSet(edit, idx, n);
-//            }
-
-//            public object KVReduce(IFn f, object init)
-//            {
-//                foreach (INode node in _array)
-//                {
-//                    if (node != null)
-//                    {
-//                        init = node.KVReduce(f, init);
-//                        if (RT.isReduced(init))
-//                            return init;
-//                    }
-//                }
-//                return init;
-//            }
-
-//            public object Fold(IFn combinef, IFn reducef, IFn fjtask, IFn fjfork, IFn fjjoin)
-//            {
-//                List<Func<object>> tasks = new List<Func<object>>();
-//                foreach (INode node in _array)
-//                {
-//                    tasks.Add(() =>
-//                        {
-//                            return node.Fold(combinef, reducef, fjtask, fjfork, fjjoin);
-//                        }
-//                    );
-//                }
-
-//                return FoldTasks(tasks, combinef, fjtask, fjfork, fjjoin);
-//            }
-
-//            static object FoldTasks(List<Func<object>> tasks, IFn combinef, IFn fjtask, IFn fjfork, IFn fjjoin)
-//            {
-
-//                if (tasks.Count == 0)
-//                    return combinef.invoke();
-
-//                if (tasks.Count == 1 )
-//                    return tasks[0].Invoke();
-
-//                int half = tasks.Count / 2;
-//                List<Func<object>> t1 = tasks.GetRange(0, half);
-//                List<Func<object>> t2 = tasks.GetRange(half, tasks.Count - half);
-//                object forked = fjfork.invoke(fjtask.invoke(new Func<object>(() => { return FoldTasks(t2, combinef, fjtask, fjfork, fjjoin); })));
-
-//                return combinef.invoke(FoldTasks(t1, combinef, fjtask, fjfork, fjjoin), fjjoin.invoke(forked));
-//            }
-
-//            #endregion
-
-//            #region Implementation details
-
-//            ArrayNode EnsureEditable(AtomicReference<Thread> edit)
-//            {
-//                if (_edit == edit)
-//                    return this;
-//                return new ArrayNode(edit, _count, (INode[])_array.Clone());
-//            }
-
-//            ArrayNode EditAndSet(AtomicReference<Thread> edit, int i, INode n)
-//            {
-//                ArrayNode editable = EnsureEditable(edit);
-//                editable._array[i] = n;
-//                return editable;
-//            }
-
-//            [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//            INode pack(AtomicReference<Thread> edit, int idx)
-//            {
-//                Object[] newArray = new Object[2 * (_count - 1)];
-//                int j = 1;
-//                int bitmap = 0;
-//                for (int i = 0; i < idx; i++)
-//                    if (_array[i] != null)
-//                    {
-//                        newArray[j] = _array[i];
-//                        bitmap |= 1 << i;
-//                        j += 2;
-//                    }
-//                for (int i = idx + 1; i < _array.Length; i++)
-//                    if (_array[i] != null)
-//                    {
-//                        newArray[j] = _array[i];
-//                        bitmap |= 1 << i;
-//                        j += 2;
-//                    }
-//                return new BitmapIndexedNode(edit, bitmap, newArray);
-//            }
-
-//            #endregion
-
-//            #region Seq implementation
-
-//            [Serializable]
-//            class Seq : ASeq
-//            {
-//                #region Data
-
-//                readonly INode[] _nodes;
-//                readonly int _i;
-//                readonly ISeq _s;
-
-//                #endregion
-
-//                #region C-tors
-
-//                [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//                static public ISeq create(INode[] nodes)
-//                {
-//                    return create(null, nodes, 0, null);
-//                }
-
-//                [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//                static ISeq create(IPersistentMap meta, INode[] nodes, int i, ISeq s)
-//                {
-//                    if (s != null)
-//                        return new Seq(meta, nodes, i, s);
-//                    for (int j = i; j < nodes.Length; j++)
-//                        if (nodes[j] != null)
-//                        {
-//                            ISeq ns = nodes[j].GetNodeSeq();
-//                            if (ns != null)
-//                                return new Seq(meta, nodes, j + 1, ns);
-//                        }
-//                    return null;
-//                }
-
-//                Seq(IPersistentMap meta, INode[] nodes, int i, ISeq s)
-//                    : base(meta)
-//                {
-//                    _nodes = nodes;
-//                    _i = i;
-//                    _s = s;
-//                }
-
-//                #endregion
-
-//                #region IObj methods
-
-//                public override IObj withMeta(IPersistentMap meta)
-//                {
-//                    if (_meta == meta)
-//                        return this;
-
-//                    return new Seq(meta, _nodes, _i, _s);
-//                }
-
-//                #endregion
-
-//                #region ISeq methods
-
-//                public override object first()
-//                {
-//                    return _s.first();
-//                }
-
-//                public override ISeq next()
-//                {
-//                    return create(null, _nodes, _i, _s.next());
-//                }
-
-//                #endregion
-//            }
-
-//            #endregion
-
-//            #region iterators
-
-//            public IEnumerator Iterator(KVMangleDel<Object> d)
-//            {
-//                foreach (INode node in _array)
-//                {
-//                    if (node != null)
-//                    {
-//                        IEnumerator ie = node.Iterator(d);
-
-//                        while (ie.MoveNext())
-//                            yield return ie.Current;
-//                    }
-//                }
-//            }
-
-//            public IEnumerator<T> IteratorT<T>(KVMangleDel<T> d)
-//            {
-//                foreach (INode node in _array)
-//                {
-//                    if (node != null)
-//                    {
-//                        IEnumerator<T> ie = node.IteratorT(d);
-
-//                        while (ie.MoveNext())
-//                            yield return ie.Current;
-//                    }
-//                }
-//            }
-
-//            #endregion
-//        }
-
-//        #endregion
-
-//        #region BitmapIndexNode
-
-//        /// <summary>
-//        ///  Represents an internal node in the trie, not full.
-//        /// </summary>
-//        [Serializable]
-//        sealed class BitmapIndexedNode : INode
-//        {
-//            #region Data
-
-//            internal static readonly BitmapIndexedNode EMPTY = new BitmapIndexedNode(null, 0, Array.Empty<object>());
-
-//            int _bitmap;
-//            object[] _array;
-//            [NonSerialized]
-//            readonly AtomicReference<Thread> _edit;
-
-//            #endregion
-
-//            #region Calculations
-
-//            int Index(int bit)
-//            {
-//                return Util.BitCount(_bitmap & (bit - 1));
-//            }
-
-//            #endregion
-
-//            #region C-tors & factory methods
-
-//            internal BitmapIndexedNode(AtomicReference<Thread> edit, int bitmap, object[] array)
-//            {
-//                _bitmap = bitmap;
-//                _array = array;
-//                _edit = edit;
-//            }
-
-//            #endregion
-
-//            #region INode Members
-
-//            public INode Assoc(int shift, int hash, object key, object val, Box addedLeaf)
-//            {
-//                int bit = Bitpos(hash, shift);
-//                int idx = Index(bit);
-//                if ((_bitmap & bit) != 0)
-//                {
-//                    object keyOrNull = _array[2 * idx];
-//                    object valOrNode = _array[2 * idx + 1];
-//                    if (keyOrNull == null)
-//                    {
-//                        INode n = ((INode)valOrNode).Assoc(shift + 5, hash, key, val, addedLeaf);
-//                        if (n == valOrNode)
-//                            return this;
-//                        return new BitmapIndexedNode(null, _bitmap, CloneAndSet(_array, 2 * idx + 1, n));
-//                    }
-//                    if ( Util.equiv(key,keyOrNull))
-//                    {
-//                        if ( val == valOrNode)
-//                            return this;
-//                        return new BitmapIndexedNode(null,_bitmap,CloneAndSet(_array,2*idx+1,val));
-//                    }
-//                    addedLeaf.Val = addedLeaf;
-//                    return new BitmapIndexedNode(null,_bitmap,
-//                        CloneAndSet(_array,
-//                                    2*idx,
-//                                    null,
-//                                    2*idx+1,
-//                                    CreateNode(shift+5,keyOrNull,valOrNode,hash,key,val)));
-//                }
-//                else
-//                {
-//                    int n = Util.BitCount(_bitmap);
-//                    if ( n >= 16 )
-//                    {
-//                        INode [] nodes = new INode[32];
-//                        int jdx = Util.Mask(hash,shift);
-//                        nodes[jdx] = EMPTY.Assoc(shift+5,hash,key,val,addedLeaf);
-//                        int j=0;
-//                        for ( int i=0; i < 32; i++ )
-//                            if ( ( (_bitmap >>i) & 1) != 0 )
-//                            {
-//                                if ( _array[j] ==  null )
-//                                   nodes[i] = (INode) _array[j+1];
-//                                else
-//                                    nodes[i] = EMPTY.Assoc(shift+5,Hash(_array[j]),_array[j],_array[j+1], addedLeaf);
-//                                j += 2;
-//                            }
-//                        return new ArrayNode(null,n+1,nodes);
-//                    }
-//                    else
-//                    {
-//                        object[] newArray = new object[2*(n+1)];
-//                        Array.Copy(_array, 0, newArray, 0, 2*idx);
-//                        newArray[2*idx] = key;
-//                        addedLeaf.Val = addedLeaf;
-//                        newArray[2*idx+1] = val;
-//                        Array.Copy(_array, 2*idx, newArray, 2*(idx + 1), 2*(n - idx));
-//                        return new BitmapIndexedNode(null, _bitmap | bit, newArray);
-//                    }
-//                }
-//            }
-
-
-//            public INode Without(int shift, int hash, object key)
-//            {
-//                int bit = Bitpos(hash, shift);
-//                if ((_bitmap & bit) == 0)
-//                    return this;
-
-//                int idx = Index(bit);
-//                object keyOrNull = _array[2 * idx];
-//                object valOrNode = _array[2 * idx + 1];
-//                if ( keyOrNull == null )
-//                {
-//                    INode n = ((INode)valOrNode).Without(shift+5,hash,key);
-//                    if ( n == valOrNode)
-//                        return this;
-//                    if ( n != null )
-//                        return new BitmapIndexedNode(null,_bitmap,CloneAndSet(_array,2*idx+1,n));
-//                    if ( _bitmap == bit )
-//                        return null;
-//                    return new BitmapIndexedNode(null,_bitmap^bit,RemovePair(_array,idx));
-//                }
-//                if (Util.equiv(key, keyOrNull))
-//                {
-//                    if (_bitmap == bit)
-//                        return null;
-//                    return new BitmapIndexedNode(null, _bitmap ^ bit, RemovePair(_array, idx));
-//                }
-//                return this;
-//            }
-
-//            public IMapEntry Find(int shift, int hash, object key)
-//            {
-//                int bit = Bitpos(hash, shift);
-//                if ((_bitmap & bit) == 0)
-//                    return null;
-//                int idx = Index(bit);
-//                 object keyOrNull = _array[2 * idx];
-//                object valOrNode = _array[2 * idx + 1];
-//                if ( keyOrNull == null )
-//                    return ((INode)valOrNode).Find(shift+5,hash,key);
-//                if ( Util.equiv(key,keyOrNull))
-//                    return (IMapEntry)MapEntry.create(keyOrNull, valOrNode);
-//                return null;
-//            }
-
-
-//            public Object Find(int shift, int hash, Object key, Object notFound)
-//            {
-//                int bit = Bitpos(hash, shift);
-//                if ((_bitmap & bit) == 0)
-//                    return notFound;
-//                int idx = Index(bit);
-//                Object keyOrNull = _array[2 * idx];
-//                Object valOrNode = _array[2 * idx + 1];
-//                if (keyOrNull == null)
-//                    return ((INode)valOrNode).Find(shift + 5, hash, key, notFound);
-//                if (Util.equiv(key, keyOrNull))
-//                    return valOrNode;
-//                return notFound;
-//            }
-
-//            public ISeq GetNodeSeq()
-//            {
-//                return NodeSeq.Create(_array);
-//            }
-
-//            public INode Assoc(AtomicReference<Thread> edit, int shift, int hash, object key, object val, Box addedLeaf)
-//            {
-//                int bit = Bitpos(hash, shift);
-//                int idx = Index(bit);
-//                if ((_bitmap & bit) != 0)
-//                {
-//                    object keyOrNull = _array[2 * idx];
-//                    object valOrNode = _array[2 * idx + 1];
-//                    if (keyOrNull == null)
-//                    {
-//                        INode n = ((INode)valOrNode).Assoc(edit, shift + 5, hash, key, val, addedLeaf);
-//                        if (n == valOrNode)
-//                            return this;
-//                        return EditAndSet(edit, 2 * idx + 1, n);
-//                    }
-//                    if (Util.equiv(key, keyOrNull))
-//                    {
-//                        if (val == valOrNode)
-//                            return this;
-//                        return EditAndSet(edit, 2 * idx + 1, val);
-//                    }
-//                    addedLeaf.Val = addedLeaf;
-//                    return EditAndSet(edit,
-//                        2*idx,null,
-//                        2*idx+1,CreateNode(edit,shift+5,keyOrNull,valOrNode,hash,key,val));
-//                }
-//                else
-//                {int n = Util.BitCount(_bitmap);
-//                    if ( n*2 < _array.Length )
-//                    {
-//                        addedLeaf.Val = addedLeaf;
-//                        BitmapIndexedNode editable = EnsureEditable(edit);
-//                        Array.Copy(editable._array,2*idx,editable._array,2*(idx+1),2*(n-idx));
-//                        editable._array[2*idx] = key;
-//                        editable._array[2*idx+1] = val;
-//                        editable._bitmap |= bit;
-//                        return editable;
-//                    }
-//                    if ( n >= 16 )
-//                    {
-//                        INode[] nodes = new INode[32];
-//                        int jdx = Util.Mask(hash,shift);
-//                        nodes[jdx] = EMPTY.Assoc(edit,shift+5,hash,key,val,addedLeaf);
-//                        int j=0;
-//                        for ( int i=0; i<32; i++ )
-//                            if (((_bitmap>>i) & 1) != 0 )
-//                            {
-//                                if ( _array[j] == null )
-//                                    nodes[i] = (INode)_array[j+1];
-//                                else
-//                                    nodes[i] = EMPTY.Assoc(edit,shift+5,Hash(_array[j]), _array[j], _array[j+1], addedLeaf);
-//                                j += 2;
-//                            }
-//                        return new ArrayNode(edit,n+1,nodes);
-//                    }
-//                    else
-//                    {
-//                        object[] newArray = new object[2*(n+4)];
-//                        Array.Copy(_array,0,newArray,0,2*idx);
-//                        newArray[2*idx] = key;
-//                        addedLeaf.Val = addedLeaf;
-//                        newArray[2 * idx + 1] = val;
-//                        Array.Copy(_array,2*idx,newArray,2*(idx+1),2*(n-idx));
-//                        BitmapIndexedNode editable = EnsureEditable(edit);
-//                        editable._array = newArray;
-//                        editable._bitmap |= bit;
-//                        return editable;
-//                    }
-//                }
-//            }
-
-
-
-//            public INode Without(AtomicReference<Thread> edit, int shift, int hash, object key, Box removedLeaf)
-//            {
-//                int bit = Bitpos(hash, shift);
-//                if ((_bitmap & bit) == 0)
-//                    return this;
-//                int idx = Index(bit);
-//                Object keyOrNull = _array[2 * idx];
-//                Object valOrNode = _array[2 * idx + 1];
-//                if (keyOrNull == null)
-//                {
-//                    INode n = ((INode)valOrNode).Without(edit, shift + 5, hash, key, removedLeaf);
-//                    if (n == valOrNode)
-//                        return this;
-//                    if (n != null)
-//                        return EditAndSet(edit, 2 * idx + 1, n);
-//                    if (_bitmap == bit)
-//                        return null;
-//                    return EditAndRemovePair(edit, bit, idx);
-//                }
-//                if (Util.equiv(key, keyOrNull))
-//                {
-//                    removedLeaf.Val = removedLeaf;
-//                    // TODO: collapse
-//                    return EditAndRemovePair(edit, bit, idx);
-//                }
-//                return this;
-//            }
-
-//            public object KVReduce(IFn f, object init)
-//            {
-//                return NodeSeq.KvReduce(_array, f, init);
-//            }
-
-//            public object Fold(IFn combinef, IFn reducef, IFn fjtask, IFn fjfork, IFn fjjoin)
-//            {
-//                return NodeSeq.KvReduce(_array, reducef, combinef.invoke());
-//            }
-
-
-//            #endregion
-
-//            #region Implementation
-
-//            private BitmapIndexedNode EditAndSet(AtomicReference<Thread> edit, int i, Object a)
-//            {
-//                BitmapIndexedNode editable = EnsureEditable(edit);
-//                editable._array[i] = a;
-//                return editable;
-//            }
-
-//            private BitmapIndexedNode EditAndSet(AtomicReference<Thread> edit, int i, Object a, int j, Object b)
-//            {
-//                BitmapIndexedNode editable = EnsureEditable(edit);
-//                editable._array[i] = a;
-//                editable._array[j] = b;
-//                return editable;
-//            }
-
-//            private BitmapIndexedNode EditAndRemovePair(AtomicReference<Thread> edit, int bit, int i)
-//            {
-//                if (_bitmap == bit)
-//                    return null;
-//                BitmapIndexedNode editable = EnsureEditable(edit);
-//                editable._bitmap ^= bit;
-//                Array.Copy(editable._array, 2 * (i + 1), editable._array, 2 * i, editable._array.Length - 2 * (i + 1));
-//                editable._array[editable._array.Length - 2] = null;
-//                editable._array[editable._array.Length - 1] = null;
-//                return editable;
-//            }
-
-//            BitmapIndexedNode EnsureEditable(AtomicReference<Thread> edit)
-//            {
-//                if (_edit == edit)
-//                    return this;
-//                int n = Util.BitCount(_bitmap);
-//                object[] newArray = new Object[n >= 0 ? 2 * (n + 1) : 4];  // make room for next assoc
-//                Array.Copy(_array, newArray, 2 * n);
-//                return new BitmapIndexedNode(edit, _bitmap, newArray);
-//            }
-
-//            #endregion
-
-//            #region iterators
-
-//            public IEnumerator Iterator(KVMangleDel<Object> d)
-//           {
-//                return NodeIter.GetEnumerator(_array, d);
-//            }
-
-//            public IEnumerator<T> IteratorT<T>(KVMangleDel<T> d)
-//            {
-//                return NodeIter.GetEnumeratorT(_array, d);
-//            }
-
-//            #endregion
-//        }
-
-//        #endregion
-
-//        #region HashCollisionNode
-
-//        /// <summary>
-//        /// Represents a leaf node corresponding to multiple map entries, all with keys that have the same hash value.
-//        /// </summary>
-//        [Serializable]
-//        sealed class HashCollisionNode : INode
-//        {
-//            #region Data
-
-//            readonly int _hash;
-//            int _count;
-//            object[] _array;
-//            [NonSerialized]
-//            readonly AtomicReference<Thread> _edit;
-
-//            #endregion
-
-//            #region C-tors
-
-//            public HashCollisionNode(AtomicReference<Thread> edit, int hash, int count, params object[] array)
-//            {
-//                _edit = edit;
-//                _hash = hash;
-//                _count = count;
-//                _array = array;
-//            }
-
-//            #endregion
-
-//            #region details
-
-//            int FindIndex(object key)
-//            {
-//                for (int i = 0; i < 2 * _count; i += 2)
-//                {
-//                    if (Util.equiv(key, _array[i]))
-//                        return i;
-//                }
-//                return -1;
-//            }
-
-//            #endregion
-
-//            #region INode Members
-
-//            public INode Assoc(int shift, int hash, object key, object val, Box addedLeaf)
-//            {
-//                if (_hash == hash)
-//                {
-//                    int idx = FindIndex(key);
-//                    if (idx != -1)
-//                    {
-//                        if (_array[idx + 1] == val)
-//                            return this;
-//                        return new HashCollisionNode(null, hash, _count, CloneAndSet(_array, idx + 1, val));
-//                    }
-//                    Object[] newArray = new Object[2 * (_count + 1)];
-//                    Array.Copy(_array, 0, newArray, 0, 2 * _count);
-//                    newArray[2 * _count] = key;
-//                    newArray[2 * _count + 1] = val;
-//                    addedLeaf.Val = addedLeaf;
-//                    return new HashCollisionNode(_edit, hash, _count + 1, newArray);
-//                }
-//                // nest it in a bitmap node
-//                return new BitmapIndexedNode(null, Bitpos(_hash, shift), new object[] { null, this })
-//                    .Assoc(shift, hash, key, val, addedLeaf);
-//            }
-
-//            public INode Without(int shift, int hash, object key)
-//            {
-//                int idx = FindIndex(key);
-//                if (idx == -1)
-//                    return this;
-//                if (_count == 1)
-//                    return null;
-//                return new HashCollisionNode(null, hash, _count - 1, RemovePair(_array, idx / 2));
-//            }
-
-//            public IMapEntry Find(int shift, int hash, object key)
-//            {
-//                int idx = FindIndex(key);
-//                if (idx < 0)
-//                    return null;
-//                return (IMapEntry)MapEntry.create(_array[idx], _array[idx + 1]);
-
-//            }
-
-//            public Object Find(int shift, int hash, Object key, Object notFound)
-//            {
-//                int idx = FindIndex(key);
-//                if (idx < 0)
-//                    return notFound;
-//                return _array[idx + 1];
-//            }
-
-//            public ISeq GetNodeSeq()
-//            {
-//                return NodeSeq.Create(_array);
-//            }
-
-//            public INode Assoc(AtomicReference<Thread> edit, int shift, int hash, Object key, Object val, Box addedLeaf)
-//            {
-//                if (hash == _hash)
-//                {
-//                    int idx = FindIndex(key);
-//                    if (idx != -1)
-//                    {
-//                        if (_array[idx + 1] == val)
-//                            return this;
-//                        return EditAndSet(edit, idx + 1, val);
-//                    }
-//                    if (_array.Length > 2 * _count)
-//                    {
-//                        addedLeaf.Val = addedLeaf;
-//                        HashCollisionNode editable = EditAndSet(edit, 2 * _count, key, 2 * _count + 1, val);
-//                        editable._count++;
-//                        return editable;
-//                    }
-//                    object[] newArray = new object[_array.Length + 2];
-//                    Array.Copy(_array, 0, newArray, 0, _array.Length);
-//                    newArray[_array.Length] = key;
-//                    newArray[_array.Length + 1] = val;
-//                    addedLeaf.Val = addedLeaf;
-//                    return EnsureEditable(edit, _count + 1, newArray);
-//                }
-//                // nest it in a bitmap node
-//                return new BitmapIndexedNode(edit, Bitpos(_hash, shift), new object[] { null, this, null, null })
-//                    .Assoc(edit, shift, hash, key, val, addedLeaf);
-//            }
-
-//            public INode Without(AtomicReference<Thread> edit, int shift, int hash, Object key, Box removedLeaf)
-//            {
-//                int idx = FindIndex(key);
-//                if (idx == -1)
-//                    return this;
-//                removedLeaf.Val = removedLeaf;
-//                if (_count == 1)
-//                    return null;
-//                HashCollisionNode editable = EnsureEditable(edit);
-//                editable._array[idx] = editable._array[2 * _count - 2];
-//                editable._array[idx + 1] = editable._array[2 * _count - 1];
-//                editable._array[2 * _count - 2] = editable._array[2 * _count - 1] = null;
-//                editable._count--;
-//                return editable;
-//            }
-
-//            public object KVReduce(IFn f, object init)
-//            {
-//                return NodeSeq.KvReduce(_array, f, init);
-//            }
-
-//            public object Fold(IFn combinef, IFn reducef, IFn fjtask, IFn fjfork, IFn fjjoin)
-//            {
-//                return NodeSeq.KvReduce(_array, reducef, combinef.invoke());
-//            }
-
-//            #endregion
-
-//            #region Implementation
-
-//            HashCollisionNode EnsureEditable(AtomicReference<Thread> edit)
-//            {
-//                if (_edit == edit)
-//                    return this;
-//                object[] newArray = new Object[2 * (_count + 1)];  // make room for next assoc
-//                System.Array.Copy(_array, 0, newArray, 0, 2 * _count);
-//                return new HashCollisionNode(edit, _hash, _count, newArray);
-//            }
-
-//            HashCollisionNode EnsureEditable(AtomicReference<Thread> edit, int count, Object[] array)
-//            {
-//                if (_edit == edit)
-//                {
-//                    _array = array;
-//                    _count = count;
-//                    return this;
-//                }
-//                return new HashCollisionNode(edit, _hash, count, array);
-//            }
-
-//            HashCollisionNode EditAndSet(AtomicReference<Thread> edit, int i, Object a)
-//            {
-//                HashCollisionNode editable = EnsureEditable(edit);
-//                editable._array[i] = a;
-//                return editable;
-//            }
-
-//            HashCollisionNode EditAndSet(AtomicReference<Thread> edit, int i, Object a, int j, Object b)
-//            {
-//                HashCollisionNode editable = EnsureEditable(edit);
-//                editable._array[i] = a;
-//                editable._array[j] = b;
-//                return editable;
-//            }
-
-//            #endregion
-
-//            #region iterators
-
-//            public IEnumerator Iterator(KVMangleDel<Object> d)
-//            {
-//                return NodeIter.GetEnumerator(_array, d);
-//            }
-
-//            public IEnumerator<T> IteratorT<T>(KVMangleDel<T> d)
-//            {
-//                return NodeIter.GetEnumeratorT(_array, d);
-//            }
-
-//            #endregion
-
-//        }
-
-//        #endregion
-
-//        #region NodeIter
-
-//        static class NodeIter
-//        {
-//            public static IEnumerator GetEnumerator(object[] array, KVMangleDel<Object> d)
-//            {
-//                for ( int i=0; i< array.Length; i+=2)
-//                {
-//                    object key = array[i];
-//                    object nodeOrVal = array[i+1];
-//                    if (key != null)
-//                        yield return d(key, nodeOrVal);
-//                    else if ( nodeOrVal != null )
-//                    {
-//                        IEnumerator ie = ((INode)nodeOrVal).Iterator(d);
-//                        while (ie.MoveNext())
-//                            yield return ie.Current;
-//                    }
-//                }
-//            }
-
-//            public static IEnumerator<T> GetEnumeratorT<T>(object[] array, KVMangleDel<T> d)
-//            {
-//                for (int i = 0; i < array.Length; i += 2)
-//                {
-//                    object key = array[i];
-//                    object nodeOrVal = array[i + 1];
-//                    if (key != null)
-//                        yield return d(key, nodeOrVal);
-//                    else if (nodeOrVal != null)
-//                    {
-//                        IEnumerator<T> ie = ((INode)nodeOrVal).IteratorT(d);
-//                        while (ie.MoveNext())
-//                            yield return ie.Current;
-//                    }
-//                }
-//            }
-//        }
-
-//        #endregion
-
-//        #region NodeSeq
-
-//        [Serializable]
-//        sealed class NodeSeq : ASeq
-//        {
-
-//            #region Data
-
-//            readonly object[] _array;
-//            readonly int _i;
-//            readonly ISeq _s;
-
-//            #endregion
-
-//            #region Ctors
-
-//            [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Justification = "<Pending>")]
-//            NodeSeq(object[] array, int i)
-//                : this(null, array, i, null)
-//            {
-//            }
-
-//            public static ISeq Create(object[] array)
-//            {
-//                return Create(array, 0, null);
-//            }
-
-//            private static ISeq Create(object[] array, int i, ISeq s)
-//            {
-//                if (s != null)
-//                    return new NodeSeq(null, array, i, s);
-//                for (int j = i; j < array.Length; j += 2)
-//                {
-//                    if (array[j] != null)
-//                        return new NodeSeq(null, array, j, null);
-//                    INode node = (INode)array[j + 1];
-//                    if (node != null)
-//                    {
-//                        ISeq nodeSeq = node.GetNodeSeq();
-//                        if (nodeSeq != null)
-//                            return new NodeSeq(null, array, j + 2, nodeSeq);
-//                    }
-//                }
-//                return null;
-//            }
-
-//            NodeSeq(IPersistentMap meta, Object[] array, int i, ISeq s)
-//                : base(meta)
-//            {
-//                _array = array;
-//                _i = i;
-//                _s = s;
-//            }
-
-//            #endregion
-
-//            #region IObj methods
-
-//            public override IObj withMeta(IPersistentMap meta)
-//            {
-//                if (_meta == meta)
-//                    return this;
-
-//                return new NodeSeq(meta, _array, _i, _s);
-//            }
-
-//            #endregion
-
-//            #region ISeq methods
-
-//            public override object first()
-//            {
-//                if (_s != null)
-//                    return _s.first();
-//                return MapEntry.create(_array[_i], _array[_i + 1]);
-//            }
-
-//            public override ISeq next()
-//            {
-//                if (_s != null)
-//                    return Create(_array, _i, _s.next());
-//                return Create(_array, _i + 2, null);
-//            }
-//            #endregion
-
-//            #region KvReduce
-
-//            static public object KvReduce(object[] array, IFn f, object init)
-//            {
-//                for (int i = 0; i < array.Length; i += 2)
-//                {
-//                    if (array[i] != null)
-//                        init = f.invoke(init, array[i], array[i + 1]);
-//                    else
-//                    {
-//                        INode node = (INode)array[i + 1];
-//                        if (node != null)
-//                            init = node.KVReduce(f, init);
-//                    }
-//                    if (RT.isReduced(init))
-//                        return init;
-//                }
-//                return init;
-//            }
-
-//            #endregion
-//        }
-
-//        #endregion
-//    }
-//}
+        loop 0 items
+        downcast ret.persistent ()
+
+    static member create(items: ISeq): PersistentHashMap =
+        let mutable ret =
+            (PersistentHashMap.Empty :> IEditableCollection)
+                .asTransient() :?> ITransientMap
+
+        let rec loop (s: ISeq) =
+            if not (isNull s) then
+                if isNull (s.next ()) then
+                    raise
+                    <| ArgumentException
+                        ("items",
+                         "No value supplied for key: "
+                         + items.first().ToString())
+
+                ret <- ret.assoc (s.first (), RTSeq.second (s))
+                loop (s.next().next())
+
+        loop items
+        downcast ret.persistent ()
+
+
+    static member create(meta: IPersistentMap, [<ParamArray>] init: obj []): PersistentHashMap =
+        (PersistentHashMap.create (init) :> IObj)
+            .withMeta(meta) :?> PersistentHashMap
+
+
+    interface IMeta with
+        override _.meta() = meta
+
+    interface IObj with
+        override this.withMeta(m) =
+            if Object.ReferenceEquals(m, meta)
+            then upcast this
+            else upcast PersistentHashMap(m, count, root, hasNull, nullValue)
+
+    interface Counted with
+        override _.count() = count
+
+    interface ILookup with
+        override this.valAt(k) = (this :> ILookup).valAt(k, null)
+
+        override _.valAt(k, nf) =
+            if isNull k then if hasNull then nullValue else nf
+            elif isNull root then null
+            else root.find (0, hash (k), k, nf)
+
+    interface Associative with
+        override _.containsKey(k) =
+            if isNull k then
+                hasNull
+            else
+                (not (isNull root))
+                && root.find (0, hash (k), k, PersistentHashMap.notFoundValue)
+                   <> (upcast PersistentHashMap.notFoundValue)
+
+        override _.entryAt(k) =
+            if isNull k
+            then if hasNull then upcast MapEntry.create (null, nullValue) else null
+            elif isNull root
+            then null
+            else root.find (0, hash (k), k)
+
+
+    interface Seqable with
+        override _.seq() =
+            let s =
+                if isNull root then null else root.getNodeSeq ()
+
+            if hasNull
+            then upcast Cons(MapEntry.create (null, nullValue), s)
+            else s
+
+
+    interface IPersistentCollection with
+        override _.count() = count
+
+        override _.empty() =
+            (PersistentHashMap.Empty :> IObj).withMeta(meta) :?> IPersistentCollection
+
+
+    interface IPersistentMap with
+        override this.assoc(k, v) =
+            if isNull k then
+                if hasNull && v = nullValue
+                then upcast this
+                else upcast PersistentHashMap(meta, (if hasNull then count else count + 1), root, true, v)
+            else
+                let addedLeaf = BoolBox()
+
+                let rootToUse: INode =
+                    if isNull root then upcast BitmapIndexedNode.Empty else root
+
+                let newRoot =
+                    rootToUse.assoc (0, hash (k), k, v, addedLeaf)
+
+                if newRoot = root then
+                    upcast this
+                else
+                    upcast PersistentHashMap
+                               (meta, (if addedLeaf.isSet then count + 1 else count), newRoot, hasNull, nullValue)
+
+        override this.assocEx(k, v) =
+            if (this :> Associative).containsKey(k) then
+                raise
+                <| InvalidOperationException("Key already present")
+
+            (this :> IPersistentMap).assoc(k, v)
+
+        override this.without(k) =
+            if isNull k then
+                if hasNull
+                then upcast PersistentHashMap(meta, count - 1, root, false, null)
+                else upcast this
+            elif isNull root then
+                upcast this
+            else
+                let newRoot = root.without (0, hash (k), k)
+
+                if newRoot = root
+                then upcast this
+                else upcast PersistentHashMap(meta, count - 1, newRoot, hasNull, nullValue)
+
+
+    interface IEditableCollection with
+        member this.asTransient() = upcast TransientHashMap(this)
+
+    static member emptyEnumerator() = Seq.empty.GetEnumerator()
+
+    static member nullEnumerator(d: KVMangleFn<obj>, nullValue: obj, root: IEnumerator) =
+        let s =
+            seq {
+                yield d (null, nullValue)
+
+                while root.MoveNext() do
+                    yield root.Current
+            }
+
+        s.GetEnumerator()
+
+    static member nullEnumeratorT<'T>(d: KVMangleFn<'T>, nullValue: obj, root: IEnumerator<'T>) =
+        let s =
+            seq {
+                yield d (null, nullValue)
+
+                while root.MoveNext() do
+                    yield root.Current
+            }
+
+        s.GetEnumerator()
+
+    member _.MakeEnumerator(d: KVMangleFn<Object>): IEnumerator =
+        let rootIter =
+            if isNull root then PersistentHashMap.emptyEnumerator () else root.iteratorT (d)
+
+        if hasNull
+        then upcast PersistentHashMap.nullEnumerator (d, nullValue, rootIter)
+        else upcast rootIter
+
+    member _.MakeEnumeratorT<'T>(d: KVMangleFn<'T>) =
+        let rootIter =
+            if isNull root then PersistentHashMap.emptyEnumerator () else root.iteratorT (d)
+
+        if hasNull
+        then PersistentHashMap.nullEnumeratorT (d, nullValue, rootIter)
+        else rootIter
+
+    interface IMapEnumerable with
+        member this.keyEnumerator() = this.MakeEnumerator(fun (k, v) -> k)
+        member this.valEnumerator() = this.MakeEnumerator(fun (k, v) -> v)
+
+
+    interface IEnumerable<IMapEntry> with
+        member this.GetEnumerator() =
+            this.MakeEnumeratorT<IMapEntry>(fun (k, v) -> upcast MapEntry.create (k, v))
+
+    interface IEnumerable with
+        member this.GetEnumerator() =
+            this.MakeEnumerator(fun (k, v) -> upcast MapEntry.create (k, v))
+
+    interface IKVReduce with
+        member _.kvreduce(f, init) =
+            let init =
+                if hasNull then f.invoke (init, null, nullValue) else init
+
+            match init with
+            | :? Reduced as r -> (r :> IDeref).deref()
+            | _ ->
+                if not (isNull root) then
+                    match root.kvReduce (f, init) with
+                    | :? Reduced as r -> (r :> IDeref).deref()
+                    | r -> r
+                else
+                    init
+
+    member _.fold(n: int64, combinef: IFn, reducef: IFn, fjinvoke: IFn, fjtask: IFn, fjfork: IFn, fjjoin: IFn): obj =
+        // JVM: we are ignoreing n for now
+        let top: Func<obj> =
+            Func<obj>
+                ((fun () ->
+                    let mutable ret = combinef.invoke ()
+
+                    if not (isNull root)
+                    then ret <- combinef.invoke (ret, root.fold (combinef, reducef, fjtask, fjfork, fjjoin))
+
+                    if hasNull
+                    then combinef.invoke (ret, reducef.invoke (combinef.invoke (), null, nullValue))
+                    else ret))
+
+        fjinvoke.invoke (top)
+
+    static member internal createNode(shift: int, key1: obj, val1: obj, key2hash: int, key2: obj, val2: obj): INode =
+        let key1hash = hash (key1)
+
+        if key1hash = key2hash then
+            upcast HashCollisionNode(null, key1hash, 2, [| key1; val1; key2; val2 |])
+        else
+            let box = BoolBox()
+            let edit = AtomicBoolean()
+
+            (BitmapIndexedNode.Empty :> INode)
+                .assoc(edit, shift, key1hash, key1, val1, box)
+                .assoc(edit, shift, key2hash, key2, val2, box)
+
+    static member internal createNode(edit: AtomicBoolean,
+                                      shift: int,
+                                      key1: obj,
+                                      val1: obj,
+                                      key2hash: int,
+                                      key2: obj,
+                                      val2: obj)
+                                      : INode =
+        let key1hash = hash (key1)
+
+        if key1hash = key2hash then
+            upcast HashCollisionNode(null, key1hash, 2, [| key1; val1; key2; val2 |])
+        else
+            let box = BoolBox()
+
+            (BitmapIndexedNode.Empty :> INode)
+                .assoc(edit, shift, key1hash, key1, val1, box)
+                .assoc(edit, shift, key2hash, key2, val2, box)
+
+
+
+and private TransientHashMap(e, r, c, hn, nv) =
+    inherit ATransientMap()
+
+    [<NonSerialized>]
+    let edit: AtomicBoolean = e
+
+    [<VolatileField>]
+    let mutable root: INode = r
+
+    [<VolatileField>]
+    let mutable count: int = c
+
+    [<VolatileField>]
+    let mutable hasNull: bool = hn
+
+    [<VolatileField>]
+    let mutable nullValue: obj = nv
+
+    let leafFlag: BoolBox = BoolBox()
+
+    new(m: PersistentHashMap) =
+        TransientHashMap(AtomicBoolean(true), m.Root, m.Count, m.HasNull, m.NullValue)
+
+    override this.doAssoc(k, v) =
+        if isNull k then
+            if nullValue <> v then nullValue <- v
+
+            if not hasNull then
+                count <- count + 1
+                hasNull <- true
+        else
+            leafFlag.reset ()
+
+            let n =
+                (if isNull root then (BitmapIndexedNode.Empty :> INode) else root)
+                    .assoc(edit, 0, hash (k), k, v, leafFlag)
+
+            if n <> root then root <- n
+
+            if leafFlag.isSet then count <- count + 1
+        upcast this
+
+    override this.doWithout(k) =
+        if isNull k then
+            if hasNull then
+                hasNull <- false
+                nullValue <- null
+                count <- count - 1
+        elif not (isNull root) then
+            leafFlag.reset ()
+
+            let n =
+                root.without (edit, 0, hash (k), k, leafFlag)
+
+            if n <> root then root <- n
+
+            if leafFlag.isSet then count <- count - 1
+
+        upcast this
+
+    override _.doCount() = count
+
+    override _.doPersistent() =
+        edit.Set(false)
+        upcast PersistentHashMap(count, root, hasNull, nullValue)
+
+    override _.doValAt(k, nf) =
+        if isNull k then if hasNull then nullValue else nf
+        elif isNull root then nf
+        else root.find (0, hash (k), k, nf)
+
+    override _.ensureEditable() =
+        if not <| edit.Get() then
+            raise
+            <| InvalidOperationException("Transient used after persistent! call")
+
+and [<Sealed>] private ArrayNode(e, c, a) =
+    let mutable count: int = c
+    let array: INode [] = a
+
+    [<NonSerialized>]
+    let edit: AtomicBoolean = e
+
+    member private _.setNode(i, n) = array.[i] <- n
+    member private _.incrementCount() = count <- count + 1
+    member private _.decrementCount() = count <- count - 1
+
+    // TODO: Do this with some sequence functions?
+    member _.pack(edit: AtomicBoolean, idx): INode =
+        let newArray: obj [] = Array.zeroCreate <| 2 * (count - 1)
+        let mutable j = 1
+        let mutable bitmap = 0
+        for i = 0 to idx - 1 do
+            if not (isNull array.[i]) then
+                newArray.[j] <- upcast array.[i]
+                bitmap <- bitmap ||| 1 <<< i
+                j <- j + 2
+        for i = idx + 1 to array.Length - 1 do
+            if not (isNull array.[i]) then
+                newArray.[j] <- upcast array.[i]
+                bitmap <- bitmap ||| 1 <<< i
+                j <- j + 2
+        upcast BitmapIndexedNode(edit, bitmap, newArray)
+
+
+    member this.ensureEditable(e) =
+        if edit = e
+        then this
+        else ArrayNode(e, count, array.Clone() :?> INode [])
+
+    member this.editAndSet(e, i, n) =
+        let editable = this.ensureEditable (e)
+        editable.setNode (i, n)
+        editable
+
+
+    interface INode with
+        member this.assoc(shift, hash, key, value, addedLeaf) =
+            let idx = NodeOps.mask (hash, shift)
+            let node = array.[idx]
+
+            if isNull node then
+                upcast ArrayNode
+                           (null,
+                            count + 1,
+                            NodeOps.cloneAndSet
+                                (array,
+                                 idx,
+                                 (BitmapIndexedNode.Empty :> INode)
+                                     .assoc(shift + 5, hash, key, value, addedLeaf)))
+            else
+                let n =
+                    node.assoc (shift + 5, hash, key, value, addedLeaf)
+
+                if n = node
+                then upcast this
+                else upcast ArrayNode(null, count, NodeOps.cloneAndSet (array, idx, n))
+
+        member this.without(shift, hash, key) =
+            let idx = NodeOps.mask (hash, shift)
+            let node = array.[idx]
+
+            if isNull node then
+                upcast this
+            else
+                let n = node.without (shift + 5, hash, key)
+
+                if n = node then
+                    upcast this
+                elif isNull n then
+                    if count <= 8 then // shrink
+                        this.pack (null, idx)
+                    else
+                        upcast ArrayNode(null, count - 1, NodeOps.cloneAndSet (array, idx, n))
+                else
+                    upcast ArrayNode(null, count, NodeOps.cloneAndSet (array, idx, n))
+
+        member _.find(shift, hash, key) =
+            let idx = NodeOps.mask (hash, shift)
+            let node = array.[idx]
+
+            match node with
+            | null -> null
+            | _ -> node.find (shift + 5, hash, key)
+
+        member _.find(shift, hash, key, nf) =
+            let idx = NodeOps.mask (hash, shift)
+            let node = array.[idx]
+
+            match node with
+            | null -> nf
+            | _ -> node.find (shift + 5, hash, key, nf)
+
+        member _.getNodeSeq() = ArrayNodeSeq.create (array)
+
+        member this.assoc(e, shift, hash, key, value, addedLeaf) =
+            let idx = NodeOps.mask (hash, shift)
+            let node = array.[idx]
+
+            if isNull node then
+                let editable =
+                    this.editAndSet
+                        (edit,
+                         idx,
+                         (BitmapIndexedNode.Empty :> INode)
+                             .assoc(e, shift + 5, hash, key, value, addedLeaf))
+
+                editable.incrementCount ()
+                upcast editable
+            else
+                let n =
+                    node.assoc (e, shift + 5, hash, key, value, addedLeaf)
+
+                if n = node then upcast this else upcast this.editAndSet (e, idx, n)
+
+        member this.without(e, shift, hash, key, removedLeaf) =
+            let idx = NodeOps.mask (hash, shift)
+            let node = array.[idx]
+
+            if isNull node then
+                upcast this
+            else
+                let n =
+                    node.without (e, shift + 5, hash, key, removedLeaf)
+
+                if n = node then
+                    upcast this
+                elif isNull n then
+                    if count <= 8 then // shrink
+                        this.pack (e, idx)
+                    else
+                        let editable = this.editAndSet (e, idx, n)
+                        editable.decrementCount ()
+                        upcast editable
+                else
+                    upcast this.editAndSet (e, idx, n)
+
+        member _.kvReduce(f, init) =
+            let rec loop (i: int) (v: obj) =
+                if i >= array.Length then
+                    v
+                else
+                    let n = array.[i]
+                    let nextv = n.kvReduce (f, v)
+
+                    if nextv :? Reduced then nextv else loop (i + 1) nextv
+
+            loop 0 init
+
+        member _.fold(combinef, reducef, fjtask, fjfork, fjjoin) =
+            let tasks =
+                array
+                |> Array.map (fun node -> Func<obj>((fun () -> node.fold (combinef, reducef, fjtask, fjfork, fjjoin))))
+
+            ArrayNode.foldTasks (tasks, combinef, fjtask, fjfork, fjjoin)
+
+        member _.iterator(d) =
+            let s =
+                seq {
+                    for node in array do
+                        if not (isNull node) then
+                            let ie = node.iterator (d)
+
+                            while ie.MoveNext() do
+                                yield ie.Current
+                }
+            s.GetEnumerator() :> IEnumerator
+
+        member _.iteratorT(d) =
+            let s =
+                seq {
+                    for node in array do
+                        if not (isNull node) then
+                            let ie = node.iteratorT (d)
+
+                            while ie.MoveNext() do
+                                yield ie.Current
+                }
+
+            s.GetEnumerator()
+
+
+    static member foldTasks(tasks: Func<obj> [], combinef: IFn, fjtask: IFn, fjfork: IFn, fjjoin: IFn) =
+        match tasks.Length with
+        | 0 -> combinef.invoke ()
+        | 1 -> tasks.[0].Invoke()
+        | _ ->
+            let halves = tasks |> Array.splitInto 2
+
+            let fn =
+                Func<obj>(fun () -> ArrayNode.foldTasks (halves.[1], combinef, fjtask, fjfork, fjjoin))
+
+            let forked = fjfork.invoke (fjtask.invoke (fn))
+            combinef.invoke (ArrayNode.foldTasks (halves.[0], combinef, fjtask, fjfork, fjjoin), fjjoin.invoke (forked))
+
+
+and private ArrayNodeSeq(meta, nodes: INode [], i: int, s: ISeq) =
+    inherit ASeq(meta)
+
+    static member create(meta: IPersistentMap, nodes: INode [], i: int, s: ISeq): ISeq =
+        match s with
+        | null ->
+            let result =
+                nodes
+                |> Seq.indexed
+                |> Seq.skip i
+                |> Seq.filter (fun (j, node) -> not (isNull node))
+                |> Seq.tryPick (fun (j, node) ->
+                    let ns = node.getNodeSeq ()
+
+                    if (isNull ns)
+                    then None
+                    else ArrayNodeSeq(meta, nodes, j + 1, ns) |> Some)
+
+            match result with
+            | Some s -> upcast s
+            | None -> null
+        | _ -> upcast ArrayNodeSeq(meta, nodes, i, s)
+
+    interface IObj with
+        override this.withMeta(m) =
+            if Object.ReferenceEquals(m, (this :> IMeta).meta())
+            then upcast this
+            else upcast ArrayNodeSeq(m, nodes, i, s)
+
+    interface ISeq with
+        member _.first() = s.first ()
+
+        member _.next() =
+            ArrayNodeSeq.create (null, nodes, i, s.next ())
+
+    static member create(nodes: INode []) =
+        ArrayNodeSeq.create (null, nodes, 0, null)
+
+
+and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
+
+    [<NonSerialized>]
+    let edit: AtomicBoolean = e
+
+    let mutable bitmap: int = b
+    let mutable array: obj [] = a
+
+    static member Empty: BitmapIndexedNode =
+        BitmapIndexedNode(null, 0, Array.empty<obj>)
+
+    member _.index(bit: int): int = NodeOps.bitCount (bitmap &&& (bit - 1))
+
+    member x.Bitmap
+        with private get () = bitmap
+        and private set (v) = bitmap <- v
+
+    member private _.setArrayVal(i, v) = array.[i] <- v
+
+    member _.Array
+        with private get () = array
+        and private set (v) = array <- v
+
+
+    interface INode with
+        member this.assoc(shift, hash, key, value, addedLeaf) =
+            let bit = NodeOps.bitPos (hash, shift)
+            let idx = this.index (bit)
+
+            if bitmap &&& bit = 0 then
+                let n = NodeOps.bitCount (bitmap)
+
+                if n >= 16 then
+                    let nodes: INode [] = Array.zeroCreate 32
+                    let jdx = NodeOps.mask (hash, shift)
+                    nodes.[jdx] <- (BitmapIndexedNode.Empty :> INode)
+                        .assoc(shift + 5, hash, key, value, addedLeaf)
+
+                    let mutable j = 0
+                    for i = 0 to 31 do
+                        if ((bitmap >>> i) &&& 1) <> 0 then
+                            nodes.[i] <- if isNull array.[j] then
+                                             array.[j + 1] :?> INode
+                                         else
+                                             (BitmapIndexedNode.Empty :> INode)
+                                                 .assoc(shift + 5,
+                                                        NodeOps.hash (array.[j]),
+                                                        array.[j],
+                                                        array.[j + 1],
+                                                        addedLeaf)
+
+                            j <- j + 2
+                    upcast ArrayNode(null, n + 1, nodes)
+                else
+                    let newArray: obj [] = 2 * (n + 1) |> Array.zeroCreate
+                    Array.Copy(array, 0, newArray, 0, 2 * idx)
+                    newArray.[2 * idx] <- key
+                    addedLeaf.set ()
+                    newArray.[2 * idx + 1] <- value
+                    Array.Copy(array, 2 * idx, newArray, 2 * (idx + 1), 2 * (n - idx))
+                    upcast BitmapIndexedNode(null, (bitmap ||| bit), newArray)
+            else
+                let keyOrNull = array.[2 * idx]
+                let valOrNode = array.[2 * idx + 1]
+
+                if isNull keyOrNull then
+                    let n =
+                        (valOrNode :?> INode)
+                            .assoc(shift + 5, hash, key, value, addedLeaf)
+
+                    if n = (valOrNode :?> INode)
+                    then upcast this
+                    else upcast BitmapIndexedNode(null, bitmap, NodeOps.cloneAndSet (array, 2 * idx + 1, upcast n))
+                elif Util.equiv (key, keyOrNull) then
+                    if value = valOrNode
+                    then upcast this
+                    else upcast BitmapIndexedNode(null, bitmap, NodeOps.cloneAndSet (array, 2 * idx + 1, value))
+                else
+                    addedLeaf.set ()
+                    upcast BitmapIndexedNode
+                               (null,
+                                bitmap,
+                                NodeOps.cloneAndSet2
+                                    (array,
+                                     2 * idx,
+                                     null,
+                                     2 * idx + 1,
+                                     upcast PersistentHashMap.createNode
+                                                (shift + 5, keyOrNull, valOrNode, hash, key, value)))
+
+        member this.without(shift, hash, key) =
+            let bit = NodeOps.bitPos (hash, shift)
+
+            if (bitmap &&& bit) = 0 then
+                upcast this
+            else
+                let idx = this.index (bit)
+                let keyOrNull = array.[2 * idx]
+                let valOrNode = array.[2 * idx + 1]
+
+                if isNull keyOrNull then
+                    let n =
+                        (valOrNode :?> INode)
+                            .without(shift + 5, hash, key)
+
+                    if n = (valOrNode :?> INode) then
+                        upcast this
+                    elif not (isNull n) then
+                        upcast BitmapIndexedNode(null, bitmap, NodeOps.cloneAndSet (array, 2 * idx + 1, upcast n))
+                    elif bitmap = bit then
+                        null
+                    else
+                        upcast BitmapIndexedNode(null, bitmap ^^^ bit, NodeOps.removePair (array, idx))
+                elif Util.equiv (key, keyOrNull) then
+                    if bitmap = bit
+                    then null
+                    else upcast BitmapIndexedNode(null, bitmap ^^^ bit, NodeOps.removePair (array, idx))
+                else
+                    upcast this
+
+        member this.find(shift, hash, key) =
+            let bit = NodeOps.bitPos (hash, shift)
+
+            if (bitmap &&& bit) = 0 then
+                null
+            else
+                let idx = this.index (bit)
+                let keyOrNull = array.[2 * idx]
+                let valOrNode = array.[2 * idx + 1]
+
+                if isNull keyOrNull
+                then (valOrNode :?> INode).find(shift + 5, hash, key)
+                elif Util.equiv (key, keyOrNull)
+                then upcast MapEntry.create (keyOrNull, valOrNode)
+                else null
+
+        member this.find(shift, hash, key, nf) =
+            let bit = NodeOps.bitPos (hash, shift)
+
+            if (bitmap &&& bit) = 0 then
+                nf
+            else
+                let idx = this.index (bit)
+                let keyOrNull = array.[2 * idx]
+                let valOrNode = array.[2 * idx + 1]
+
+                if isNull keyOrNull then
+                    (valOrNode :?> INode)
+                        .find(shift + 5, hash, key, nf)
+                elif Util.equiv (key, keyOrNull) then
+                    valOrNode
+                else
+                    nf
+
+        member _.getNodeSeq() = NodeSeq.create (array)
+
+        member this.assoc(edit, shift, hash, key, value, addedLeaf) =
+            let bit = NodeOps.bitPos (hash, shift)
+            let idx = this.index (bit)
+
+            if (bitmap &&& bit) <> 0 then
+                let keyOrNull = array.[2 * idx]
+                let valOrNode = array.[2 * idx + 1]
+
+                if isNull keyOrNull then
+                    let n =
+                        (valOrNode :?> INode)
+                            .assoc(edit, shift + 5, hash, key, value, addedLeaf)
+
+                    if n = (valOrNode :?> INode)
+                    then upcast this
+                    else upcast this.editAndSet (edit, 2 * idx + 1, n)
+                elif Util.equiv (key, keyOrNull) then
+                    if value = valOrNode
+                    then upcast this
+                    else upcast this.editAndSet (edit, 2 * idx + 1, value)
+                else
+                    addedLeaf.set ()
+                    upcast this.editAndSet
+                               (edit,
+                                2 * idx,
+                                null,
+                                2 * idx + 1,
+                                PersistentHashMap.createNode (edit, shift + 5, keyOrNull, valOrNode, hash, key, value))
+            else
+                let n = NodeOps.bitCount bitmap
+
+                if n * 2 < array.Length then
+                    addedLeaf.set ()
+                    let editable = this.ensureEditable (edit)
+                    Array.Copy(editable.Array, 2 * idx, editable.Array, 2 * (idx + 1), 2 * (n - idx))
+                    editable.setArrayVal (2 * idx, key)
+                    editable.setArrayVal (2 * idx + 1, value)
+                    editable.Bitmap <- editable.Bitmap ||| bit
+                    upcast editable
+                elif n >= 16 then
+                    let nodes: INode [] = Array.zeroCreate 32
+                    let jdx = NodeOps.mask (hash, shift)
+                    nodes.[jdx] <- (BitmapIndexedNode.Empty :> INode)
+                        .assoc(edit, shift + 5, hash, key, value, addedLeaf)
+
+                    let mutable j = 0
+                    for i = 0 to 31 do
+                        if ((bitmap >>> i) &&& 1) <> 0 then
+                            if isNull array.[j] then
+                                nodes.[i] <- array.[j + 1] :?> INode
+                            else
+                                nodes.[i] <- (BitmapIndexedNode.Empty :> INode)
+                                    .assoc(edit,
+                                           shift + 5,
+                                           NodeOps.hash (array.[j]),
+                                           array.[j],
+                                           array.[j + 1],
+                                           addedLeaf)
+
+                            j <- j + 2
+                    upcast ArrayNode(edit, n + 1, nodes)
+                else
+                    let newArray: obj [] = 2 * (n + 4) |> Array.zeroCreate
+                    Array.Copy(array, 0, newArray, 0, 2 * idx)
+                    newArray.[2 * idx] <- key
+                    newArray.[2 * idx + 1] <- value
+                    addedLeaf.set ()
+                    Array.Copy(array, 2 * idx, newArray, 2 * (idx + 1), 2 * (n - idx))
+                    let editable = this.ensureEditable (edit)
+                    editable.Array <- newArray
+                    editable.Bitmap <- editable.Bitmap ||| bit
+                    upcast editable
+
+        member this.without(e, shift, hash, key, removedLeaf) =
+            let bit = NodeOps.bitPos (hash, shift)
+
+            if (bitmap &&& bit) = 0 then
+                upcast this
+            else
+                let idx = this.index (bit)
+                let keyOrNull = array.[2 * idx]
+                let valOrNode = array.[2 * idx + 1]
+
+                if isNull keyOrNull then
+                    let n =
+                        (valOrNode :?> INode)
+                            .without(e, shift + 5, hash, key, removedLeaf)
+
+                    if n = (valOrNode :?> INode)
+                    then upcast this
+                    elif not (isNull n)
+                    then upcast this.editAndSet (e, 2 * idx + 1, n)
+                    elif bitmap = bit
+                    then null
+                    else upcast this.editAndRemovePair (e, bit, idx)
+                elif Util.equiv (key, keyOrNull) then
+                    removedLeaf.set ()
+                    upcast this.editAndRemovePair (e, bit, idx)
+                else
+                    upcast this
+
+        member _.kvReduce(f, init) = NodeSeq.kvReduce (array, f, init)
+
+        member _.fold(combinef, reducef, fjtask, fjfork, fjjoin) =
+            NodeSeq.kvReduce (array, reducef, combinef.invoke ())
+
+        member _.iterator(d) = NodeIter.getEnumerator (array, d)
+
+        member _.iteratorT(d) = NodeIter.getEnumeratorT (array, d)
+
+    member this.ensureEditable(e: AtomicBoolean): BitmapIndexedNode =
+        if edit = e then
+            this
+        else
+            let n = NodeOps.bitCount (bitmap)
+
+            let newArray: obj [] =
+                Array.zeroCreate (if n >= 0 then 2 * (n + 1) else 4) // make room for next assoc
+
+            Array.Copy(array, newArray, 2 * n)
+            BitmapIndexedNode(e, bitmap, newArray)
+
+    member private this.editAndSet(e: AtomicBoolean, i: int, a: obj): BitmapIndexedNode =
+        let editable = this.ensureEditable (e)
+        editable.setArrayVal (i, a)
+        editable
+
+
+    member private this.editAndSet(e:AtomicBoolean, i: int, a: obj, j: int, b: obj): BitmapIndexedNode =
+        let editable = this.ensureEditable (e)
+        editable.setArrayVal (i, a)
+        editable.setArrayVal (j, b)
+        editable
+
+    member private this.editAndRemovePair(e: AtomicBoolean, bit: int, i: int): BitmapIndexedNode =
+        if bitmap = bit then
+            null
+        else
+            let editable = this.ensureEditable (e)
+            editable.Bitmap <- editable.Bitmap ^^^ bit
+            Array.Copy(editable.Array, 2 * (i + 1), editable.Array, 2 * i, editable.Array.Length - 2 * (i + 1))
+            editable.setArrayVal (editable.Array.Length - 2, null)
+            editable.setArrayVal (editable.Array.Length - 1, null)
+            editable
+
+
+and HashCollisionNode(edit: AtomicBoolean, hash: int, c, a) =
+
+    let mutable count: int = c
+    let mutable array: obj [] = a
+
+    member _.Array
+        with private get () = array
+        and private set (a) = array <- a
+
+    member _.Count
+        with private get () = count
+        and private set (c) = count <- c
+
+    member _.tryFindIndex(key: obj): int option =
+        let rec loop (i: int) =
+            if i >= 2 * count then None
+            elif Util.equiv (key, array.[i]) then Some i
+            else i + 2 |> loop
+
+        loop 0
+
+
+    interface INode with
+        member this.assoc(shift, h, key, value, addedLeaf) =
+            if h = hash then
+                match this.tryFindIndex (key) with
+                | Some idx ->
+                    if array.[idx + 1] = value
+                    then upcast this
+                    else upcast HashCollisionNode(null, h, count, NodeOps.cloneAndSet (array, idx + 1, value))
+                | None ->
+                    let newArray: obj [] = 2 * (count + 1) |> Array.zeroCreate
+                    Array.Copy(array, 0, newArray, 0, 2 * count)
+                    newArray.[2 * count] <- key
+                    newArray.[2 * count + 1] <- value
+                    addedLeaf.set ()
+                    upcast HashCollisionNode(edit, h, count + 1, newArray)
+            else
+                (BitmapIndexedNode(null, NodeOps.bitPos (hash, shift), [| null; this |]) :> INode)
+                    .assoc(shift, h, key, value, addedLeaf)
+
+        member this.without(shift, h, key) =
+            match this.tryFindIndex (key) with
+            | None -> upcast this
+            | Some idx ->
+                if count = 1
+                then null
+                else upcast HashCollisionNode(null, h, count - 1, NodeOps.removePair (array, idx / 2))
+
+        member this.find(shift, h, key) =
+            match this.tryFindIndex (key) with
+            | None -> null
+            | Some idx -> upcast MapEntry.create (array.[idx], array.[idx + 1])
+
+        member this.find(shift, h, key, nf) =
+            match this.tryFindIndex (key) with
+            | None -> nf
+            | Some idx -> array.[idx + 1]
+
+        member _.getNodeSeq() = NodeSeq.create (array)
+
+        member this.assoc(e, shift, h, key, value, addedLeaf) =
+            if h = hash then
+                match this.tryFindIndex (key) with
+                | Some idx ->
+                    if array.[idx + 1] = value
+                    then upcast this
+                    else upcast this.editAndSet (e, idx + 1, value)
+                | None ->
+                    if array.Length > 2 * count then
+                        addedLeaf.set ()
+
+                        let editable =
+                            this.editAndSet (e, 2 * count, key, 2 * count + 1, value)
+
+                        editable.Count <- editable.Count + 1
+                        upcast editable
+                    else
+                        let newArray: obj [] = array.Length + 2 |> Array.zeroCreate
+                        Array.Copy(array, 0, newArray, 0, array.Length)
+                        newArray.[array.Length] <- key
+                        newArray.[array.Length + 1] <- value
+                        addedLeaf.set ()
+                        upcast this.ensureEditable (e, count + 1, newArray)
+            else
+                (BitmapIndexedNode(null, NodeOps.bitPos (hash, shift), [| null; this; null; null |]) :> INode)
+                    .assoc(e, shift, h, key, value, addedLeaf)
+
+        member this.without(e, shift, h, key, removedLeaf) =
+            match this.tryFindIndex (key) with
+            | None -> upcast this
+            | Some idx ->
+                removedLeaf.set ()
+
+                if count = 1 then
+                    null
+                else
+                    let editable = this.ensureEditable (e)
+                    editable.Array.[idx] <- editable.Array.[2 * count - 2]
+                    editable.Array.[idx + 1] <- editable.Array.[2 * count - 1]
+                    editable.Array.[2 * count - 2] <- null
+                    editable.Array.[2 * count - 1] <- null
+                    editable.Count <- editable.Count - 1
+                    upcast editable
+
+        member _.kvReduce(f, init) = NodeSeq.kvReduce (array, f, init)
+
+        member _.fold(combinef, reducef, fjtask, fjfork, fjjoin) =
+            NodeSeq.kvReduce (array, reducef, combinef.invoke ())
+
+        member _.iterator(d) = NodeIter.getEnumerator (array, d)
+
+        member _.iteratorT(d) = NodeIter.getEnumeratorT (array, d)
+
+
+    member this.ensureEditable(e) =
+        if e = edit then
+            this
+        else
+            let newArray: obj [] = 2 * (count + 1) |> Array.zeroCreate
+            Array.Copy(array, 0, newArray, 0, 2 * count)
+            HashCollisionNode(e, hash, count, newArray)
+
+    member this.ensureEditable(e, c, a) =
+        if e = edit then
+            array <- a
+            count <- c
+            this
+        else
+            HashCollisionNode(e, hash, c, a)
+
+    member this.editAndSet(e, i, a) =
+        let editable = this.ensureEditable (e)
+        editable.Array.[i] <- a
+        editable
+
+    member this.editAndSet(e, i, a, j, b) =
+        let editable = this.ensureEditable (e)
+        editable.Array.[i] <- a
+        editable.Array.[j] <- b
+        editable
+
+
+
+
+and NodeSeq(meta, array: obj [], idx: int, seq: ISeq) =
+    inherit ASeq(meta)
+
+    new(i, a, s) = NodeSeq(null, a, i, s)
+
+    static member private create(array: obj [], i: int, s: ISeq): ISeq =
+        if not (isNull s) then
+            upcast NodeSeq(null, array, i, s)
+        else
+            let result =
+                array
+                |> Seq.indexed
+                |> Seq.skip i
+                |> Seq.tryPick (fun (j, node) ->
+
+                    if j % 2 = 0 then // even => key entry
+                        if not (isNull array.[j]) then NodeSeq(null, array, j, null) |> Some else None
+                    else // odd => value entry
+
+                    if isNull array.[j - 1] then
+                        let node: INode = array.[j] :?> INode
+
+                        if not (isNull node) then
+                            let nodeSeq = node.getNodeSeq ()
+
+                            if not (isNull nodeSeq)
+                            then NodeSeq(null, array, j + 1, nodeSeq) |> Some
+                            else None
+                        else
+                            None
+                    else
+                        None)
+
+            match result with
+            | Some ns -> upcast ns
+            | None -> null
+
+
+    static member create(array: obj []): ISeq = NodeSeq.create (array, 0, null)
+
+    interface IObj with
+        override this.withMeta(m) =
+            if Object.ReferenceEquals(m, (this :> IMeta).meta())
+            then upcast this
+            else upcast NodeSeq(m, array, idx, seq)
+
+    interface ISeq with
+        member _.first() =
+            match seq with
+            | null -> upcast MapEntry.create (array.[idx], array.[idx + 1])
+            | _ -> seq.first ()
+
+        member _.next() =
+            match seq with
+            | null -> NodeSeq.create (array, idx + 2, null)
+            | _ -> NodeSeq.create (array, idx, seq.next ())
+
+    static member kvReduce(a: obj [], f: IFn, init: obj): obj =
+        let rec loop (result: obj) (i: int) =
+            if i >= a.Length then
+                result
+            else
+                let nextResult =
+                    if not (isNull a.[i]) then
+                        f.invoke (result, a.[i], a.[i + 1])
+                    else
+                        let node = a.[i + 1] :?> INode
+
+                        if not (isNull node) then node.kvReduce (f, result) else result
+
+                if nextResult :? Reduced then nextResult else loop nextResult (i + 2)
+
+        loop init 0
+

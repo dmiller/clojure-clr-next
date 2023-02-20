@@ -16,6 +16,7 @@
     <Compile Include="Fn.fs" />
     <Compile Include="SeqEnumerator.fs" />
     <Compile Include="StarterSequences.fs" />
+    <Compile Include="RTSeq.fs" />
     <Compile Include="ArraySeq.fs" />
     <Compile Include="MoreSequences.fs" />
     <Compile Include="LazySeq.fs" />

@@ -418,11 +418,3 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
 
             loop ((this :> ISeq).next ()) ((this :> ISeq).first ())
 
-// I'm not sure this is the final resting place for this
-module RT2 =
-
-    let cons (x: obj, coll: obj) : ISeq =
-        match coll with
-        | null -> upcast PersistentList(x)
-        | :? ISeq as s -> upcast Cons(x, s)
-        | _ -> upcast Cons(x, RT0.seq (coll))
