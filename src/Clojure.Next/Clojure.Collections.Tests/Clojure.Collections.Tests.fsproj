@@ -13,6 +13,7 @@
     <Compile Include="OtherSequencesTests.fs" />
     <Compile Include="RangeTests.fs" />
     <Compile Include="PersistentVectorTests.fs" />
+    <Compile Include="PersistentArrayMapTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

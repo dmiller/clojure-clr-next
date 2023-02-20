@@ -25,7 +25,7 @@ type APersistentMap() =
         match hasheq with
         | Some h -> h
         | None ->
-            let h = Hashing.hashUnordered (this)
+            let h = Hashing.hashUnordered (this :> IEnumerable)
             hasheq <- Some h
             h
 
@@ -496,7 +496,7 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
                 let newArray: obj array = Array.zeroCreate (arr.Length + 2)
 
                 if arr.Length > 0 then
-                    Array.Copy(arr, 0, newArray, 0, newArray.Length)
+                    Array.Copy(arr, 0, newArray, 0, arr.Length)
 
                 newArray[newArray.Length - 2] <- k
                 newArray[newArray.Length - 1] <- v
@@ -562,10 +562,10 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
 
     interface IMapEnumerableTyped<obj, obj> with
         member this.tkeyEnumerator() =
-            (seq { for i in 0 .. arr.Length .. 2 -> arr[i] }).GetEnumerator()
+            (seq { for i in 0 .. 2 .. arr.Length-1 -> arr[i] }).GetEnumerator()
 
         member this.tvalEnumerator() =
-            (seq { for i in 0 .. arr.Length .. 2 -> arr[i + 1] }).GetEnumerator()
+            (seq { for i in 0 .. 2 .. arr.Length-1 -> arr[i + 1] }).GetEnumerator()
 
     interface IEnumerable with
         member this.GetEnumerator() =
@@ -573,13 +573,22 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
 
     interface IEnumerable<IMapEntry> with
         member this.GetEnumerator() =
-            (seq { for i in 0 .. arr.Length .. 2 -> (MapEntry.create (arr[i], arr[i + 1]) :> IMapEntry) })
+            (seq { for i in 0 .. 2 .. arr.Length-1 -> (MapEntry.create (arr[i], arr[i + 1]) :> IMapEntry) })
                 .GetEnumerator()
 
     interface IEnumerable<KeyValuePair<obj, obj>> with
         member this.GetEnumerator() =
-            (seq { for i in 0 .. arr.Length .. 2 -> KeyValuePair(arr[i], arr[i + 1]) })
+            (seq { for i in 0 .. 2 .. arr.Length-1  -> KeyValuePair(arr[i], arr[i + 1]) })
                 .GetEnumerator()
+
+    static member createD2(other: IDictionary<'TKey,'TValue>) : IPersistentMap =
+        let mutable ret =
+            (PersistentArrayMap.Empty :> IEditableCollection).asTransient () :?> ITransientAssociative
+
+        for de in Seq.cast<KeyValuePair<'TKey,'TValue>> other do
+            ret <- ret.assoc (de.Key, de.Value)
+
+        ret.persistent () :?> IPersistentMap
 
     static member create(other: IDictionary) : IPersistentMap =
         let mutable ret =
@@ -735,7 +744,7 @@ and TransientArrayMap(a: obj array) =
     let mutable isTransient = true
 
     [<VolatileField>]
-    let mutable len = arr.Length
+    let mutable len = a.Length
 
     do Array.Copy(a, arr, a.Length)
 
@@ -860,7 +869,7 @@ and [<Sealed>] internal PAMSeq(meta: IPersistentMap, arr: obj array, index: int)
     interface IEnumerable<obj> with
         override _.GetEnumerator() =
             let s =
-                seq { for i in index .. arr.Length - 1 .. 2 -> MapEntry.create (arr[i], arr[i + 1]) :> obj }
+                seq { for i in index .. 2 .. arr.Length - 1 -> MapEntry.create (arr[i], arr[i + 1]) :> obj }
 
             s.GetEnumerator()
 
@@ -917,7 +926,7 @@ and [<AbstractClass; Sealed>] private NodeOps() =
     static member bitIndex(bitmap, bit) =  NodeOps.bitCount(bitmap &&& (bit - 1)) // Not used?
 
     static member findIndex(key: obj, items: obj[], count: int) : int =
-        seq { 0..2 .. 2 * count - 1 }
+        seq { 0 .. 2 .. 2 * count - 1 }
         |> Seq.tryFindIndex (fun i -> Util.equiv (key, items.[i]))
         |> Option.defaultValue -1
 

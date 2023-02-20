@@ -86,7 +86,7 @@ type ValSeq private (meta: IPersistentMap, seq: ISeq, enumerable: IEnumerable) =
                 raise
                 <| InvalidCastException("Cannot convert hashtable entry to IMapEntry or DictionaryEntry")
 
-        override _.next() = KeySeq.create (seq.next ())
+        override _.next() = ValSeq.create (seq.next ())
 
     interface IObj with
         override this.withMeta(m) =

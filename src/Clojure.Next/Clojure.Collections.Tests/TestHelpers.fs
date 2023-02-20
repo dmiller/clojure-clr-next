@@ -20,14 +20,15 @@ let verifyISeqContents (s: ISeq) (vals: obj list) =
     let cnt = loop s 0
     Expect.equal cnt avals.Length "Should have same number of elements"
 
-let compareISeqs (s1:ISeq) (s2:ISeq) =
-    let rec loop (s1:ISeq) (s2:ISeq) =
+let compareISeqs (s1: ISeq) (s2: ISeq) =
+    let rec loop (s1: ISeq) (s2: ISeq) =
         match s1, s2 with
         | null, null -> true
         | null, _ -> false
         | _, null -> true
-        | _, _ when s1.first() = s2.first() -> loop (s1.next()) (s2.next())
+        | _, _ when s1.first () = s2.first () -> loop (s1.next ()) (s2.next ())
         | _ -> false
+
     loop s1 s2
 
 
@@ -75,24 +76,24 @@ let takeEager (n: int) (s: ISeq) =
 
 // Some Helpers for testing IObj
 
-// Defer these until we have maps available.
 
-//let metaForSimpleTests =
-//    let keys: obj list = [ "a"; "b" ]
-//    let vals: obj list = [ "AAA"; "BBB" ]
-//    SimpleMap(keys, vals)
+let metaForSimpleTests =
+    //let keys: obj list = [ "a"; "b" ]
+    //let vals: obj list = [ "AAA"; "BBB" ]
+    //PersistentArrayMap(keys, vals)
+    PersistentArrayMap([| "a"; "AAA"; "b"; "BBB" |])
 
-//let verifyWithMetaHasCorrectMeta (io: IObj) =
-//    let newIO = io.withMeta (metaForSimpleTests)
-//    Expect.isTrue (Object.ReferenceEquals(newIO.meta (), metaForSimpleTests)) "should have same meta"
+let verifyWithMetaHasCorrectMeta (io: IObj) =
+    let newIO = io.withMeta (metaForSimpleTests)
+    Expect.isTrue (Object.ReferenceEquals(newIO.meta (), metaForSimpleTests)) "should have same meta"
 
-//let verifyWithMetaNoChange (io: IObj) =
-//    let io2 = io.withMeta (io.meta ())
-//    Expect.isTrue (Object.ReferenceEquals(io2, io)) "Expect same object back from withMeta if no change in meta"
+let verifyWithMetaNoChange (io: IObj) =
+    let io2 = io.withMeta (io.meta ())
+    Expect.isTrue (Object.ReferenceEquals(io2, io)) "Expect same object back from withMeta if no change in meta"
 
-//let verifyNullMeta (io: IObj) =
-//    Expect.isNull (io.meta ()) "Meta expected to be null"
+let verifyNullMeta (io: IObj) =
+    Expect.isNull (io.meta ()) "Meta expected to be null"
 
-//let verifyWithMetaReturnType (io: IObj) (t: Type) =
-//    let io2 = io.withMeta (metaForSimpleTests)
-//    Expect.equal (io2.GetType()) t "Expected type for withMeta"
+let verifyWithMetaReturnType (io: IObj) (t: Type) =
+    let io2 = io.withMeta (metaForSimpleTests)
+    Expect.equal (io2.GetType()) t "Expected type for withMeta"

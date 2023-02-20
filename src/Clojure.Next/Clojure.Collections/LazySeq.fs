@@ -103,7 +103,7 @@ type LazySeq private (m1, fn1, s1) =
 
             if isNull s then upcast PersistentList.Empty else s.more ()
 
-        member this.cons(o: obj) : ISeq = RT2.cons (o, (this :> ISeq).seq ())
+        member this.cons(o: obj) : ISeq = RTSeq.cons (o, (this :> ISeq).seq ())
 
     interface IPending with
         member _.isRealized() = isNull fn
