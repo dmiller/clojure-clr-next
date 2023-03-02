@@ -6,15 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="PersistentVectorBenchmarks.fs" />
-    <Compile Include="PersistentHashMapBenchmarks.fs" />
+    <Compile Include="PersistentHashMapPerf.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.13.4" />
-    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.4" />
-    <PackageReference Include="Clojure" Version="1.12.0-alpha3" />
+    <PackageReference Include="Clojure" Version="1.12.0-alpha5" />
   </ItemGroup>
 
   <ItemGroup>

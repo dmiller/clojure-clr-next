@@ -9,8 +9,8 @@ type BigInt(lpart: int64, bipart: BigInteger option) =
     member this.Lpart = lpart
     member this.Bipart = bipart
 
-    static member ZERO = BigInt(0, None)
-    static member ONE = BigInt(1, None)
+    static member val ZERO = BigInt(0, None)
+    static member val ONE = BigInt(1, None)
 
     static member private BigIntegerAsInt64(bi: BigInteger) : int64 option =
         if bi.CompareTo(Int64.MaxValue) <= 0 && bi.CompareTo(Int64.MinValue) >= 0 then

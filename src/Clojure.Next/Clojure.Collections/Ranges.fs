@@ -32,7 +32,7 @@ type Range
     [<VolatileField>]
     let mutable next: ISeq = null // cached
 
-    static member CHUNK_SIZE = 32
+    static member val CHUNK_SIZE = 32
 
     static member PositiveStepCheck(endV: obj) = (fun (v: obj) -> Numbers.gte (v, endV))
     static member NegativeStepCheck(endV: obj) = (fun (v: obj) -> Numbers.lte (v, endV))

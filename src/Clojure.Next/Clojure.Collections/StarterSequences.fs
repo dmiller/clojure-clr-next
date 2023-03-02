@@ -251,7 +251,7 @@ and [<Sealed>] EmptyList(m) =
 
     static member hasheq = Hashing.hashOrdered (Enumerable.Empty<Object>())
 
-    static member Empty: EmptyList = EmptyList()
+    static member val Empty: EmptyList = EmptyList()
 
     override _.GetHashCode() = 1
 
@@ -307,7 +307,7 @@ and [<Sealed>] EmptyList(m) =
         override _.IsSynchronized = true
         override this.SyncRoot = upcast this
 
-    static member emptyEnumerator: IEnumerator = Seq.empty<obj>.GetEnumerator () :> IEnumerator
+    static member val emptyEnumerator: IEnumerator = Seq.empty<obj>.GetEnumerator () :> IEnumerator
 
     interface IEnumerable with
         override x.GetEnumerator() = EmptyList.emptyEnumerator
@@ -346,7 +346,7 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
     new(first: obj) = PersistentList(null, first, null, 1)
 
     // for backwards compatability
-    static member Empty = EmptyList.Empty
+    static member val Empty = EmptyList.Empty
 
     static member create(init: IList) =
         let mutable r = EmptyList.Empty :> IPersistentList

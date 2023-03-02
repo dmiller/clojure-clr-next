@@ -212,8 +212,8 @@ type Numbers() =
            Numbers.ULONG_OPS
            Numbers.CLRDEC_OPS |]
 
-    static member private IntOverflow() = OverflowException("integer overflow")
-    static member private DecOverflow() = OverflowException("decimal overflow")
+    static member private IntOverflow() = OverflowException("integer overflow")  // not 'val' we need this created in context to pick up the call stack
+    static member private DecOverflow() = OverflowException("decimal overflow")  // not 'val' we need this created in context to pick up the call stack
 
     static member IsNaN(x: obj) =
         match x with

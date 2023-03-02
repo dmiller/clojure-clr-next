@@ -1113,3 +1113,28 @@ let bigPersistentHashMapWithoutTests =
           testCase "Without update test for 1000" <| fun _ -> doBigWithoutTest 1000
           testCase "Without update test for 10000" <| fun _ -> doBigWithoutTest 10000
           testCase "Without update test for 100000" <| fun _ -> doBigWithoutTest 100000 ]
+
+
+[<Tests>]
+let myLittleTest =
+    testList
+        "Just do one thing"
+        [ testCase "whatever"
+          <| fun _ ->
+                let mutable pv =
+                    (Clojure.Collections.PersistentHashMap.Empty :> Clojure.Collections.IEditableCollection) 
+                        .asTransient () :?> Clojure.Collections.ITransientAssociative
+
+                pv <- pv.assoc(1L,1L)
+                pv <- pv.assoc(2L, 2L)
+                pv <- pv.assoc(3L, 3L)
+                pv <- pv.assoc(4L, 4L)
+                pv <- pv.assoc(5L, 5L)
+
+                Expect.equal (pv.persistent().count()) 5 "Equal"
+
+
+
+            ]
+
+                
