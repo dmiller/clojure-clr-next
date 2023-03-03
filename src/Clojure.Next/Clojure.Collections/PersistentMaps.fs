@@ -1002,7 +1002,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
 
     static member val Empty = PersistentHashMap(null, 0, null, false, null)
 
-    static member val private notFoundValue = obj()
+    static member val internal notFoundValue = obj()
 
     // factories
 
