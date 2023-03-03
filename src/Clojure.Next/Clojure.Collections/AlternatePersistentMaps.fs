@@ -191,7 +191,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
 
             let rootToUse =
                 match root with
-                | None -> BNode.Empty
+                | None -> BNode.Empty :> INode2
                 | Some n -> n
 
             let newRoot = rootToUse.assoc (0, NodeOps.hash (k), k, v, addedLeaf)
@@ -369,3 +369,357 @@ and [<Sealed>] THashMap(e, r, c) =
     override _.ensureEditable() =
         if not <| myEdit.Get() then
             raise <| InvalidOperationException("Transient used after persistent! call")
+
+and [<Sealed>] ANode(e, c, a) =
+
+    let mutable count: int = c
+    let mutable nodes: INode2 option array = a
+
+    [<NonSerialized>]
+    let myEdit: AtomicBoolean = e
+
+    member private _.setNode(i, n) = nodes[i] <- n
+    member _.incrementCount() = count <- count + 1
+    member _.decrementCount() = count <- count - 1
+
+
+    member _.pack(edit: AtomicBoolean, idx: int) : INode2 =
+        let newArray: BNodeEntry[] = count - 1 |> Array.zeroCreate
+        let mutable j = 0
+        let mutable bitmap = 0
+
+        for i = 0 to idx - 1 do
+            match nodes.[i] with
+            | None -> ()
+            | Some n ->
+                newArray.[j] <- Node n
+                bitmap <- bitmap ||| 1 <<< i
+                j <- j + 1
+
+        for i = idx + 1 to nodes.Length - 1 do
+            match nodes.[i] with
+            | None -> ()
+            | Some n ->
+                newArray.[j] <- Node n
+                bitmap <- bitmap ||| 1 <<< i
+                j <- j + 1
+
+        BNode(edit, bitmap, newArray)
+
+    member this.ensureEditable(e) =
+        if obj.ReferenceEquals(e, myEdit) then
+            this
+        else
+            ANode(e, count, downcast nodes.Clone())
+
+    member this.editAndSet(e, i, n) =
+        let editable = this.ensureEditable (e)
+        nodes.[i] <- n
+        editable
+
+
+    interface INode2 with
+
+        member this.assoc(shift, hash, key, value, addedLeaf) =
+            let idx = NodeOps.mask (hash, shift)
+
+            match nodes.[idx] with
+            | None ->
+                let newNode = (BNode.Empty :> INode2).assoc (shift + 5, hash, key, value, addedLeaf)
+
+                ANode(null, count + 1, NodeOps.cloneAndSet (nodes, idx, Some newNode))
+            | Some node ->
+                let newNode = node.assoc (shift + 5, hash, key, value, addedLeaf)
+
+                if obj.ReferenceEquals(newNode, node) then
+                    this
+                else
+                    ANode(null, count, NodeOps.cloneAndSet (nodes, idx, Some newNode))
+
+        member this.without(shift, hash, key) =
+            let idx = NodeOps.mask (hash, shift)
+
+            match nodes.[idx] with
+            | None -> Some this
+            | Some node ->
+                match node.without (shift + 5, hash, key) with
+                | None -> // this branch got deleted
+                    if count <= 8 then
+                        this.pack (null, idx) |> Some // shrink
+                    else
+                        ANode(null, count - 1, NodeOps.cloneAndSet (nodes, idx, None)) :> INode2 |> Some // zero out this entry
+                | Some newNode ->
+                    if newNode = node then
+                        this :> INode2 |> Some
+                    else
+                        ANode(null, count - 1, NodeOps.cloneAndSet (nodes, idx, Some newNode)) :> INode2
+                        |> Some
+
+        member _.find(shift, hash, key) =
+            let idx = NodeOps.mask (hash, shift)
+
+            match nodes[idx] with
+            | None -> None
+            | Some n -> n.find (shift + 5, hash, key)
+
+        member _.find(shift, hash, key, nf) =
+            let idx = NodeOps.mask (hash, shift)
+
+            match nodes[idx] with
+            | None -> nf
+            | Some n -> n.find (shift + 5, hash, key, nf)
+
+        member _.getNodeSeq() = ANodeSeq.create (nodes)
+
+        member this.assoc(e, shift, hash, key, value, addedLeaf) =
+            let idx = NodeOps.mask (hash, shift)
+
+            match nodes.[idx] with
+            | None ->
+                let editable =
+                    this.editAndSet (
+                        e,
+                        idx,
+                        (BNode.Empty :> INode2).assoc (e, shift + 5, hash, key, value, addedLeaf)
+                        |> Some
+                    )
+
+                editable.incrementCount ()
+                editable
+
+            | Some node ->
+                let newNode = node.assoc (e, shift + 5, hash, key, value, addedLeaf)
+
+                if obj.ReferenceEquals(newNode, node) then
+                    this
+                else
+                    this.editAndSet (e, idx, newNode |> Some)
+
+        member this.without(e, shift, hash, key, removedLeaf) =
+            let idx = NodeOps.mask (hash, shift)
+
+            match nodes.[idx] with
+            | None -> this :> INode2 |> Some
+            | Some node ->
+                match node.without (e, shift + 5, hash, key, removedLeaf) with
+                | None -> // this branch got deleted
+                    if count <= 8 then
+                        this.pack (e, idx) |> Some // shrink
+                    else
+                        let editable = this.editAndSet (e, idx, None)
+                        editable.decrementCount ()
+                        editable :> INode2 |> Some
+
+                | Some newNode ->
+                    if newNode = node then
+                        this :> INode2 |> Some
+                    else
+                        let editable = this.editAndSet (e, idx, newNode |> Some)
+
+                        editable.decrementCount ()
+                        editable :> INode2 |> Some
+
+        member _.kvReduce(f, init) =
+            let rec loop (i: int) (v: obj) =
+                if i >= nodes.Length then
+                    v
+                else
+                    match nodes[i] with
+                    | None -> v
+                    | Some n ->
+                        let nextV = n.kvReduce (f, v)
+
+                        match nextV with
+                        | :? Reduced -> nextV
+                        | _ -> loop (i + 1) nextV
+
+            loop 0 init
+
+
+        member _.fold(combinef, reducef, fjtask, fjfork, fjjoin) =
+            let tasks =
+                nodes
+                |> Array.filter (fun node -> node.IsSome)
+                |> Array.map (fun node ->
+                    Func<obj>((fun () -> node.Value.fold (combinef, reducef, fjtask, fjfork, fjjoin))))
+
+            ANode.foldTasks (tasks, combinef, fjtask, fjfork, fjjoin)
+
+        member _.iterator(d) =
+            let s =
+                seq {
+                    for node in nodes do
+                        match node with
+                        | None -> ()
+                        | Some n ->
+                            let ie = n.iterator (d)
+
+                            while ie.MoveNext() do
+                                yield ie.Current
+                }
+
+            s.GetEnumerator() :> IEnumerator
+
+        member _.iteratorT(d) =
+            let s =
+                seq {
+                    for node in nodes do
+                        match node with
+                        | None -> ()
+                        | Some n ->
+                            let ie = n.iteratorT (d)
+
+                            while ie.MoveNext() do
+                                yield ie.Current
+                }
+
+            s.GetEnumerator()
+
+
+    static member foldTasks(tasks: Func<obj>[], combinef: IFn, fjtask: IFn, fjfork: IFn, fjjoin: IFn) =
+        match tasks.Length with
+        | 0 -> combinef.invoke ()
+        | 1 -> tasks[ 0 ].Invoke()
+        | _ ->
+            let halves = tasks |> Array.splitInto 2
+
+            let fn =
+                Func<obj>(fun () -> ANode.foldTasks (halves[1], combinef, fjtask, fjfork, fjjoin))
+
+            let forked = fjfork.invoke (fjtask.invoke (fn))
+            combinef.invoke (ArrayNode.foldTasks (halves[0], combinef, fjtask, fjfork, fjjoin), fjjoin.invoke (forked))
+
+
+and BNodeEntry =
+    | KeyValue of Key: obj * Value: obj
+    | Node of Node: INode2
+    | EmptyEntry
+
+and [<Sealed>] BNode(e, b, a) =
+
+    [<NonSerialized>]
+    let myEdit: AtomicBoolean = e
+
+    let mutable bitmap: int = b
+    let mutable entries: BNodeEntry array = a
+
+    static member Empty: BNode = BNode(null, 0, Array.empty<BNodeEntry>)
+
+    member this.modifyOrCreateBNode (newEdit: AtomicBoolean) (newBitmap: int) (newEntries: BNodeEntry[]) =
+        if obj.ReferenceEquals(myEdit, newEdit) then
+            // Current node is editable -- modify in-place
+            bitmap <- newBitmap
+            entries <- newEntries
+            this
+        else
+            // create new editable node with correct data
+            BNode(newEdit, newBitmap, newEntries)
+
+    member _.index(bit: int) : int = NodeOps.bitCount (bitmap &&& (bit - 1))
+
+    member x.Bitmap
+        with private get () = bitmap
+        and private set (v) = bitmap <- v
+
+    member private _.setEntriesVal(i, v) = entries[i] <- v
+
+    member _.Entries
+        with private get () = entries
+        and private set (v) = entries <- v
+
+    interface INode2 with
+        member this.assoc(shift, hash, key, value, addedLeaf) =
+            let bit = NodeOps.bitPos (hash, shift)
+            let idx = this.index (bit)
+
+            if bitmap &&& bit = 0 then
+                let n = NodeOps.bitCount (bitmap)
+
+                if n >= 16 then
+                    let nodes: INode2 option[] = Array.zeroCreate 32
+                    let jdx = NodeOps.mask (hash, shift)
+                    nodes.[jdx] <- (BNode.Empty :> INode2).assoc (shift + 5, hash, key, value, addedLeaf) |> Some
+
+                    let mutable j = 0
+
+                    for i = 0 to 31 do
+                        if ((bitmap >>> i) &&& 1) <> 0 then
+                            nodes.[i] <-
+                                match entries.[j] with
+                                | KeyValue(Key = k; Value = v) ->
+                                    (BNode.Empty :> INode2).assoc (shift + 5, NodeOps.hash (k), k, v, addedLeaf)
+                                    |> Some
+                                | Node(Node = node) -> node |> Some
+                                | EmptyEntry ->
+                                    InvalidOperationException("Found Empty cell in BitmapEntry -- algorithm bug")
+                                    |> raise
+
+                            j <- j + 1
+
+                    ANode(null, n + 1, nodes)
+
+                else
+                    let newArray: BNodeEntry[] = Array.zeroCreate (n + 1)
+                    Array.Copy(entries, 0, newArray, 0, idx)
+                    newArray.[idx] <- KeyValue(key, value)
+                    Array.Copy(entries, idx, newArray, idx + 1, n - idx)
+                    addedLeaf.set ()
+                    BNode(null, bitmap ||| bit, newArray)
+
+            else
+                let entry = entries.[idx]
+
+                match entry with
+                | KeyValue(Key = k; Value = v) ->
+                    if Util.equiv (key, k) then
+                        if value = v then
+                            this
+                        else
+                            BNode(null, bitmap, NodeOps.cloneAndSet (entries, idx, KeyValue(key, value)))
+                    else
+                        addedLeaf.set ()
+
+                        let newNode = PHashMap.createNode (shift + 5, k, v, hash, key, value)
+
+                        BNode(null, bitmap, NodeOps.cloneAndSet (entries, idx, Node(newNode)))
+                | Node(Node = node) ->
+                    let newNode = node.assoc (shift + 5, hash, key, value, addedLeaf)
+
+                    if newNode = node then
+                        this
+                    else
+                        BNode(null, bitmap, NodeOps.cloneAndSet (entries, idx, Node(newNode)))
+                | EmptyEntry ->
+                    InvalidOperationException("Found Empty cell in BitmapNode3 -- algorithm bug")
+                    |> raise
+
+        member this.without(shift, hash, key) =
+            let bit = NodeOps.bitPos (hash, shift)
+
+            if (bitmap &&& bit) = 0 then
+                this :> INode2 |> Some
+            else
+                let idx = this.index (bit)
+
+                match entries[idx] with
+                | KeyValue(Key = k; Value = v) ->
+                    if Util.equiv (key, k) then
+                        if bitmap = bit then // only one entry
+                            None
+                        else
+                            BNode(null, bitmap ^^^ bit, NodeOps.removePair (entries, idx)) :> INode2 |> Some
+                    else
+                        this :> INode2 |> Some
+                | Node(Node = node) ->
+                    match node.without (shift + 5, hash, key) with
+                    | None -> this :> INode2 |> Some
+                    | Some n ->
+                        if obj.ReferenceEquals(n, node) then
+                            this :> INode2 |> Some
+                        else
+                            BNode(null, bitmap, NodeOps.cloneAndSet (entries, idx, Node(n))) :> INode2
+                            |> Some
+                | EmptyEntry ->
+                    InvalidOperationException("Found Empty cell in BitmapNode3 -- algorithm bug")
+                    |> raise
+

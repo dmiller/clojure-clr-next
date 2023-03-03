@@ -1569,6 +1569,7 @@ and [<Sealed>] private ArrayNode(e, c, a) =
         member _.fold(combinef, reducef, fjtask, fjfork, fjjoin) =
             let tasks =
                 array
+                |> Array.filter (fun node -> not <| isNull node)
                 |> Array.map (fun node -> Func<obj>((fun () -> node.fold (combinef, reducef, fjtask, fjfork, fjjoin))))
 
             ArrayNode.foldTasks (tasks, combinef, fjtask, fjfork, fjjoin)
@@ -1658,7 +1659,7 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
     let myedit: AtomicBoolean = e
 
     let mutable bitmap: int = b
-    let mutable array: obj [] = a
+    let mutable array: obj array = a
 
     static member val Empty: BitmapIndexedNode =
         BitmapIndexedNode(null, 0, Array.empty<obj>)
