@@ -65,7 +65,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         ret.persistent ()
 
 
-    static member createWithCheck([<ParamArray>] init: obj[]) : PersistentHashMap =
+    static member createWithCheck([<ParamArray>] init: obj[]) : PHashMap =
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
@@ -78,7 +78,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         downcast ret.persistent ()
 
 
-    static member create([<ParamArray>] init: obj[]) : PersistentHashMap =
+    static member create([<ParamArray>] init: obj[]) : PHashMap =
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
@@ -88,7 +88,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         downcast ret.persistent ()
 
 
-    static member create1(init: IList) : PersistentHashMap =
+    static member create1(init: IList) : PHashMap =
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
@@ -106,7 +106,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         downcast ret.persistent ()
 
 
-    static member createWithCheck(items: ISeq) : PersistentHashMap =
+    static member createWithCheck(items: ISeq) : PHashMap =
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
@@ -128,7 +128,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         downcast ret.persistent ()
 
 
-    static member create(items: ISeq) : PersistentHashMap =
+    static member create(items: ISeq) : PHashMap =
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
@@ -144,8 +144,8 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         loop items
         downcast ret.persistent ()
 
-    static member create(meta: IPersistentMap, [<ParamArray>] init: obj[]) : PersistentHashMap =
-        (PHashMap.create (init) :> IObj).withMeta (meta) :?> PersistentHashMap
+    static member create(meta: IPersistentMap, [<ParamArray>] init: obj[]) : PHashMap =
+        (PHashMap.create (init) :> IObj).withMeta (meta) :?> PHashMap
 
 
     interface IMeta with
@@ -746,7 +746,7 @@ and [<Sealed>] BNode(e, b, a) =
                         if bitmap = bit then // only one entry
                             None
                         else
-                            BNode(null, bitmap ^^^ bit, NodeOps.removePair (entries, idx)) :> INode2 |> Some
+                            BNode(null, bitmap ^^^ bit, NodeOps2.removeEntry (entries, idx)) :> INode2 |> Some
                     else
                         this :> INode2 |> Some
                 | Node(Node = node) ->
