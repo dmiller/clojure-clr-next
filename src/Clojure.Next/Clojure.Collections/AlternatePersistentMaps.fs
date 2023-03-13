@@ -21,6 +21,15 @@ type INode2 =
     abstract iterator: d: KVMangleFn<obj> -> IEnumerator
     abstract iteratorT: d: KVMangleFn<'T> -> IEnumerator<'T>
 
+module private NodeOps2 =
+
+    // things that are not in NodeOps
+
+    let removeEntry (arr: 'T[], i: int) : 'T[] =
+        let newArr: 'T[] = Array.zeroCreate <| arr.Length - 1
+        Array.Copy(arr, 0, newArr, 0, i)
+        Array.Copy(arr, (i + 1), newArr, i, newArr.Length - i)
+        newArr
 
 [<Sealed>]
 type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
@@ -34,7 +43,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
 
     static member val Empty = PHashMap(null, 0, None)
 
-    new(c,r) = PHashMap(null,c,r)
+    new(c, r) = PHashMap(null, c, r)
 
     static member createD2(other: IDictionary<'TKey, 'TValue>) : IPersistentMap =
         let mutable ret =
@@ -283,7 +292,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         let key1hash = NodeOps.hash (key1)
 
         if key1hash = key2hash then
-            CNode(null, key1hash, 2, [| key1; val1; key2; val2 |])
+            CNode(null, key1hash, 2, [| MapEntry(key1, val1); MapEntry(key2, val2) |])
         else
             let box = BoolBox()
 
@@ -305,7 +314,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         let key1hash = NodeOps.hash (key1)
 
         if key1hash = key2hash then
-            CNode(edit, key1hash, 2, [| key1; val1; key2; val2 |])
+            CNode(edit, key1hash, 2, [| MapEntry(key1, val1); MapEntry(key2, val2) |])
         else
             let box = BoolBox()
 
@@ -459,7 +468,7 @@ and [<Sealed>] ANode(e, c, a) =
                     else
                         ANode(null, count - 1, NodeOps.cloneAndSet (nodes, idx, None)) :> INode2 |> Some // zero out this entry
                 | Some newNode ->
-                    if obj.ReferenceEquals(newNode,node) then
+                    if obj.ReferenceEquals(newNode, node) then
                         this :> INode2 |> Some
                     else
                         ANode(null, count - 1, NodeOps.cloneAndSet (nodes, idx, Some newNode)) :> INode2
@@ -479,7 +488,7 @@ and [<Sealed>] ANode(e, c, a) =
             | None -> nf
             | Some n -> n.find (shift + 5, hash, key, nf)
 
-        member _.getNodeSeq() = ANodeSeq.create (nodes)
+        member _.getNodeSeq() = ANodeSeq.create (nodes, 0)
 
         member this.assoc(e, shift, hash, key, value, addedLeaf) =
             let idx = NodeOps.mask (hash, shift)
@@ -521,7 +530,7 @@ and [<Sealed>] ANode(e, c, a) =
                         editable :> INode2 |> Some
 
                 | Some newNode ->
-                    if obj.ReferenceEquals(newNode,node) then
+                    if obj.ReferenceEquals(newNode, node) then
                         this :> INode2 |> Some
                     else
                         this.editAndSet (e, idx, newNode |> Some) :> INode2 |> Some
@@ -622,6 +631,29 @@ and [<Sealed>] BNode(e, b, a) =
             // create new editable node with correct data
             BNode(newEdit, newBitmap, newEntries)
 
+    member this.editAndSet(e: AtomicBoolean, idx: int, entry: BNodeEntry) : BNode =
+        if obj.ReferenceEquals(e, myEdit) then
+            entries[idx] <- entry
+            this
+        else
+            let newEntries = entries.Clone() :?> BNodeEntry array
+            newEntries[idx] <- entry
+            BNode(e, bitmap, entries)
+
+    member this.editAndRemove(e: AtomicBoolean, bit: int, idx: int) : INode2 option =
+        if bitmap = bit then
+            None
+        elif obj.ReferenceEquals(myEdit, e) then
+            Array.Copy(entries, idx + 1, entries, idx, entries.Length - idx - 1)
+            entries[idx] <- EmptyEntry
+            this :> INode2 |> Some
+        else
+            let newEntries: BNodeEntry array = Array.zeroCreate (entries.Length - 1)
+            Array.Copy(entries, 0, newEntries, 0, idx - 1)
+            Array.Copy(entries, idx + 1, newEntries, idx, entries.Length - idx - 1)
+            BNode(e, bitmap ^^^ bit, newEntries) :> INode2 |> Some
+
+
     member _.index(bit: int) : int = NodeOps.bitCount (bitmap &&& (bit - 1))
 
     member x.Bitmap
@@ -692,7 +724,7 @@ and [<Sealed>] BNode(e, b, a) =
                 | Node(Node = node) ->
                     let newNode = node.assoc (shift + 5, hash, key, value, addedLeaf)
 
-                    if obj.ReferenceEquals(newNode,node) then
+                    if obj.ReferenceEquals(newNode, node) then
                         this
                     else
                         BNode(null, bitmap, NodeOps.cloneAndSet (entries, idx, Node(newNode)))
@@ -790,7 +822,7 @@ and [<Sealed>] BNode(e, b, a) =
                     if obj.ReferenceEquals(node, newNode) then
                         this
                     else
-                        this.editAndSet(e, idx, node newNode)
+                        this.editAndSet (e, idx, Node newNode)
                 | EmptyEntry ->
                     InvalidOperationException("Found Empty cell in BitmapNode3 -- algorithm bug")
                     |> raise
@@ -838,41 +870,45 @@ and [<Sealed>] BNode(e, b, a) =
                     this.modifyOrCreateBNode e (bitmap ||| bit) newArray
 
         member this.without(e, shift, hash, key, removedLeaf) =
-            let bit = NodeOps.bitPos(hash,shift)
+            let bit = NodeOps.bitPos (hash, shift)
 
             if bitmap &&& bit = 0 then
                 this :> INode2 |> Some
             else
-                let idx = this.index(bit)
+                let idx = this.index (bit)
+
                 match entries[idx] with
-                | KeyValue(Key=k) ->
-                    if Util.equiv(key,k) then
-                        removedLeaf.set()
-                        this.editAndRemove(e,bit,idx) :> INode2 |> Some
+                | KeyValue(Key = k) ->
+                    if Util.equiv (key, k) then
+                        removedLeaf.set ()
+                        this.editAndRemove (e, bit, idx)
                     else
-                        this:> INode2 |> Some
-                | Node(Node=n) ->
-                    match n.without(e,shift+5,hash,key,removedLeaf) with
-                    | None -> this :> INode2 |> Some                                // TODO:  Is this right?
+                        this :> INode2 |> Some
+                | Node(Node = n) ->
+                    match n.without (e, shift + 5, hash, key, removedLeaf) with
+                    | None -> this :> INode2 |> Some // TODO:  Is this right?
                     | Some newNode ->
-                        if obj.ReferenceEquals(newNode,n) then
+                        if obj.ReferenceEquals(newNode, n) then
                             this :> INode2 |> Some
                         elif bitmap = bit then
                             None
                         else
-                            this.editAndRemove(e,bit,idx) :> INode2 |> Some
+                            this.editAndRemove (e, bit, idx)
+                | EmptyEntry ->
+                    InvalidOperationException("Found Empty cell in BitmapNode3 -- algorithm bug")
+                    |> raise
 
-        member _.kvReduce(f,init) = BNodeSeq.kvReduce(entries,f,init)
+        member _.kvReduce(f, init) = BNodeSeq.kvReduce (entries, f, init)
 
         member _.fold(combinef, reducef, fjtask, fjfork, fjjoin) =
-            BNodeSeq.kvReduce (array, reducef, combinef.invoke ())
+            BNodeSeq.kvReduce (entries, reducef, combinef.invoke ())
 
         member this.iterator d =
             let s =
                 seq {
                     for entry in entries do
                         match entry with
-                        | KeyValue (Key = k; Value = v) -> yield d (k, v)
+                        | KeyValue(Key = k; Value = v) -> yield d (k, v)
                         | Node(Node = node) ->
                             let ie = node.iterator (d)
 
@@ -890,7 +926,7 @@ and [<Sealed>] BNode(e, b, a) =
                 seq {
                     for entry in entries do
                         match entry with
-                        | KeyValue (Key = k; Value = v) -> yield d (k, v)
+                        | KeyValue(Key = k; Value = v) -> yield d (k, v)
                         | Node(Node = node) ->
                             let ie = node.iteratorT (d)
 
@@ -902,6 +938,254 @@ and [<Sealed>] BNode(e, b, a) =
 
             s.GetEnumerator()
 
+and [<Sealed>] internal CNode(e: AtomicBoolean, h: int, c: int, a: MapEntry[]) =
 
-       
-                        
+    [<NonSerialized>]
+    let myEdit: AtomicBoolean = e
+
+    let mutable count: int = c
+    let mutable kvs: MapEntry[] = a
+    let nodeHash: int = h
+
+    member this.tryFindNodeIndex key =
+        kvs
+        |> Array.tryFindIndex (fun kv -> (not (isNull kv)) && Util.equiv ((kv :> IMapEntry).key (), key))
+
+    interface INode2 with
+        member this.assoc(shift, hash, key, value, addedLeaf) =
+            if hash = nodeHash then
+                match this.tryFindNodeIndex key with
+                | Some idx ->
+                    let kv = kvs.[idx] :> IMapEntry
+
+                    if kv.value () = value then
+                        this
+                    else
+                        CNode(null, hash, count, NodeOps.cloneAndSet (kvs, idx, MapEntry(key, value)))
+                | None ->
+                    let newArray: MapEntry[] = count + 1 |> Array.zeroCreate
+                    Array.Copy(kvs, 0, newArray, 0, count)
+                    newArray.[count] <- MapEntry(key, value)
+                    addedLeaf.set ()
+                    CNode(null, hash, count + 1, newArray)
+            else
+                (BNode(null, NodeOps.bitPos (hash, shift), [| Node(this) |]) :> INode2)
+                    .assoc (shift, h, key, value, addedLeaf)
+
+        member this.without(shift, hash, key) =
+            match this.tryFindNodeIndex key with
+            | None -> this :> INode2 |> Some
+            | Some idx ->
+                if count = 1 then
+                    None
+                else
+                    CNode(null, h, count, NodeOps2.removeEntry (kvs, idx)) :> INode2 |> Some
+
+        member this.find(shift, hash, key) =
+            match this.tryFindNodeIndex key with
+            | None -> None
+            | Some idx -> Some(upcast kvs.[idx])
+
+
+        member this.find(shift, hash, key, notFound) =
+            match this.tryFindNodeIndex key with
+            | None -> notFound
+            | Some idx -> (kvs.[idx] :> IMapEntry).value ()
+
+        member this.getNodeSeq() = CNodeSeq.create (kvs, 0)
+
+        member this.assoc(e, shift, hash, key, value, addedLeaf) =
+            if hash = nodeHash then
+                match this.tryFindNodeIndex key with
+                | Some idx ->
+                    let kv = kvs.[idx] :> IMapEntry
+
+                    if kv.value () = value then
+                        this
+                    elif obj.ReferenceEquals(myEdit, e) then
+                        kvs.[idx] <- MapEntry(key, value)
+                        this
+                    else
+                        // we have an entry with a different value, but we are not editable.
+                        // create a new node with the new k/v entry
+                        CNode(e, hash, count, NodeOps.cloneAndSet (kvs, idx, MapEntry(key, value)))
+                | None ->
+                    // no entry for this key, so we will be adding.
+                    addedLeaf.set ()
+
+                    if obj.ReferenceEquals(myEdit, e) then
+                        // we are editable.
+                        // Either we have existing space or we need to create a new array.
+                        // Either way, we can update in place.
+                        if kvs.Length > count then
+                            kvs.[count] <- MapEntry(key, value)
+                            count <- count + 1
+                            this
+                        else
+                            // no space, create a new array.
+                            let currLength = kvs.Length
+                            let newArray: MapEntry[] = currLength + 1 |> Array.zeroCreate
+                            Array.Copy(kvs, 0, newArray, 0, currLength)
+                            newArray.[currLength] <- MapEntry(key, value)
+                            kvs <- newArray
+                            count <- count + 1
+                            this
+                    else
+                        // we are not editable, so we need to create a new node
+
+                        let newArray: MapEntry[] = count + 1 |> Array.zeroCreate
+                        Array.Copy(kvs, 0, newArray, 0, count)
+                        newArray.[count] <- MapEntry(key, value)
+
+                        CNode(e, hash, count + 1, newArray)
+            else
+                // we got to this collision node, but our key has different hash.
+                // Need to create a bitmap node here holding our collision node and add our new key/value to it.
+                (BNode(e, NodeOps.bitPos (hash, shift), [| Node(this) |]) :> INode2)
+                    .assoc (e, shift, h, key, value, addedLeaf)
+
+        member this.without(e, shift, hash, key, removedLeaf) =
+            match this.tryFindNodeIndex key with
+            | None -> this :> INode2 |> Some
+            | Some idx ->
+                removedLeaf.set ()
+
+                if count = 1 then
+                    None
+                else if obj.ReferenceEquals(myEdit, e) then
+                    // we are editable, edit in place
+                    count <- count - 1
+                    kvs.[idx] <- kvs.[count]
+                    kvs.[count] <- null
+                    this :> INode2 |> Some
+                else
+                    CNode(e, h, count - 1, NodeOps2.removeEntry (kvs, idx)) :> INode2 |> Some
+
+        member _.kvReduce(f, init) = CNodeSeq.kvReduce (kvs, f, init)
+
+        member _.fold(combinef, reducef, fjtask, fjfork, fjjoin) =
+            CNodeSeq.kvReduce (kvs, reducef, combinef.invoke ())
+
+
+        member this.iterator d =
+            let s =
+                seq {
+                    for kv in kvs do
+                        let me = kv :> IMapEntry
+                        yield d (me.key (), me.value ())
+                }
+
+            s.GetEnumerator()
+
+        member this.iteratorT d =
+            let s =
+                seq {
+                    for kv in kvs do
+                        let me = kv :> IMapEntry
+                        yield d (me.key (), me.value ())
+                }
+
+            s.GetEnumerator()
+
+and ANodeSeq(nodes: INode2 option array, idx: int, s: ISeq) =
+    inherit ASeq()
+
+    static member create(nodes: (INode2 option)[], idx: int) : ISeq =
+        if idx >= nodes.Length then
+            null
+        else
+            match nodes.[idx] with
+            | Some(node) ->
+                match node.getNodeSeq () with
+                | null -> ANodeSeq.create (nodes, idx + 1)
+                | s -> ANodeSeq(nodes, idx, s)
+            | None -> ANodeSeq.create (nodes, idx + 1)
+
+    interface ISeq with
+        member _.first() = s.first ()
+
+        member _.next() =
+            match s.next () with
+            | null -> ANodeSeq.create (nodes, idx + 1)
+            | s1 -> ANodeSeq(nodes, idx, s1)
+
+
+and BNodeSeq(entries: BNodeEntry[], idx: int, seq: ISeq) =
+    inherit ASeq()
+
+    static member create(entries: BNodeEntry[], idx: int) : ISeq =
+        if idx >= entries.Length then
+            null
+        else
+            match entries.[idx] with
+            | KeyValue(_, _) -> BNodeSeq(entries, idx, null)
+            | Node(Node = node) ->
+                match node.getNodeSeq () with
+                | null -> BNodeSeq.create (entries, idx + 1)
+                | s -> BNodeSeq(entries, idx, s)
+            | EmptyEntry -> null
+
+    interface ISeq with
+        member _.first() =
+            match entries.[idx] with
+            | KeyValue(Key = k; Value = v) -> MapEntry(k, v)
+            | Node(Node = _) -> seq.first ()
+            | EmptyEntry ->
+                InvalidOperationException("Found Empty cell in BitmapNode3 -- algorithm bug")
+                |> raise
+
+
+        member _.next() =
+            match entries.[idx] with
+            | KeyValue(_, _) -> BNodeSeq.create (entries, idx + 1)
+            | Node(_) ->
+                match seq.next () with
+                | null -> BNodeSeq.create (entries, idx + 1)
+                | s -> BNodeSeq(entries, idx, s)
+            | EmptyEntry ->
+                InvalidOperationException("Found Empty cell in BitmapNode3 -- algorithm bug")
+                |> raise
+
+    static member kvReduce(entries: BNodeEntry array, f: IFn, init: obj) : obj =
+        let rec loop (idx: int) (acc: obj) =
+            if idx >= entries.Length then
+                acc
+            else
+                let nextAcc =
+                    match entries[idx] with
+                    | KeyValue(Key = k; Value = v) -> f.invoke (acc, k, v)
+                    | Node(Node = n) -> n.kvReduce (f, acc)
+                    | EmptyEntry -> acc
+
+                match nextAcc with
+                | :? Reduced -> nextAcc
+                | _ -> loop (idx + 1) nextAcc
+
+        loop 0 init
+
+
+and CNodeSeq(kvs: MapEntry[], idx: int) =
+    inherit ASeq()
+
+    static member create(kvs: MapEntry[], idx: int) : ISeq =
+        if idx >= kvs.Length then null else CNodeSeq(kvs, idx)
+
+    interface ISeq with
+        member _.first() = kvs.[idx]
+        member _.next() = CNodeSeq.create (kvs, idx + 1)
+
+    static member kvReduce(kvs: MapEntry array, f:IFn, init: obj) : obj =
+        let rec loop (idx: int) (acc: obj) =
+            if idx >= kvs.Length then
+                acc
+            else
+                let nextAcc =
+                    match kvs[idx] with
+                    | null -> acc
+                    | entry -> f.invoke(acc,(entry:>IMapEntry).key,(entry:>IMapEntry).value)
+
+                match nextAcc with
+                | :? Reduced -> nextAcc
+                | _ -> loop (idx + 1) nextAcc
+
+        loop 0 init

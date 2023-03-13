@@ -501,7 +501,7 @@ and [<AbstractClass; Sealed>] LazilyPersistentVector() =
 //
 ////////////////////////////////
 
-and [<AbstractClass>] AMapEntry() =
+and [<AbstractClass; AllowNullLiteral>] AMapEntry() =
     inherit APersistentVector()
 
     override this.Equals(o) = APersistentVector.doEquals (this, 0)
@@ -571,7 +571,7 @@ and [<AbstractClass>] AMapEntry() =
 ////////////////////////////////
 
 
-and MapEntry(key, value) =
+and [<AllowNullLiteral>] MapEntry(key, value) =
     inherit AMapEntry()
 
     static member create(k, v) = MapEntry(k, v)
