@@ -231,10 +231,10 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
             | Some n ->
                 match n.without (0, NodeOps.hash (k), k) with
                 | None -> PHashMap.Empty
-                | Some newRoot ->
+                | Some newRoot  as snr ->
                     if obj.ReferenceEquals(newRoot, n) then this
                     elif count = 1 then PHashMap.Empty //  TODO -- is this possible?  Shouldn't n.without return None in this case?  and shouldn't we preserrve the meta?
-                    else PHashMap(meta, count - 1, Some newRoot)
+                    else PHashMap(meta, count - 1, snr)
 
     interface IEditableCollection with
         member this.asTransient() = THashMap(this)
@@ -365,9 +365,9 @@ and [<Sealed>] THashMap(e, r, c) =
             let result = n.without (myEdit, 0, NodeOps.hash (k), k, leafFlag)
             match result with
             | None -> root <- None
-            | Some newRoot ->
+            | Some newRoot as snr ->
                 if not <| obj.ReferenceEquals(newRoot, n) then
-                    root <- Some newRoot
+                    root <- snr
 
             if leafFlag.isSet then
                 count <- count - 1
@@ -478,11 +478,11 @@ and [<Sealed>] ANode(e, c, a) =
                         this.pack (null, idx) |> Some // shrink
                     else
                         ANode(null, count - 1, NodeOps.cloneAndSet (nodes, idx, None)) :> INode2 |> Some // zero out this entry
-                | Some newNode ->
+                | Some newNode as snn ->
                     if obj.ReferenceEquals(newNode, node) then
                         this :> INode2 |> Some
                     else
-                        ANode(null, count, NodeOps.cloneAndSet (nodes, idx, Some newNode)) :> INode2
+                        ANode(null, count, NodeOps.cloneAndSet (nodes, idx, snn)) :> INode2
                         |> Some
 
         member _.find(shift, hash, key) =
@@ -542,11 +542,11 @@ and [<Sealed>] ANode(e, c, a) =
                         editable.decrementCount ()
                         editable :> INode2 |> Some
 
-                | Some newNode ->
+                | Some newNode as snn ->
                     if obj.ReferenceEquals(newNode, node) then
                         this :> INode2 |> Some
                     else
-                        this.editAndSet (e, idx, newNode |> Some) :> INode2 |> Some
+                        this.editAndSet (e, idx, snn ) :> INode2 |> Some
 
         member _.kvReduce(f, init) =
             let rec loop (i: int) (v: obj) =
