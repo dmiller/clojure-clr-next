@@ -1084,7 +1084,45 @@ let doBigWithoutTest (numEntries: int) =
     Expect.equal (m.count()) 0 "Should be nothing left"
 
 
+let doBigTransientWithoutTest (numEntries: int) =
+    printfn "Testing %i items." numEntries
 
+    let rnd = Random(123)
+    let dict = Dictionary<int, int>(numEntries)
+    let keepers = List<int>()
+    let withouts = List<int>()
+
+    for i = 0 to numEntries - 1 do
+        let r = rnd.Next()
+        if not <| dict.ContainsKey(r) then
+            if i % 2 = 0 then keepers.Add(r) else withouts.Add(r)
+            dict.[r] <- r
+
+    let mutable m = PersistentHashMap.createD2 (dict)
+    let mutable tm = (m:?>IEditableCollection).asTransient() :?> ITransientMap
+
+    for r in withouts do
+        tm <- tm.without(r)
+
+    m <- tm.persistent()
+
+    Expect.equal (m.count ()) (keepers.Count) "Should have same number of entries"
+
+    for r in keepers do
+        Expect.isTrue (m.containsKey (r :> obj)) "keepers key should be in map"
+        Expect.equal (m.valAt (r)) (upcast r) "Value should be same as key"
+
+    
+    for r in withouts do
+        Expect.isFalse (m.containsKey (r :> obj)) "withouts key should not be in map"
+
+    // let's go the rest of the way 
+
+    for r in keepers do
+        m <-m.without(r)
+        Expect.isFalse (m.containsKey(r))  "Key just removed should be missing"
+
+    Expect.equal (m.count()) 0 "Should be nothing left"
 
 
 [<Tests>]
@@ -1123,6 +1161,17 @@ let bigPersistentHashMapWithoutTests =
           testCase "Without update test for 1000" <| fun _ -> doBigWithoutTest 1000
           testCase "Without update test for 10000" <| fun _ -> doBigWithoutTest 10000
           testCase "Without update test for 100000" <| fun _ -> doBigWithoutTest 100000 ]
+
+
+[<Tests>]
+let bigPersistentHashMapTransientWithoutTests =
+    testList
+        "Updates via transient without into PersistentHashMap"
+        [ testCase "Without update test for 10" <| fun _ -> doBigTransientWithoutTest 10
+          testCase "Without update test for 100" <| fun _ -> doBigTransientWithoutTest 100
+          testCase "Without update test for 1000" <| fun _ -> doBigTransientWithoutTest 1000
+          testCase "Without update test for 10000" <| fun _ -> doBigTransientWithoutTest 10000
+          testCase "Without update test for 100000" <| fun _ -> doBigTransientWithoutTest 100000 ]
 
 
 [<Tests>]

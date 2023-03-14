@@ -1180,7 +1180,7 @@ let bigAlternateHashMapWithoutTests =
 let bigAlternateHashMapTransientWithoutTests =
     testList
         "Updates via transient without into AlternateHashMap"
-        [ ftestCase "Without update test for 10" <| fun _ -> doBigTransientWithoutTest 10
+        [ testCase "Without update test for 10" <| fun _ -> doBigTransientWithoutTest 10
           testCase "Without update test for 100" <| fun _ -> doBigTransientWithoutTest 100
           testCase "Without update test for 1000" <| fun _ -> doBigTransientWithoutTest 1000
           testCase "Without update test for 10000" <| fun _ -> doBigTransientWithoutTest 10000
