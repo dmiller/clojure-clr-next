@@ -923,9 +923,12 @@ and [<AbstractClass; Sealed>] private NodeOps() =
     static member hash(k) = Hashing.hasheq (k)
     static member mask(hash: int, shift: int) = (hash >>> shift) &&& 0x01f
     static member bitPos(hash, shift) = 1 <<< NodeOps.mask (hash, shift)
-
+        
     static member bitCount(x: int) =
-        System.Numerics.BitOperations.PopCount(uint64 (x))
+        let x = x - ((x >>> 1) &&& 0x55555555);
+        let x = (((x >>> 2) &&& 0x33333333) + (x &&& 0x33333333));
+        let x = (((x >>> 4) + x) &&& 0x0f0f0f0f);
+        (x * 0x01010101) >>> 24
 
     static member bitIndex(bitmap, bit) = NodeOps.bitCount (bitmap &&& (bit - 1)) // Not used?
 
@@ -1457,13 +1460,13 @@ and [<Sealed>] private ArrayNode(e, c, a) =
         for i = 0 to idx - 1 do
             if not (isNull array[i]) then
                 newArray[j] <- upcast array[i]
-                bitmap <- bitmap ||| 1 <<< i
+                bitmap <- bitmap ||| (1 <<< i)
                 j <- j + 2
 
         for i = idx + 1 to array.Length - 1 do
             if not (isNull array[i]) then
                 newArray[j] <- upcast array[i]
-                bitmap <- bitmap ||| 1 <<< i
+                bitmap <- bitmap ||| (1 <<< i)
                 j <- j + 2
 
         upcast BitmapIndexedNode(edit, bitmap, newArray)

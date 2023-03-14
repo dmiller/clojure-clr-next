@@ -1075,6 +1075,16 @@ let doBigWithoutTest (numEntries: int) =
     for r in withouts do
         Expect.isFalse (m.containsKey (r :> obj)) "withouts key should not be in map"
 
+    // let's go the rest of the way 
+
+    for r in keepers do
+        m <-m.without(r)
+        Expect.isFalse (m.containsKey(r))  "Key just removed should be missing"
+
+    Expect.equal (m.count()) 0 "Should be nothing left"
+
+
+
 
 
 [<Tests>]
