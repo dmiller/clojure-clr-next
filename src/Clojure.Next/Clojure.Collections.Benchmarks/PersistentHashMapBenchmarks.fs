@@ -33,7 +33,8 @@ type PHMCons() =
 [<MemoryDiagnoser>]
 type PHMTransientConj() =
 
-    [<Params( 15, 16, 17, 18, 19, 24, 32)>]
+    //[<Params( 15, 16, 17, 18, 19, 24, 32)>]
+    [<Params( 10, 20, 50, 100, 1000)>]
     member val size: int = 0 with get, set
 
 
@@ -56,6 +57,18 @@ type PHMTransientConj() =
             pv <- pv.assoc(i,i)
 
         pv.persistent ()
+
+    [<Benchmark>]
+    member this.AlternateTransientConj() =
+        let mutable pv =
+            (Clojure.Collections.Alternate.PHashMap.Empty :> Clojure.Collections.IEditableCollection) 
+                .asTransient () :?> Clojure.Collections.ITransientAssociative
+
+        for i in 0 .. this.size do
+            pv <- pv.assoc(i,i)
+
+        pv.persistent ()
+
 
 
 [<MemoryDiagnoser>]

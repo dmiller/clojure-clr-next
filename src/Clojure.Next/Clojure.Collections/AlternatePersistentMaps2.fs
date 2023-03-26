@@ -1,4 +1,4 @@
-﻿namespace Clojure.Collections.Alternate
+﻿namespace Clojure.Collections.Alternate2
 
 open Clojure.Collections
 open System

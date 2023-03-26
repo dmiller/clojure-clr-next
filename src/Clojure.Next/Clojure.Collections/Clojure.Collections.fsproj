@@ -25,7 +25,8 @@
     <Compile Include="PersistentVector.fs" />
     <Compile Include="MapHelpers.fs" />
     <Compile Include="PersistentMaps.fs" />
-    <Compile Include="AlternatePersistentMaps.fs" />
+    <Compile Include="AlternatePersistentHashMap.fs" />
+    <Compile Include="AlternatePersistentMaps2.fs" />
   </ItemGroup>
 
   <ItemGroup>
