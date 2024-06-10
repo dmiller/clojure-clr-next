@@ -12,5 +12,7 @@ let ArrayClone(a: obj array) : obj array = Array.copy a
 
 let SystemArrayCreateInstance(n:int) : obj array = System.Array.CreateInstance( typeof<obj>, n) :?> obj array
 
-//let Naked(n:int) : obj array =  (# "newarr !0" typeof<obj> (obj) n : obj array #)
+//let inline Naked(n:int) : obj array =  
+//    let inline makeNaked(cnt) = (# "newarr !0" typeof<obj> (obj) cnt : obj array #)
+//    makeNaked n
 

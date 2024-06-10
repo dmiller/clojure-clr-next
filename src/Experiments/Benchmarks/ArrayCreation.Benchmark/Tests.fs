@@ -10,21 +10,13 @@ open ArrayCreation.CSharp
 type Tests() =
 
 
-    let NumIters = 10_000
-    let NumIters64 = 100_000L
+    let NumIters = 1000
 
-    [<Benchmark(Baseline=true)>]
+    [<Benchmark>]
     member _.CSharp() =
         let mutable x : obj array = null
         for i = 0 to NumIters do
             x <- CreateArrayLib.CreateArray(32)
-        x
-
-    [<Benchmark>]
-    member _.FSharpZeroCreate() =
-        let mutable x : obj array = null
-        for i = 0 to NumIters do
-            x <- ZeroCreateArray(32)
         x
 
     [<Benchmark>]
@@ -33,12 +25,11 @@ type Tests() =
         for i = 0 to NumIters do
             x <- CreateArrayLib.CreateArrayFixed()
         x
-
-    [<Benchmark>]
-    member _.FSharpZeroCreateFixed() =
+    [<Benchmark(Baseline=true)>]
+    member _.FSharpZeroCreate() =
         let mutable x : obj array = null
         for i = 0 to NumIters do
-            x <- ZeroCreateArrayFixed()
+            x <- ZeroCreateArray(32)
         x
 
     [<Benchmark>]
