@@ -453,7 +453,9 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
             this.indexOfObject (key)
 
     static member internal equalKey(k1: obj, k2: obj) =
-        PersistentArrayMap.keywordCheck (k1) && k1 = k2 || Util.equiv (k1, k2)
+        // TODO: Undo this!
+        //PersistentArrayMap.keywordCheck (k1) && k1 = k2 || Util.equiv (k1, k2)
+        Util.equiv (k1, k2)
 
     interface Associative with
         override this.containsKey(k) = this.indexOfKey (k) >= 0
@@ -602,15 +604,18 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
     member this.create([<ParamArray>] init: obj array) = PersistentArrayMap(meta, init)
 
     static member createWithCheck(init: obj array) =
-        for i in 0 .. init.Length - 1 .. 2 do
-            for j in i + 2 .. init.Length - 1 .. 2 do
-                if PersistentArrayMap.equalKey (init[i], init[j]) then
-                    raise <| ArgumentException($"Duplicate key: {init[i]}")
+        
+        for i = 0 to init.Length / 2 - 1 do
+            for j = i+1 to init.Length / 2 - 1 do
+                if Util.equiv(init.[i*2], init.[j*2]) then
+                    raise <| ArgumentException($"Duplicate key: {init.[i*2]}")
+                //if PersistentArrayMap.equalKey (init.[i*2], init.[j*2]) then
+                //    raise <| ArgumentException($"Duplicate key: {init.[i*2]}")
 
         PersistentArrayMap(init)
 
 
-    // This method attempts to find resue [sic] the given array as the basis for an array map as quickly as possible.
+    // This method attempts to find reuse the given array as the basis for an array map as quickly as possible.
     // If a trailing element exists in the array or it contains duplicate keys then it delegates to the complex path.
 
     static member createAsIfByAssoc(init: obj array) : PersistentArrayMap =
@@ -1176,7 +1181,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
     interface IPersistentMap with
         override this.assoc(k, v) =
             if isNull k then
-                if hasNull && v = nullValue then
+                if hasNull && v = nullValue then  // TODO: should this be a ReferenceEquals test or something else?
                     upcast this
                 else
                     upcast PersistentHashMap(meta, (if hasNull then count else count + 1), root, true, v)
@@ -1379,7 +1384,7 @@ and private TransientHashMap(e, r, c, hn, nv) =
 
     override this.doAssoc(k, v) =
         if isNull k then
-            if nullValue <> v then
+            if not <| obj.ReferenceEquals(nullValue,v) then
                 nullValue <- v
 
             if not hasNull then
@@ -1866,15 +1871,15 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
                     let n = existingNode.assoc (e, shift + 5, hash, key, value, addedLeaf)
 
                     if obj.ReferenceEquals(n, existingNode) then
-                        upcast this
+                        this
                     else
-                        upcast this.editAndSet (e, 2 * idx + 1, n)
+                        this.editAndSet (e, 2 * idx + 1, n)
 
                 elif Util.equiv (key, keyOrNull) then
-                    if value = valOrNode then
-                        upcast this
+                    if obj.ReferenceEquals(value,valOrNode) then
+                        this
                     else
-                        upcast this.editAndSet (e, 2 * idx + 1, value)
+                        this.editAndSet (e, 2 * idx + 1, value)
                 else
                     addedLeaf.set ()
 
@@ -2077,7 +2082,7 @@ and HashCollisionNode(edit: AtomicBoolean, hash: int, c, a) =
             if h = hash then
                 match this.tryFindIndex (key) with
                 | Some idx ->
-                    if array[idx + 1] = value then
+                    if obj.ReferenceEquals(array[idx + 1] ,value) then
                         upcast this
                     else
                         upcast this.editAndSet (e, idx + 1, value)

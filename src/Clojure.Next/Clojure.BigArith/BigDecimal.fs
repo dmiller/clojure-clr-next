@@ -62,7 +62,7 @@ type internal ParseData =
 
 type internal ParseResult = ParseResult of ParseData * int
 
-
+[<Sealed>]
 type BigDecimal private (coeff, exp, precision) =
 
     // Precision

@@ -141,7 +141,7 @@ type LazySeq private (m1, fn1, s1) =
                 let rec loop i (s: ISeq) =
                     if i = index then
                         s.first ()
-                    elif s = null then
+                    elif isNull s then
                         raise <| ArgumentOutOfRangeException("index", "Index past end of list")
                     else
                         loop (i + 1) (s.next ())

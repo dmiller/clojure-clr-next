@@ -23,7 +23,7 @@ let hasheq (o: obj) : int =
     | null -> 0
     | :? IHashEq as ihe -> ihe.hasheq ()
     | x when Numbers.IsNumeric(x) -> Numbers.hasheq (x)
-    | :? String as s -> Murmur3.HashInt(s.GetHashCode())
+    | :? String as s -> Murmur3.HashString(s)
     | _ -> o.GetHashCode()
 
 let hashOrderedU (xs: IEnumerable) : uint =

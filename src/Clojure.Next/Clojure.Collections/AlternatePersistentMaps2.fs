@@ -69,8 +69,11 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
-        for i in 0..2 .. init.Length - 1 do
+        //for i in 0..2 .. init.Length - 1 do  <- seriously, this is much slower than the while loop
+        let mutable i = 0
+        while i < init.Length - 1 do
             ret <- ret.assoc (init[i], init[i + 1])
+            i <- i + 2
 
             if ret.count () <> i / 2 + 1 then
                 raise <| ArgumentException("init", "Duplicate key: " + init[ i ].ToString())
@@ -82,8 +85,11 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
-        for i in 0..2 .. init.Length - 1 do
+        //for i in 0..2 .. init.Length - 1 do  <- seriously, this is much slower than the while loop
+        let mutable i = 0
+        while i < init.Length - 1 do
             ret <- ret.assoc (init[i], init[i + 1])
+            i <- i + 2
 
         downcast ret.persistent ()
 

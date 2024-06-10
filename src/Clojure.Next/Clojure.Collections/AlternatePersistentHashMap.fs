@@ -75,8 +75,11 @@ type PHashMap private (meta: IPersistentMap, count: int, root: INode, hasNull: b
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
-        for i in 0..2 .. init.Length - 1 do
+        //for i in 0..2 .. init.Length - 1 do  <- seriously, this is much slower than the while loop
+        let mutable i = 0
+        while i < init.Length - 1 do
             ret <- ret.assoc (init[i], init[i + 1])
+            i <- i + 2
 
         downcast ret.persistent ()
 
@@ -84,8 +87,12 @@ type PHashMap private (meta: IPersistentMap, count: int, root: INode, hasNull: b
         let mutable ret =
             (PHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
-        for i in 0..2 .. init.Length - 1 do
+        //for i in 0..2 .. init.Length - 1 do  <- seriously, this is much slower than the while loop
+        let mutable i = 0
+        while i < init.Length - 1 do
             ret <- ret.assoc (init[i], init[i + 1])
+            i <- i + 2
+
 
             if ret.count () <> i / 2 + 1 then
                 raise <| ArgumentException("init", "Duplicate key: " + init[ i ].ToString())
@@ -611,7 +618,7 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
                     else
                         nf
 
-        member _.getNodeSeq() = BNodeSeq.create (kns,vals)
+        member _.getNodeSeq() = BNodeSeq.create (kns,vals,NodeOps.bitCount (bitmap))
 
         member this.assoc(e, shift, hash, key, value, addedLeaf) =
             let bit = NodeOps.bitPos (hash, shift)
@@ -624,35 +631,43 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
                     if obj.ReferenceEquals(returnNode, n) then
                         this
                     else
-                        this.editAndSetNode(e,idx,returnNode)
+                        this.editAndSetNode(e,idx,BSubNode returnNode)
                 | BKey(Key=k) ->
                     if Util.equiv(k,key) then
                         if vals[idx] = value then   
                             this
                         else
-                            this.editAndSetValue(e,idx,value)
+                            this.editAndSetVal(e,idx,value)
                     else
-                        addedLeaf.editAndSet2(e,idx,PHashMap.createNode(e,shift+5,k,vals[idx],hash,key,value),null)
+                        addedLeaf.set()
+                        this.editAndSetBoth(e,idx,BSubNode(PHashMap.createNode(e,shift+5,k,vals[idx],hash,key,value)),null)
             else
                 let n = NodeOps.bitCount bitmap
 
-                if n * 2 < array.Length then
+                if n < kns.Length then
                     addedLeaf.set ()
                     let editable = this.ensureEditable (e)
-                    Array.Copy(editable.Array, 2 * idx, editable.Array, 2 * (idx + 1), 2 * (n - idx))
-                    editable.setArrayVal (2 * idx, key)
-                    editable.setArrayVal (2 * idx + 1, value)
+                    Array.Copy(editable.Kns,  idx, editable.Kns, (idx + 1), (n - idx))
+                    editable.setKnArray(idx,BKey key)
+                    Array.Copy(editable.Vals,  idx, editable.Vals, (idx + 1), (n - idx))
+                    editable.setValArray(idx,value)
                     editable.Bitmap <- editable.Bitmap ||| bit
                     upcast editable
                 else
-                    let newArray: obj[] = 2 * (n + 4) |> Array.zeroCreate
-                    Array.Copy(array, 0, newArray, 0, 2 * idx)
-                    newArray[2 * idx] <- key
-                    newArray[2 * idx + 1] <- value
+                    let newKns: BNodeEntry[] = (n + 4) |> Array.zeroCreate
+                    Array.Copy(kns, 0, newKns, 0, idx)
+                    newKns[idx] <- BKey key
+                    Array.Copy(kns, idx, newKns, (idx + 1), (n - idx))
+
+                    let newVals: obj[] = (n + 4) |> Array.zeroCreate
+                    Array.Copy(vals, 0, newVals, 0, idx)
+                    newVals[idx] <- value
+                    Array.Copy(vals, idx, newVals, (idx + 1), (n - idx))
+
                     addedLeaf.set ()
-                    Array.Copy(array, 2 * idx, newArray, 2 * (idx + 1), 2 * (n - idx))
                     let editable = this.ensureEditable (e)
-                    editable.Array <- newArray
+                    editable.Kns <- newKns
+                    editable.Vals <- newVals
                     editable.Bitmap <- editable.Bitmap ||| bit
                     upcast editable
 
@@ -663,35 +678,32 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
                 upcast this
             else
                 let idx = this.index (bit)
-                let keyOrNull = array[2 * idx]
-                let valOrNode = array[2 * idx + 1]
-
-                if isNull keyOrNull then
-                    let existingNode = (valOrNode :?> INode)
-                    let n = existingNode.without (e, shift + 5, hash, key, removedLeaf)
-
-                    if obj.ReferenceEquals(n, existingNode) then
-                        upcast this
-                    elif not (isNull n) then
-                        upcast this.editAndSet (e, 2 * idx + 1, n)
+                match kns[idx] with
+                | BSubNode n ->
+                    let retNode = n.without(e,shift+5,hash,key, removedLeaf)
+                    if obj.ReferenceEquals(n,retNode) then
+                       this
+                    elif not <| isNull retNode then
+                       this.editAndSetNode(e,idx,BSubNode retNode)
                     elif bitmap = bit then
                         null
                     else
-                        upcast this.editAndRemovePair (e, bit, idx)
-                elif Util.equiv (key, keyOrNull) then
-                    removedLeaf.set ()
-                    upcast this.editAndRemovePair (e, bit, idx)
-                else
-                    upcast this
+                        this.editAndRemoveBoth(e,bit,idx)
+                | BKey k ->
+                    if Util.equiv(key,k) then
+                        removedLeaf.set()
+                        this.editAndRemoveBoth(e,bit,idx)
+                    else
+                        this
 
-        member _.kvReduce(f, init) = NodeSeq.kvReduce (array, f, init)
+        member _.kvReduce(f, init) = BNodeSeq.kvReduce (kns, vals,  NodeOps.bitCount bitmap, f, init)
 
         member _.fold(combinef, reducef, fjtask, fjfork, fjjoin) =
-            NodeSeq.kvReduce (array, reducef, combinef.invoke ())
+            BNodeSeq.kvReduce (kns, vals,  NodeOps.bitCount bitmap, reducef, combinef.invoke ())
 
-        member _.iterator(d) = NodeIter.getEnumerator (array, d)
+        member _.iterator(d) = BNodeIter.getEnumerator (kns, vals,  NodeOps.bitCount bitmap, d)
 
-        member _.iteratorT(d) = NodeIter.getEnumeratorT (array, d)
+        member _.iteratorT(d) = BNodeIter.getEnumeratorT (kns, vals, NodeOps.bitCount bitmap, d)
 
     member this.ensureEditable(e: AtomicBoolean) : BNode =
         if Object.ReferenceEquals(myedit, e) then
@@ -699,34 +711,42 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
         else
             let n = NodeOps.bitCount (bitmap)
 
-            let newArray: obj[] = Array.zeroCreate (if n >= 0 then 2 * (n + 1) else 4) // make room for next assoc
+            let newKns: BNodeEntry[] = Array.zeroCreate (if n >= 0 then (n + 1) else 2) // make room for next assoc
+            Array.Copy(kns, newKns, n)
 
-            Array.Copy(array, newArray, 2 * n)
-            BNode(e, bitmap, newArray)
+            let newVals: obj[] = Array.zeroCreate (if n >= 0 then (n + 1) else 2) // make room for next assoc
+            Array.Copy(vals, newVals, n)
 
-    member private this.editAndSet(e: AtomicBoolean, i: int, a: obj) : BNode =
+            BNode(e, bitmap, newKns, newVals)
+
+    member private this.editAndSetNode(e: AtomicBoolean, i: int, a: BNodeEntry) : BNode =
         let editable = this.ensureEditable (e)
-        editable.setArrayVal (i, a)
+        editable.setKnArray (i, a)
+        editable
+
+    member private this.editAndSetVal(e: AtomicBoolean, i: int, a: obj) : BNode =
+        let editable = this.ensureEditable (e)
+        editable.setValArray (i, a)
         editable
 
 
-    member private this.editAndSet(e: AtomicBoolean, i: int, a: obj, j: int, b: obj) : BNode =
+    member private this.editAndSetBoth(e: AtomicBoolean, i: int, bne: BNodeEntry, v: obj) : BNode =
         let editable = this.ensureEditable (e)
-        editable.setArrayVal (i, a)
-        editable.setArrayVal (j, b)
+        editable.setKnArray (i, bne)
+        editable.setValArray (i, v)
         editable
 
-    member private this.editAndRemovePair(e: AtomicBoolean, bit: int, i: int) : BNode =
+    member private this.editAndRemoveBoth(e: AtomicBoolean, bit: int, i: int) : BNode =
         if bitmap = bit then
             null
         else
             let editable = this.ensureEditable (e)
             editable.Bitmap <- editable.Bitmap ^^^ bit
-            Array.Copy(editable.Array, 2 * (i + 1), editable.Array, 2 * i, editable.Array.Length - 2 * (i + 1))
-            editable.setArrayVal (editable.Array.Length - 2, null)
-            editable.setArrayVal (editable.Array.Length - 1, null)
+            Array.Copy(editable.Kns,i+1,editable.Kns,i,editable.Kns.Length-(i+1))
+            editable.setKnArray(editable.Kns.Length - 1, BKey null)
+            Array.Copy(editable.Vals,i+1,editable.Vals,i,editable.Vals.Length-(i+1))
+            editable.setValArray(editable.Vals.Length - 1, null)
             editable
-
 
 and CNode(edit: AtomicBoolean, hash: int, c, a) =
 
@@ -767,7 +787,7 @@ and CNode(edit: AtomicBoolean, hash: int, c, a) =
                     addedLeaf.set ()
                     upcast CNode(edit, h, count + 1, newArray)
             else
-                (BNode(null, NodeOps.bitPos (hash, shift), [| null; this |]) :> INode)
+                (BNode(null, NodeOps.bitPos (hash, shift), [| BSubNode this|], [| null |]) :> INode)
                     .assoc (shift, h, key, value, addedLeaf)
 
         member this.without(shift, h, key) =
@@ -815,7 +835,7 @@ and CNode(edit: AtomicBoolean, hash: int, c, a) =
                         addedLeaf.set ()
                         upcast this.ensureEditable (e, count + 1, newArray)
             else
-                (BNode(null, NodeOps.bitPos (hash, shift), [| null; this; null; null |]) :> INode)
+                (BNode(null, NodeOps.bitPos (hash, shift), [| BSubNode this; BKey null |],   [| null, null |]) :> INode)
                     .assoc (e, shift, h, key, value, addedLeaf)
 
         member this.without(e, shift, h, key, removedLeaf) =
@@ -872,92 +892,87 @@ and CNode(edit: AtomicBoolean, hash: int, c, a) =
         editable.Array[j] <- b
         editable
 
-
-
-
-and NodeSeq(meta, array: obj[], idx: int, seq: ISeq) =
+and BNodeSeq(meta, kns: BNodeEntry[], vals: obj[], idx: int, cnt: int, seq: ISeq) =
     inherit ASeq(meta)
 
-    new(i, a, s) = NodeSeq(null, a, i, s)
+    new(i, cnt, kns, vals, s) = BNodeSeq(null, kns, vals, i, cnt, s)
 
-    static member private create(array: obj[], i: int, s: ISeq) : ISeq =
+    static member private create(kns: BNodeEntry[], vals: obj[], i: int, cnt: int, s: ISeq) : ISeq =
         if not (isNull s) then
-            upcast NodeSeq(null, array, i, s)
+            upcast BNodeSeq(null, kns, vals, i, cnt, s)
+        elif i > cnt then
+            null
         else
-            let result =
-                array
-                |> Seq.indexed
-                |> Seq.skip i
-                |> Seq.tryPick (fun (j, node) ->
+            match kns[i] with
+            | BKey key -> BNodeSeq(null,kns,vals,i,cnt,null)
+            | BSubNode sn -> BNodeSeq(null,kns,vals,i+1,cnt,sn.getNodeSeq())
 
-                    if j % 2 = 0 then // even => key entry
-                        if not (isNull array[j]) then
-                            NodeSeq(null, array, j, null) |> Some
-                        else
-                            None
-                    else // odd => value entry
-
-                    if
-                        isNull array[j - 1]
-                    then
-                        let node: INode = array[j] :?> INode
-
-                        if not (isNull node) then
-                            let nodeSeq = node.getNodeSeq ()
-
-                            if not (isNull nodeSeq) then
-                                NodeSeq(null, array, j + 1, nodeSeq) |> Some
-                            else
-                                None
-                        else
-                            None
-                    else
-                        None)
-
-            match result with
-            | Some ns -> upcast ns
-            | None -> null
-
-
-    static member create(array: obj[]) : ISeq = NodeSeq.create (array, 0, null)
+    static member create(kns: BNodeEntry[], vals: obj[], cnt:int) : ISeq = BNodeSeq.create (kns,vals, 0, cnt, null)
 
     interface IObj with
         override this.withMeta(m) =
             if Object.ReferenceEquals(m, (this :> IMeta).meta ()) then
                 upcast this
             else
-                upcast NodeSeq(m, array, idx, seq)
+                upcast BNodeSeq(m, kns, vals, idx, cnt, seq)
 
     interface ISeq with
         member _.first() =
             match seq with
-            | null -> upcast MapEntry.create (array[idx], array[idx + 1])
+            | null -> 
+                match kns[idx] with
+                | BKey key -> MapEntry.create(key,vals[idx])
+                | BSubNode sn -> sn.getNodeSeq().first()   // TODO: IS THIS CORRECT -- we have a missing case here, not sure what this should be.  RESEARCH!!!
             | _ -> seq.first ()
 
         member _.next() =
             match seq with
-            | null -> NodeSeq.create (array, idx + 2, null)
-            | _ -> NodeSeq.create (array, idx, seq.next ())
+            | null -> BNodeSeq.create (kns, vals, idx + 1, cnt, null)
+            | _ -> BNodeSeq.create (kns, vals, idx, cnt, seq.next ())
 
-    static member kvReduce(a: obj[], f: IFn, init: obj) : obj =
+    static member kvReduce(kns: BNodeEntry[], vals: obj[], cnt:int, f: IFn, init: obj) : obj =
         let rec loop (result: obj) (i: int) =
-            if i >= a.Length then
+            if i >= cnt then
                 result
             else
                 let nextResult =
-                    if not (isNull a[i]) then
-                        f.invoke (result, a[i], a[i + 1])
-                    else
-                        let node = a[i + 1] :?> INode
-
-                        if not (isNull node) then
-                            node.kvReduce (f, result)
-                        else
-                            result
+                    match kns[i] with
+                    | BKey key -> f.invoke(result,key,vals[i])
+                    | BSubNode sn -> sn.kvReduce(f,result)
 
                 if nextResult :? Reduced then
                     nextResult
                 else
-                    loop nextResult (i + 2)
+                    loop nextResult (i + 1)
 
         loop init 0
+
+
+and [<AbstractClass; Sealed>] private BNodeIter() =
+    static member getEnumerator(kns: BNodeEntry[], vals: obj[], cnt:int, d: KVMangleFn<obj>) : IEnumerator =
+        let s =
+            seq {
+                for i = 0 to cnt - 1 do
+                    match kns[i] with
+                    | BKey key -> yield d(key,vals[i])
+                    | BSubNode sn -> 
+                        let ie = sn.iterator(d)
+                        while ie.MoveNext() do
+                            yield ie.Current
+            }
+
+        s.GetEnumerator() :> IEnumerator
+
+    static member getEnumeratorT(kns: BNodeEntry[], vals: obj[], cnt:int, d: KVMangleFn<'T>) : IEnumerator<'T> =
+        let s =
+            seq {
+                for i = 0 to cnt - 1 do
+                    match kns[i] with
+                    | BKey key -> yield d(key,vals[i])
+                    | BSubNode sn -> 
+                        let ie = sn.iteratorT(d)
+                        while ie.MoveNext() do
+                            yield ie.Current
+            }
+
+        s.GetEnumerator()

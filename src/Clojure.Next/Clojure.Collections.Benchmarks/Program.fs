@@ -10,8 +10,11 @@ let main argv =
     //BenchmarkRunner.Run<PVNth>() |> ignore
     //BenchmarkRunner.Run<PersistentVsTransient>() |> ignore
 
+    BenchmarkRunner.Run<RTEquiv>() |> ignore
+    //BenchmarkRunner.Run<PMCreate>() |> ignore
+
     //BenchmarkRunner.Run<PHMCons>() |> ignore
-    BenchmarkRunner.Run<PHMTransientConj>() |> ignore
+    //BenchmarkRunner.Run<PHMTransientConj>() |> ignore
     //BenchmarkRunner.Run<PHMContainsKey>() |> ignore
 
    

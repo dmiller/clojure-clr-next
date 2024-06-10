@@ -5,7 +5,7 @@ open System.Collections
 open Clojure.Numerics
 
 let equals (x, y) =
-    obj.ReferenceEquals(x, y) || x <> null && x.Equals(y)
+    obj.ReferenceEquals(x, y) || not (isNull x) && x.Equals(y)
 
 let pcequiv (k1: obj, k2: obj) =
     match k1, k2 with

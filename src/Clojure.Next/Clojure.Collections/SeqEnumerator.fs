@@ -25,7 +25,7 @@ type TypedSeqEnumerator<'T when 'T: not struct>(o: obj) =
 
         member _.MoveNext() =
             match seqOption with
-            | Some s when (s = null) -> false
+            | Some s when isNull s -> false
             | Some s ->
                 let next = s.next ()
                 seqOption <- Some next

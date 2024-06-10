@@ -49,10 +49,10 @@ let rec baseMetaPrinter (x: obj, w: TextWriter) : unit =
 and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
     let printInnerSeq readably (s: ISeq) (w: TextWriter) =
         let rec loop (s: ISeq) =
-            if s <> null then 
+            if not (isNull s) then 
                  printBasic (readably, s.first(), w) 
                  let next = s.next() 
-                 if next <> null then w.Write(' ')
+                 if not (isNull next) then w.Write(' ')
                  loop next
         loop s
 
@@ -108,7 +108,7 @@ and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
             printBasic (readably, e.key (), w)
             w.Write(' ')
             printBasic (readably, e.value (), w)
-            if s.next () <> null then w.Write(", ")
+            if not (isNull (s.next ())) then w.Write(", ")
             loop (s.next ())
 
         w.Write('{')

@@ -211,7 +211,7 @@ type ASeq(m) =
                 )
 
             let rec loop (i: int) (s: ISeq) =
-                if i < arr.Length && s <> null then
+                if i < arr.Length && not (isNull s) then
                     arr.SetValue(s.first (), i)
                     loop (i + 1) (s.next ())
 

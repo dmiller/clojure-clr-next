@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,11 +11,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Clojure" Version="1.12.0-alpha5" />
+    <PackageReference Include="Clojure" Version="1.12.0-alpha9" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="8.0.400-beta.24229.4" />
   </ItemGroup>
 
 </Project>
