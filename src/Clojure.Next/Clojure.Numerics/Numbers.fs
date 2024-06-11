@@ -197,15 +197,15 @@ type OpsP() =
 [<AbstractClass; Sealed>]
 type Numbers() =
 
-    static member LONG_OPS: Ops = LongOps()
-    static member DOUBLE_OPS: Ops = DoubleOps()
-    static member RATIO_OPS: Ops = RatioOps()
-    static member BIGINT_OPS: Ops = BigIntOps()
-    static member BIGDEC_OPS: Ops = BigDecimalOps()
-    static member ULONG_OPS: Ops = ULongOps()
-    static member CLRDEC_OPS: Ops = ClrDecimalOps()
+    static member val  LONG_OPS: Ops = LongOps()
+    static member val DOUBLE_OPS: Ops = DoubleOps()
+    static member val RATIO_OPS: Ops = RatioOps()
+    static member val BIGINT_OPS: Ops = BigIntOps()
+    static member val BIGDEC_OPS: Ops = BigDecimalOps()
+    static member val ULONG_OPS: Ops = ULongOps()
+    static member val CLRDEC_OPS: Ops = ClrDecimalOps()
 
-    static member private opsImplTable: Ops array =
+    static member val private opsImplTable: Ops array =
         [| Numbers.LONG_OPS
            Numbers.DOUBLE_OPS
            Numbers.RATIO_OPS
@@ -1202,7 +1202,7 @@ type Numbers() =
         | _ -> BigDecimal.Create(convertToDouble (x))
 
 
-    static member private BigIntegerTen = BigInteger(10)
+    static member val private BigIntegerTen = BigInteger(10)
 
     //[<WarnedBoxMath(false)>]
     static member ToRatio(x: obj) =
@@ -2190,11 +2190,11 @@ and [<Sealed>] BigDecimalOps() =
             | None -> bx.Abs()
 
 
-and [<AbstractClass; Sealed>] OpsImpls =
-    static member Long: Ops = LongOps()
-    static member ULong = ULongOps()
-    static member Double = DoubleOps()
-    static member Ratio = RatioOps()
-    static member BigInt = BigIntOps()
-    static member BigDecimal = BigDecimalOps()
-    static member ClrDecimal = ClrDecimalOps()
+//and [<AbstractClass; Sealed>] OpsImpls =
+//    static member val Long: Ops = LongOps()
+//    static member ULong = ULongOps()
+//    static member Double = DoubleOps()
+//    static member Ratio = RatioOps()
+//    static member BigInt = BigIntOps()
+//    static member BigDecimal = BigDecimalOps()
+//    static member ClrDecimal = ClrDecimalOps()

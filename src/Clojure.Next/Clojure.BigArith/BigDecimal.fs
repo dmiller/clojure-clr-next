@@ -21,23 +21,23 @@ type Context =
       roundingMode: RoundingMode }
 
     /// Standard precision for 32-bit decimal
-    static member Decimal32 =
+    static member val Decimal32 =
         { precision = 7u
           roundingMode = HalfEven }
     /// Standard precision for 64-bit decimal
-    static member Decimal64 =
+    static member val Decimal64 =
         { precision = 16u
           roundingMode = HalfEven }
     /// Standard precision for 128-bit decimal
-    static member Decimal128 =
+    static member val Decimal128 =
         { precision = 34u
           roundingMode = HalfEven }
     /// No precision limit
-    static member Unlimited =
+    static member val Unlimited =
         { precision = 0u
           roundingMode = HalfUp }
     /// Default mode
-    static member Default =
+    static member val Default =
         { precision = 9ul
           roundingMode = HalfUp }
     /// Create a Context with specified precision and roundingMode = HalfEven
@@ -103,9 +103,9 @@ type BigDecimal private (coeff, exp, precision) =
 
     // Useful constants
 
-    static member Zero = BigDecimal(BigInteger.Zero, 0, 1u)
-    static member One = BigDecimal(BigInteger.One, 0, 1u)
-    static member Ten = BigDecimal(new BigInteger(10), 0, 2u)
+    static member val Zero = BigDecimal(BigInteger.Zero, 0, 1u)
+    static member val One = BigDecimal(BigInteger.One, 0, 1u)
+    static member val Ten = BigDecimal(new BigInteger(10), 0, 2u)
 
     // Exponent support
 

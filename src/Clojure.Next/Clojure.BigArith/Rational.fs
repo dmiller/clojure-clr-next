@@ -75,10 +75,10 @@ type Rational(n: BigInteger, d: BigInteger) =
     member _.Denominator = denominator
 
     // Some contants
-    static member Zero =
+    static member val Zero =
         Rational(BigInteger.Zero, BigInteger.One)
 
-    static member One =
+    static member val One =
         Rational(BigInteger.One, BigInteger.One)
 
     // basic interfaces

@@ -91,7 +91,7 @@ type RTEquiv() =
 [<MemoryDiagnoser>]
 type PMCreate() = 
 
-    [<Params( 0, 1, 4, 8, 16)>]
+    [<Params( 0, 1, 2, 3, 4, 6, 8, 12, 16)>]
     member val size: int = 0 with get, set
 
     [<DefaultValue>]

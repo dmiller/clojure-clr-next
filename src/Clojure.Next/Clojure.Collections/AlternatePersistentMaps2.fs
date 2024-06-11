@@ -638,7 +638,7 @@ and [<Sealed>] BNode(e, b, a) =
     let mutable bitmap: int = b
     let mutable entries: BNodeEntry array = a
 
-    static member Empty: BNode = BNode(null, 0, Array.empty<BNodeEntry>)
+    static member val Empty: BNode = BNode(null, 0, Array.empty<BNodeEntry>)
 
     member this.modifyOrCreateBNode (newEdit: AtomicBoolean) (newBitmap: int) (newEntries: BNodeEntry[]) =
         if obj.ReferenceEquals(myEdit, newEdit) then

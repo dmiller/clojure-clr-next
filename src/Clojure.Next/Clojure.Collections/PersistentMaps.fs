@@ -605,12 +605,14 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
 
     static member createWithCheck(init: obj array) =
         
-        for i = 0 to init.Length / 2 - 1 do
-            for j = i+1 to init.Length / 2 - 1 do
-                if Util.equiv(init.[i*2], init.[j*2]) then
-                    raise <| ArgumentException($"Duplicate key: {init.[i*2]}")
-                //if PersistentArrayMap.equalKey (init.[i*2], init.[j*2]) then
-                //    raise <| ArgumentException($"Duplicate key: {init.[i*2]}")
+        let mutable i = 0;
+        while i < init.Length do
+            let mutable j = i + 2
+            while j < init.Length do
+                if PersistentArrayMap.equalKey (init.[i], init.[j]) then
+                    raise <| ArgumentException($"Duplicate key: {init.[i]}")
+                j <- j + 2
+            i <- i + 2
 
         PersistentArrayMap(init)
 

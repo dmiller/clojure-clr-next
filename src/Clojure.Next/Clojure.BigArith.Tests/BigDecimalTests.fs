@@ -2626,7 +2626,7 @@ let subTests =
        //TSub("subx792 subtract  1000  Inf   -> -Infinity
 
        //TSub("subx800 subtract  Inf   Inf   ->  NaN  Invalid_operation
-       ///TSub("subx801 subtract  Inf   1000  ->  Infinity
+       //TSub("subx801 subtract  Inf   1000  ->  Infinity
        //TSub("subx802 subtract  Inf   1     ->  Infinity
        //TSub("subx803 subtract  Inf   0     ->  Infinity
        //TSub("subx804 subtract  Inf  -0     ->  Infinity
