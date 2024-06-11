@@ -665,7 +665,7 @@ let aPersistentMapTests =
                   PersistentArrayMap.createD2 (d) :?> ICollection
 
               Expect.isTrue (c.IsSynchronized) "should be synchronized"
-              Expect.isTrue (Object.ReferenceEquals(c, c.SyncRoot)) "SyncRoot should be self"
+              Expect.isTrue (LanguagePrimitives.PhysicalEquality (c :> obj) c.SyncRoot) "SyncRoot should be self"
               Expect.equal (c.Count) 2 "Count should be correct"
 
               let a: IMapEntry [] = Array.zeroCreate c.Count

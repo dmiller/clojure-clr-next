@@ -35,7 +35,7 @@ type BigInt(lpart: int64, bipart: BigInteger option) =
     static member valueOf(n: int64) = BigInt(n, None)
 
     override this.Equals(o) : bool =
-        if Object.ReferenceEquals(o, this) then
+        if LanguagePrimitives.PhysicalEquality o this then
             true
         else
             match o with

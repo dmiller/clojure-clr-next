@@ -63,7 +63,7 @@ type ChunkedCons(meta:IPersistentMap, chunk:IChunk, more:ISeq) =
 
     interface IObj with 
         override this.withMeta(m) =
-            if obj.ReferenceEquals(m,meta) then
+            if LanguagePrimitives.PhysicalEquality m meta then
                 this
             else
                 ChunkedCons(m,chunk,more)

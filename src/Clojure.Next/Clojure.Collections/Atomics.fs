@@ -28,7 +28,7 @@ type AtomicReference<'T when 'T: not struct>(r: 'T) =
 
     member this.CompareAndSet(expect: 'T, update: 'T) =
         let oldVal = Interlocked.CompareExchange(&ref, expect, update)
-        obj.ReferenceEquals(oldVal, expect)
+        LanguagePrimitives.PhysicalEquality oldVal expect
 
 
 

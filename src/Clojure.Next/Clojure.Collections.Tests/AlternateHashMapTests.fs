@@ -96,7 +96,7 @@ let basicAlternateHashMapCreateTests =
               let m = PHashMap.create (meta :> IPersistentMap) :> IPersistentMap
 
               Expect.equal (m.count ()) 0 "Empty map should have 0 count"
-              Expect.isTrue (Object.ReferenceEquals((m :?> IMeta).meta (), meta)) "Should have identical meta"
+              Expect.isTrue (LanguagePrimitives.PhysicalEquality ((m :?> IMeta).meta ()) meta) "Should have identical meta"
 
           // Non-duplicate
           testCase "Create on metaargs returns map"
@@ -110,7 +110,7 @@ let basicAlternateHashMapCreateTests =
               Expect.equal (m.valAt (1)) (upcast "a") "m[1]=a"
               Expect.equal (m.valAt (2)) (upcast "b") "m[2]=b"
               Expect.isFalse (m.containsKey (3)) "Shouldn't contain some random key"
-              Expect.isTrue (Object.ReferenceEquals((m :?> IMeta).meta (), meta)) "Should have identical meta" 
+              Expect.isTrue (LanguagePrimitives.PhysicalEquality ((m :?> IMeta).meta ()) meta) "Should have identical meta" 
         ]
 
 [<Tests>]
@@ -789,7 +789,7 @@ let aAlternaetMapTests =
               let c = PHashMap.createD2 (d) :?> ICollection
 
               Expect.isTrue (c.IsSynchronized) "should be synchronized"
-              Expect.isTrue (Object.ReferenceEquals(c, c.SyncRoot)) "SyncRoot should be self"
+              Expect.isTrue (LanguagePrimitives.PhysicalEquality (c :> obj) c.SyncRoot) "SyncRoot should be self"
               Expect.equal (c.Count) 2 "Count should be correct"
 
               let a: IMapEntry[] = Array.zeroCreate c.Count

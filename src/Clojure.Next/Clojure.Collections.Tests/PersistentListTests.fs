@@ -84,7 +84,7 @@ let IPersistentListTests =
           //        p.withMeta (metaForSimpleTests) :?> IPersistentCollection
 
           //    let e = pm.empty () :?> IObj
-          //    Expect.isTrue (Object.ReferenceEquals(e.meta (), metaForSimpleTests)) "Should have same meta"
+          //    Expect.isTrue (LanguagePrimitives.PhysicalEquality (e.meta ()) metaForSimpleTests) "Should have same meta"
 
           // TODO:  Add IReduce/IReduceInit tests when we have AFnImpl completed
           //        public static class DummyFn
@@ -151,7 +151,7 @@ let IPersistentListTests =
               //let p5 = p4.cons ("pqr")
 
               //Expect.isTrue
-              //    (Object.ReferenceEquals((p5 :?> IMeta).meta(), (p4 :?> IMeta).meta()))
+              //    (LanguagePrimitives.PhysicalEquality ((p5 :?> IMeta).meta()) ((p4 :?> IMeta).meta()))
               //    "Cons should preserve meta"
 
           // defer until we have maps

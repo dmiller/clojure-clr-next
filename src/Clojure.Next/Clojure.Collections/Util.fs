@@ -5,7 +5,7 @@ open System.Collections
 open Clojure.Numerics
 
 let equals (x : obj, y  : obj ) =
-    obj.ReferenceEquals(x, y) || not (isNull x) && x.Equals(y)
+    LanguagePrimitives.PhysicalEquality x y || not (isNull x) && x.Equals(y)
 
 let pcequiv (k1: obj, k2: obj) =
     match k1, k2 with
@@ -14,7 +14,7 @@ let pcequiv (k1: obj, k2: obj) =
     | _ -> k1.Equals(k2)
 
 let equiv (k1: obj, k2: obj) =
-    if Object.ReferenceEquals(k1, k2) then
+    if LanguagePrimitives.PhysicalEquality k1 k2 then
         true
     elif isNull k1 then
         false
@@ -37,7 +37,7 @@ let nameForType (t: Type) =
 
 let compare(k1:obj,k2:obj) =
     match k1, k2 with
-    | _,_ when obj.ReferenceEquals(k1,k2) -> 0
+    | _,_ when LanguagePrimitives.PhysicalEquality k1 k2 -> 0
     | _, null -> 1
     | null, _ -> -1
     | _,_ when Numbers.IsNumeric(k1) -> Numbers.compare(k1,k2)

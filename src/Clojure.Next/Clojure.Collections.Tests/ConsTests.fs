@@ -31,7 +31,7 @@ let consTests =
           //<| fun _ ->
           //    let m = SimpleMap.makeSimpleMap 3
           //    let c = Cons(m, "abc", null)
-          //    Expect.isTrue (Object.ReferenceEquals((c :> IMeta).meta(), m)) "Should get back same meta as put in"
+          //    Expect.isTrue (LanguagePrimitives.PhysicalEquality ((c :> IMeta).meta()) m) "Should get back same meta as put in"
 
           testCase "Cons.count works"
           <| fun _ ->
@@ -41,7 +41,7 @@ let consTests =
           testCase "Cons.seq returns self"
           <| fun _ ->
               let c = makeConsChain 3
-              Expect.isTrue (Object.ReferenceEquals((c :> ISeq).seq (), c)) "Should be self"
+              Expect.isTrue (LanguagePrimitives.PhysicalEquality ((c :> ISeq).seq ()) c) "Should be self"
 
 
           testCase "Cons.empty is empty"
@@ -116,7 +116,7 @@ let aseqTests =
 
               Expect.equal (ic.Count) 3 "Proper count"
               Expect.isTrue (ic.IsSynchronized) "should be synchronized"
-              Expect.isTrue (Object.ReferenceEquals(ic, ic.SyncRoot)) "Sync root should be self"
+              Expect.isTrue (LanguagePrimitives.PhysicalEquality (ic :> obj) ic.SyncRoot) "Sync root should be self"
 
           testCase "ASeq.GetEnumerator()"
           <| fun _ ->

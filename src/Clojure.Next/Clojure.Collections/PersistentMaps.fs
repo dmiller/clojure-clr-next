@@ -32,7 +32,7 @@ type APersistentMap() =
 
     static member mapEquals(m1: IPersistentMap, o: obj) =
         match o with
-        | _ when obj.ReferenceEquals(m1, o) -> true
+        | _ when LanguagePrimitives.PhysicalEquality (m1 :> obj) o -> true
         | :? IDictionary as d ->
             if d.Count <> m1.count () then
                 false
@@ -416,7 +416,7 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
 
     interface IObj with
         override this.withMeta(m) =
-            if obj.ReferenceEquals(m, meta) then
+            if LanguagePrimitives.PhysicalEquality m meta then
                 this
             else
                 PersistentArrayMap(m, arr)
@@ -1124,7 +1124,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(m, meta) then
+            if LanguagePrimitives.PhysicalEquality m meta then
                 this
             else
                 PersistentHashMap(m, count, root, hasNull, nullValue)
@@ -1183,7 +1183,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
     interface IPersistentMap with
         override this.assoc(k, v) =
             if isNull k then
-                if hasNull && v = nullValue then  // TODO: should this be a ReferenceEquals test or something else?
+                if hasNull && LanguagePrimitives.PhysicalEquality v nullValue then
                     upcast this
                 else
                     upcast PersistentHashMap(meta, (if hasNull then count else count + 1), root, true, v)
@@ -1194,7 +1194,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
 
                 let newRoot = rootToUse.assoc (0, NodeOps.hash (k), k, v, addedLeaf)
 
-                if obj.ReferenceEquals(newRoot, root) then
+                if LanguagePrimitives.PhysicalEquality newRoot root then
                     upcast this
                 else
                     upcast
@@ -1223,7 +1223,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
             else
                 let newRoot = root.without (0, NodeOps.hash (k), k)
 
-                if obj.ReferenceEquals(newRoot, root) then
+                if LanguagePrimitives.PhysicalEquality newRoot root then
                     upcast this
                 else
                     upcast PersistentHashMap(meta, count - 1, newRoot, hasNull, nullValue)
@@ -1386,7 +1386,7 @@ and private TransientHashMap(e, r, c, hn, nv) =
 
     override this.doAssoc(k, v) =
         if isNull k then
-            if not <| obj.ReferenceEquals(nullValue,v) then
+            if not <| LanguagePrimitives.PhysicalEquality nullValue v then
                 nullValue <- v
 
             if not hasNull then
@@ -1402,7 +1402,7 @@ and private TransientHashMap(e, r, c, hn, nv) =
                      root)
                     .assoc (edit, 0, NodeOps.hash (k), k, v, leafFlag)
 
-            if not <| obj.ReferenceEquals(n, root) then
+            if not <| LanguagePrimitives.PhysicalEquality n root then
                 root <- n
 
             if leafFlag.isSet then
@@ -1421,7 +1421,7 @@ and private TransientHashMap(e, r, c, hn, nv) =
 
             let n = root.without (edit, 0, NodeOps.hash (k), k, leafFlag)
 
-            if not <| obj.ReferenceEquals(n, root) then
+            if not <| LanguagePrimitives.PhysicalEquality n root then
                 root <- n
 
             if leafFlag.isSet then
@@ -1480,7 +1480,7 @@ and [<Sealed>] private ArrayNode(e, c, a) =
 
 
     member this.ensureEditable(e) =
-        if obj.ReferenceEquals(myedit, e) then
+        if LanguagePrimitives.PhysicalEquality myedit e then
             this
         else
             ArrayNode(e, count, array.Clone() :?> INode[])
@@ -1511,7 +1511,7 @@ and [<Sealed>] private ArrayNode(e, c, a) =
             else
                 let n = node.assoc (shift + 5, hash, key, value, addedLeaf)
 
-                if obj.ReferenceEquals(n, node) then
+                if LanguagePrimitives.PhysicalEquality n node then
                     upcast this
                 else
                     upcast ArrayNode(null, count, NodeOps.cloneAndSet (array, idx, n))
@@ -1525,7 +1525,7 @@ and [<Sealed>] private ArrayNode(e, c, a) =
             else
                 let n = node.without (shift + 5, hash, key)
 
-                if obj.ReferenceEquals(n, node) then
+                if LanguagePrimitives.PhysicalEquality n node then
                     upcast this
                 elif isNull n then
                     if count <= 8 then // shrink
@@ -1571,7 +1571,7 @@ and [<Sealed>] private ArrayNode(e, c, a) =
             else
                 let n = node.assoc (e, shift + 5, hash, key, value, addedLeaf)
 
-                if obj.ReferenceEquals(n, node) then
+                if LanguagePrimitives.PhysicalEquality n node then
                     upcast this
                 else
                     upcast this.editAndSet (e, idx, n)
@@ -1585,7 +1585,7 @@ and [<Sealed>] private ArrayNode(e, c, a) =
             else
                 let n = node.without (e, shift + 5, hash, key, removedLeaf)
 
-                if obj.ReferenceEquals(n, node) then
+                if LanguagePrimitives.PhysicalEquality n node then
                     upcast this
                 elif isNull n then
                     if count <= 8 then // shrink
@@ -1685,7 +1685,7 @@ and private ArrayNodeSeq(meta, nodes: INode[], i: int, s: ISeq) =
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 upcast this
             else
                 upcast ArrayNodeSeq(m, nodes, i, s)
@@ -1769,7 +1769,7 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
                     let existingNode = (valOrNode :?> INode)
                     let n = existingNode.assoc (shift + 5, hash, key, value, addedLeaf)
 
-                    if obj.ReferenceEquals(n, existingNode) then
+                    if LanguagePrimitives.PhysicalEquality n existingNode then
                         upcast this
                     else
                         upcast BitmapIndexedNode(null, bitmap, NodeOps.cloneAndSet (array, 2 * idx + 1, upcast n))
@@ -1808,7 +1808,7 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
                     let existingNode = (valOrNode :?> INode)
                     let n = existingNode.without (shift + 5, hash, key)
 
-                    if obj.ReferenceEquals(n, existingNode) then
+                    if LanguagePrimitives.PhysicalEquality n existingNode then
                         upcast this
                     elif not (isNull n) then
                         upcast BitmapIndexedNode(null, bitmap, NodeOps.cloneAndSet (array, 2 * idx + 1, upcast n))
@@ -1872,13 +1872,13 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
                     let existingNode = valOrNode :?> INode
                     let n = existingNode.assoc (e, shift + 5, hash, key, value, addedLeaf)
 
-                    if obj.ReferenceEquals(n, existingNode) then
+                    if LanguagePrimitives.PhysicalEquality n existingNode then
                         this
                     else
                         this.editAndSet (e, 2 * idx + 1, n)
 
                 elif Util.equiv (key, keyOrNull) then
-                    if obj.ReferenceEquals(value,valOrNode) then
+                    if LanguagePrimitives.PhysicalEquality value valOrNode then
                         this
                     else
                         this.editAndSet (e, 2 * idx + 1, value)
@@ -1959,7 +1959,7 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
                     let existingNode = (valOrNode :?> INode)
                     let n = existingNode.without (e, shift + 5, hash, key, removedLeaf)
 
-                    if obj.ReferenceEquals(n, existingNode) then
+                    if LanguagePrimitives.PhysicalEquality n existingNode then
                         upcast this
                     elif not (isNull n) then
                         upcast this.editAndSet (e, 2 * idx + 1, n)
@@ -1983,7 +1983,7 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
         member _.iteratorT(d) = NodeIter.getEnumeratorT (array, d)
 
     member this.ensureEditable(e: AtomicBoolean) : BitmapIndexedNode =
-        if Object.ReferenceEquals(myedit, e) then
+        if LanguagePrimitives.PhysicalEquality myedit e then
             this
         else
             let n = NodeOps.bitCount (bitmap)
@@ -2084,7 +2084,7 @@ and HashCollisionNode(edit: AtomicBoolean, hash: int, c, a) =
             if h = hash then
                 match this.tryFindIndex (key) with
                 | Some idx ->
-                    if obj.ReferenceEquals(array[idx + 1] ,value) then
+                    if LanguagePrimitives.PhysicalEquality array[idx + 1] value then
                         upcast this
                     else
                         upcast this.editAndSet (e, idx + 1, value)
@@ -2135,7 +2135,7 @@ and HashCollisionNode(edit: AtomicBoolean, hash: int, c, a) =
 
 
     member this.ensureEditable(e) =
-        if obj.ReferenceEquals(e, edit) then
+        if LanguagePrimitives.PhysicalEquality e edit then
             this
         else
             let newArray: obj[] = 2 * (count + 1) |> Array.zeroCreate
@@ -2143,7 +2143,7 @@ and HashCollisionNode(edit: AtomicBoolean, hash: int, c, a) =
             HashCollisionNode(e, hash, count, newArray)
 
     member this.ensureEditable(e, c, a) =
-        if obj.ReferenceEquals(e, edit) then
+        if LanguagePrimitives.PhysicalEquality e edit then
             array <- a
             count <- c
             this
@@ -2212,7 +2212,7 @@ and NodeSeq(meta, array: obj[], idx: int, seq: ISeq) =
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 upcast this
             else
                 upcast NodeSeq(m, array, idx, seq)

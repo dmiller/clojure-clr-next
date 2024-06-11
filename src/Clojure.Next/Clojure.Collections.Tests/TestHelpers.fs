@@ -54,7 +54,7 @@ let verifyIseqRestMaintainsMeta (s: ISeq) =
         match s.next () with
         | null -> ()
         | _ ->
-            Expect.isTrue (Object.ReferenceEquals((s.next () :?> IMeta).meta (), m)) "Next should have same meta"
+            Expect.isTrue (LanguagePrimitives.PhysicalEquality ((s.next () :?> IMeta).meta ()) m) "Next should have same meta"
             loop (s.next ())
 
     loop s
@@ -85,11 +85,11 @@ let metaForSimpleTests =
 
 let verifyWithMetaHasCorrectMeta (io: IObj) =
     let newIO = io.withMeta (metaForSimpleTests)
-    Expect.isTrue (Object.ReferenceEquals(newIO.meta (), metaForSimpleTests)) "should have same meta"
+    Expect.isTrue (LanguagePrimitives.PhysicalEquality (newIO.meta ()) metaForSimpleTests) "should have same meta"
 
 let verifyWithMetaNoChange (io: IObj) =
     let io2 = io.withMeta (io.meta ())
-    Expect.isTrue (Object.ReferenceEquals(io2, io)) "Expect same object back from withMeta if no change in meta"
+    Expect.isTrue (LanguagePrimitives.PhysicalEquality io2 io) "Expect same object back from withMeta if no change in meta"
 
 let verifyNullMeta (io: IObj) =
     Expect.isNull (io.meta ()) "Meta expected to be null"

@@ -28,7 +28,7 @@ type ASeq(m) =
     override this.ToString() = RTPrint.printString (this)
 
     override this.Equals(o) =
-        if obj.ReferenceEquals(this, o) then
+        if LanguagePrimitives.PhysicalEquality (this :> obj) o then
             true
         else
             match o with
@@ -227,7 +227,7 @@ and [<Sealed>] Cons(meta, f: obj, m: ISeq) =
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(m, meta) then
+            if LanguagePrimitives.PhysicalEquality m meta then
                 (this :> IObj)
             else
                 Cons(m, first, more) :> IObj
@@ -263,7 +263,7 @@ and [<Sealed>] EmptyList(m) =
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this :> IObj
             else
                 EmptyList(m) :> IObj
@@ -358,7 +358,7 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this :> IObj
             else
                 PersistentList(m, first, rest, count) :> IObj

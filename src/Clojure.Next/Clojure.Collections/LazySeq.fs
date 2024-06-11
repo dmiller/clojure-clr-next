@@ -32,7 +32,7 @@ type LazySeq private (m1, fn1, s1) =
 
     interface IObj with
         override this.withMeta(meta: IPersistentMap) =
-            if obj.ReferenceEquals((this :> IMeta).meta (), meta) then
+            if LanguagePrimitives.PhysicalEquality ((this :> IMeta).meta ()) meta then
                 this :> IObj
             else
                 LazySeq(meta, (this :> ISeq).seq ()) :> IObj

@@ -37,7 +37,7 @@ type KeySeq private (meta: IPersistentMap, seq: ISeq, enumerable: IEnumerable) =
 
     interface IObj with
         override this.withMeta(m) =
-            if obj.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this
             else
                 KeySeq(m, seq, enumerable)
@@ -90,7 +90,7 @@ type ValSeq private (meta: IPersistentMap, seq: ISeq, enumerable: IEnumerable) =
 
     interface IObj with
         override this.withMeta(m) =
-            if obj.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this
             else
                 ValSeq(m, seq, enumerable)

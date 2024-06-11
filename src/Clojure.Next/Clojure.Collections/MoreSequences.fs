@@ -32,7 +32,7 @@ type Repeat private (m: IPersistentMap, count: int64 option, value: obj) =
 
     interface IObj with
         override this.withMeta(m) =
-            if obj.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this
             else
                 Repeat(m, count, value)
@@ -122,7 +122,7 @@ type Cycle private (meta: IPersistentMap, all: ISeq, prev: ISeq, c: ISeq, n: ISe
 
     interface IObj with
         override this.withMeta(m) =
-            if obj.ReferenceEquals(m, meta) then
+            if LanguagePrimitives.PhysicalEquality m meta then
                 this
             else
                 Cycle(m, all, prev, current, next)
@@ -173,7 +173,7 @@ type Iterate private (meta: IPersistentMap, fn: IFn, prevSeed: obj, s: obj, n: I
 
     interface ISeq with
         member _.first() =
-            if obj.ReferenceEquals(seed, Iterate.UNREALIZED_SEED) then
+            if LanguagePrimitives.PhysicalEquality seed Iterate.UNREALIZED_SEED then
                 seed <- fn.invoke (prevSeed)
 
             seed
@@ -186,7 +186,7 @@ type Iterate private (meta: IPersistentMap, fn: IFn, prevSeed: obj, s: obj, n: I
 
     interface IObj with
         member this.withMeta(m) =
-            if obj.ReferenceEquals(m, meta) then
+            if LanguagePrimitives.PhysicalEquality m meta then
                 this
             else
                 Iterate(m, fn, prevSeed, seed, next)

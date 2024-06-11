@@ -124,7 +124,7 @@ type Range
 
     interface IObj with
         override this.withMeta(m) =
-            if obj.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this
             else
                 Range(m, startV, endV, step, boundsCheck, chunk, chunkNext)
@@ -273,7 +273,7 @@ type LongRange private (m: IPersistentMap, startV: int64, endV: int64, step: int
 
     interface IObj with
         override this.withMeta(m) =
-            if obj.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this
             else
                 LongRange(m, startV, endV, step, count)

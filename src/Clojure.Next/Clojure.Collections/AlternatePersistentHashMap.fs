@@ -163,7 +163,7 @@ type PHashMap private (meta: IPersistentMap, count: int, root: INode, hasNull: b
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(m, meta) then
+            if LanguagePrimitives.PhysicalEquality m meta then
                 this
             else
                 PHashMap(m, count, root, hasNull, nullValue)
@@ -233,7 +233,7 @@ type PHashMap private (meta: IPersistentMap, count: int, root: INode, hasNull: b
 
                 let newRoot = rootToUse.assoc (0, NodeOps.hash (k), k, v, addedLeaf)
 
-                if obj.ReferenceEquals(newRoot, root) then
+                if LanguagePrimitives.PhysicalEquality newRoot root then
                     upcast this
                 else
                     upcast
@@ -262,7 +262,7 @@ type PHashMap private (meta: IPersistentMap, count: int, root: INode, hasNull: b
             else
                 let newRoot = root.without (0, NodeOps.hash (k), k)
 
-                if obj.ReferenceEquals(newRoot, root) then
+                if LanguagePrimitives.PhysicalEquality newRoot root then
                     upcast this
                 else
                     upcast PHashMap(meta, count - 1, newRoot, hasNull, nullValue)
@@ -441,7 +441,7 @@ and private THashMap(e, r, c, hn, nv) =
                      root)
                     .assoc (edit, 0, NodeOps.hash (k), k, v, leafFlag)
 
-            if not <| obj.ReferenceEquals(n, root) then
+            if not <| LanguagePrimitives.PhysicalEquality n root then
                 root <- n
 
             if leafFlag.isSet then
@@ -460,7 +460,7 @@ and private THashMap(e, r, c, hn, nv) =
 
             let n = root.without (edit, 0, NodeOps.hash (k), k, leafFlag)
 
-            if not <| obj.ReferenceEquals(n, root) then
+            if not <| LanguagePrimitives.PhysicalEquality n root then
                 root <- n
 
             if leafFlag.isSet then
@@ -542,7 +542,7 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
                 match kns[idx] with
                 | BSubNode(Node=node) ->
                     let resultNode = node.assoc(shift+5,hash,key,value,addedLeaf)
-                    if obj.ReferenceEquals(resultNode, node) then
+                    if LanguagePrimitives.PhysicalEquality resultNode node then
                         this
                     else
                         BNode(null,bitmap,NodeOps.cloneAndSet(kns,idx,BSubNode(resultNode)),vals)
@@ -568,7 +568,7 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
                 match kns[idx] with
                 | BSubNode(Node=n) -> 
                     let returnNode = n.without(shift+5,hash,key)
-                    if obj.ReferenceEquals(returnNode, n) then
+                    if LanguagePrimitives.PhysicalEquality returnNode n then
                         this
                     elif not (isNull returnNode) then
                         BNode(null, bitmap, NodeOps.cloneAndSet(kns,idx,BSubNode(returnNode)), vals)
@@ -628,7 +628,7 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
                 match kns[idx] with
                 | BSubNode(Node = n) ->
                     let returnNode = n.assoc(e,shift+5,hash,key,value,addedLeaf)
-                    if obj.ReferenceEquals(returnNode, n) then
+                    if LanguagePrimitives.PhysicalEquality returnNode n then
                         this
                     else
                         this.editAndSetNode(e,idx,BSubNode returnNode)
@@ -681,7 +681,7 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
                 match kns[idx] with
                 | BSubNode n ->
                     let retNode = n.without(e,shift+5,hash,key, removedLeaf)
-                    if obj.ReferenceEquals(n,retNode) then
+                    if LanguagePrimitives.PhysicalEquality n retNode then
                        this
                     elif not <| isNull retNode then
                        this.editAndSetNode(e,idx,BSubNode retNode)
@@ -706,7 +706,7 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
         member _.iteratorT(d) = BNodeIter.getEnumeratorT (kns, vals, NodeOps.bitCount bitmap, d)
 
     member this.ensureEditable(e: AtomicBoolean) : BNode =
-        if Object.ReferenceEquals(myedit, e) then
+        if LanguagePrimitives.PhysicalEquality myedit e then
             this
         else
             let n = NodeOps.bitCount (bitmap)
@@ -866,7 +866,7 @@ and CNode(edit: AtomicBoolean, hash: int, c, a) =
 
 
     member this.ensureEditable(e) =
-        if obj.ReferenceEquals(e, edit) then
+        if LanguagePrimitives.PhysicalEquality e edit then
             this
         else
             let newArray: obj[] = 2 * (count + 1) |> Array.zeroCreate
@@ -874,7 +874,7 @@ and CNode(edit: AtomicBoolean, hash: int, c, a) =
             CNode(e, hash, count, newArray)
 
     member this.ensureEditable(e, c, a) =
-        if obj.ReferenceEquals(e, edit) then
+        if LanguagePrimitives.PhysicalEquality e edit then
             array <- a
             count <- c
             this
@@ -911,7 +911,7 @@ and BNodeSeq(meta, kns: BNodeEntry[], vals: obj[], idx: int, cnt: int, seq: ISeq
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(m, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 upcast this
             else
                 upcast BNodeSeq(m, kns, vals, idx, cnt, seq)

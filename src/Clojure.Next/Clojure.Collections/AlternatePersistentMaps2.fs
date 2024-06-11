@@ -160,7 +160,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
 
     interface IObj with
         override this.withMeta(newMeta) =
-            if obj.ReferenceEquals(newMeta, meta) then
+            if LanguagePrimitives.PhysicalEquality newMeta meta then
                 this
             else
                 PHashMap(newMeta, count, root)
@@ -219,7 +219,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
 
             let newRoot = rootToUse.assoc (0, NodeOps.hash (k), k, v, addedLeaf)
 
-            if obj.ReferenceEquals(newRoot, rootToUse) then
+            if LanguagePrimitives.PhysicalEquality newRoot rootToUse then
                 this
             else
                 let newCount = if addedLeaf.isSet then count + 1 else count
@@ -238,7 +238,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
                 match n.without (0, NodeOps.hash (k), k) with
                 | None -> PHashMap.Empty
                 | Some newRoot  as snr ->
-                    if obj.ReferenceEquals(newRoot, n) then this
+                    if LanguagePrimitives.PhysicalEquality newRoot n then this
                     elif count = 1 then PHashMap.Empty //  TODO -- is this possible?  Shouldn't n.without return None in this case?  and shouldn't we preserrve the meta?
                     else PHashMap(meta, count - 1, snr)
 
@@ -354,7 +354,7 @@ and [<Sealed>] THashMap(e, r, c) =
 
         let n = nodeToUse.assoc (myEdit, 0, NodeOps.hash (k), k, v, leafFlag)
 
-        if not <| obj.ReferenceEquals(n, nodeToUse) then
+        if not <| LanguagePrimitives.PhysicalEquality n nodeToUse then
             root <- Some n
 
         if leafFlag.isSet then
@@ -372,7 +372,7 @@ and [<Sealed>] THashMap(e, r, c) =
             match result with
             | None -> root <- None
             | Some newRoot as snr ->
-                if not <| obj.ReferenceEquals(newRoot, n) then
+                if not <| LanguagePrimitives.PhysicalEquality newRoot n then
                     root <- snr
 
             if leafFlag.isSet then
@@ -442,7 +442,7 @@ and [<Sealed>] ANode(e, c, a) =
 
 
     member this.ensureEditable(e) =
-        if obj.ReferenceEquals(e, myEdit) then
+        if LanguagePrimitives.PhysicalEquality e myEdit then
             this
         else
             ANode(e, count, downcast nodes.Clone())
@@ -467,7 +467,7 @@ and [<Sealed>] ANode(e, c, a) =
             | Some node ->
                 let newNode = node.assoc (shift + 5, hash, key, value, addedLeaf)
 
-                if obj.ReferenceEquals(newNode, node) then
+                if  LanguagePrimitives.PhysicalEquality newNode node then
                     this
                 else
                     ANode(null, count, NodeOps.cloneAndSet (nodes, idx, Some newNode))
@@ -485,7 +485,7 @@ and [<Sealed>] ANode(e, c, a) =
                     else
                         ANode(null, count - 1, NodeOps.cloneAndSet (nodes, idx, None)) :> INode2 |> Some // zero out this entry
                 | Some newNode as snn ->
-                    if obj.ReferenceEquals(newNode, node) then
+                    if LanguagePrimitives.PhysicalEquality newNode node then
                         this :> INode2 |> Some
                     else
                         ANode(null, count, NodeOps.cloneAndSet (nodes, idx, snn)) :> INode2
@@ -528,7 +528,7 @@ and [<Sealed>] ANode(e, c, a) =
                 // Console.WriteLine($"--assoc to {node}");
                 let newNode = node.assoc (e, shift + 5, hash, key, value, addedLeaf)
 
-                if obj.ReferenceEquals(newNode, node) then
+                if LanguagePrimitives.PhysicalEquality newNode node then
                     this
                 else
                     this.editAndSet (e, idx, newNode |> Some)
@@ -549,7 +549,7 @@ and [<Sealed>] ANode(e, c, a) =
                         editable :> INode2 |> Some
 
                 | Some newNode as snn ->
-                    if obj.ReferenceEquals(newNode, node) then
+                    if LanguagePrimitives.PhysicalEquality newNode node then
                         this :> INode2 |> Some
                     else
                         this.editAndSet (e, idx, snn ) :> INode2 |> Some
@@ -641,7 +641,7 @@ and [<Sealed>] BNode(e, b, a) =
     static member val Empty: BNode = BNode(null, 0, Array.empty<BNodeEntry>)
 
     member this.modifyOrCreateBNode (newEdit: AtomicBoolean) (newBitmap: int) (newEntries: BNodeEntry[]) =
-        if obj.ReferenceEquals(myEdit, newEdit) then
+        if LanguagePrimitives.PhysicalEquality myEdit newEdit then
             // Current node is editable -- modify in-place
             bitmap <- newBitmap
             entries <- newEntries
@@ -651,7 +651,7 @@ and [<Sealed>] BNode(e, b, a) =
             BNode(newEdit, newBitmap, newEntries)
 
     member this.editAndSet(e: AtomicBoolean, idx: int, entry: BNodeEntry) : BNode =
-        if obj.ReferenceEquals(e, myEdit) then
+        if LanguagePrimitives.PhysicalEquality e myEdit then
             entries[idx] <- entry
             this
         else
@@ -662,7 +662,7 @@ and [<Sealed>] BNode(e, b, a) =
     member this.editAndRemove(e: AtomicBoolean, bit: int, idx: int) : INode2 option =
         if bitmap = bit then
             None
-        elif obj.ReferenceEquals(myEdit, e) then
+        elif LanguagePrimitives.PhysicalEquality myEdit e then
             Array.Copy(entries, idx + 1, entries, idx, entries.Length - idx - 1)
             entries[entries.Length-1] <- EmptyEntry
             bitmap <- bitmap ^^^ bit
@@ -744,7 +744,7 @@ and [<Sealed>] BNode(e, b, a) =
                 | Node(Node = node) ->
                     let newNode = node.assoc (shift + 5, hash, key, value, addedLeaf)
 
-                    if obj.ReferenceEquals(newNode, node) then
+                    if LanguagePrimitives.PhysicalEquality newNode node then
                         this
                     else
                         BNode(null, bitmap, NodeOps.cloneAndSet (entries, idx, Node(newNode)))
@@ -777,7 +777,7 @@ and [<Sealed>] BNode(e, b, a) =
                         else    
                             BNode(null,bitmap^^^bit,NodeOps2.removeEntry(entries,idx)) :> INode2 |> Some                    
                     | Some n ->
-                        if obj.ReferenceEquals(n, node) then
+                        if LanguagePrimitives.PhysicalEquality n node then
                             this :> INode2 |> Some
                         else
                             BNode(null, bitmap, NodeOps.cloneAndSet (entries, idx, Node(n))) :> INode2
@@ -844,7 +844,7 @@ and [<Sealed>] BNode(e, b, a) =
                 | Node(Node = node) ->
                     let newNode = node.assoc (e, shift + 5, hash, key, value, addedLeaf)
 
-                    if obj.ReferenceEquals(node, newNode) then
+                    if LanguagePrimitives.PhysicalEquality node newNode then
                         this
                     else
                         this.editAndSet (e, idx, Node newNode)
@@ -854,7 +854,7 @@ and [<Sealed>] BNode(e, b, a) =
             else
                 let n = NodeOps.bitCount (bitmap)
 
-                if obj.ReferenceEquals(myEdit, e) && n < entries.Length then
+                if LanguagePrimitives.PhysicalEquality myEdit e && n < entries.Length then
                     // we have space in the array and we are already editing this node transiently, so we can just move things areound.
                     // if we have space in the array but we are not already editing this node, then the space is not helpful -- we just fall through to the next case.
                     addedLeaf.set ()
@@ -917,7 +917,7 @@ and [<Sealed>] BNode(e, b, a) =
                         else 
                              this.editAndRemove (e, bit, idx)
                     | Some newNode ->
-                        if obj.ReferenceEquals(newNode, n) then
+                        if LanguagePrimitives.PhysicalEquality newNode n then
                             this :> INode2 |> Some
                         else
                             this.editAndSet (e, idx, Node(newNode)) :> INode2 |> Some
@@ -1028,7 +1028,7 @@ and [<Sealed>] internal CNode(e: AtomicBoolean, h: int, c: int, a: MapEntry[]) =
 
                     if kv.value () = value then
                         this
-                    elif obj.ReferenceEquals(myEdit, e) then
+                    elif LanguagePrimitives.PhysicalEquality myEdit e then
                         kvs.[idx] <- MapEntry(key, value)
                         this
                     else
@@ -1039,7 +1039,7 @@ and [<Sealed>] internal CNode(e: AtomicBoolean, h: int, c: int, a: MapEntry[]) =
                     // no entry for this key, so we will be adding.
                     addedLeaf.set ()
 
-                    if obj.ReferenceEquals(myEdit, e) then
+                    if LanguagePrimitives.PhysicalEquality myEdit e then
                         // we are editable.
                         // Either we have existing space or we need to create a new array.
                         // Either way, we can update in place.
@@ -1078,7 +1078,7 @@ and [<Sealed>] internal CNode(e: AtomicBoolean, h: int, c: int, a: MapEntry[]) =
 
                 if count = 1 then
                     None
-                else if obj.ReferenceEquals(myEdit, e) then
+                else if LanguagePrimitives.PhysicalEquality myEdit e then
                     // we are editable, edit in place
                     count <- count - 1
                     kvs.[idx] <- kvs.[count]

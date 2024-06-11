@@ -136,7 +136,7 @@ type [<AllowNullLiteral>] APersistentVector() =
     override this.ToString() = RTPrint.printString (this)
 
     override this.Equals(o: obj) =
-        obj.ReferenceEquals(this, o)
+        LanguagePrimitives.PhysicalEquality (this :> obj) o
         || APersistentVector.doEquals (this :> IPersistentVector, o)
 
     static member doEquals(v: IPersistentVector, o: obj) =
@@ -228,7 +228,7 @@ type [<AllowNullLiteral>] APersistentVector() =
         member this.cons(o) = (this :> IPersistentVector).cons (o)
 
         member this.equiv(o) =
-            obj.ReferenceEquals(this, o)
+            LanguagePrimitives.PhysicalEquality (this :> obj) o
             || APersistentVector.doEquiv (this :> IPersistentVector, o)
 
     static member doEquiv(v: IPersistentVector, o: obj) =
@@ -1017,7 +1017,7 @@ and [<Sealed; AllowNullLiteral>] PVChunkedSeq
 
     interface IObj with
         override this.withMeta(newMeta) =
-            if obj.ReferenceEquals(newMeta, (this :> IMeta).meta ()) then
+            if LanguagePrimitives.PhysicalEquality newMeta ((this :> IMeta).meta ()) then
                 this
             else
                 PVChunkedSeq(newMeta, vec, node, idx, offset)
