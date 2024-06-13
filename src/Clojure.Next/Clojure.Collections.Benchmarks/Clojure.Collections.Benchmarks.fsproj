@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="NumericsBenchmarks.fs" />
     <Compile Include="PersistentVectorBenchmarks.fs" />
     <Compile Include="PersistentHashMapBenchmarks.fs" />
     <Compile Include="Program.fs" />

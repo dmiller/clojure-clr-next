@@ -27,28 +27,28 @@ type TestingConverters() =
     [<Benchmark>]   
     member _.TypeCode() = 
         for i in 0 .. data.Length - 1 do 
-            convertToIntTypeCode data[i] |> ignore
+            convertToInt64TypeCode data[i] |> ignore
         
     [<Benchmark>]   
     member _.CastingAlpha() = 
         for i in 0 .. data.Length - 1 do 
-            convertToIntCastingAlpha data[i] |> ignore
+            convertToInt64CastingAlpha data[i] |> ignore
 
     [<Benchmark>]   
     member _.CastingNasty() = 
         for i in 0 .. data.Length - 1 do 
-            convertToIntCastingNasty data[i] |> ignore
+            convertToInt64CastingNasty data[i] |> ignore
 
 
     [<Benchmark>]   
     member _.CastingNice() = 
         for i in 0 .. data.Length - 1 do 
-            convertToIntCastingNice data[i] |> ignore
+            convertToInt64CastingNice data[i] |> ignore
 
     [<Benchmark(Baseline=true)>]   
     member _.Direct() = 
         for i in 0 .. data.Length - 1 do 
-            convertToIntDirectly data[i] |> ignore
+            convertToInt64Directly data[i] |> ignore
 
 
 type TestingCategorizers() = 

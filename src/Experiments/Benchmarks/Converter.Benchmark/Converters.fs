@@ -3,74 +3,74 @@
 open System
 open System.Globalization
 
-let convertToIntTypeCode (o: obj) : int =
+let convertToInt64TypeCode (o: obj) : int64 =
     match Type.GetTypeCode(o.GetType()) with
-    | TypeCode.Byte -> int (o :?> Byte)
-    | TypeCode.Char -> int (o :?> Char)
-    | TypeCode.Decimal -> int (o :?> Decimal)
-    | TypeCode.Double -> int (o :?> Double)
-    | TypeCode.Int16 -> int (o :?> Int16)
-    | TypeCode.Int32 -> int (o :?> Int32)
-    | TypeCode.Int64 -> int (o :?> Int64)
-    | TypeCode.SByte -> int (o :?> SByte)
-    | TypeCode.Single -> int (o :?> Single)
-    | TypeCode.UInt16 -> int (o :?> UInt16)
-    | TypeCode.UInt32 -> int (o :?> UInt32)
-    | TypeCode.UInt64 -> int (o :?> UInt64)
-    | _ -> Convert.ToInt32(o, CultureInfo.InvariantCulture)
+    | TypeCode.Byte -> int64 (o :?> Byte)
+    | TypeCode.Char -> int64 (o :?> Char)
+    | TypeCode.Decimal -> int64 (o :?> Decimal)
+    | TypeCode.Double -> int64 (o :?> Double)
+    | TypeCode.Int16 -> int64 (o :?> Int16)
+    | TypeCode.Int32 -> int64 (o :?> Int32)
+    | TypeCode.Int64 -> int64 (o :?> Int64)
+    | TypeCode.SByte -> int64 (o :?> SByte)
+    | TypeCode.Single -> int64 (o :?> Single)
+    | TypeCode.UInt16 -> int64 (o :?> UInt16)
+    | TypeCode.UInt32 -> int64 (o :?> UInt32)
+    | TypeCode.UInt64 -> int64 (o :?> UInt64)
+    | _ -> Convert.ToInt64(o, CultureInfo.InvariantCulture)
 
 
-let convertToIntCastingAlpha (o: obj) : int =
+let convertToInt64CastingAlpha (o: obj) : int64 =
     match o with
-    | :? Byte as b -> int (b)
-    | :? Char as c -> int (c)
-    | :? Decimal as d -> int (d)
-    | :? Double as d -> int (d)
-    | :? Int16 as i -> int (i)
-    | :? Int32 as i -> int (i)
-    | :? Int64 as i -> int (i)
-    | :? SByte as s -> int (s)
-    | :? Single as s -> int (s)
-    | :? UInt16 as u -> int (u)
-    | :? UInt32 as u -> int (u)
-    | :? UInt64 as u -> int (u)
-    | _ -> Convert.ToInt32(o, CultureInfo.InvariantCulture)
+    | :? Byte as b -> int64 (b)
+    | :? Char as c -> int64 (c)
+    | :? Decimal as d -> int64 (d)
+    | :? Double as d -> int64 (d)
+    | :? Int16 as i -> int64 (i)
+    | :? Int32 as i -> int64 (i)
+    | :? Int64 as i -> int64 (i)
+    | :? SByte as s -> int64 (s)
+    | :? Single as s -> int64 (s)
+    | :? UInt16 as u -> int64 (u)
+    | :? UInt32 as u -> int64 (u)
+    | :? UInt64 as u -> int64 (u)
+    | _ -> Convert.ToInt64(o, CultureInfo.InvariantCulture)
 
-let convertToIntCastingNasty (o: obj) : int =
+let convertToInt64CastingNasty (o: obj) : int64 =
     match o with
-    | :? Byte as b -> int (b)
-    | :? Char as c -> int (c)
-    | :? Decimal as d -> int (d)
-    | :? Int16 as i -> int (i)
-    | :? SByte as s -> int (s)
-    | :? Single as s -> int (s)
-    | :? UInt16 as u -> int (u)
-    | :? UInt32 as u -> int (u)
-    | :? UInt64 as u -> int (u)
-    | :? Int32 as i -> int (i)
-    | :? Int64 as i -> int (i)
-    | :? Double as d -> int (d)
-    | _ -> Convert.ToInt32(o, CultureInfo.InvariantCulture)
+    | :? Byte as b -> int64 (b)
+    | :? Char as c -> int64 (c)
+    | :? Decimal as d -> int64 (d)
+    | :? Int16 as i -> int64 (i)
+    | :? SByte as s -> int64 (s)
+    | :? Single as s -> int64 (s)
+    | :? UInt16 as u -> int64 (u)
+    | :? UInt32 as u -> int64 (u)
+    | :? UInt64 as u -> int64 (u)
+    | :? Int32 as i -> int64 (i)
+    | :? Int64 as i -> int64 (i)
+    | :? Double as d -> int64 (d)
+    | _ -> Convert.ToInt64(o, CultureInfo.InvariantCulture)
 
-let convertToIntCastingNice (o: obj) : int =
+let convertToInt64CastingNice (o: obj) : int64 =
     match o with
-    | :? Int32 as i -> int (i)
-    | :? Int64 as i -> int (i)
-    | :? Double as d -> int (d)
-    | :? Byte as b -> int (b)
-    | :? Char as c -> int (c)
-    | :? Decimal as d -> int (d)
-    | :? Int16 as i -> int (i)
-    | :? SByte as s -> int (s)
-    | :? Single as s -> int (s)
-    | :? UInt16 as u -> int (u)
-    | :? UInt32 as u -> int (u)
-    | :? UInt64 as u -> int (u)
-    | _ -> Convert.ToInt32(o, CultureInfo.InvariantCulture)
+    | :? Int32 as i -> int64 (i)
+    | :? Int64 as i -> int64 (i)
+    | :? Double as d -> int64 (d)
+    | :? Byte as b -> int64 (b)
+    | :? Char as c -> int64 (c)
+    | :? Decimal as d -> int64 (d)
+    | :? Int16 as i -> int64 (i)
+    | :? SByte as s -> int64 (s)
+    | :? Single as s -> int64 (s)
+    | :? UInt16 as u -> int64 (u)
+    | :? UInt32 as u -> int64 (u)
+    | :? UInt64 as u -> int64 (u)
+    | _ -> Convert.ToInt64(o, CultureInfo.InvariantCulture)
 
 
-let convertToIntDirectly (o: obj) : int =
-    Convert.ToInt32(o, CultureInfo.InvariantCulture)
+let convertToInt64Directly (o: obj) : int64 =
+    Convert.ToInt64(o, CultureInfo.InvariantCulture)
 
 
 type Category =

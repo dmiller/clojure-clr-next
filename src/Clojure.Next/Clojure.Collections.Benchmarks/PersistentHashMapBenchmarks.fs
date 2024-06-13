@@ -88,7 +88,7 @@ type RTEquiv() =
 
 
 
-[<MemoryDiagnoser>]
+[<MemoryDiagnoser; HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)>]
 type PMCreate() = 
 
     [<Params( 0, 1, 2, 3, 4, 6, 8, 12, 16)>]

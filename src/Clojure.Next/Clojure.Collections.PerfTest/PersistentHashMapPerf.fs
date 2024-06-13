@@ -33,3 +33,10 @@ type PHMTransientConj() =
 
         pv.persistent ()
 
+
+    member this.FirstEquivInt(x:int, y:int) =
+        clojure.lang.Numbers.equal( box x, box y)
+
+
+    member this.NextEquivInt(x:int, y:int) =
+        Clojure.Numerics.Numbers.equal( box x, box y)
