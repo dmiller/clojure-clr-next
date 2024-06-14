@@ -14,7 +14,6 @@ type Tests() =
     member this.NoLookup() = 
         let mutable i : int =0
         for iter in 0 .. this.size do
-        //for iter in 0 .. 1000 do
             i <- i + 17
         i
 
@@ -22,7 +21,6 @@ type Tests() =
     member this.LiteralLookup() = 
         let mutable i : int =0
         for iter in 0 .. this.size do
-        //for iter in 0 .. 1000 do
             i <- i + VH.LitConst
         i
               
@@ -30,19 +28,16 @@ type Tests() =
     member this.StaticValLookup() = 
         let mutable i : int =0
         for iter in 0 .. this.size do
-        //for iter in 0 .. 1000 do
             i <- i + VH.ValueHolder.StaticVal
 
     [<Benchmark>]   
     member this.NonstaticValLookup() = 
         let mutable i : int =0
         for iter in 0 .. this.size do
-        //for iter in 0 .. 1000 do
             i <- i + c.NonstaticVal
 
     [<Benchmark>]   
     member this.GetLetLookup() = 
         let mutable i : int =0
         for iter in 0 .. this.size do
-        //for iter in 0 .. 1000 do
             i <- i + c.GetLetVar

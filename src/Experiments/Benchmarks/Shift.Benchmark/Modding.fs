@@ -29,7 +29,6 @@ type Modders() =
         ((i-1) >>> 5) <<< 5
 
 
-
     static member doMod64(i:int64) =
         let im1 = i - 1L
         im1 - (im1 % 32L) 

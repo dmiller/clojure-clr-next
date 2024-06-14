@@ -12,8 +12,4 @@ type ValueHolder()  =
     static member val public StaticVal : int = 17
 
     member val public NonstaticVal : int = 17
-
-
-
-
    

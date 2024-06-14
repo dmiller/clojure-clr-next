@@ -7,58 +7,85 @@ open Converters
 
 let numEntries = 100_000
 
-let generateRandomEntry (r:Random) : obj =
-    match r.NextInt64(4) with
-    | 0L -> 1.3 :> obj
-    | 1L -> "12" :> obj
-    | 2L -> 12L :> obj
-    | _ -> 12 :> obj
+type EInputType =
+| I32 = 0
+| I64 = 1
+| Dbl = 2
+| Str = 3
 
-let rnd = Random()
 
-let data : obj array = [| for i in 1 .. numEntries -> generateRandomEntry(rnd) |]
-
-[<GlobalSetup>]
-let globalSetup() = Console.WriteLine($"data has {data.Length}")
+let getValue(inputType : EInputType) : obj =
+    match inputType with
+    | EInputType.I32 -> 12
+    | EInputType.I64 -> 12L
+    | EInputType.Dbl -> 1.2
+    | EInputType.Str -> "12"
+    | _ -> failwith "Invalid input type"
 
 
 type TestingConverters() = 
 
+    [<ParamsAllValues>]
+    member val inputType: EInputType = EInputType.I32 with get, set
+
+    member val testedVal : obj = null with get, set
+
+    [<GlobalSetup>]
+    member this.GlobalSetup() =
+        this.testedVal <- getValue this.inputType
+
+
     [<Benchmark>]   
-    member _.TypeCode() = 
-        for i in 0 .. data.Length - 1 do 
-            convertToInt64TypeCode data[i] |> ignore
+    member this.TypeCode() = 
+        ////let v = getValue this.inputType
+        //for i =  0 to numEntries - 1 do 
+        convertToInt64TypeCode this.testedVal |> ignore
         
     [<Benchmark>]   
-    member _.CastingAlpha() = 
-        for i in 0 .. data.Length - 1 do 
-            convertToInt64CastingAlpha data[i] |> ignore
+    member this.CastingAlpha() = 
+        //let v = getValue this.inputType
+        //for i =  0 to numEntries - 1 do 
+        convertToInt64CastingAlpha this.testedVal |> ignore
 
     [<Benchmark>]   
-    member _.CastingNasty() = 
-        for i in 0 .. data.Length - 1 do 
-            convertToInt64CastingNasty data[i] |> ignore
+    member this.CastingNasty() = 
+        //let v = getValue this.inputType
+        //for i =  0 to numEntries - 1 do 
+        convertToInt64CastingNasty this.testedVal |> ignore
 
 
     [<Benchmark>]   
-    member _.CastingNice() = 
-        for i in 0 .. data.Length - 1 do 
-            convertToInt64CastingNice data[i] |> ignore
+    member this.CastingNice() = 
+        //let v = getValue this.inputType
+        //for i =  0 to numEntries - 1 do 
+        convertToInt64CastingNice this.testedVal |> ignore
 
     [<Benchmark(Baseline=true)>]   
-    member _.Direct() = 
-        for i in 0 .. data.Length - 1 do 
-            convertToInt64Directly data[i] |> ignore
+    member this.Direct() = 
+        //let v = getValue this.inputType
+        //for i =  0 to numEntries - 1 do 
+        convertToInt64Directly this.testedVal |> ignore
 
 
 type TestingCategorizers() = 
 
+    [<ParamsAllValues>]
+    member val inputType: EInputType = EInputType.I32 with get, set
+
+    member val testedVal : obj = null with get, set
+
+    [<GlobalSetup>]
+    member this.GlobalSetup() =
+        this.testedVal <- getValue this.inputType
+
     [<Benchmark(Baseline=true)>]    
-    member _.TypeCode() = 
-        for i in 0 .. data.Length - 1 do 
-            categorizeByTypeCode data[i] |> ignore
+    member this.TypeCode() = 
+        //let v = getValue this.inputType
+        //for i =  0 to numEntries - 1 do 
+        categorizeByTypeCode this.testedVal |> ignore
         
     [<Benchmark>]   
-    member _.Type() = 
-        for i in 0 .. data.Length - 1 do 
-            categorizeByType data[i] |> ignore
+    member this.Type() = 
+        //let v = getValue this.inputType
+        //for i =  0 to numEntries - 1 do 
+        categorizeByType this.testedVal |> ignore

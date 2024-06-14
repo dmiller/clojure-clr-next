@@ -15,12 +15,6 @@ type Tests() =
         | _ -> "aaa".GetType()
 
 
-    member this.GrabObject i : obj =
-        match i % 4 with
-        | 0 -> "aaa"
-        | 1 -> 7
-        | 2 -> 7.4
-        | _ -> "aaa"
 
     [<Benchmark(Baseline=true)>]
     member this.CSharpEquals() =
@@ -40,7 +34,7 @@ type Tests() =
 
 
     [<Benchmark>]
-    member this.FSharpEqualsOp2() =
+    member this.FSharpEquals2() =
         let mutable cnt : int = 0
         for i in 0 .. 1_000_000 do
             if TypeEquality.HasSpecialTypeEquals2 (this.GrabType i )
@@ -63,6 +57,15 @@ type Tests() =
             if TypeEquality.HasSpecialTypeRefEquals (this.GrabType i )
             then cnt <- cnt + 1 
         cnt
+
+   
+    member this.GrabObject i : obj =
+        match i % 4 with
+        | 0 -> "aaa"
+        | 1 -> 7
+        | 2 -> 7.4
+        | _ -> "aaa"
+
 
     [<Benchmark>]
     member this.CSharpTestTypeObj() =

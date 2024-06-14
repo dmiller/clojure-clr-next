@@ -3,11 +3,9 @@
 open BenchmarkDotNet.Attributes
 open Modding
 
-type Tests() =
-
+type Tests32() =
 
     let NumIters = 100_000
-    let NumIters64 = 100_000L
 
     [<Benchmark(Baseline=true)>]
     member _.ModOp() =
@@ -30,7 +28,13 @@ type Tests() =
             x <- Modders.doShift(i)
         x
 
-    [<Benchmark>]
+
+
+type Tests64() =
+
+    let NumIters = 100_000
+
+    [<Benchmark(Baseline=true)>]
     member _.ModOp64() =
         let mutable x : int64 = 0
         for i = 0 to NumIters do
