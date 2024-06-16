@@ -82,9 +82,6 @@ let getValue(inputType : EInputType) : obj =
     | _ -> failwith "Invalid input type"
 
 
-
-
-[<MemoryDiagnoser>]
 type CategoryVersusOps() =
 
     [<ParamsAllValues>]

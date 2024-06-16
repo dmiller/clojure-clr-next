@@ -142,3 +142,69 @@ Because some parts of this code is private on the C# side, we'll have to extract
 
 Let's dig in.
 
+
+First, we do a simple comparison of C# `Numbers.category` vs F# `Numbers.getOps`.
+They aren't identical -- `Numbers.category` maps an object to its 'category', which is an enum value.
+`Numbers.getOps` actually returns an instance of `Ops` -- a class that implements the `Ops` interface.
+The specific objects implementing the `Ops` interface (of types `LongOps`, `DoubleOps`, etc.) stand in for the category used in the C# code.
+As long as they are being compared via `ceq` IL instruction, we should be fine.
+
+However, we found this:
+
+| Method        | inputType | Mean     | Error     | StdDev    | Ratio | RatioSD | Allocated | Alloc Ratio |
+|-------------- |---------- |---------:|----------:|----------:|------:|--------:|----------:|------------:|
+| FirstCategory | I32       | 1.187 ns | 0.0119 ns | 0.0111 ns |  1.00 |    0.00 |         - |          NA |
+| NextOps       | I32       | 6.275 ns | 0.1219 ns | 0.1140 ns |  5.29 |    0.10 |         - |          NA |
+|               |           |          |           |           |       |         |           |             |
+| FirstCategory | I64       | 1.181 ns | 0.0255 ns | 0.0238 ns |  1.00 |    0.00 |         - |          NA |
+| NextOps       | I64       | 4.527 ns | 0.0289 ns | 0.0256 ns |  3.83 |    0.09 |         - |          NA |
+|               |           |          |           |           |       |         |           |             |
+| FirstCategory | Dbl       | 1.408 ns | 0.0232 ns | 0.0217 ns |  1.00 |    0.00 |         - |          NA |
+| NextOps       | Dbl       | 4.724 ns | 0.1266 ns | 0.1184 ns |  3.36 |    0.10 |         - |          NA |
+|               |           |          |           |           |       |         |           |             |
+| FirstCategory | U64       | 1.673 ns | 0.0575 ns | 0.0639 ns |  1.00 |    0.00 |         - |          NA |
+| NextOps       | U64       | 4.568 ns | 0.0688 ns | 0.0610 ns |  2.72 |    0.12 |         - |          NA |
+
+
+A 3-5x performance hit.  Ouch.  A quick scan of the for `Numbers.getOps` shows that we are getting bitten by static initialization.
+Apparently tiered compilation is not getting rid of this initialization checks that occur on every initialization.
+
+What can we do?  Move the needed fields out of classes and into a module.  This will require some code restructuring, for sure.
+
+
+First attempt:  Restrurcture thing into OpsImpl.  Recursive namespace, so the module could reference LongOps and other classes.
+However, we end up with Lazy initialization, which is not what we want.
+
+
+| Method        | inputType | Mean     | Error     | StdDev    | Ratio | RatioSD |
+|-------------- |---------- |---------:|----------:|----------:|------:|--------:|
+| FirstCategory | I32       | 1.220 ns | 0.0109 ns | 0.0085 ns |  1.00 |    0.00 |
+| NextOps       | I32       | 5.564 ns | 0.1036 ns | 0.1018 ns |  4.56 |    0.09 |
+|               |           |          |           |           |       |         |
+| FirstCategory | I64       | 1.214 ns | 0.0227 ns | 0.0213 ns |  1.00 |    0.00 |
+| NextOps       | I64       | 3.905 ns | 0.0348 ns | 0.0326 ns |  3.22 |    0.06 |
+|               |           |          |           |           |       |         |
+| FirstCategory | Dbl       | 1.493 ns | 0.0498 ns | 0.0466 ns |  1.00 |    0.00 |
+| NextOps       | Dbl       | 4.112 ns | 0.0552 ns | 0.0517 ns |  2.76 |    0.09 |
+|               |           |          |           |           |       |         |
+| FirstCategory | U64       | 1.658 ns | 0.0167 ns | 0.0157 ns |  1.00 |    0.00 |
+| NextOps       | U64       | 3.970 ns | 0.0450 ns | 0.0399 ns |  2.40 |    0.03 |
+
+Second attempt:  use let bindings to initialize the fields.  Trying still to avoid static initialization fields.
+It turns out that the let binding initialization looks okay.
+_However_, a each reference to the let binding has the static initialization check.  So we are back to square one.
+
+| Method        | inputType | Mean     | Error     | StdDev    | Ratio | RatioSD |
+|-------------- |---------- |---------:|----------:|----------:|------:|--------:|
+| FirstCategory | I32       | 1.193 ns | 0.0260 ns | 0.0217 ns |  1.00 |    0.00 |
+| NextOps       | I32       | 5.351 ns | 0.0253 ns | 0.0237 ns |  4.49 |    0.08 |
+|               |           |          |           |           |       |         |
+| FirstCategory | I64       | 1.233 ns | 0.0196 ns | 0.0184 ns |  1.00 |    0.00 |
+| NextOps       | I64       | 3.306 ns | 0.0414 ns | 0.0388 ns |  2.68 |    0.05 |
+|               |           |          |           |           |       |         |
+| FirstCategory | Dbl       | 1.376 ns | 0.0140 ns | 0.0131 ns |  1.00 |    0.00 |
+| NextOps       | Dbl       | 3.410 ns | 0.0431 ns | 0.0403 ns |  2.48 |    0.04 |
+|               |           |          |           |           |       |         |
+| FirstCategory | U64       | 1.597 ns | 0.0233 ns | 0.0218 ns |  1.00 |    0.00 |
+| NextOps       | U64       | 3.442 ns | 0.0386 ns | 0.0361 ns |  2.16 |    0.04 |
+
