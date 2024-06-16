@@ -1,7 +1,13 @@
 ﻿module VH
 
+open System
+
 [<Literal>]
 let public LitConst = 17
+
+let f() = DateTime.Now
+
+let x = f()
 
 type ValueHolder()  = 
     

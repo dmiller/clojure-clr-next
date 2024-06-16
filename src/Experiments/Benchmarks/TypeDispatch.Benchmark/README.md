@@ -2,7 +2,7 @@
 
 This is similar to the `DispatchBenchmark`.
 
-I was comparing C# ClojureCLR to F# ClojureCLR.Next code in the general of area of the `Util.equiv`.
+I was comparing C# ClojureCLR to F# ClojureCLR.Next code in the general of area of the `equiv`.
 That code tests for whether a value is 'numeric'.  The C# code is rather simple:
 
 ```C#

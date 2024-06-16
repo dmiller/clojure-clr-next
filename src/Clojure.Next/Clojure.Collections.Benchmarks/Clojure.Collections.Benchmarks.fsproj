@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="README.md" />
     <Compile Include="NumericsBenchmarks.fs" />
     <Compile Include="PersistentVectorBenchmarks.fs" />
     <Compile Include="PersistentHashMapBenchmarks.fs" />
@@ -19,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\BabyNumbers.CSharp\BabyNumbers.CSharp.csproj" />
     <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
   </ItemGroup>
 

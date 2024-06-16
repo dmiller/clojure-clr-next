@@ -1404,69 +1404,70 @@ type Numbers() =
 
     // the following were originally in Util
 
-    //static member private IsNumericType(t: Type) =
-    //    match Type.GetTypeCode(t) with
-    //    | TypeCode.SByte
-    //    | TypeCode.Byte
-    //    | TypeCode.Int16
-    //    | TypeCode.Int32
-    //    | TypeCode.Int64
-    //    | TypeCode.Double
-    //    | TypeCode.Single
-    //    | TypeCode.UInt16
-    //    | TypeCode.UInt32
-    //    | TypeCode.UInt64 -> true
-    //    | _ -> System.Type.op_Equality(t, typeof<Clojure.Numerics.BigInt>) 
-    //        || System.Type.op_Equality(t, typeof<System.Numerics.BigInteger>)
-    //        || System.Type.op_Equality(t, typeof<Clojure.BigArith.BigDecimal>)
-    //        || System.Type.op_Equality(t, typeof<Clojure.Numerics.Ratio>)
+    static member private IsNumericType(t: Type) =
+        match Type.GetTypeCode(t) with
+        | TypeCode.SByte
+        | TypeCode.Byte
+        | TypeCode.Int16
+        | TypeCode.Int32
+        | TypeCode.Int64
+        | TypeCode.Double
+        | TypeCode.Single
+        | TypeCode.UInt16
+        | TypeCode.UInt32
+        | TypeCode.UInt64 -> true
+        | _ -> System.Type.op_Equality(t, typeof<Clojure.Numerics.BigInt>) 
+            || System.Type.op_Equality(t, typeof<System.Numerics.BigInteger>)
+            || System.Type.op_Equality(t, typeof<Clojure.BigArith.BigDecimal>)
+            || System.Type.op_Equality(t, typeof<Clojure.Numerics.Ratio>)
 
     // The code above corresponds to the original C# code.
-    // However, the C# compiler does a better job of optimizing the code.
+    // I did some benchmarking against the C# code.  I originally thought the C# produced better IL and wrote the code below to generate it here.
+    // However, after tweaking the bencmarking code, I found that the F# code was actually faster.  I am leaving the code below for reference.
     // THe following is the equivalent to how the C# compiles.
     
-    static member public IsNumericType(t: Type) =
-        let tc : uint =  uint (Type.GetTypeCode(t)) 
-        tc  - 5u <= 9u ||   
-        Type.op_Equality(t, typeof<BigInt>) ||
-        Type.op_Equality(t, typeof<BigInteger>) ||
-        Type.op_Equality(t, typeof<BigDecimal>) ||
-        Type.op_Equality(t, typeof<Ratio>)
-
-    //static member private IsPrimitiveNumericType(t: Type) =
-    //    match Type.GetTypeCode(t) with
-    //    | TypeCode.SByte
-    //    | TypeCode.Byte
-    //    | TypeCode.Int16
-    //    | TypeCode.Int32
-    //    | TypeCode.Int64
-    //    | TypeCode.Double
-    //    | TypeCode.Single
-    //    | TypeCode.UInt16
-    //    | TypeCode.UInt32
-    //    | TypeCode.UInt64 -> true
-    //    | _ -> false
+    //static member public IsNumericType(t: Type) =
+    //    let tc : uint =  uint (Type.GetTypeCode(t)) 
+    //    tc  - 5u <= 9u ||   
+    //    Type.op_Equality(t, typeof<BigInt>) ||
+    //    Type.op_Equality(t, typeof<BigInteger>) ||
+    //    Type.op_Equality(t, typeof<BigDecimal>) ||
+    //    Type.op_Equality(t, typeof<Ratio>)
 
     static member private IsPrimitiveNumericType(t: Type) =
-        let tc : uint =  uint (Type.GetTypeCode(t)) 
-        tc  - 5u <= 9u  
+        match Type.GetTypeCode(t) with
+        | TypeCode.SByte
+        | TypeCode.Byte
+        | TypeCode.Int16
+        | TypeCode.Int32
+        | TypeCode.Int64
+        | TypeCode.Double
+        | TypeCode.Single
+        | TypeCode.UInt16
+        | TypeCode.UInt32
+        | TypeCode.UInt64 -> true
+        | _ -> false
+
+    //static member private IsPrimitiveNumericType(t: Type) =
+    //    let tc : uint =  uint (Type.GetTypeCode(t)) 
+    //    tc  - 5u <= 9u  
 
 
-    //static member private IsPrimitiveIntegerType(t: Type) =
-    //    match Type.GetTypeCode(t) with
-    //    | TypeCode.SByte
-    //    | TypeCode.Byte
-    //    | TypeCode.Int16
-    //    | TypeCode.Int32
-    //    | TypeCode.Int64
-    //    | TypeCode.UInt16
-    //    | TypeCode.UInt32
-    //    | TypeCode.UInt64 -> true
-    //    | _ -> false
+    static member private IsPrimitiveIntegerType(t: Type) =
+        match Type.GetTypeCode(t) with
+        | TypeCode.SByte
+        | TypeCode.Byte
+        | TypeCode.Int16
+        | TypeCode.Int32
+        | TypeCode.Int64
+        | TypeCode.UInt16
+        | TypeCode.UInt32
+        | TypeCode.UInt64 -> true
+        | _ -> false
 
-    static member IsPrimitiveIntegerType(t: Type) =
-        let tc : uint =  uint (Type.GetTypeCode(t)) 
-        tc  - 5u <= 7u  
+    //static member IsPrimitiveIntegerType(t: Type) =
+    //    let tc : uint =  uint (Type.GetTypeCode(t)) 
+    //    tc  - 5u <= 7u  
 
     static member IsNumeric(o: obj) =
         match o with

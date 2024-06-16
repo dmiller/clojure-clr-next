@@ -31,7 +31,7 @@ type NumericEquivTests() =
     member this.FirstNumberEqualOnLong() =  clojure.lang.Numbers.equal( 1L, 2L)
  
     [<Benchmark>]
-    member this.NextNumberEqualOLong() = Clojure.Numerics.Numbers.equal( 1L, 2L)
+    member this.NextNumberEqualOnLong() = Clojure.Numerics.Numbers.equal( 1L, 2L)
 
    
         
@@ -62,3 +62,43 @@ type NumericConverterTests() =
         for i = 0 to this.size-1 do
             x <- x + Clojure.Numerics.Converters.convertToLong( NumericConverterTests.getValue(i))
         x
+
+
+
+type EInputType =
+| I32 = 0
+| I64 = 1
+| Dbl = 2
+| U64 = 3
+
+
+
+let getValue(inputType : EInputType) : obj =
+    match inputType with
+    | EInputType.I32 -> 12
+    | EInputType.I64 -> 12L
+    | EInputType.Dbl -> 1.2
+    | EInputType.U64 -> 12UL
+    | _ -> failwith "Invalid input type"
+
+
+
+
+[<MemoryDiagnoser>]
+type CategoryVersusOps() =
+
+    [<ParamsAllValues>]
+    member val inputType: EInputType = EInputType.I32 with get, set
+
+    member val testedVal : obj = null with get, set
+
+    [<GlobalSetup>]
+    member this.GlobalSetup() =
+        this.testedVal <- getValue this.inputType
+
+
+    [<Benchmark(Baseline = true)>]  
+    member this.FirstCategory() = BabyNumbers.CSharp.Numbers.category(this.testedVal)
+
+    [<Benchmark>]
+    member this.NextOps() = Clojure.Numerics.Numbers.getOps(this.testedVal)
