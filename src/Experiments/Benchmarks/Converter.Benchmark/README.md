@@ -158,6 +158,30 @@ I would have expected the opposite.
 But it is clear here that except for strings, type testing beats switching.  But it is order-dependent.  We can guess that certain data types are more likely than others and place them first.
 It's a guessing game.  Given that I would expect types in the 'Other' category to be infrequent, the other cases are will come out faster.
 
+Subsequently, I also tested using `Type.op_Equality` to compare types.  Just checking against the `match` test `:? T`.  Essentially, no real difference.
+
+| Method         | inputType | Mean     | Error     | StdDev    | Ratio | RatioSD |
+|--------------- |---------- |---------:|----------:|----------:|------:|--------:|
+| TypeCode       | I32       | 2.327 ns | 0.0523 ns | 0.0490 ns |  1.00 |    0.00 |
+| Type           | I32       | 1.625 ns | 0.0187 ns | 0.0175 ns |  0.70 |    0.01 |
+| TypeOpEquality | I32       | 1.656 ns | 0.0130 ns | 0.0109 ns |  0.71 |    0.02 |
+|                |           |          |           |           |       |         |
+| TypeCode       | I64       | 2.387 ns | 0.0236 ns | 0.0221 ns |  1.00 |    0.00 |
+| Type           | I64       | 1.598 ns | 0.0258 ns | 0.0241 ns |  0.67 |    0.01 |
+| TypeOpEquality | I64       | 2.075 ns | 0.0219 ns | 0.0194 ns |  0.87 |    0.01 |
+|                |           |          |           |           |       |         |
+| TypeCode       | Dbl       | 2.393 ns | 0.0712 ns | 0.1284 ns |  1.00 |    0.00 |
+| Type           | Dbl       | 1.384 ns | 0.0332 ns | 0.0311 ns |  0.60 |    0.04 |
+| TypeOpEquality | Dbl       | 1.664 ns | 0.0322 ns | 0.0302 ns |  0.72 |    0.04 |
+|                |           |          |           |           |       |         |
+| TypeCode       | Str       | 2.662 ns | 0.0329 ns | 0.0308 ns |  1.00 |    0.00 |
+| Type           | Str       | 2.169 ns | 0.0510 ns | 0.0426 ns |  0.81 |    0.02 |
+| TypeOpEquality | Str       | 2.129 ns | 0.0470 ns | 0.0392 ns |  0.80 |    0.01 |
+
+
+
+
+
 
 ## Converting a value
 
