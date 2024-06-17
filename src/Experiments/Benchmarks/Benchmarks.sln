@@ -29,8 +29,6 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "AllThingsBeingEqual.Benchma
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "NumericsEqual.Benchmark", "NumericsEqual.Benchmark\NumericsEqual.Benchmark.fsproj", "{C108A3B1-B0E4-47E1-AFAF-04B5C20E571B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BabyNumbers.CSharp", "BabyNumbers.CSharp\BabyNumbers.CSharp.csproj", "{B44B74C4-C1DD-47FE-BDA9-29C5592E7DEF}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -89,10 +87,6 @@ Global
 		{C108A3B1-B0E4-47E1-AFAF-04B5C20E571B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C108A3B1-B0E4-47E1-AFAF-04B5C20E571B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C108A3B1-B0E4-47E1-AFAF-04B5C20E571B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B44B74C4-C1DD-47FE-BDA9-29C5592E7DEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B44B74C4-C1DD-47FE-BDA9-29C5592E7DEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B44B74C4-C1DD-47FE-BDA9-29C5592E7DEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B44B74C4-C1DD-47FE-BDA9-29C5592E7DEF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

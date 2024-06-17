@@ -89,3 +89,12 @@ type TestingCategorizers() =
         //let v = getValue this.inputType
         //for i =  0 to numEntries - 1 do 
         categorizeByType this.testedVal |> ignore
+
+
+    [<Benchmark>]   
+    member this.TypeOpEquality() = 
+        //let v = getValue this.inputType
+        //for i =  0 to numEntries - 1 do 
+        categorizeByTypeOpEquality this.testedVal |> ignore
+
+        

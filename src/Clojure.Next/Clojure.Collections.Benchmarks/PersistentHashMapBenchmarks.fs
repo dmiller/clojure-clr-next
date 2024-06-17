@@ -88,8 +88,8 @@ type RTEquiv() =
 
 
 
-[<MemoryDiagnoser; HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)>]
-type PMCreate() = 
+[<MemoryDiagnoser>]
+type PMCreateWithCheck() = 
 
     [<Params( 0, 1, 2, 3, 4, 6, 8, 12, 16)>]
     member val size: int = 0 with get, set
@@ -99,28 +99,17 @@ type PMCreate() =
 
     [<GlobalSetup>]
     member this.GlobalSetup() =
+        Clojure.Numerics.Initializer.init() |> ignore
         this.items <- Array.zeroCreate (this.size*2)
         for i in 0 .. this.size - 1 do
             this.items.[2*i] <- i
             this.items.[2*i + 1] <- i
 
-    //[<Benchmark(Baseline = true)>]
-    member this.FirstCreatePAMAssoc() =
-        let mutable pv =
-            clojure.lang.PersistentArrayMap.createAsIfByAssoc  this.items :> clojure.lang.IPersistentMap
-        pv
-  
     [<Benchmark(Baseline = true)>]
     member this.FirstCreatePAMCheck() =
         let mutable pv =
             clojure.lang.PersistentArrayMap.createWithCheck  this.items :> clojure.lang.IPersistentMap
         pv  
-
-    //[<Benchmark>]
-    member this.NextCreatePAMAssoc() =
-        let mutable pv =
-            Clojure.Collections.PersistentArrayMap.createAsIfByAssoc  this.items :> Clojure.Collections.IPersistentMap
-        pv
    
     [<Benchmark>]
     member this.NextCreatePAMCheck() =
@@ -128,8 +117,37 @@ type PMCreate() =
             Clojure.Collections.PersistentArrayMap.createWithCheck  this.items :> Clojure.Collections.IPersistentMap
         pv  
 
- 
- 
+ [<MemoryDiagnoser>]
+type PMCreateByAssoc() = 
+
+    [<Params( 0, 1, 2, 3, 4, 6, 8, 12, 16)>]
+    member val size: int = 0 with get, set
+
+    [<DefaultValue>]
+    val mutable items : obj[]
+
+    [<GlobalSetup>]
+    member this.GlobalSetup() =
+        Clojure.Numerics.Initializer.init() |> ignore
+        this.items <- Array.zeroCreate (this.size*2)
+        for i in 0 .. this.size - 1 do
+            this.items.[2*i] <- i
+            this.items.[2*i + 1] <- i
+
+    [<Benchmark(Baseline = true)>]
+    member this.FirstCreatePAMAssoc() =
+        let mutable pv =
+            clojure.lang.PersistentArrayMap.createAsIfByAssoc  this.items :> clojure.lang.IPersistentMap
+        pv
+  
+    
+    [<Benchmark>]
+    member this.NextCreatePAMAssoc() =
+        let mutable pv =
+            Clojure.Collections.PersistentArrayMap.createAsIfByAssoc  this.items :> Clojure.Collections.IPersistentMap
+        pv
+   
+    
  [<MemoryDiagnoser>]
 type PHMCons() =
 

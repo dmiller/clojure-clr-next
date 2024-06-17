@@ -7,7 +7,7 @@ let public LitConst = 17
 
 let f() = DateTime.Now
 
-let x = f()
+let public moduleLet = f()
 
 type ValueHolder()  = 
     

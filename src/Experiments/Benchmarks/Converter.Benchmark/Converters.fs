@@ -121,3 +121,26 @@ let categorizeByType (o: obj) =
     | :? Decimal -> Category.Decimal
 
     | _ -> Category.Other
+
+let categorizeByTypeOpEquality (o: obj) : Category =
+    let t = o.GetType()
+
+    match t with
+
+    | _ when Type.op_Equality(t, typeof<Single>) ||
+             Type.op_Equality(t, typeof<Double>) -> Category.Floating
+
+    | _ when Type.op_Equality(t, typeof<Int16>) ||
+            Type.op_Equality(t, typeof<Int32>) ||
+            Type.op_Equality(t, typeof<Int64>) ||
+            Type.op_Equality(t, typeof<SByte>) -> Category.SignedInteger
+
+    | _ when Type.op_Equality(t, typeof<Byte>) ||
+            Type.op_Equality(t, typeof<UInt16>) ||
+            Type.op_Equality(t, typeof<UInt32>) ||
+            Type.op_Equality(t, typeof<UInt64>) -> Category.UnsignedInteger
+
+    | _ when Type.op_Equality(t, typeof<Decimal>) -> Category.Decimal
+
+    | _ -> Category.Other
+

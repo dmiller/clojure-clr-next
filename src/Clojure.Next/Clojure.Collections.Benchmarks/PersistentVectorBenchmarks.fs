@@ -4,7 +4,7 @@ open BenchmarkDotNet.Attributes
 open BenchmarkDotNet.Diagnosers
 
 
-[<MemoryDiagnoser; HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)>]
+[<MemoryDiagnoser (* ; HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)  *) >]
 type PVCons() =
 
     [<Params(10, 100, 1_000, 10_000, 100_000)>]
