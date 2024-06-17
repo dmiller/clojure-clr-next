@@ -5,99 +5,6 @@ open Converters
 open System.Numerics
 open Clojure.BigArith
 
-
-type OpsType =
-    | Long = 0
-    | Double = 1
-    | Ratio = 2
-    | BigInteger = 3
-    | BigDecimal = 4
-    | ULong = 5
-    | ClrDecimal = 6
-
-module OpsSelector =
-
-    let selectorTable =
-        array2D
-            [| [| OpsType.Long
-                  OpsType.Double
-                  OpsType.Ratio
-                  OpsType.BigInteger
-                  OpsType.BigDecimal
-                  OpsType.BigInteger
-                  OpsType.ClrDecimal |]
-               [| OpsType.Double
-                  OpsType.Double
-                  OpsType.Double
-                  OpsType.Double
-                  OpsType.Double
-                  OpsType.Double
-                  OpsType.Double |]
-               [| OpsType.Ratio
-                  OpsType.Double
-                  OpsType.Ratio
-                  OpsType.Ratio
-                  OpsType.BigDecimal
-                  OpsType.Ratio
-                  OpsType.BigDecimal |]
-               [| OpsType.BigInteger
-                  OpsType.Double
-                  OpsType.Ratio
-                  OpsType.BigInteger
-                  OpsType.BigDecimal
-                  OpsType.BigInteger
-                  OpsType.BigDecimal |]
-               [| OpsType.BigDecimal
-                  OpsType.Double
-                  OpsType.BigDecimal
-                  OpsType.BigDecimal
-                  OpsType.BigDecimal
-                  OpsType.BigDecimal
-                  OpsType.BigDecimal |]
-               [| OpsType.BigInteger
-                  OpsType.Double
-                  OpsType.Ratio
-                  OpsType.BigInteger
-                  OpsType.BigDecimal
-                  OpsType.ULong
-                  OpsType.ClrDecimal |]
-               [| OpsType.ClrDecimal
-                  OpsType.Double
-                  OpsType.BigDecimal
-                  OpsType.BigDecimal
-                  OpsType.BigDecimal
-                  OpsType.ClrDecimal
-                  OpsType.ClrDecimal |] |]
-
-    // TODO: Look at the efficiency of this re type testing
-
-    let ops (x: obj) : OpsType =
-        match Type.GetTypeCode(x.GetType()) with
-        | TypeCode.SByte
-        | TypeCode.Int16
-        | TypeCode.Int32
-        | TypeCode.Int64 -> OpsType.Long
-
-        | TypeCode.Byte
-        | TypeCode.UInt16
-        | TypeCode.UInt32
-        | TypeCode.UInt64 -> OpsType.ULong
-
-        | TypeCode.Single
-        | TypeCode.Double -> OpsType.Double
-
-        | TypeCode.Decimal -> OpsType.ClrDecimal
-
-        | _ ->
-            match x with
-            | :? BigInt
-            | :? BigInteger -> OpsType.BigInteger
-            | :? Ratio -> OpsType.Ratio
-            | :? BigDecimal -> OpsType.BigDecimal
-            | _ -> OpsType.Long
-
-    let combine (t1: OpsType, t2: OpsType) = selectorTable[int (t1), int (t2)]
-
 type Ops =
     abstract isZero: x: obj -> bool
     abstract isPos: x: obj -> bool
@@ -194,25 +101,168 @@ type OpsP() =
         member this.unchecked_dec(x) = (this :> Ops).dec (x)
 
 
+
+
+type OpsType =
+    | Long = 0
+    | Double = 1
+    | Ratio = 2
+    | BigInteger = 3
+    | BigDecimal = 4
+    | ULong = 5
+    | ClrDecimal = 6
+
+module OpsSelector =
+
+    let selectorTable =
+        array2D
+            [| [| OpsType.Long
+                  OpsType.Double
+                  OpsType.Ratio
+                  OpsType.BigInteger
+                  OpsType.BigDecimal
+                  OpsType.BigInteger
+                  OpsType.ClrDecimal |]
+               [| OpsType.Double
+                  OpsType.Double
+                  OpsType.Double
+                  OpsType.Double
+                  OpsType.Double
+                  OpsType.Double
+                  OpsType.Double |]
+               [| OpsType.Ratio
+                  OpsType.Double
+                  OpsType.Ratio
+                  OpsType.Ratio
+                  OpsType.BigDecimal
+                  OpsType.Ratio
+                  OpsType.BigDecimal |]
+               [| OpsType.BigInteger
+                  OpsType.Double
+                  OpsType.Ratio
+                  OpsType.BigInteger
+                  OpsType.BigDecimal
+                  OpsType.BigInteger
+                  OpsType.BigDecimal |]
+               [| OpsType.BigDecimal
+                  OpsType.Double
+                  OpsType.BigDecimal
+                  OpsType.BigDecimal
+                  OpsType.BigDecimal
+                  OpsType.BigDecimal
+                  OpsType.BigDecimal |]
+               [| OpsType.BigInteger
+                  OpsType.Double
+                  OpsType.Ratio
+                  OpsType.BigInteger
+                  OpsType.BigDecimal
+                  OpsType.ULong
+                  OpsType.ClrDecimal |]
+               [| OpsType.ClrDecimal
+                  OpsType.Double
+                  OpsType.BigDecimal
+                  OpsType.BigDecimal
+                  OpsType.BigDecimal
+                  OpsType.ClrDecimal
+                  OpsType.ClrDecimal |] |]
+
+    // TODO: Look at the efficiency of this re type testing
+
+    //let ops (x: obj) : OpsType =
+    //    let xt = x.GetType();
+    //    match Type.GetTypeCode(xt) with
+    //    | TypeCode.SByte
+    //    | TypeCode.Int16
+    //    | TypeCode.Int32
+    //    | TypeCode.Int64 -> OpsType.Long
+
+    //    | TypeCode.Byte
+    //    | TypeCode.UInt16
+    //    | TypeCode.UInt32
+    //    | TypeCode.UInt64 -> OpsType.ULong
+
+    //    | TypeCode.Single
+    //    | TypeCode.Double -> OpsType.Double
+
+    //    | TypeCode.Decimal -> OpsType.ClrDecimal
+
+    //    | _ ->
+    //        if Type.op_Equality(xt,typeof<BigInteger>) || Type.op_Equality(xt,typeof<BigInt>) then
+    //            OpsType.BigInteger
+    //        elif Type.op_Equality(xt,typeof<Ratio>) then
+    //            OpsType.Ratio
+    //        elif Type.op_Equality(xt,typeof<BigDecimal>) then
+    //            OpsType.BigDecimal
+    //        else
+    //            OpsType.Long
+            //match x with
+            //| :? BigInt
+            //| :? BigInteger -> OpsType.BigInteger
+            //| :? Ratio -> OpsType.Ratio
+            //| :? BigDecimal -> OpsType.BigDecimal
+            //| _ -> OpsType.Long
+
+
+    let ops (x: obj) : OpsType =
+        match x with
+        | :? Int64 -> OpsType.Long
+        | :? Double -> OpsType.Double
+
+        | :? Int32 -> OpsType.Long
+        | :? Single -> OpsType.Double
+
+        | :? BigInt
+        | :? BigInteger -> OpsType.BigInteger
+
+        | :? SByte
+        | :? Int16  -> OpsType.Long
+
+        | :? Ratio -> OpsType.Ratio
+
+        | :? Byte
+        | :? UInt16
+        | :? UInt32
+        | :? UInt64 -> OpsType.ULong
+
+        | :? BigDecimal -> OpsType.BigDecimal
+
+        | :? Decimal -> OpsType.ClrDecimal
+
+        | _ -> OpsType.Long
+
+    let combine (t1: OpsType, t2: OpsType) = selectorTable[int (t1), int (t2)]
+
+    let opsImplTable: Ops array = Array.zeroCreate 7
+
+    let getOps(x: obj) = opsImplTable[ops (x) |> int]
+    let getOps2(x: obj, y: obj) = opsImplTable[combine( ops (x), ops (y)) |> int]
+
+    let getOpsFromType(t: OpsType) = opsImplTable[int t]
+    let getOpsFromType2(t1: OpsType, t2: OpsType) = opsImplTable[combine(t1, t2) |> int]
+
+    let getBigIntOps = opsImplTable[int OpsType.BigInteger]
+    let getBigDecOps = opsImplTable[int OpsType.BigDecimal]
+
+
 [<AbstractClass; Sealed>]
 type Numbers() =
 
-    static member val  LONG_OPS: Ops = LongOps()
-    static member val DOUBLE_OPS: Ops = DoubleOps()
-    static member val RATIO_OPS: Ops = RatioOps()
-    static member val BIGINT_OPS: Ops = BigIntOps()
-    static member val BIGDEC_OPS: Ops = BigDecimalOps()
-    static member val ULONG_OPS: Ops = ULongOps()
-    static member val CLRDEC_OPS: Ops = ClrDecimalOps()
+    //static member val  LONG_OPS: Ops = LongOps()
+    //static member val DOUBLE_OPS: Ops = DoubleOps()
+    //static member val RATIO_OPS: Ops = RatioOps()
+    //static member val BIGINT_OPS: Ops = BigIntOps()
+    //static member val BIGDEC_OPS: Ops = BigDecimalOps()
+    //static member val ULONG_OPS: Ops = ULongOps()
+    //static member val CLRDEC_OPS: Ops = ClrDecimalOps()
 
-    static member val private opsImplTable: Ops array =
-        [| Numbers.LONG_OPS
-           Numbers.DOUBLE_OPS
-           Numbers.RATIO_OPS
-           Numbers.BIGINT_OPS
-           Numbers.BIGDEC_OPS
-           Numbers.ULONG_OPS
-           Numbers.CLRDEC_OPS |]
+    //static member val private opsImplTable: Ops array =
+    //    [| Numbers.LONG_OPS
+    //       Numbers.DOUBLE_OPS
+    //       Numbers.RATIO_OPS
+    //       Numbers.BIGINT_OPS
+    //       Numbers.BIGDEC_OPS
+    //       Numbers.ULONG_OPS
+    //       Numbers.CLRDEC_OPS |]
 
     static member private IntOverflow() = OverflowException("integer overflow")  // not 'val' we need this created in context to pick up the call stack
     static member private DecOverflow() = OverflowException("decimal overflow")  // not 'val' we need this created in context to pick up the call stack
@@ -224,28 +274,28 @@ type Numbers() =
         | _ -> false
 
 
-    static member getOps(x: obj) =
-        Numbers.opsImplTable[int (OpsSelector.ops (x))]
+    //static member getOps(x: obj) =
+    //    Numbers.opsImplTable[int (OpsSelector.ops (x))]
 
-    static member getOps(x: obj, y: obj) =
-        Numbers.opsImplTable[int (OpsSelector.combine (OpsSelector.ops (x), OpsSelector.ops (y)))]
+    //static member getOps(x: obj, y: obj) =
+    //    Numbers.opsImplTable[int (OpsSelector.combine (OpsSelector.ops (x), OpsSelector.ops (y)))]
 
 
     // isZero, isPos, isNeg
 
-    static member isZero(x: obj) = Numbers.getOps(x).isZero (x)
+    static member isZero(x: obj) = OpsSelector.getOps(x).isZero (x)
     static member isZero(x: double) = x = 0.0
     static member isZero(x: int64) = x = 0L
     static member isZero(x: uint64) = x = 0UL
     static member isZero(x: decimal) = x = 0M
 
-    static member isPos(x: obj) = Numbers.getOps(x).isPos (x)
+    static member isPos(x: obj) = OpsSelector.getOps(x).isPos (x)
     static member isPos(x: double) = x > 0.0
     static member isPos(x: int64) = x > 0L
     static member isPos(x: uint64) = x > 0UL
     static member isPos(x: decimal) = x > 0M
 
-    static member isNeg(x: obj) = Numbers.getOps(x).isNeg (x)
+    static member isNeg(x: obj) = OpsSelector.getOps(x).isNeg (x)
     static member isNeg(x: double) = x < 0.0
     static member isNeg(x: int64) = x < 0L
     static member isNeg(_: uint64) = false
@@ -254,7 +304,7 @@ type Numbers() =
 
     // add, addP, unchecked_add
 
-    static member add(x: obj, y: obj) = Numbers.getOps(x, y).add (x, y)
+    static member add(x: obj, y: obj) = OpsSelector.getOps2(x, y).add (x, y)
     static member add(x: double, y: double) = x + y
 
     static member add(x: int64, y: int64) =
@@ -300,7 +350,7 @@ type Numbers() =
         raise <| ArithmeticException("Ambiguous type: Cannot add Int64 and UInt64")
 
 
-    static member addP(x: obj, y: obj) = Numbers.getOps(x, y).addP (x, y)
+    static member addP(x: obj, y: obj) = OpsSelector.getOps2(x, y).addP (x, y)
     static member addP(x: double, y: double) = x + y
 
     static member addP(x: int64, y: int64) =
@@ -342,7 +392,7 @@ type Numbers() =
 
 
     static member unchecked_add(x: obj, y: obj) =
-        Numbers.getOps(x, y).unchecked_add (x, y)
+        OpsSelector.getOps2(x, y).unchecked_add (x, y)
 
     static member unchecked_add(x: double, y: double) = x + y
     static member unchecked_add(x: int64, y: int64) = x + y
@@ -368,7 +418,7 @@ type Numbers() =
 
     // unary minus, minusP, unchecked_minus
 
-    static member minus(x: obj) = Numbers.getOps(x).negate (x)
+    static member minus(x: obj) = OpsSelector.getOps(x).negate (x)
     static member minus(x: double) = -x
 
     static member minus(x: int64) =
@@ -387,7 +437,7 @@ type Numbers() =
 
     static member minus(x: decimal) = -x
 
-    static member minusP(x: obj) = Numbers.getOps(x).negateP (x)
+    static member minusP(x: obj) = OpsSelector.getOps(x).negateP (x)
     static member minusP(x: double) = -x
 
     static member minusP(x: int64) =
@@ -404,7 +454,7 @@ type Numbers() =
 
     static member minusP(x: decimal) = -x
 
-    static member unchecked_minus(x: obj) = Numbers.getOps(x).unchecked_negate (x)
+    static member unchecked_minus(x: obj) = OpsSelector.getOps(x).unchecked_negate (x)
     static member unchecked_minus(x: double) = Numbers.minus (x)
     static member unchecked_minus(x: int64) = -x
 
@@ -417,13 +467,11 @@ type Numbers() =
 
     static member unchecked_minus(x: decimal) = -x
 
-
-
     // binary minus, minusP, unchecked_minus
 
     static member minus(x: obj, y: obj) =
-        let yops = Numbers.getOps (y)
-        let xyops = Numbers.getOps (x, y)
+        let yops = OpsSelector.getOps (y)
+        let xyops = OpsSelector.getOps2 (x, y)
         // Only one Ops implementation does not support negate: ULong (except on arg 0UL)
         // Special case that one
         match yops, xyops with
@@ -475,14 +523,14 @@ type Numbers() =
 
     static member minusP(x: obj, y: obj) =
         // the straightforward code:
-        //      let yops = Numbers.getOps (y)
+        //      let yops = OpsSelector.getOps (y)
         //      let negativeY = yops.negateP (y)
-        //      Numbers.getOps(x, negativeY).addP (x, negativeY)
+        //      OpsSelector.getOps2(x, negativeY).addP (x, negativeY)
         // causes perhaps unnecessary promotion when x,y are ULong.
         // Again, we need to special case that
 
-        let yops = Numbers.getOps (y)
-        let xyops = Numbers.getOps (x, y)
+        let yops = OpsSelector.getOps (y)
+        let xyops = OpsSelector.getOps2 (x, y)
         // Only one Ops implementation does not support negate: ULong (except on arg 0UL)
         // Special case that one
         match yops, xyops with
@@ -502,7 +550,7 @@ type Numbers() =
 
     static member minusP(x: uint64, y: uint64) =
         if y > x then
-            Numbers.BIGINT_OPS.addP (x, Numbers.BIGINT_OPS.negateP (y))
+            OpsSelector.getBigIntOps.addP (x, OpsSelector.getBigIntOps.negateP (y))
         else
             (x - y) :> obj
 
@@ -531,8 +579,8 @@ type Numbers() =
 
     static member unchecked_minus(x: obj, y: obj) =
         // once again, need special case ULongs
-        let yops = Numbers.getOps (y)
-        let xyops = Numbers.getOps (x, y)
+        let yops = OpsSelector.getOps (y)
+        let xyops = OpsSelector.getOps2 (x, y)
 
         match yops, xyops with
         | :? ULongOps, :? ULongOps -> Numbers.unchecked_minus (convertToULong (x), convertToULong (y)) :> obj
@@ -564,7 +612,7 @@ type Numbers() =
 
     // multiply, multiplyP, unchecked_multiply
 
-    static member multiply(x: obj, y: obj) = Numbers.getOps(x, y).multiply (x, y)
+    static member multiply(x: obj, y: obj) = OpsSelector.getOps2(x, y).multiply (x, y)
     static member multiply(x: double, y: double) = x * y
 
     static member multiply(x: int64, y: int64) =
@@ -606,7 +654,7 @@ type Numbers() =
     static member multiply(x: uint64, y: int64) =
         raise <| ArithmeticException("Ambiguous type: Cannot multiply UInt64 and Int64")
 
-    static member multiplyP(x: obj, y: obj) = Numbers.getOps(x, y).multiplyP (x, y)
+    static member multiplyP(x: obj, y: obj) = OpsSelector.getOps2(x, y).multiplyP (x, y)
     static member multiplyP(x: double, y: double) = x * y
 
     static member multiplyP(x: int64, y: int64) =
@@ -632,7 +680,7 @@ type Numbers() =
         try
             x * y :> obj
         with :? OverflowException ->
-            Numbers.BIGDEC_OPS.multiply (x, y)
+            OpsSelector.getBigDecOps.multiply (x, y)
 
     static member multiplyP(x: double, y: obj) = x * convertToDouble (y)
     static member multiplyP(x: obj, y: double) = convertToDouble (x) * y
@@ -650,7 +698,7 @@ type Numbers() =
     static member multiplyP(x: uint64, y: int64) = Numbers.multiplyP (x :> obj, y :> obj)
 
     static member unchecked_multiply(x: obj, y: obj) =
-        Numbers.getOps(x, y).unchecked_multiply (x, y)
+        OpsSelector.getOps2(x, y).unchecked_multiply (x, y)
 
     static member unchecked_multiply(x: double, y: double) = x * y
     static member unchecked_multiply(x: int64, y: int64) = x * y
@@ -690,12 +738,12 @@ type Numbers() =
         elif Numbers.IsNaN(y) then
             y
         else
-            let yops = Numbers.getOps (y)
+            let yops = OpsSelector.getOps (y)
 
             if yops.isZero (y) then
                 raise <| ArithmeticException("divide by zero")
             else
-                Numbers.getOps(x, y).divide (x, y)
+                OpsSelector.getOps2(x, y).divide (x, y)
 
     static member divide(x: double, y: double) = x / y
     static member divide(x: int64, y: int64) = Numbers.divide (x :> obj, y :> obj)
@@ -714,12 +762,12 @@ type Numbers() =
 
 
     static member quotient(x: obj, y: obj) =
-        let yops = Numbers.getOps (y)
+        let yops = OpsSelector.getOps (y)
 
         if yops.isZero (y) then
             raise <| ArithmeticException("Divide by zero")
         else
-            Numbers.getOps(x, y).quotient (x, y)
+            OpsSelector.getOps2(x, y).quotient (x, y)
 
     static member quotient(x: double, y: double) =
         if y = 0 then
@@ -759,12 +807,12 @@ type Numbers() =
 
 
     static member remainder(x: obj, y: obj) =
-        let yops = Numbers.getOps (y)
+        let yops = OpsSelector.getOps (y)
 
         if yops.isZero (y) then
             raise <| ArithmeticException("Divide by zero")
         else
-            Numbers.getOps(x, y).remainder (x, y)
+            OpsSelector.getOps2(x, y).remainder (x, y)
 
     static member remainder(x: double, y: double) =
         if y = 0 then
@@ -796,7 +844,7 @@ type Numbers() =
 
     // inc, incP, unchecked_in, dec, decP, unchecked_dec
 
-    static member inc(x: obj) = Numbers.getOps(x).inc (x)
+    static member inc(x: obj) = OpsSelector.getOps(x).inc (x)
     static member inc(x: double) = x + 1.0
 
     static member inc(x: int64) =
@@ -813,31 +861,31 @@ type Numbers() =
 
     static member inc(x: decimal) = x + 1M
 
-    static member incP(x: obj) = Numbers.getOps(x).incP (x)
+    static member incP(x: obj) = OpsSelector.getOps(x).incP (x)
     static member incP(x: double) = x + 1.0
 
     static member incP(x: int64) =
         if x = Int64.MaxValue then
-            Numbers.BIGINT_OPS.inc (x :> obj)
+            OpsSelector.getBigIntOps.inc (x :> obj)
         else
             x + 1L :> obj
 
     static member incP(x: uint64) =
         if x = UInt64.MaxValue then
-            Numbers.BIGINT_OPS.inc (x :> obj)
+            OpsSelector.getBigIntOps.inc (x :> obj)
         else
             x + 1UL :> obj
 
     static member incP(x: decimal) = Numbers.addP (x, 1M)
 
-    static member unchecked_inc(x: obj) = Numbers.getOps(x).unchecked_inc (x)
+    static member unchecked_inc(x: obj) = OpsSelector.getOps(x).unchecked_inc (x)
     static member unchecked_inc(x: double) = Numbers.inc (x)
     static member unchecked_inc(x: int64) = x + 1L
     static member unchecked_inc(x: uint64) = x + 1UL
     static member unchecked_inc(x: decimal) = Numbers.inc (x)
 
 
-    static member dec(x: obj) = Numbers.getOps(x).dec (x)
+    static member dec(x: obj) = OpsSelector.getOps(x).dec (x)
     static member dec(x: double) = x - 1.0
 
     static member dec(x: int64) =
@@ -854,24 +902,24 @@ type Numbers() =
 
     static member dec(x: decimal) = x - 1M
 
-    static member decP(x: obj) = Numbers.getOps(x).decP (x)
+    static member decP(x: obj) = OpsSelector.getOps(x).decP (x)
     static member decP(x: double) = x - 1.0
 
     static member decP(x: int64) =
         if x = Int64.MinValue then
-            Numbers.BIGINT_OPS.dec (x :> obj)
+            OpsSelector.getBigIntOps.dec (x :> obj)
         else
             x - 1L :> obj
 
     static member decP(x: uint64) =
         if x = UInt64.MinValue then
-            Numbers.BIGINT_OPS.dec (x :> obj)
+            OpsSelector.getBigIntOps.dec (x :> obj)
         else
             x - 1UL :> obj
 
     static member decP(x: decimal) = Numbers.addP (x, -1M)
 
-    static member unchecked_dec(x: obj) = Numbers.getOps(x).unchecked_dec (x)
+    static member unchecked_dec(x: obj) = OpsSelector.getOps(x).unchecked_dec (x)
     static member unchecked_dec(x: double) = Numbers.dec (x)
     static member unchecked_dec(x: int64) = x - 1L
     static member unchecked_dec(x: uint64) = x - 1UL
@@ -880,10 +928,15 @@ type Numbers() =
     // equal, compare
 
     static member equal(x: obj, y: obj) =
-        OpsSelector.ops (x) = OpsSelector.ops (y) && Numbers.getOps(x, y).equiv (x, y)
+        let xOpType = OpsSelector.ops (x)
+        let yOpType = OpsSelector.ops (y)
+        xOpType =  yOpType && OpsSelector.getOpsFromType(xOpType).equiv (x, y)
+
+     // originally:  OpsSelector.ops (x) = OpsSelector.ops (y) && OpsSelector.getOps2(x, y).equiv (x, y)
+
 
     static member compare(x: obj, y: obj) =
-        let xyops = Numbers.getOps (x, y)
+        let xyops = OpsSelector.getOps2 (x, y)
 
         if xyops.lt (x, y) then -1
         elif xyops.lt (y, x) then 1
@@ -891,7 +944,7 @@ type Numbers() =
 
     // equiv, lt, lte, gt, gte
 
-    static member equiv(x: obj, y: obj) = Numbers.getOps(x, y).equiv (x, y)
+    static member equiv(x: obj, y: obj) = OpsSelector.getOps2(x, y).equiv (x, y)
     static member equiv(x: double, y: double) = x = y
     static member equiv(x: int64, y: int64) = x = y
     static member equiv(x: uint64, y: uint64) = x = y
@@ -909,7 +962,7 @@ type Numbers() =
     static member equiv(x: int64, y: uint64) = Numbers.equiv (x :> obj, y :> obj)
     static member equiv(x: uint64, y: int64) = Numbers.equiv (x :> obj, y :> obj)
 
-    static member lt(x: obj, y: obj) = Numbers.getOps(x, y).lt (x, y)
+    static member lt(x: obj, y: obj) = OpsSelector.getOps2(x, y).lt (x, y)
     static member lt(x: double, y: double) = x < y
     static member lt(x: int64, y: int64) = x < y
     static member lt(x: uint64, y: uint64) = x < y
@@ -927,7 +980,7 @@ type Numbers() =
     static member lt(x: int64, y: uint64) = Numbers.lt (x :> obj, y :> obj)
     static member lt(x: uint64, y: int64) = Numbers.lt (x :> obj, y :> obj)
 
-    static member lte(x: obj, y: obj) = Numbers.getOps(x, y).lte (x, y)
+    static member lte(x: obj, y: obj) = OpsSelector.getOps2(x, y).lte (x, y)
     static member lte(x: double, y: double) = x <= y
     static member lte(x: int64, y: int64) = x <= y
     static member lte(x: uint64, y: uint64) = x <= y
@@ -945,7 +998,7 @@ type Numbers() =
     static member lte(x: int64, y: uint64) = Numbers.lte (x :> obj, y :> obj)
     static member lte(x: uint64, y: int64) = Numbers.lte (x :> obj, y :> obj)
 
-    static member gt(x: obj, y: obj) = Numbers.getOps(x, y).lt (y, x)
+    static member gt(x: obj, y: obj) = OpsSelector.getOps2(x, y).lt (y, x)
     static member gt(x: double, y: double) = x > y
     static member gt(x: int64, y: int64) = x > y
     static member gt(x: uint64, y: uint64) = x > y
@@ -963,7 +1016,7 @@ type Numbers() =
     static member gt(x: int64, y: uint64) = Numbers.gt (x :> obj, y :> obj)
     static member gt(x: uint64, y: int64) = Numbers.gt (x :> obj, y :> obj)
 
-    static member gte(x: obj, y: obj) = Numbers.getOps(x, y).gte (x, y)
+    static member gte(x: obj, y: obj) = OpsSelector.getOps2(x, y).gte (x, y)
     static member gte(x: double, y: double) = x >= y
     static member gte(x: int64, y: int64) = x >= y
     static member gte(x: uint64, y: uint64) = x >= y
@@ -1119,7 +1172,7 @@ type Numbers() =
 
     static member min(x: uint64, y: int64) : obj = if Numbers.lt (x, y) then x else y
 
-    static member abs(x: obj) = Numbers.getOps(x).abs (x)
+    static member abs(x: obj) = OpsSelector.getOps(x).abs (x)
 
     // int overloads for basic ops -- needed by the compiler and core.clj
 
@@ -1541,7 +1594,7 @@ and [<Sealed>] LongOps() =
             let ret = lx + ly
 
             if (ret ^^^ lx) < 0 && (ret ^^^ ly) < 0 then
-                Numbers.BIGINT_OPS.add (x, y)
+                OpsSelector.getBigIntOps.add (x, y)
             else
                 ret :> obj
 
@@ -1557,12 +1610,12 @@ and [<Sealed>] LongOps() =
             let ly = convertToLong (y)
 
             if lx = Int64.MinValue && ly < 0 then
-                Numbers.BIGINT_OPS.multiply (x, y)
+                OpsSelector.getBigIntOps.multiply (x, y)
             else
                 let ret = lx * ly
 
                 if ly <> 0 && ret / ly <> lx then
-                    Numbers.BIGINT_OPS.multiply (x, y)
+                    OpsSelector.getBigIntOps.multiply (x, y)
                 else
                     ret :> obj
 
@@ -1623,7 +1676,7 @@ and [<Sealed>] LongOps() =
             if lx < Int64.MaxValue then
                 (lx + 1L) :> obj
             else
-                Numbers.BIGINT_OPS.inc (x)
+                OpsSelector.getBigIntOps.inc (x)
 
         member this.unchecked_inc(x: obj) : obj =
             Numbers.unchecked_inc (convertToLong (x))
@@ -1637,7 +1690,7 @@ and [<Sealed>] LongOps() =
             if lx > Int64.MinValue then
                 (lx - 1L) :> obj
             else
-                Numbers.BIGINT_OPS.dec (x)
+                OpsSelector.getBigIntOps.dec (x)
 
         member this.unchecked_dec(x: obj) : obj =
             Numbers.unchecked_dec (convertToLong (x))
@@ -1668,7 +1721,7 @@ and [<Sealed>] ULongOps() =
             let uly = convertToULong (y)
 
             if ulx > UInt64.MaxValue - uly then
-                Numbers.BIGINT_OPS.add (x, y)
+                OpsSelector.getBigIntOps.add (x, y)
             else
                 (ulx + uly) :> obj
 
@@ -1686,7 +1739,7 @@ and [<Sealed>] ULongOps() =
             let ret = ulx * uly
 
             if uly <> 0UL && ret / uly <> ulx then
-                Numbers.BIGINT_OPS.multiply (x, y)
+                OpsSelector.getBigIntOps.multiply (x, y)
             else
                 ret
 
@@ -1756,7 +1809,7 @@ and [<Sealed>] ULongOps() =
             if lx < UInt64.MaxValue then
                 (lx + 1UL) :> obj
             else
-                Numbers.BIGINT_OPS.inc (x)
+                OpsSelector.getBigIntOps.inc (x)
 
         member this.unchecked_inc(x: obj) : obj =
             Numbers.unchecked_inc (convertToULong (x))
@@ -1770,7 +1823,7 @@ and [<Sealed>] ULongOps() =
             if lx > 0UL then
                 (lx - 1UL) :> obj
             else
-                Numbers.BIGINT_OPS.dec (x)
+                OpsSelector.getBigIntOps.dec (x)
 
         member this.unchecked_dec(x: obj) : obj =
             Numbers.unchecked_dec (convertToULong (x))
@@ -1912,7 +1965,7 @@ and [<Sealed>] ClrDecimalOps() =
             try
                 dx + dy :> obj
             with :? OverflowException ->
-                Numbers.BIGDEC_OPS.add (x, y)
+                OpsSelector.getBigDecOps.add (x, y)
 
         member this.unchecked_add(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
@@ -1932,7 +1985,7 @@ and [<Sealed>] ClrDecimalOps() =
             try
                 dx * dy :> obj
             with :? OverflowException ->
-                Numbers.BIGDEC_OPS.multiply (x, y)
+                OpsSelector.getBigDecOps.multiply (x, y)
 
         member this.unchecked_multiply(x: obj, y: obj) : obj =
             let dx = convertToDecimal (x)
@@ -1987,7 +2040,7 @@ and [<Sealed>] ClrDecimalOps() =
             try
                 dx + 1M :> obj
             with :? OverflowException ->
-                Numbers.BIGDEC_OPS.inc (BigDecimal.Create(dx))
+                OpsSelector.getBigDecOps.inc (BigDecimal.Create(dx))
 
         member this.unchecked_inc(x: obj) : obj = convertToDecimal (x) + 1M :> obj
 
@@ -1999,7 +2052,7 @@ and [<Sealed>] ClrDecimalOps() =
             try
                 dx - 1M :> obj
             with :? OverflowException ->
-                Numbers.BIGDEC_OPS.dec (BigDecimal.Create(dx))
+                OpsSelector.getBigDecOps.dec (BigDecimal.Create(dx))
 
         member this.unchecked_dec(x: obj) : obj = convertToDecimal (x) - 1M :> obj
 
@@ -2189,6 +2242,16 @@ and [<Sealed>] BigDecimalOps() =
             match c with
             | Some cx -> bx.Abs(cx)
             | None -> bx.Abs()
+
+module Initializer =
+    let init() =
+        OpsSelector.opsImplTable[OpsType.Long |> int] <- LongOps()
+        OpsSelector.opsImplTable[OpsType.ULong |> int] <- ULongOps()
+        OpsSelector.opsImplTable[OpsType.Double |> int] <- DoubleOps()
+        OpsSelector.opsImplTable[OpsType.Ratio |> int] <- RatioOps()
+        OpsSelector.opsImplTable[OpsType.BigInteger |> int] <- BigIntOps()
+        OpsSelector.opsImplTable[OpsType.BigDecimal |> int] <- BigDecimalOps()
+        OpsSelector.opsImplTable[OpsType.ClrDecimal |> int] <- ClrDecimalOps()
 
 
 //and [<AbstractClass; Sealed>] OpsImpls =
