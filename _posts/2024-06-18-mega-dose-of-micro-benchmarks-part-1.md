@@ -1,7 +1,7 @@
 ---
 layout: post
 title: A mega-dose of micro-benchmarks, Part 1 -- Setting the stage   
-date: 2024-06-18 10:36:00 -0500
+date: 2024-06-18 00:00:00 -0500
 categories: general
 ---
 
