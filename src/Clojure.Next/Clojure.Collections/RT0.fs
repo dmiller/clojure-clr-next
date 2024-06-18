@@ -2,6 +2,9 @@
 
 open System
 open System.Collections
+open Clojure.Numerics
+open System.Text.RegularExpressions
+open System.Reflection
 
 let seq (o: obj) : ISeq =
     match o with
@@ -72,3 +75,144 @@ let count (o: obj) : int =
     | _ ->
         raise
         <| InvalidOperationException($"count not supported on this type: {Util.nameForType (o.GetType())}")
+
+
+
+let nthFrom (coll: obj, n: int) : obj =
+    match coll with
+    | null -> null
+    | :? string as str -> str[n]
+    | _ when coll.GetType().IsArray -> (coll :?> Array).GetValue(n)
+    | :? IList as ilist -> ilist.[n]
+    | :? JReMatcher as jrem -> jrem.group(n)
+    | :? Match as matcher -> matcher.Groups.[n]
+    | :? DictionaryEntry as de -> 
+        match n with
+        | 0 -> de.Key
+        | 1 -> de.Value
+        | _ -> raise <| ArgumentOutOfRangeException("n")
+    | _ when coll.GetType().IsGenericType && coll.GetType().Name = "KeyValuePair`2" ->
+        match n with
+        | 0 -> coll.GetType().InvokeMember("Key", BindingFlags.GetProperty, null, coll, null)  // TODO: can we improve this
+        | 1 -> coll.GetType().InvokeMember("Value", BindingFlags.GetProperty, null, coll, null)
+        | _ -> raise <| ArgumentOutOfRangeException("n")
+    | :? IMapEntry as me ->
+        match n with
+        | 0 -> me.key()
+        | 1 -> me.value()
+        | _ -> raise <| ArgumentOutOfRangeException("n")
+    | :? Sequential ->
+        let rec loop (i:int) (s:ISeq) =
+            match s with
+            | null -> raise <| ArgumentOutOfRangeException("n")
+            | _ when i = n -> s.first()
+            | _ -> loop (i + 1) (s.next())
+        loop 0 (seq coll)
+    | _ ->
+        raise <| InvalidOperationException($"nth not supported on this type: {Util.nameForType (coll.GetType())}")
+
+
+
+let nthFromWithDefault (coll: obj, n: int, notFound: obj) : obj =
+    match coll with
+    | null -> notFound
+    | _ when n < 0 -> notFound
+    | :? string as str -> 
+        if n < str.Length then str[n] else notFound
+    | _ when coll.GetType().IsArray -> 
+        let a = coll :?> Array
+        if n < a.Length then a.GetValue(n) else notFound
+    | :? JReMatcher as jrem -> 
+        if jrem.IsUnrealizedOrFailed then 
+            notFound 
+        else 
+            let groups = jrem.groupCount()
+            if ( groups > 0 && n <= groups) then 
+                jrem.group(n) 
+            else 
+                notFound
+
+    | :? Match as matcher -> 
+        if n < matcher.Groups.Count then matcher.Groups.[n] else notFound
+    | :? DictionaryEntry as de -> 
+        match n with
+        | 0 -> de.Key
+        | 1 -> de.Value
+        | _ -> raise <| ArgumentOutOfRangeException("n")
+    | _ when coll.GetType().IsGenericType && coll.GetType().Name = "KeyValuePair`2" ->
+        match n with
+        | 0 -> coll.GetType().InvokeMember("Key", BindingFlags.GetProperty, null, coll, null)  // TODO: can we improve this
+        | 1 -> coll.GetType().InvokeMember("Value", BindingFlags.GetProperty, null, coll, null)
+        | _ -> raise <| ArgumentOutOfRangeException("n")
+    | :? IMapEntry as me ->
+        match n with
+        | 0 -> me.key()
+        | 1 -> me.value()
+        | _ -> raise <| ArgumentOutOfRangeException("n")
+    | :? Sequential -> 
+        let rec loop (i: int) (s:ISeq) =
+            match s with
+            | null -> notFound
+            | _ when i = n -> s.first()
+            | _ -> loop (i + 1) (s.next())
+        loop 0 (seq coll)
+    | :? IList as ilist -> 
+        if n < ilist.Count then ilist.[n] else notFound  // have to move this down to here.  Need LazySeqs to be handled first (above)
+    | _ ->
+        raise <| InvalidOperationException($"nth not supported on this type: {Util.nameForType (coll.GetType())}")
+
+
+
+let nth (coll: obj, n: int) =
+    match coll with
+    | :? Indexed as indexed -> indexed.nth(n)
+    | _ -> nthFrom(coll, n)        // nthFrom(Util.Ret1(coll, coll = null), n)
+
+
+let nth (coll: obj, n: int, notFound : obj) =
+    match coll with
+    | :? Indexed as indexed -> indexed.nth(n, notFound)
+    | _ -> nthFromWithDefault(coll, n, notFound)        // nthFrom(Util.Ret1(coll, coll = null), n)
+
+    (*
+
+
+
+    *)
+
+ // TODO: Prime candidate for protocols
+let private getFrom(coll: obj, key: obj) =
+    match coll with
+    | null -> null
+    | :? IDictionary as m -> m[key]
+    | :? IPersistentSet as set -> set.get(key)
+    | _ when Numbers.IsNumeric(key) && (coll :? string || coll.GetType().IsArray) ->
+        let n = Converters.convertToInt(key)
+        if n >= 0 && n < count coll then nth(coll, n) else null
+    | :? ITransientSet as tset -> tset.get(key)
+    | _ -> null
+
+ // TODO: Prime candidate for protocols
+let private getFromWithDefault(coll: obj, key: obj, notFound: obj) =
+    match coll with
+    | null -> notFound
+    | :? IDictionary as m -> if m.Contains(key) then m[key] else notFound
+    | :? IPersistentSet as set -> if set.contains(key) then set.get(key) else notFound
+    | _ when Numbers.IsNumeric(key) && (coll :? string || coll.GetType().IsArray) ->
+        let n = Converters.convertToInt(key)
+        if n >= 0 && n < count coll then nth(coll, n) else notFound
+    | :? ITransientSet as tset -> if tset.contains(key) then tset.get(key) else notFound
+    | _ -> notFound
+
+   
+let get(coll: obj, key: obj)  =
+    match coll with
+    | :? ILookup as look ->   look.valAt(key)
+    | _ -> getFrom(coll, key)
+     
+
+let get(coll: obj, key: obj, notFound: obj) = 
+    match coll with
+    | :? ILookup as look ->   look.valAt(key, notFound)
+    | _ -> getFromWithDefault(coll, key, notFound)
+

@@ -14,6 +14,7 @@
     <Compile Include="RTPrint.fs" />
     <Compile Include="SmallThings.fs" />
     <Compile Include="Fn.fs" />
+    <Compile Include="Symbol.fs" />
     <Compile Include="SeqEnumerator.fs" />
     <Compile Include="StarterSequences.fs" />
     <Compile Include="RTSeq.fs" />
