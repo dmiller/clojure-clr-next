@@ -6,6 +6,8 @@ For more info on ClojureCLR go to the [ClojureCLR Github repo](https://github.co
 
 For more info on Clojure go to the [Clojure website](https://clojure.org).
 
+For posts about the development process go to the [ClojureCLR.Next Github Pages](https://dmiller.github.io/clojure-clr-next/).
+
 In various parts of this website, there will be quotations from the Clojure and ClojureCLR codebase.  These are all under the following copyright.
 
 
