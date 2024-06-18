@@ -212,3 +212,42 @@ Better across the board.
 
 One caveat.  We had removed a call to check for keyword keys.
 I'm not quite ready to implement `Keyword` yet, but I can substitute a check for a different type.
+So I put it back, but checked for some other type than `Keyword`.
+
+
+| Method              | size | Mean         | Ratio |
+|-------------------- |----- |-------------:|------:|
+| FirstCreatePAMCheck | 0    |     4.698 ns |  1.00 |
+| NextCreatePAMCheck  | 0    |     4.215 ns |  0.90 |
+|                     |      |              |       |
+| FirstCreatePAMCheck | 1    |     4.221 ns |  1.00 |
+| NextCreatePAMCheck  | 1    |     4.362 ns |  1.03 |
+|                     |      |              |       |
+| FirstCreatePAMCheck | 2    |    21.157 ns |  1.00 |
+| NextCreatePAMCheck  | 2    |    18.872 ns |  0.89 |
+|                     |      |              |       |
+| FirstCreatePAMCheck | 3    |    48.321 ns |  1.00 |
+| NextCreatePAMCheck  | 3    |    40.721 ns |  0.84 |
+|                     |      |              |       |
+| FirstCreatePAMCheck | 4    |    89.689 ns |  1.00 |
+| NextCreatePAMCheck  | 4    |    77.693 ns |  0.87 |
+|                     |      |              |       |
+| FirstCreatePAMCheck | 6    |   229.218 ns |  1.00 |
+| NextCreatePAMCheck  | 6    |   187.162 ns |  0.82 |
+|                     |      |              |       |
+| FirstCreatePAMCheck | 8    |   436.050 ns |  1.00 |
+| NextCreatePAMCheck  | 8    |   374.963 ns |  0.86 |
+|                     |      |              |       |
+| FirstCreatePAMCheck | 12   | 1,011.322 ns |  1.00 |
+| NextCreatePAMCheck  | 12   |   872.979 ns |  0.86 |
+|                     |      |              |       |
+|
+| FirstCreatePAMCheck | 16   | 1,822.578 ns |  1.00 |
+| NextCreatePAMCheck  | 16   | 1,497.199 ns |  0.82 |
+
+
+A slight degradation in performance, as expected, but we are still winning across the board.
+
+I'm done.
+
+For now.

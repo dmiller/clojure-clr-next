@@ -7,9 +7,9 @@ categories: general
 
 Refer to the preceding post, [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({{site.baseurl}}{% post_url 2024-06-18-mega-does-of-micro-benchmarks-part-1 %}), for the context of the code we are looking at here.
 
-The numeric comparison code sits at at the bottom of the code stack for this example.  Any performance improvements here area going to affect more than just `PersistentArrayMap.createWithCheck`.  
+Any performance improvements in the code handling numeric operations is going to affect more than just `PersistentArrayMap.createWithCheck`, so it's worth taking a look.
 
-##  Who's a number?
+##  Who's got my number?
 
 Let's start with `IsNumeric`:
 
@@ -42,7 +42,7 @@ Let's start with `IsNumeric`:
 
 ```
 
-There are several things to test here.  First, what is the most efficient way to test for the primitive types?  The use of `match` on `TypeCode` here was taken from the Microsoft Dynamic Language Runtime code. (In C#, that's a `switch` statement, of course.)  However, I have also seen code that worked with explicit type checking.  One has to back that up to `IsNumeric`:
+What is the most efficient way to test for the primitive types?  The use of `match` on `TypeCode` here was taken from the Microsoft Dynamic Language Runtime code. (In C#, that's a `switch` statement, of course.)  However, I have also seen code that worked with explicit type checking.  One has to back that up to `IsNumeric`:
 
 ```F#
   static member private IsNumeric(o: obj) =
@@ -53,7 +53,7 @@ There are several things to test here.  First, what is the most efficient way to
         ...
 ```
 
-Though later we will see a place where we prefer one to the other, here it seemed to make no real difference, so I left it alone.
+This change seemed to make no real difference here, so I left it alone.
 
 Next, I looked at
 
@@ -69,7 +69,7 @@ The `=` here translates to (decompiling to C#):
 LanguagePrimitives.HashCompare.GenericEqualityIntrinsic(t, typeof(BigInt))
 ```
 
-which is very slow.  We could spend a lot of time talking about how `=` compiles in F#, but it would take us too far afield.  The C# translates to the IL
+which is very slow.  We could spend a lot of time talking about how `=` compiles in F#, but it would take us too far afield.  There are circumstances under which that call gets optimized to something much faster, but not here.  (I think is because `Type` is not sealed.)  In the C# code, we get this IL:
 
 ```
 IL_0010: ldarg.0
@@ -153,6 +153,7 @@ let convertToLong (o: obj) : int64 =
 
 Here, we use matching by `:?` which translates to a series of checks using the `isinst` opcode.
 The speed will be dependent on the order in which the types are tested, so I benchmarked different orders against different input types.  One could also match on `TypeCode` as we did in `IsNumericType`.  Finally, one could just call `Convert.ToInt64` and not try to be clever.  
+
  I did runs with single calls.  I did runs with 100,000 calls.  I used different data types for input.
  Here is a sample run:
 
@@ -182,10 +183,12 @@ The speed will be dependent on the order in which the types are tested, so I ben
 | CastingNice  | Str       | 7.105 ns | 0.0316 ns |  1.40 |    0.02 |
 | Direct       | Str       | 5.064 ns | 0.0727 ns |  1.00 |    0.00 |
 
+The differences between the Castingxxx tests are the ordering of the match cases.
+
 The only place where `Direct` is beat is several of the `Double` cases.
 Apparently the method dispatch in the `Convert.ToInt64`is faster in general than grabbing the type code and switching or doing sequential type testings.  
 
-I contemplated special casing `Double` before calling `Convert.ToInt64` but I figured I could live with a 0.39 nanosecond hit on doubles versus all the rest.
+I contemplated special casing `Double` before calling `Convert.ToInt64` but I figured I could live with a 0.39 nanosecond hit on doubles.
 
 So `convertToLong` gets simplified to:
 
@@ -193,7 +196,7 @@ So `convertToLong` gets simplified to:
 let convertToLong (o: obj) : int64 = Convert.ToInt64(o, CultureInfo.InvariantCulture)
 ```
 
-With the additional bonus of being inlined, saving a call!
+With the additional bonus of being inline-able, saving a call!  (Which may be where the savings actually occurs.)
 
 
 ## Solving a problem with dispatch
@@ -206,7 +209,6 @@ Continuing with
 ```
 
 Can we improve the categorization of the types or the table lookups?
-
 
 ```F#
     let ops (x: obj) : OpsType =
@@ -235,7 +237,7 @@ Can we improve the categorization of the types or the table lookups?
             | _ -> OpsType.Long
 ```
 
-It turns out that moving from `TypeCode` to `isinst` is a small win.   The results are order-dependent, so I may undo this change:
+It turns out that moving from `TypeCode` to `:?` (`isinst` in IL) is a small win.   The results are order-dependent, so I may undo this change:
 
 ```F#
     let ops (x: obj) : OpsType =
@@ -458,31 +460,36 @@ This avoids doing the type-to-category lookup twice.  And we end up with a win o
 
 | Method                 | xInputType | yInputType | Mean      | Ratio |
 |----------------------- |----------- |----------- |----------:|------:|
-| FirstNumberEqualOnLong | I32        | I32        | 14.512 ns |  1.00 |
-| NextNumberEqualOnLong  | I32        | I32        |  6.848 ns |  0.47 |
-|                        |            |            |           |       |
-| FirstNumberEqualOnLong | I32        | I64        | 14.491 ns |  1.00 |
-| NextNumberEqualOnLong  | I32        | I64        |  9.183 ns |  0.63 |
-|                        |            |            |           |       |
-| FirstNumberEqualOnLong | I32        | Dbl        |  2.674 ns |  1.00 |
-| NextNumberEqualOnLong  | I32        | Dbl        |  4.111 ns |  1.54 |
-|                        |            |            |           |       |
-| FirstNumberEqualOnLong | I64        | I32        | 13.888 ns |  1.00 |
-| NextNumberEqualOnLong  | I64        | I32        |  9.250 ns |  0.67 |
-|                        |            |            |           |       |
-| FirstNumberEqualOnLong | I64        | I64        | 13.692 ns |  1.00 |
-| NextNumberEqualOnLong  | I64        | I64        |  5.333 ns |  0.39 |
-|                        |            |            |           |       |
-| FirstNumberEqualOnLong | I64        | Dbl        |  2.790 ns |  1.00 |
-| NextNumberEqualOnLong  | I64        | Dbl        |  2.797 ns |  1.00 |
-|                        |            |            |           |       |
-| FirstNumberEqualOnLong | Dbl        | I32        |  2.941 ns |  1.00 |
-| NextNumberEqualOnLong  | Dbl        | I32        |  4.053 ns |  1.38 |
-|                        |            |            |           |       |
-| FirstNumberEqualOnLong | Dbl        | I64        |  2.711 ns |  1.00 |
-| NextNumberEqualOnLong  | Dbl        | I64        |  2.760 ns |  1.02 |
-|                        |            |            |           |       |
-| FirstNumberEqualOnLong | Dbl        | Dbl        | 12.366 ns |  1.00 |
-| NextNumberEqualOnLong  | Dbl        | Dbl        |  5.930 ns |  0.48 |
+| FirstNumberEqual | I32        | I32        | 14.512 ns |  1.00 |
+| NextNumberEqual  | I32        | I32        |  6.848 ns |  0.47 |
+|                  |            |            |           |       |
+| FirstNumberEqual | I32        | I64        | 14.491 ns |  1.00 |
+| NextNumberEqual  | I32        | I64        |  9.183 ns |  0.63 |
+|                  |            |            |           |       |
+| FirstNumberEqual | I32        | Dbl        |  2.674 ns |  1.00 |
+| NextNumberEqual  | I32        | Dbl        |  4.111 ns |  1.54 |
+|                  |            |            |           |       |
+| FirstNumberEqual | I64        | I32        | 13.888 ns |  1.00 |
+| NextNumberEqual  | I64        | I32        |  9.250 ns |  0.67 |
+|                  |            |            |           |       |
+| FirstNumberEqual | I64        | I64        | 13.692 ns |  1.00 |
+| NextNumberEqual  | I64        | I64        |  5.333 ns |  0.39 |
+|                  |            |            |           |       |
+| FirstNumberEqual | I64        | Dbl        |  2.790 ns |  1.00 |
+| NextNumberEqual  | I64        | Dbl        |  2.797 ns |  1.00 |
+|                  |            |            |           |       |
+| FirstNumberEqual | Dbl        | I32        |  2.941 ns |  1.00 |
+| NextNumberEqual  | Dbl        | I32        |  4.053 ns |  1.38 |
+|                  |            |            |           |       |
+| FirstNumberEqual | Dbl        | I64        |  2.711 ns |  1.00 |
+| NextNumberEqual  | Dbl        | I64        |  2.760 ns |  1.02 |
+|                  |            |            |           |       |
+| FirstNumberEqual | Dbl        | Dbl        | 12.366 ns |  1.00 |
+| NextNumberEqual  | Dbl        | Dbl        |  5.930 ns |  0.48 |
+
+At least if don't compare `Int32`s and `Double`s too often. 
 
 And that's it for the numbers.
+
+In the [next post]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-3 %}), we look at the topmost level of the code, `PersistentArrayMap.createWithCheck`.  We'll see if we can get a win there.
+

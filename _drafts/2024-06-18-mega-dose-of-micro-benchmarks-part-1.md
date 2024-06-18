@@ -5,28 +5,25 @@ date: 2024-06-18 10:36:00 -0500
 categories: general
 ---
 
-I finally have time to work on ClojureCLR.Next again.  Thing had been busy.
+I finally have time to work on ClojureCLR.Next.  I had to attend to other things, including keeping ClojureCLR itself up-to-date and adding deps.edn/CLI functionality.
 
-One concern that I have had is that the performance of the new ClojureCLR might not be as good as the old one. Being relatively new to F#, I don't know all the little pitfalls that can cause performance problems.  Before this recent hiatus, I had been working on hash maps implementations and had been checking performance.  Some things looked okay, some not.  To get back in the groove of things, I decided to focus on something simple: creating a `PersistentArrayMap`.
 
-You may want to review two previous posts:
+One concern that I have had is that the performance of the new ClojureCLR might not be as good as the old one. Being relatively new to F#, I don't know all the little pitfalls that can cause performance problems.  Before this recent hiatus, I had been working on hash maps implementations and had been checking performance.  Some things looked okay, some not.  To get back in the groove, I decided to focus on something simpler: benchmarking `PersistentArrayMap`.
 
-- [This map is the territory]({{site.baseurl}}{% post_url 2023-01-11 %}) discusses the interfaces that a map must implement and presents a naive implementation of a map.
+Two previous posts lay the groundwork for what maps look like in Clojure(JVM/CLR):
+
+- [This map is the territory]({{site.baseurl}}{% post_url 2023-01-11-this-map-is-the-territory %}) discusses the interfaces that a map must implement and presents a naive implementation of a map.
 - [A road to maps]({{site.baseurl}}{% post_url 2023-02-03-a-road-to-maps %}) discuses the various classes that are involved in getting to implementations of `PersistentVector`, `PersistentHashMap`, and company.  (There are four articles here on `PersistentVector` -- we won't need them at this time.)
 
 
 # `PersistentArrayMap`
 
-`PersistentArrayMap` is a simple map that uses an array to store the keys and values.  The keys are stored in the even indexes and the values in the odd indexes.  For immutability, the array is never modified.  When we perform an operation such as deleting or adding an key/value pair, a new object holding a new array is createed.
+`PersistentArrayMap` is a simple map data strucutre that uses an array to store the keys and values. It's actually similar to the naive implementation of a map presented in the first post listed above.  The keys are stored in the even indexes and the values in the odd indexes.  For immutability, the array is never modified.  When we perform an operation such as deleting or adding an key/value pair, a new isntance holding a new array is created.
 
-`PersistentArrayMap` performs key lookup via linear search in the array.  This is not efficient.  This data structure is intended to be used only for small maps.  The idea is that linear search will be efficient up to certain size.  After that, we switch to a data structure (`PersistentHashMap`) that has larger memory footprint but faster access time.  (The threshold in Clojure(JVM) and ClojureCLR is set at 16 entries.)  When you add a key/value pair to a `PersistentArrayMap` and cause the size to move above the threshold, the operation will return a `PersistentHashMap`.  Thus, you need to develop both maps in order to deliver. 
-
-
-The implementation of `PersistentArrayMap` is straightforward.  The data structure holds an array (and a map for metadata, if needed).
-There are some little oddities in there.  For example, because Clojure keywords are commonly used as keys, there is some special case code to speed things up for that case.  But no need to go into details here.  What I'd like to focus on is just one thing: creating a `PersistentArrayMap` from an array of alternating key/value pairs.  Here is the code I originally wrote:
+`PersistentArrayMap` performs key lookup via linear search in the array.  This is not efficient unless the array is small;  this data structure is intended to be used only for small maps.  In Clojure, you will get a `PersistentArrayMap` when you create a small map.  If you add entries past a threshold size (16) you will get back  a `PersistentHashMap`.
 
 
-
+The implementation of `PersistentArrayMap` is straightforward.  The data structure holds an array (and a map for metadata, if needed). What I'd like to focus on is just one thing: creating a `PersistentArrayMap` from an array of alternating key/value pairs.  My starting point was a straight port of the C# code:
 
 ```F#
     static member createWithCheck(init: obj array) =
@@ -38,13 +35,11 @@ There are some little oddities in there.  For example, because Clojure keywords 
         PersistentArrayMap(init)
 ```
 
+We check each key against the keys following it in the array.  Yes, it is an `O(n^2)` algorithm. This is okay.  Only for small `n`.
 
+What is not okay is that my first benchmark showed this running 20-40% slower than the C# ClojureCLR version.  Now, granted, times on the C# range from 4ns to 1,100 ns depending on the size of the input array, but we createa _lot_ of maps.  I was worried that things I was doing incorrectly in F# were going to bite me even more later on.  So I decided to investigate.
 
-Yes, it is an O(n^2) algorithm:  We check each key against the keys following it in the array.  This is okay.  Only for small `n`.
-
-What is not okay is that my first benchmark showed this running 20-30% slower than the C# ClojureCLR version.  Now, granted, times on the C# range from 4ns to 1, 100 ns, but we createa _lot_ of maps.  I was worried that things I was doing incorrectly in F# were going to bite me even more later on.  So I decided to investigate.
-
-Let's look at the code all the way down.
+Let's look at the code all the way down from this starting point.  There is only call other than the contructor call.
 
 ```F#
     static member internal equalKey(k1: obj, k2: obj) =
@@ -56,6 +51,8 @@ Let's look at the code all the way down.
 ```F#
      static member internal equalKey(k1: obj, k2: obj) = Util.equiv (k1, k2)
 ```
+
+in order to make progress.  (I'll add a temporary replacement back in before we're done.)
 
 Here is `Util.equiv`:
 
@@ -73,7 +70,10 @@ let equiv (k1: obj, k2: obj) =
         k1.Equals(k2)
 ```
 
-Given that my tests used integer keys, we can skip looking at `pcquiv` -- the guard clause will have been false.  However, we certainly will be going into the numeric tests. `Numbers.IsNumeric` at least is reasonably self-contained:
+We check for object identity, we deal with nulls, we deal with numbers, we deal with Clojure collections, and finally we just ask one object to compare itself to the other.
+
+Given that my tests used integer keys, any performace issues would come from the numeric tests.
+`Numbers.IsNumeric` at least is fairly contained:
 
 ```F#
     static member IsNumeric(o: obj) =
@@ -104,16 +104,14 @@ Given that my tests used integer keys, we can skip looking at `pcquiv` -- the gu
 
 ```
 
-`Numbers.equal` is not so self-contained:
-
+`Numbers.equal` is a bit more involved:
 
 ```F#
     static member equal(x: obj, y: obj) =
         OpsSelector.ops (x) = OpsSelector.ops (y) && Numbers.getOps(x, y).equiv (x, y)
-```
+```   
 
-`OpsSelector.ops` is a simple function that returns the `Ops` object for a given object's type.
-
+`OpsSelector.ops` is a simple function that returns the `Ops` object based on the given object's type.
 
 ```F#
     let ops (x: obj) : OpsType =
@@ -142,12 +140,15 @@ Given that my tests used integer keys, we can skip looking at `pcquiv` -- the gu
             | _ -> OpsType.Long
 ```
 
+`getOps` retrieves an _operations object_ based on the `OpsType` of its arguments.  Here is the code:
 
 ```F#
     static member getOps(x: obj, y: obj) =
         Numbers.opsImplTable[int (OpsSelector.combine (OpsSelector.ops (x), OpsSelector.ops (y)))]
 ```
+
 `Number.getOps` does a table lookup in a 2D array (that's the call to `combine`), based on the `OpsType` of its arguments, then looks up a operation implementation object.
+
 In our case, we comparing integers to integers, so we will end up with an instance of the `LongOps` class.  Here is the `equiv` method of `LongOps`:
 
 ```F#
@@ -178,9 +179,9 @@ let convertToLong (o: obj) : int64 =
 
 And we've finally bottomed out.  All this code just to compare two (integer) keys for equality.
 
-In the subsequent posts of this series, I'll dig into the individual benchmarks and code improvements.  I will not attempt to cover them in historical order -- I was all over the place tracking things down.
+In the subsequent posts of this series, I'll dig into the individual benchmarks and code improvements.  
 
 There are many pitfalls in doing micro-benchmarking.  I'm sure I'm aware of only a few.
-Fortunately, I had a comparison point in the C# ClojureCLR code. I started at the top, worked my way through calls to isolate where there were performance differences, compare the generated IL code (and occasionally assembler code), and try to figure out an improvement in the F#.  Once I had a improvement showing in the microbenchmark, I would move back up the call tree and see if there was an improvement overall.
+Fortunately, I had a comparison point in the C# ClojureCLR code. I started at the top, worked my way through calls to isolate where there were performance differences, compared the generated IL code (and occasionally assembler code), and tried to figure out an improvement in the F#.  Once I had a improvement showing in the microbenchmark, I would move back up the call tree and see if there was an improvement at higher levels of the code.
 
-Onward!
+Ready ... set ... [go]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %})!
