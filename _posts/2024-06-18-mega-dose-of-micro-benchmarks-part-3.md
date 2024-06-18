@@ -7,8 +7,8 @@ categories: general
 
 Refer to the preceding posts
 
-- [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({{site.baseurl}}{% post_url 2024-06-18-mega-does-of-micro-benchmarks-part-1 %})
-- [A mega-dose of micro-benchmarks, Part 2 -- By the numbers]({{site.baseurl}}{% post_url 2024-06-18-mega-does-of-micro-benchmarks-part-2 %})
+- [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({{site.baseurl}}{% post_url 2024-06-18-mega-doses-of-micro-benchmarks-part-1 %})
+- [A mega-dose of micro-benchmarks, Part 2 -- By the numbers]({{site.baseurl}}{% post_url 2024-06-18-mega-doses-of-micro-benchmarks-part-2 %})
 
 for context.
 

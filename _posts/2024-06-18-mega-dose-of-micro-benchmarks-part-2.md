@@ -5,7 +5,7 @@ date: 2024-06-18 00:00:00 -0500
 categories: general
 ---
 
-Refer to the preceding post, [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({{site.baseurl}}{% post_url 2024-06-18-mega-does-of-micro-benchmarks-part-1 %}), for the context of the code we are looking at here.
+Refer to the preceding post, [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({{site.baseurl}}{% post_url 2024-06-18-mega-doses-of-micro-benchmarks-part-1 %}), for the context of the code we are looking at here.
 
 Any performance improvements in the code handling numeric operations is going to affect more than just `PersistentArrayMap.createWithCheck`, so it's worth taking a look.
 
