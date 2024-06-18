@@ -110,7 +110,6 @@ Given that my tests used integer keys, we can skip looking at `pcquiv` -- the gu
 ```F#
     static member equal(x: obj, y: obj) =
         OpsSelector.ops (x) = OpsSelector.ops (y) && Numbers.getOps(x, y).equiv (x, y)
-
 ```
 
 `OpsSelector.ops` is a simple function that returns the `Ops` object for a given object's type.
