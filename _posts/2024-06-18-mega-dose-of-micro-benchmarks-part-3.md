@@ -5,6 +5,8 @@ date: 2024-06-18 00:00:00 -0500
 categories: general
 ---
 
+We apply some finishing touches to the `PersistentArrayMap` creation code.  And then declare success.
+
 Refer to the preceding posts
 
 - [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-1 %})

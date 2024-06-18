@@ -5,6 +5,8 @@ date: 2024-06-18 00:00:00 -0500
 categories: general
 ---
 
+We go deep doing micro-benchmarks to improve the performance of one little function.
+
 I finally have time to work on ClojureCLR.Next.  I had to attend to other things, including keeping ClojureCLR itself up-to-date and adding deps.edn/CLI functionality.
 
 
