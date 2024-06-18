@@ -407,11 +407,9 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
     static member val public Empty = PersistentArrayMap()
 
 
-    // In the original this had Keyword as a special case.
-    // I'm not ready for that yet.
-    // So I'll put in a mutable static to be set up later during initialization.
-    // Sigh.
-    static member val keywordCheck: obj -> bool = (fun _ -> false) with get, set
+
+    // TODO: replace this when we have Keyword implemented
+    static member keywordCheck(o: obj) = o :? System.Uri
 
 
     interface IObj with
@@ -453,10 +451,8 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
             this.indexOfObject (key)
 
     static member internal equalKey(k1: obj, k2: obj) =
-        // TODO: Undo this!
-        //PersistentArrayMap.keywordCheck (k1) && k1 = k2 || Util.equiv (k1, k2)
-        Util.equiv (k1, k2)
-
+        PersistentArrayMap.keywordCheck (k1) && k1 = k2 || Util.equiv (k1, k2)
+ 
     interface Associative with
         override this.containsKey(k) = this.indexOfKey (k) >= 0
 

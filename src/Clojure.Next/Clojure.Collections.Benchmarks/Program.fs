@@ -14,8 +14,8 @@ let main argv =
     //BenchmarkRunner.Run<NumericEquivTests>() |> ignore
     //BenchmarkRunner.Run<NumericConverterTests>() |> ignore
 
-    //BenchmarkRunner.Run<PMCreateWithCheck>() |> ignore
-    BenchmarkRunner.Run<PMCreateByAssoc>() |> ignore
+    BenchmarkRunner.Run<PMCreateWithCheck>() |> ignore
+    //BenchmarkRunner.Run<PMCreateByAssoc>() |> ignore
 
     //BenchmarkRunner.Run<PVCons>() |> ignore
     //BenchmarkRunner.Run<PVTransientConj>() |> ignore
