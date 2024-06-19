@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="TestHelpers.fs" />
     <Compile Include="SymbolTests.fs" />
+    <Compile Include="KeywordTests.fs" />
     <Compile Include="ConsTests.fs" />
     <Compile Include="PersistentListTests.fs" />
     <Compile Include="OtherSequencesTests.fs" />
