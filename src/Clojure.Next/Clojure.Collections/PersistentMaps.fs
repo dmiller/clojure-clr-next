@@ -406,12 +406,6 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
 
     static member val public Empty = PersistentArrayMap()
 
-
-
-    // TODO: replace this when we have Keyword implemented
-    static member keywordCheck(o: obj) = o :? System.Uri
-
-
     interface IObj with
         override this.withMeta(m) =
             if LanguagePrimitives.PhysicalEquality m meta then
@@ -440,18 +434,21 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
         loop 0
 
     member this.indexOfKey(key: obj) =
-        if PersistentArrayMap.keywordCheck (key) then
+        match key with
+        | :? Keyword -> 
             let rec loop (i: int) =
                 if i >= arr.Length then -1
-                elif key = arr[i] then i
+                elif LanguagePrimitives.PhysicalEquality key arr[i] then i
                 else loop (i + 2)
 
             loop 0
-        else
+        | _ ->
             this.indexOfObject (key)
 
     static member internal equalKey(k1: obj, k2: obj) =
-        PersistentArrayMap.keywordCheck (k1) && k1 = k2 || Util.equiv (k1, k2)
+        match k1 with
+        | :? Keyword  -> LanguagePrimitives.PhysicalEquality k1 k2
+        | _ -> Util.equiv (k1, k2)
  
     interface Associative with
         override this.containsKey(k) = this.indexOfKey (k) >= 0
