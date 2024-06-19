@@ -435,21 +435,20 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
 
     member this.indexOfKey(key: obj) =
         match key with
-        | :? Keyword -> 
+        | :? Keyword ->
             let rec loop (i: int) =
                 if i >= arr.Length then -1
                 elif LanguagePrimitives.PhysicalEquality key arr[i] then i
                 else loop (i + 2)
 
             loop 0
-        | _ ->
-            this.indexOfObject (key)
+        | _ -> this.indexOfObject (key)
 
     static member internal equalKey(k1: obj, k2: obj) =
         match k1 with
-        | :? Keyword  -> LanguagePrimitives.PhysicalEquality k1 k2
+        | :? Keyword -> LanguagePrimitives.PhysicalEquality k1 k2
         | _ -> Util.equiv (k1, k2)
- 
+
     interface Associative with
         override this.containsKey(k) = this.indexOfKey (k) >= 0
 
@@ -597,14 +596,18 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
     member this.create([<ParamArray>] init: obj array) = PersistentArrayMap(meta, init)
 
     static member createWithCheck(init: obj array) =
-        
-        let mutable i = 0;
+
+        let mutable i = 0
+
         while i < init.Length do
             let mutable j = i + 2
+
             while j < init.Length do
                 if PersistentArrayMap.equalKey (init.[i], init.[j]) then
                     raise <| ArgumentException($"Duplicate key: {init.[i]}")
+
                 j <- j + 2
+
             i <- i + 2
 
         PersistentArrayMap(init)
@@ -923,11 +926,11 @@ and [<AbstractClass; Sealed>] private NodeOps() =
     static member hash(k) = Hashing.hasheq (k)
     static member mask(hash: int, shift: int) = (hash >>> shift) &&& 0x01f
     static member bitPos(hash, shift) = 1 <<< NodeOps.mask (hash, shift)
-        
+
     static member bitCount(x: int) =
-        let x = x - ((x >>> 1) &&& 0x55555555);
-        let x = (((x >>> 2) &&& 0x33333333) + (x &&& 0x33333333));
-        let x = (((x >>> 4) + x) &&& 0x0f0f0f0f);
+        let x = x - ((x >>> 1) &&& 0x55555555)
+        let x = (((x >>> 2) &&& 0x33333333) + (x &&& 0x33333333))
+        let x = (((x >>> 4) + x) &&& 0x0f0f0f0f)
         (x * 0x01010101) >>> 24
 
     static member bitIndex(bitmap, bit) = NodeOps.bitCount (bitmap &&& (bit - 1)) // Not used?

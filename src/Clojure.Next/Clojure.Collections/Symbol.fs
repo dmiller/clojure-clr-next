@@ -4,7 +4,7 @@ open System
 open Clojure.Numerics
 open Clojure.Numerics.Hashing
 
-[<Serializable;Sealed;AllowNullLiteral>]
+[<Serializable; Sealed; AllowNullLiteral>]
 type Symbol private (meta: IPersistentMap, ns: string, name: string) =
     inherit AFn()
 
@@ -26,42 +26,46 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
     override this.Equals(obj) =
         match obj with
         | _ when Object.ReferenceEquals(this, obj) -> true
-        | :? Symbol as sym -> Util.equals(ns, sym.Namespace) && name.Equals(sym.Name)
+        | :? Symbol as sym -> Util.equals (ns, sym.Namespace) && name.Equals(sym.Name)
         | _ -> false
 
     override this.GetHashCode() =
         match hasheq with
         | Some h -> h
         | None ->
-            let hc = hashCombine(Murmur3.HashString(if isNull ns then "" else ns),Murmur3.HashString(name));
+            let hc =
+                hashCombine (Murmur3.HashString(if isNull ns then "" else ns), Murmur3.HashString(name))
+
             hasheq <- Some hc
             hc
-    
+
     interface IHashEq with
         member this.hasheq() = this.GetHashCode()
 
     override this.ToString() =
         if isNull _str then
-            _str <- 
+            _str <-
                 match ns with
                 | null -> name
                 | _ -> ns + "/" + name
-        
+
         _str
 
-        // TODO: simplify this
+    // TODO: simplify this
     interface IComparable with
         member this.CompareTo(obj) =
             match obj with
             | :? Symbol as sym ->
-                if this.Equals(sym) then 0
-                elif isNull ns  && not (isNull sym.Namespace) then -1
+                if this.Equals(sym) then
+                    0
+                elif isNull ns && not (isNull sym.Namespace) then
+                    -1
                 elif not (isNull ns) then
-                    if sym.Namespace = null then 1
+                    if sym.Namespace = null then
+                        1
                     else
                         let nsc = ns.CompareTo(sym.Namespace)
-                        if nsc <> 0 then nsc
-                        else name.CompareTo(sym.Name)
+                        if nsc <> 0 then nsc else name.CompareTo(sym.Name)
                 else
                     name.CompareTo(sym.Name)
             | _ -> invalidArg "obj" "Must compare to non-null Symbol"
@@ -72,6 +76,7 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
     // Intern a symbol with the given name (extracting the namespace if name is of the form ns/name)
     static member intern(nsname: string) =
         let i = nsname.IndexOf('/')
+
         if i = -1 || nsname.Equals("/") then
             Symbol(null, nsname)
         else
@@ -80,7 +85,10 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(meta,m) then this else Symbol(m, ns, name)
+            if Object.ReferenceEquals(meta, m) then
+                this
+            else
+                Symbol(m, ns, name)
 
 
     interface IMeta with
@@ -92,11 +100,11 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
 
 
     interface IFn with
-        member this.invoke(arg1) = RT0.get(arg1, this)
-        member this.invoke(arg1, arg2) = RT0.getWithDefault(arg1, this, arg2)
+        member this.invoke(arg1) = RT0.get (arg1, this)
+        member this.invoke(arg1, arg2) = RT0.getWithDefault (arg1, this, arg2)
 
 
-        (*
+(*
         
 Do we need any of these?
 

@@ -5,21 +5,21 @@ open System
 open Clojure.Numerics
 open System.Collections.Concurrent
 
-[<Serializable;Sealed;AllowNullLiteral>]
+[<Serializable; Sealed; AllowNullLiteral>]
 type Keyword(baseSym: Symbol) =
     inherit AFn()
-     
-    let hasheq : int = (baseSym:>IHashEq).hasheq() + 0x9e3779b9
+
+    let hasheq: int = (baseSym :> IHashEq).hasheq () + 0x9e3779b9
 
     [<NonSerialized>]
-    let mutable cachedStr : string = null
+    let mutable cachedStr: string = null
 
-        // Originally, ClojureJVM had this implementing IFn, while I had it based on AFn.
-        // I changed it to match when updating to fix for CLJ-2350 (commit bd4c42d, 2021.09.14) in order to get consistency in arity error messages.
-        // I'm changing it back for this implementation. Screw it.
+    // Originally, ClojureJVM had this implementing IFn, while I had it based on AFn.
+    // I changed it to match when updating to fix for CLJ-2350 (commit bd4c42d, 2021.09.14) in order to get consistency in arity error messages.
+    // I'm changing it back for this implementation. Screw it.
 
     member _.Symbol = baseSym
-    
+
     // Object overrides
 
     override this.Equals(obj) =
@@ -33,23 +33,30 @@ type Keyword(baseSym: Symbol) =
     override _.ToString() =
         if isNull cachedStr then
             cachedStr <- ":" + baseSym.ToString()
+
         cachedStr
-   
+
     // Map from symbol to keyword to uniquify keywords.
-    static member val private symKeyMap = new ConcurrentDictionary<Symbol,WeakReference>()
+    static member val private symKeyMap = new ConcurrentDictionary<Symbol, WeakReference>()
 
     static member intern(sym: Symbol) =
         let generateSymForKey sym =
-            if isNull ((sym:>IMeta).meta()) then sym else (sym:>IObj).withMeta(null) :?> Symbol
+            if isNull ((sym :> IMeta).meta ()) then
+                sym
+            else
+                (sym :> IObj).withMeta (null) :?> Symbol
+
         let rec loop () =
-            let existingRef = 
+            let existingRef =
                 let (success, existingRef) = Keyword.symKeyMap.TryGetValue(sym)
-                if success
-                    then existingRef 
-                else 
+
+                if success then
+                    existingRef
+                else
                     let k = new Keyword(generateSymForKey sym)
                     let wr = new WeakReference(k)
                     Keyword.symKeyMap.GetOrAdd(sym, wr)
+
             if isNull existingRef.Target then
                 // weak reference died in the interim
                 // remove existing entry to avoid confusion (infinite loop) and retry
@@ -57,13 +64,13 @@ type Keyword(baseSym: Symbol) =
                 loop ()
             else
                 existingRef.Target :?> Keyword
+
         loop ()
 
     static member intern(ns: string, name: string) =
-        Keyword.intern(Symbol.intern(ns, name))
-        
-    static member intern(nsname: string) =
-        Keyword.intern(Symbol.intern(nsname))
+        Keyword.intern (Symbol.intern (ns, name))
+
+    static member intern(nsname: string) = Keyword.intern (Symbol.intern (nsname))
 
     interface Named with
         member _.getNamespace() = baseSym.Namespace
@@ -77,14 +84,14 @@ type Keyword(baseSym: Symbol) =
         // (:keyword arg)  => (get arg :keyword)
         member this.invoke(arg1) =
             match arg1 with
-            | :? ILookup as ilu -> ilu.valAt(this)
-            | _ -> RT0.get(arg1, this)
+            | :? ILookup as ilu -> ilu.valAt (this)
+            | _ -> RT0.get (arg1, this)
 
         // (:keyword arg default) => (get arg :keyword default)
         member this.invoke(arg1, notFound) =
             match arg1 with
-            | :? ILookup as ilu -> ilu.valAt(this, notFound)
-            | _ -> RT0.getWithDefault(arg1, this, notFound)
+            | :? ILookup as ilu -> ilu.valAt (this, notFound)
+            | _ -> RT0.getWithDefault (arg1, this, notFound)
 
     interface IComparable with
         member this.CompareTo(obj) =
@@ -95,12 +102,12 @@ type Keyword(baseSym: Symbol) =
     interface IHashEq with
         member this.hasheq() = hasheq
 
-    static member find(sym:Symbol) =
+    static member find(sym: Symbol) =
         let (success, wr) = Keyword.symKeyMap.TryGetValue(sym)
         if success then wr.Target :?> Keyword else null
 
-    static member find(ns:string, name:string) = Keyword.find(Symbol.intern(ns, name))
-    static member find(nsname:string) = Keyword.find(Symbol.intern(nsname))
+    static member find(ns: string, name: string) = Keyword.find (Symbol.intern (ns, name))
+    static member find(nsname: string) = Keyword.find (Symbol.intern (nsname))
 
 (*
 
