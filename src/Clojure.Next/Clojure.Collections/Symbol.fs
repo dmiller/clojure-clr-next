@@ -4,7 +4,7 @@ open System
 open Clojure.Numerics
 open Clojure.Numerics.Hashing
 
-[<Serializable>]
+[<Serializable;Sealed;AllowNullLiteral>]
 type Symbol private (meta: IPersistentMap, ns: string, name: string) =
     inherit AFn()
 
