@@ -33,7 +33,7 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
         match hasheq with
         | Some h -> h
         | None ->
-            let hc = hashCombine(Murmur3.HashString(ns),Murmur3.HashString(name));
+            let hc = hashCombine(Murmur3.HashString(if isNull ns then "" else ns),Murmur3.HashString(name));
             hasheq <- Some hc
             hc
     
