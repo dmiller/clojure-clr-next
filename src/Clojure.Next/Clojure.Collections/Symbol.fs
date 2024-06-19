@@ -49,10 +49,22 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
         
         _str
 
-
-
-
-
+        // TODO: simplify this
+    interface IComparable with
+        member this.CompareTo(obj) =
+            match obj with
+            | :? Symbol as sym ->
+                if this.Equals(sym) then 0
+                elif isNull ns  && not (isNull sym.Namespace) then -1
+                elif not (isNull ns) then
+                    if sym.Namespace = null then 1
+                    else
+                        let nsc = ns.CompareTo(sym.Namespace)
+                        if nsc <> 0 then nsc
+                        else name.CompareTo(sym.Name)
+                else
+                    name.CompareTo(sym.Name)
+            | _ -> invalidArg "obj" "Must compare to non-null Symbol"
 
     // Intern a symbol with the given name  and namespace-name
     static member intern(ns: string, name: string) = Symbol(null, ns, name)
@@ -81,24 +93,12 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
 
     interface IFn with
         member this.invoke(arg1) = RT0.get(arg1, this)
-        member this.invoke(arg1, arg2) = RT0.get(arg1, this, arg2)
+        member this.invoke(arg1, arg2) = RT0.getWithDefault(arg1, this, arg2)
 
 
         (*
         
-     
-        public override object invoke(Object obj)
-        {
-            return RT.get(obj, this);
-        }
-
-
-        public override object invoke(Object obj, Object notFound)
-        {
-            return RT.get(obj, this, notFound);
-        }
-
-
+Do we need any of these?
 
         /// <summary>
         /// Construct a Symbol during deserialization.
@@ -137,48 +137,8 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
 
         #endregion
 
-        #region IFn members
 
 
-        public override object invoke(Object obj)
-        {
-            return RT.get(obj, this);
-        }
-
-
-        public override object invoke(Object obj, Object notFound)
-        {
-            return RT.get(obj, this, notFound);
-        }
-
-        #endregion
-
-        #region IComparable Members
-
-        /// <summary>
-        /// Compare this symbol to another object.
-        /// </summary>
-        /// <param name="obj">The object to compare to.</param>
-        /// <returns>neg,zero,pos semantics.</returns>
-        public int CompareTo(object obj)
-        {
-            if (!(obj is Symbol s))
-                throw new ArgumentException("Must compare to non-null Symbol", "obj");
-
-            if (Equals(s))
-                return 0;
-            if (_ns == null && s._ns != null)
-                return -1;
-            if (_ns != null)
-            {
-                if (s._ns == null)
-                    return 1;
-                int nsc = _ns.CompareTo(s._ns);
-                if (nsc != 0)
-                    return nsc;
-            }
-            return _name.CompareTo(s._name);
-        }
 
         #endregion
 
@@ -252,21 +212,5 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
             info.AddValue("_ns", _ns);
         }
 
-        #endregion
-
-        #region IHashEq members
-
-        public int hasheq()
-        {
-            if (_hasheq == 0)
-            {
-                _hasheq = Util.hashCombine(Murmur3.HashString(_name), Util.hasheq(_ns));
-            }
-            return _hasheq;
-        }
-
-        #endregion
-    }
-}
-        
+       
         *)

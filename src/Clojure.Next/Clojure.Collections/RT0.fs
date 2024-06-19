@@ -123,7 +123,7 @@ let nthFromWithDefault (coll: obj, n: int, notFound: obj) : obj =
         let a = coll :?> Array
         if n < a.Length then a.GetValue(n) else notFound
     | :? JReMatcher as jrem -> 
-        if jrem.IsUnrealizedOrFailed then 
+        if jrem.isUnrealizedOrFailed then 
             notFound 
         else 
             let groups = jrem.groupCount()
@@ -169,7 +169,7 @@ let nth (coll: obj, n: int) =
     | _ -> nthFrom(coll, n)        // nthFrom(Util.Ret1(coll, coll = null), n)
 
 
-let nth (coll: obj, n: int, notFound : obj) =
+let nthWithDefault (coll: obj, n: int, notFound : obj) =
     match coll with
     | :? Indexed as indexed -> indexed.nth(n, notFound)
     | _ -> nthFromWithDefault(coll, n, notFound)        // nthFrom(Util.Ret1(coll, coll = null), n)
@@ -188,7 +188,7 @@ let private getFrom(coll: obj, key: obj) =
     | :? IPersistentSet as set -> set.get(key)
     | _ when Numbers.IsNumeric(key) && (coll :? string || coll.GetType().IsArray) ->
         let n = Converters.convertToInt(key)
-        if n >= 0 && n < count coll then nth(coll, n) else null
+        if n >= 0 && n < count coll then nth(coll,n) else null
     | :? ITransientSet as tset -> tset.get(key)
     | _ -> null
 
@@ -211,7 +211,7 @@ let get(coll: obj, key: obj)  =
     | _ -> getFrom(coll, key)
      
 
-let get(coll: obj, key: obj, notFound: obj) = 
+let getWithDefault(coll: obj, key: obj, notFound: obj) = 
     match coll with
     | :? ILookup as look ->   look.valAt(key, notFound)
     | _ -> getFromWithDefault(coll, key, notFound)
