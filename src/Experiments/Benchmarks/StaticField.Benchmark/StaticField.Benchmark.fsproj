@@ -7,7 +7,6 @@
 
   <ItemGroup>
     <None Include="README.md" />
-    <Compile Include="ArrayCreation.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -16,10 +15,6 @@
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.13.12" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\ArrayCreation.CSharp\ArrayCreation.CSharp.csproj" />
   </ItemGroup>
 
 </Project>

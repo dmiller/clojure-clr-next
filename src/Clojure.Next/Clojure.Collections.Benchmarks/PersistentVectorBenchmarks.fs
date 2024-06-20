@@ -59,7 +59,7 @@ type PVTransientConj() =
         pv.persistent ()
 
 
-[<MemoryDiagnoser; HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions)>]
+[<MemoryDiagnoser (*; HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.BranchInstructions) *) >]
 type PVNth() =
 
     [<Params(10, 100, 1_000, 10_000, 100_000)>]

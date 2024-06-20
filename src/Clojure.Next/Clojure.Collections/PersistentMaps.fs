@@ -29,7 +29,6 @@ type APersistentMap() =
             hasheq <- Some h
             h
 
-
     static member mapEquals(m1: IPersistentMap, o: obj) =
         match o with
         | _ when LanguagePrimitives.PhysicalEquality (m1 :> obj) o -> true
@@ -400,8 +399,6 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
     new(arr) = PersistentArrayMap(null, arr)
     new() = PersistentArrayMap(null, Array.zeroCreate 0)
 
-
-
     static member val internal hashtableThreshold: int = 16
 
     static member val public Empty = PersistentArrayMap()
@@ -767,7 +764,7 @@ and TransientArrayMap(a: obj array) =
         let i = this.indexOfKey (k)
 
         if i >= 0 then
-            if arr[i + 1] <> v then
+            if arr[i + 1] <> v then  // TODO: Should this be PhysicalEquality?
                 arr[i + 1] <- v
 
             this
@@ -1048,8 +1045,10 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
         let mutable ret =
             (PersistentHashMap.Empty :> IEditableCollection).asTransient () :?> ITransientMap
 
-        for i in 0..2 .. init.Length - 1 do
+        let mutable i = 0
+        while i < init.Length - 1 do
             ret <- ret.assoc (init[i], init[i + 1])
+            i <- i + 2
 
             if ret.count () <> i / 2 + 1 then
                 raise <| ArgumentException("init", "Duplicate key: " + init[ i ].ToString())
@@ -1770,7 +1769,7 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
                     else
                         upcast BitmapIndexedNode(null, bitmap, NodeOps.cloneAndSet (array, 2 * idx + 1, upcast n))
                 elif Util.equiv (key, keyOrNull) then
-                    if value = valOrNode then
+                    if LanguagePrimitives.PhysicalEquality value valOrNode then
                         upcast this
                     else
                         upcast BitmapIndexedNode(null, bitmap, NodeOps.cloneAndSet (array, 2 * idx + 1, value))
@@ -2040,7 +2039,7 @@ and HashCollisionNode(edit: AtomicBoolean, hash: int, c, a) =
             if h = hash then
                 match this.tryFindIndex (key) with
                 | Some idx ->
-                    if array[idx + 1] = value then
+                    if LanguagePrimitives.PhysicalEquality array[idx + 1] value then
                         upcast this
                     else
                         upcast HashCollisionNode(null, h, count, NodeOps.cloneAndSet (array, idx + 1, value))

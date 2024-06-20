@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="PersistentHashMapResults.md" />
+    <None Include="PersisentVectorResults.md" />
     <None Include="README.md" />
     <Compile Include="NumericsBenchmarks.fs" />
     <Compile Include="PersistentVectorBenchmarks.fs" />

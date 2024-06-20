@@ -14,13 +14,13 @@ type Tests() =
 
     static member val arrayToClone = Array.zeroCreate 32 with get
 
-    [<Benchmark>]
+    [<Benchmark(Baseline=true)>]
     member _.CSharp() = CreateArrayLib.CreateArray(32)
  
     [<Benchmark>]
     member _.CSharpFixed() = CreateArrayLib.CreateArrayFixed()
         
-    [<Benchmark(Baseline=true)>]
+    [<Benchmark>]
     member _.FSharpZeroCreate() = ZeroCreateArray(32)
 
     [<Benchmark>]

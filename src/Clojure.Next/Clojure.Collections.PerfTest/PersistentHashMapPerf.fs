@@ -2,6 +2,14 @@
 
 type PHMTransientConj() =
 
+    member this.NextCons(size: int) =
+        let mutable pv =
+            Clojure.Collections.PersistentHashMap.Empty :> Clojure.Collections.IPersistentMap
+
+        for i in 0 .. size do
+            pv <- pv.assoc (i,i)
+
+        pv
 
 
     member this.FirstTransientConj(size:int) =

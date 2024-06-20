@@ -89,7 +89,7 @@ type RTEquiv() =
 
 
 [<MemoryDiagnoser>]
-type PMCreateWithCheck() = 
+type PAMCreateWithCheck() = 
 
     [<Params( 0, 1, 2, 3, 4, 6, 8, 12, 16)>]
     member val size: int = 0 with get, set
@@ -118,7 +118,7 @@ type PMCreateWithCheck() =
         pv  
 
  [<MemoryDiagnoser>]
-type PMCreateByAssoc() = 
+type PAMCreateByAssoc() = 
 
     [<Params( 0, 1, 2, 3, 4, 6, 8, 12, 16)>]
     member val size: int = 0 with get, set
@@ -151,8 +151,12 @@ type PMCreateByAssoc() =
  [<MemoryDiagnoser>]
 type PHMCons() =
 
-    [<Params( 3, 8, 9, 16, 17, 32, 33, 48, 64, 100, 1000)>]
+    [<Params( 0, 1, 2, 3,  32, 33, 34)>]
     member val size: int = 0 with get, set
+
+    [<GlobalSetup>]
+    member this.GlobalSetup() =
+        Clojure.Numerics.Initializer.init() |> ignore
 
     [<Benchmark(Baseline = true)>]
     member this.FirstCons() =
@@ -166,6 +170,8 @@ type PHMCons() =
 
     [<Benchmark>]
     member this.NextCons() =
+
+        let x  = Clojure.Collections.Util.equiv(12,12)
         let mutable pv =
             Clojure.Collections.PersistentHashMap.Empty :> Clojure.Collections.IPersistentMap
 
@@ -175,12 +181,18 @@ type PHMCons() =
         pv
 
 
-[<MemoryDiagnoser;HardwareCounters(HardwareCounter.BranchMispredictions,HardwareCounter.BranchInstructions,HardwareCounter.CacheMisses)>]
+[<MemoryDiagnoser (*;HardwareCounters(HardwareCounter.BranchMispredictions,HardwareCounter.BranchInstructions,HardwareCounter.CacheMisses) *) >]
 type PHMTransientConj() =
 
     //[<Params( 15, 16, 17, 18, 19, 24, 32)>]
-    [<Params( 5, 10,15, 16, 17, 18, 19, 24, 32, 50, 100, 500)>]
+    //[<Params( 5, 10,15, 16, 17, 18, 19, 24, 32, 50, 100, 500)>]
+    [<Params( 500, 100, 50, 32, 24,  17, 10, 5)>]
     member val size: int = 0 with get, set
+
+    
+    [<GlobalSetup>]
+    member this.GlobalSetup() =
+        Clojure.Numerics.Initializer.init() |> ignore
 
 
     [<Benchmark(Baseline = true)>]
@@ -246,6 +258,8 @@ type PHMContainsKey() =
         
     [<GlobalSetup>]
     member this.GlobalSetup() =
+
+        Clojure.Numerics.Initializer.init() |> ignore
 
         this.firstMap <- PHMContainsKey.createFirst(this.size) :?> clojure.lang.IPersistentMap
         this.nextMap <- PHMContainsKey.createNext(this.size) :?> Clojure.Collections.IPersistentMap
