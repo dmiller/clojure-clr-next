@@ -11,8 +11,11 @@ let main argv =
 
     //BenchmarkRunner.Run<RTEquiv>() |> ignore
 
-    BenchmarkRunner.Run<NumericEquivTests>() |> ignore
+    //BenchmarkRunner.Run<NumericEquivTests>() |> ignore
     //BenchmarkRunner.Run<NumericConverterTests>() |> ignore
+    
+    BenchmarkRunner.Run<CategoryVersusOps>() |> ignore
+   
 
 
     //BenchmarkRunner.Run<PVCons>() |> ignore
@@ -31,6 +34,4 @@ let main argv =
 
 
 
-    //BenchmarkRunner.Run<CategoryVersusOps>() |> ignore
-   
     0 // return an integer exit code

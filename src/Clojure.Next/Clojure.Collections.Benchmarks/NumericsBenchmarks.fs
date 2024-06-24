@@ -92,3 +92,8 @@ type CategoryVersusOps() =
 
     [<Benchmark>]
     member this.NextOps() = Clojure.Numerics.OpsSelector.ops(this.testedVal)
+
+
+    [<Benchmark>]
+    member this.NextOps2() = Clojure.Numerics.OpsSelector.ops(this.testedVal)
+

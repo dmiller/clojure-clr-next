@@ -3,7 +3,7 @@
 open Clojure.Numerics
 open Clojure.Collections
 
-Initializer.init() |> ignore
+//Initializer.init() |> ignore
 
 let perfClass = PHMTransientConj()
 
