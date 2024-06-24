@@ -7,18 +7,17 @@ categories: general
 
 # Making a hash of things
 
-The most complex data structure in the Clojure catalog has to be the PersistentHashMap. This is Phil Bagwell's [Hash Array Mapped Trie (HAMT)](https://en.wikipedia.org/wiki/Hash_array_mapped_trie) as modified by Rich Hickey to be immutable and persistent.  (Bagwell's original paper is available [here](http://infoscience.epfl.ch/record/64398/files/idealhashtrees.pdf.)  I want to describe the ideas behind this data structure and code a simple implementation, leaving out complexities that come from various efficiency hacks.
+The most complex data structure in the Clojure catalog has to be the PersistentHashMap. This is Phil Bagwell's [Hash Array Mapped Trie (HAMT)](https://en.wikipedia.org/wiki/Hash_array_mapped_trie) as modified by Rich Hickey to be immutable and persistent.  (Bagwell's original paper is available [here](http://infoscience.epfl.ch/record/64398/files/idealhashtrees.pdf.))  I want to describe the ideas behind this data structure and code a simple implementation, leaving out complexities that come from various efficiency hacks.
 
 
  ## Hashing
 
+We are interested in mapping from keys to their associated values.
  There are a variety of data structures that use hashing to provide O(1) or O(ln n) access to data.  A simple flavor is the _hash table_.  
- Assume we are mapping keys to values. 
+
  A hash code is computed from the key which in turn is used to compute an index into an array where the corresponding value will be found.  
  Because generally hash codes or indexes are not unique, two keys can _collide_, i.e., are mapped to the same location.  
- Some technique must be used to deal with collisions.   
- The theory on hash tables of this type is extensive; you can get started [here](https://en.wikipedia.org/wiki/Hash_table).
-
+ Some technique must be used to deal with collisions.   The theory on hash tables of this type is extensive; you can get started [here](https://en.wikipedia.org/wiki/Hash_table).
 
 Another approach uses trees instead of arrays.  As an example, we could store key/value pairs in a binary tree.  Treating the hash code as a sequence of bits and mapping 1 to Left and 0 to Right, the hash code of an item describes a path through the tree.  One does not need to use all the bits, just enough to distinguish a given key from all the others.  Assuming 5-bit hashcodes, this picture illustrates how a given set of four keys would be distributed.
 
@@ -28,7 +27,7 @@ Again, one must deal with collisions.
 
 ## Hash Array Mapped Trees
 
-Binary branching is not efficient.  One can end up with trees that are quite deep and that are fragmented in memory.  Depth correlates with the number of memory accesses.  Fragmentation makes  accesses are expensive.   A _hash array mapped trie/tree_ (HAMT) combines the array and tree notions.   Rather than a node branching in two directions and the path to choose based on a single bit,  in an HAMT the branching factor in a node is greater -- usually a small power of two -- and the branch to choose is based on several contiguous bits in the hash.  Which bits depend on the branching factor (power of two) and the level in the tree.  Using four as the branching factor, we might see a configuration such as the following:
+Binary branching is not efficient.  One can end up with trees that are quite deep and that are fragmented in memory.  Depth correlates with the number of memory accesses.  Fragmentation makes accesses are expensive.   A _hash array mapped trie/tree_ (HAMT) combines the array and tree notions.   Rather than a node branching in two directions and the path to choose based on a single bit,  in an HAMT the branching factor in a node is greater -- usually a small power of two -- and the branch to choose is based on several contiguous bits in the hash.  Which bits depend on the branching factor (power of two) and the level in the tree.  Using four as the branching factor, we might see a configuration such as the following:
 
 ![HAMT example](/assets/images/HAMT-1.png)
 
@@ -64,7 +63,10 @@ The text for whether our index is present in the compacted array is
 ```F#
         let bit = bitPos (hash, shift)
 
-        if bit &&& bitmap = 0 then
+        if bit &&& bitmap = 0 then  
+            // not in the array
+        else
+            // in the array
 ```
 
 If the key is indeed, present, we need to know how many bits are set below it.  The trick is to take our bit and subtract one.  That will give us all ones in the positions prior to us (0 to 20)
@@ -470,14 +472,14 @@ The `cloneAndSet` method creates a copy of this node's entries with a new value 
 
 Doing `assoc` on a `BitmapNode` is a bit more complex, in fact the most complicated code in the implementation.  A table to ouline the logic:
 
-| Entry present? |  |  |  | Map count | Code snippet |
-|---|---|---|---|:---:|:---:|
-| No entry | >= 1/2 full |  | Create an `ArrayNode` copying this node and inserting new K/V pair | +1 | A |
-| No entry  | < 1/2 full |  | Create a `BitmapNode` copying this node and inserting a new K/V pair | +1 | B |
-| Has entry | Entry is KV | Key matches, value matches | No-op | no change | (inline) |
-| Has entry | Entry is KV | Key matches, value does not match | Create a `BitmapNode` copying this node but key's value replaced with new value | no change | (inline)
-| Has entry | Entry is KV | Key does not match | Create a new node <br>(`CollisionNode` if the two keys hash the same, `BitmapNode` otherwise) <br>and insert where the existing KV is | +1 | (inline) |
-| Has entry | Entry is SHMNode |  | Do the `assoc` on the subnode.  <br>If same node comes back, then this is a no-op.  <br>Else create a `BitmapNode` copying this one <br>with the new node replacing the existing one. | no change or +1 | (inline)
+| Entry present? |                  |                                   |                                                                         | Map count | Code snippet |
+|----------------|------------------|-----------------------------------|-------------------------------------------------------------------------|:---------:|:------------:|
+| No entry       | >= 1/2 full      |                                   | Create an `ArrayNode` copying this node and inserting new K/V pair      | +1        | A            |
+| No entry       | < 1/2 full       |                                   | Create a `BitmapNode` copying this node and inserting a new K/V pair    | +1        | B            |
+| Has entry      | Entry is KV      | Key matches, value matches        | No-op | no change | (inline) |
+| Has entry      | Entry is KV      | Key matches, value does not match | Create a `BitmapNode` copying this node but key's value replaced with new value | no change | (inline) |
+| Has entry      | Entry is KV      | Key does not match                | Create a new node<br>(`CollisionNode` if the two keys hash the same, `BitmapNode` otherwise) <br>and insert where the existing KV is | +1 | (inline) |
+| Has entry      | Entry is SHMNode |                                   | Do the `assoc` on the subnode.<br>If same node comes back, then this is a no-op. <br>Else create a `BitmapNode` copying this one<br>with the new node replacing the existing one. | no change or +1 | (inline)
 
 I present the code without additional commentary.   You really need to work through the mechanics.
 
@@ -830,11 +832,16 @@ In translating the C# version--itself a very direct translation of the Java code
 |     MakePHMByAssoc | 10000 |     7,879.8 us |   1.00 | 9388.42 KB |
 | MakePHMByTransient | 10000 |     3,765.6 us |   0.47 | 1644.79 KB |
 
-I expected a hit.  I did not expect ratios like 80X and 415X in performance.  I was also perplexed by the fact that it was allocating less memory.  Surely a bunch of `isint` IL instructions versus `null` checks would not be so bad.
+I expected a hit.  I did not expect ratios like 80X and 415X in performance.  
+I was also perplexed by the fact that it was allocating less memory.  
+Surely a bunch of `isint` IL instructions versus `null` checks would not be so bad.
 
 I went to bed.  
 
-And when I woke up (not with a sudden insight, but with ... never mind).  In my several moments of wakefulness, the answer came to me.  In moving from the class-defined nodes to the discriminated union, the semantics of equality changed from reference to structural.  Reference semantics is just doing a pointer check, which is appropriate here as we want to know if we got back exactly the same node as we had before, in code like this:
+And when I woke up (not with a sudden insight, but with ... never mind).  
+In my several moments of wakefulness, the answer came to me.  
+In moving from the class-defined nodes to the discriminated union, the semantics of equality changed from reference to structural.  
+Reference semantics is just doing a pointer check, which is appropriate here as we want to know if we got back exactly the same node as we had before, in code like this:
 
 ```F#
                 let newNode =
@@ -846,7 +853,9 @@ And when I woke up (not with a sudden insight, but with ... never mind).  In my 
                     ArrayNode(count, cloneAndSet (nodes, idx, Some newNode))
 
 ```
-With reference semantics, that little `=` is a nice call to `Object.ReferenceEquals` which becomes some really trivial IL/assembler.  With structural semantics, that little `=` turns into a ferocious CPU cycle eater that traverse both data structures, including the arrays.   The fix?  Just one little annotation:
+With reference semantics, that little `=` is a nice call to `Object.ReferenceEquals` which becomes some really trivial IL/assembler.  
+With structural semantics, that little `=` turns into a ferocious CPU cycle eater that traverse both data structures, including the arrays.   
+The fix?  Just one little annotation:
 
 ```F#
 [<ReferenceEquality>] SHMNode = ...
