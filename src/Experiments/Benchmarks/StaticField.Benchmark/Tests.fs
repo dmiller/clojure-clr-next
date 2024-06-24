@@ -14,35 +14,88 @@ type A (v:int) =
 
 
 
+type B(v:int ) =
+
+    static member val EmptyC = C(0)
+    static member val EmptyA = A(0)
+
+    member this.V = v
+
+and C(v:int) = 
+
+
+    member this.V = v
+
+
+
 [<Literal>]
 let NumIters = 100
-
 
 
 type Tests() = 
     
 
+    //[<Benchmark(Baseline=true)>]
+    //member this.StaticVal() =  
+    //    let mutable i : int =0
+    //    for iter in 0 .. NumIters do
+    //        i <- i + A.StaticVal.V
+    //    i
+    
+    //[<Benchmark>]
+    //member _.StaticVal2() = 
+    //    let mutable i : int =0
+    //    for iter in 0 .. NumIters do
+    //        i <- i + A.StaticVal.V
+    //    i
+
+    
+    //[<Benchmark>]
+    //member _.StaticVal3() = 
+    //    let mutable i : int =0
+    //    for iter in 0 .. NumIters do
+    //        i <- i + A.StaticVal.V
+    //    i
+
+
     [<Benchmark(Baseline=true)>]
-    member this.StaticVal() =  
+    member this.BC() =  
         let mutable i : int =0
         for iter in 0 .. NumIters do
-            i <- i + A.StaticVal.V
+            i <- i + B.EmptyC.V
         i
     
     [<Benchmark>]
-    member _.StaticVal2() = 
+    member _.BC2() = 
         let mutable i : int =0
         for iter in 0 .. NumIters do
-            i <- i + A.StaticVal.V
+            i <- i + B.EmptyC.V
         i
 
     
     [<Benchmark>]
-    member _.StaticVal3() = 
+    member _.BC3() = 
         let mutable i : int =0
         for iter in 0 .. NumIters do
-            i <- i + A.StaticVal.V
+            i <- i + B.EmptyC.V
         i
+
+
+
+    [<Benchmark>]
+    member this.BA() =  
+        let mutable i : int =0
+        for iter in 0 .. NumIters do
+            i <- i + B.EmptyA.V
+        i
+    
+    [<Benchmark>]
+    member _.BA2() = 
+        let mutable i : int =0
+        for iter in 0 .. NumIters do
+            i <- i + B.EmptyA.V
+        i
+
 
 
 
