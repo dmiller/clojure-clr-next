@@ -404,6 +404,16 @@ module Initializer =
         OpsSelector.opsImplTable[OpsType.BigDecimal |> int] <- BigDecimalOps()
         OpsSelector.opsImplTable[OpsType.ClrDecimal |> int] <- ClrDecimalOps()    
 ```
+<style>
+bad-shit { text-decoration: line-through}
+</style>
+
+>  There must have been a problem in my original benchmark of `ops` and my conclusions on the impact of static initializations.  I have since redone that work
+and provided  a [corrigendum]]({{site.baseurl}}{% post_url 2024-06-24-corrigendum-static-initialization %}).
+
+
+<div class="bad-shit">
+
 
 Does it matter?  I did a mockup of the C# code -- I couldn't access the code from the C# assembly because the things I needed to test were private.  The C# equivalant of the `ops` call is called `category`.  Before making any changes:
 
@@ -442,6 +452,8 @@ With the changes to the type lookup and the static intialization (and one other 
 
 I'm not surprised U64 takes a hit -- it is at the bottom of sequence of type tests.
 Not sure about I32.  
+
+</div>
 
 I made one last little change to `Numbers.equal`, going from
 
