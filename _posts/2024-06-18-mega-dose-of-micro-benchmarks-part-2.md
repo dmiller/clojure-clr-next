@@ -406,7 +406,7 @@ module Initializer =
 ```
 
 >  There must have been a problem in my original benchmark of `ops` and my conclusions on the impact of static initializations.  I have since redone that work
-and provided  a [corrigendum]]({{site.baseurl}}{% post_url 2024-06-24-corrigendum-static-initialization %}).
+and provided  a [corrigendum]({{site.baseurl}}{% post_url 2024-06-24-corrigendum-static-initialization %}).  Ignore some of what follows.
 
 
 
