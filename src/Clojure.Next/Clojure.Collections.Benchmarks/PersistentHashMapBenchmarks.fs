@@ -181,7 +181,7 @@ type PHMCons() =
         pv
 
 
-[<MemoryDiagnoser (*;HardwareCounters(HardwareCounter.BranchMispredictions,HardwareCounter.BranchInstructions,HardwareCounter.CacheMisses) *) >]
+[<MemoryDiagnoser ;HardwareCounters(HardwareCounter.BranchMispredictions,HardwareCounter.BranchInstructions,HardwareCounter.CacheMisses)  >]
 type PHMTransientConj() =
 
     //[<Params( 15, 16, 17, 18, 19, 24, 32)>]

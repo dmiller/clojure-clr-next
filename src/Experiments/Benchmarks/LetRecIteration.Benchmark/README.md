@@ -56,3 +56,7 @@ I added multiple calls to each method
 | ManualLoopInt         | 100  | 183.10 ns | 1.498 ns |  1.328 ns |  0.38 |    0.02 |
 
 
+Let's use ManualLoopInt as the baseline.
+
+
+

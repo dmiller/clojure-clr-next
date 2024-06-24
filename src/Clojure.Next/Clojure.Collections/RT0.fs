@@ -216,3 +216,8 @@ let getWithDefault(coll: obj, key: obj, notFound: obj) =
     | :? ILookup as look ->   look.valAt(key, notFound)
     | _ -> getFromWithDefault(coll, key, notFound)
 
+
+let booleanCast(x:obj) : bool =
+    match x with
+    | :? bool as b -> b
+    | _ -> not (isNull x)

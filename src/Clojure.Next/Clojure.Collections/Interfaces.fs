@@ -124,6 +124,7 @@ type IObj =
     inherit IMeta
     abstract withMeta: meta: IPersistentMap -> IObj
 
+[<AllowNullLiteral>]
 type IDeref =
     abstract deref: unit -> obj
 
@@ -366,6 +367,8 @@ type IFn =
         [<ParamArray>] args: obj array ->
             obj
 
+    abstract applyTo : ISeq -> obj 
+
 [<AllowNullLiteral>]
 type IChunk =
     inherit Indexed
@@ -467,3 +470,42 @@ type IEditableCollection =
 [<AllowNullLiteral>]
 type IDrop =
     abstract drop: n: int -> Sequential
+
+
+
+
+// References and related
+
+// Represents an object with settable metadata.
+[<AllowNullLiteral>]
+type IReference =
+    inherit IMeta
+    abstract alterMeta: alter: IFn * args: ISeq -> IPersistentMap
+    abstract resetMeta: m: IPersistentMap -> IPersistentMap
+
+// Represents a reference to a value.
+// IRef is the basic interface supported by Refs, Agents, Atoms, Vars, and other references to values.
+// This interface supports getting/setting the validator for the value, and getting/setting watchers.
+// Dereferencing is supplied in interface IDeref.
+// This interface does not support changes to values. Changes are the responsibility of the implementations of this interface,
+// and often have to be done in concert with LockingTransaction.
+// The validator function will be applied to any new value before that value is applied.
+// If the validator throws an exception or returns false, changing the reference to the new value is aborted.
+// When setting a new validator, it must validate the current value.
+// A reference can be watched by one or more Agents. The agent will be sent a message when the value changes.
+
+[<AllowNullLiteral>]
+type IRef =
+    inherit IDeref
+    abstract setValidator: vf: IFn -> unit
+    abstract getValidator: unit -> IFn
+    abstract getWatches: unit -> IPersistentMap
+    abstract addWatch: key: obj * callback: IFn -> IRef
+    abstract removeWatch: key: obj -> IRef
+
+
+
+
+(*
+
+*)

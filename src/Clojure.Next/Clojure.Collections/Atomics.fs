@@ -59,3 +59,30 @@ type AtomicBoolean private(v:int) =
 
         let origVal = Interlocked.CompareExchange(ref value, inewVal, ioldVal)
         origVal = ioldVal
+
+
+// Implements the Java java.util.concurrent.atomic.AtomicLong class.  
+[<Sealed;AllowNullLiteral>]
+type AtomicLong(v: int64) =
+
+    let mutable value = v
+
+    new() = AtomicLong(0)
+
+    override _.ToString() = value.ToString()
+
+    member this.get() = value
+
+    member this.getAndSet(update: int64) = Interlocked.Exchange(&value, update)
+
+    
+    member this.set(update: int64) = Interlocked.Exchange(&value, update)
+
+    member this.compareAndSet(expect: int64, update: int64) =
+        let oldVal = Interlocked.CompareExchange(&value, expect, update)
+        oldVal  = expect
+
+    member this.incrementAndGet() = Interlocked.Increment(&value)
+
+    member this.getAndIncrement() = Interlocked.Increment(&value) - 1L
+

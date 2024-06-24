@@ -57,7 +57,7 @@ type Tests() =
     member val size: int = 0 with get, set
 
 
-    [<Benchmark(Baseline=true)>]
+    [<Benchmark>]
     member this.LetRecIterOption() = 
         let mutable x = 0
         for iter = 0 to this.size do
@@ -106,7 +106,8 @@ type Tests() =
         x
 
 
-    [<Benchmark>]
+
+    [<Benchmark(Baseline=true)>]
     member this.ManualLoopInt() = 
         let mutable x = 0
         for iter = 0 to this.size do

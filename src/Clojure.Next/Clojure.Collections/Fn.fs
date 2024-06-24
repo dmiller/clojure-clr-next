@@ -61,6 +61,7 @@ type AFn() =
     member this.WrongArityException(reqArity: int) : ArityException =
         ArityException(reqArity, this.GetType().FullName)
 
+
     interface IFn with
         member this.invoke() = raise <| this.WrongArityException(0)
         member this.invoke(a1) = raise <| this.WrongArityException(1)
@@ -125,6 +126,8 @@ type AFn() =
                 [<ParamArray>] args
             ) =
             raise <| this.WrongArityException(21)
+
+        member this.applyTo(argList: ISeq) : obj = AFn.applyToHelper(this, argList)
 
     // TODO: Check to see if the original use of Util1.Ret is necessary.
 
@@ -393,7 +396,6 @@ type AFn() =
             )
 
 
-    abstract applyTo: arglist: ISeq -> obj
-    default this.applyTo arglist = AFn.applyToHelper (this, arglist)
+
 
 // TODO: Do we need the implementation of IDynamicMetaObjectProvide.GetMetaObject?
