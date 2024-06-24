@@ -99,7 +99,7 @@ type PAMCreateWithCheck() =
 
     [<GlobalSetup>]
     member this.GlobalSetup() =
-        Clojure.Numerics.Initializer.init() |> ignore
+        //Clojure.Numerics.Initializer.init() |> ignore
         this.items <- Array.zeroCreate (this.size*2)
         for i in 0 .. this.size - 1 do
             this.items.[2*i] <- i
@@ -128,7 +128,7 @@ type PAMCreateByAssoc() =
 
     [<GlobalSetup>]
     member this.GlobalSetup() =
-        Clojure.Numerics.Initializer.init() |> ignore
+        //Clojure.Numerics.Initializer.init() |> ignore
         this.items <- Array.zeroCreate (this.size*2)
         for i in 0 .. this.size - 1 do
             this.items.[2*i] <- i
@@ -151,12 +151,12 @@ type PAMCreateByAssoc() =
  [<MemoryDiagnoser>]
 type PHMCons() =
 
-    [<Params( 0, 1, 2, 3,  32, 33, 34)>]
+    [<Params( 32, 100, 500, 1000)>]
     member val size: int = 0 with get, set
 
-    [<GlobalSetup>]
-    member this.GlobalSetup() =
-        Clojure.Numerics.Initializer.init() |> ignore
+    //[<GlobalSetup>]
+    //member this.GlobalSetup() =
+    //    Clojure.Numerics.Initializer.init() |> ignore
 
     [<Benchmark(Baseline = true)>]
     member this.FirstCons() =
@@ -180,6 +180,27 @@ type PHMCons() =
 
         pv
 
+    [<Benchmark>]
+    member this.NextConsAlt() =
+        let mutable pv =
+            Clojure.Collections.Alternate.PHashMap.Empty :> Clojure.Collections.IPersistentMap
+
+        for i in 0 .. this.size do
+            pv <- pv.assoc (i,i)
+            
+        pv
+
+
+    [<Benchmark>]
+    member this.NextConsAlt2() =
+        let mutable pv =
+            Clojure.Collections.Alternate2.PHashMap.Empty :> Clojure.Collections.IPersistentMap
+
+        for i in 0 .. this.size do
+            pv <- pv.assoc (i,i)
+            
+        pv
+
 
 [<MemoryDiagnoser ;HardwareCounters(HardwareCounter.BranchMispredictions,HardwareCounter.BranchInstructions,HardwareCounter.CacheMisses)  >]
 type PHMTransientConj() =
@@ -190,9 +211,9 @@ type PHMTransientConj() =
     member val size: int = 0 with get, set
 
     
-    [<GlobalSetup>]
-    member this.GlobalSetup() =
-        Clojure.Numerics.Initializer.init() |> ignore
+    //[<GlobalSetup>]
+    //member this.GlobalSetup() =
+    //    Clojure.Numerics.Initializer.init() |> ignore
 
 
     [<Benchmark(Baseline = true)>]
@@ -259,7 +280,7 @@ type PHMContainsKey() =
     [<GlobalSetup>]
     member this.GlobalSetup() =
 
-        Clojure.Numerics.Initializer.init() |> ignore
+        //Clojure.Numerics.Initializer.init() |> ignore
 
         this.firstMap <- PHMContainsKey.createFirst(this.size) :?> clojure.lang.IPersistentMap
         this.nextMap <- PHMContainsKey.createNext(this.size) :?> Clojure.Collections.IPersistentMap

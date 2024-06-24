@@ -7,11 +7,11 @@ open NumericsBenchmarks
 [<EntryPoint>]
 let main argv =
 
-    Clojure.Numerics.Initializer.init() |> ignore
+    //Clojure.Numerics.Initializer.init() |> ignore
 
     //BenchmarkRunner.Run<RTEquiv>() |> ignore
 
-    //BenchmarkRunner.Run<NumericEquivTests>() |> ignore
+    BenchmarkRunner.Run<NumericEquivTests>() |> ignore
     //BenchmarkRunner.Run<NumericConverterTests>() |> ignore
 
 
@@ -26,7 +26,7 @@ let main argv =
 
 
     //BenchmarkRunner.Run<PHMCons>() |> ignore
-    BenchmarkRunner.Run<PHMTransientConj>() |> ignore
+    //BenchmarkRunner.Run<PHMTransientConj>() |> ignore
     //BenchmarkRunner.Run<PHMContainsKey>() |> ignore
 
 

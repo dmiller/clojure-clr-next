@@ -36,7 +36,7 @@ type NumericEquivTests() =
 
     [<GlobalSetup>]
     member this.GlobalSetup() =
-        Clojure.Numerics.Initializer.init() |> ignore
+        //Clojure.Numerics.Initializer.init() |> ignore
         this.testedValX <- getValue this.xInputType
         this.testedValY <- getValue this.yInputType
 

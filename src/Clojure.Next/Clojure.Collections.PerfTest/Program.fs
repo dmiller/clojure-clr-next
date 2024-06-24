@@ -16,8 +16,8 @@ let perfClass = PHMTransientConj()
 //let y = perfClass.NextCons(100)
 //printf "Count is %d" ((y:>Counted).count())
 
-let y = perfClass.NextTransientConj(100)
-printf "Count is %d" ((y:?>Counted).count())
+//let y = perfClass.NextTransientConj(100)
+//printf "Count is %d" ((y:?>Counted).count())
 
 
 

@@ -1,4 +1,4 @@
-﻿namespace Clojure.Numerics
+﻿namespace rec Clojure.Numerics
 
 open System
 open Converters
@@ -232,7 +232,14 @@ module OpsSelector =
 
     let combine (t1: OpsType, t2: OpsType) = selectorTable[int (t1), int (t2)]
 
-    let opsImplTable: Ops array = Array.zeroCreate 7
+    let opsImplTable: Ops array = 
+         [| LongOps();
+           DoubleOps();
+           RatioOps();
+           BigIntOps();
+           BigDecimalOps();
+           ULongOps();
+           ClrDecimalOps() |]
 
     let getOps(x: obj) = opsImplTable[ops (x) |> int]
     let getOps2(x: obj, y: obj) = opsImplTable[combine( ops (x), ops (y)) |> int]
@@ -2243,15 +2250,15 @@ and [<Sealed>] BigDecimalOps() =
             | Some cx -> bx.Abs(cx)
             | None -> bx.Abs()
 
-module Initializer =
-    let init() =
-        OpsSelector.opsImplTable[OpsType.Long |> int] <- LongOps()
-        OpsSelector.opsImplTable[OpsType.ULong |> int] <- ULongOps()
-        OpsSelector.opsImplTable[OpsType.Double |> int] <- DoubleOps()
-        OpsSelector.opsImplTable[OpsType.Ratio |> int] <- RatioOps()
-        OpsSelector.opsImplTable[OpsType.BigInteger |> int] <- BigIntOps()
-        OpsSelector.opsImplTable[OpsType.BigDecimal |> int] <- BigDecimalOps()
-        OpsSelector.opsImplTable[OpsType.ClrDecimal |> int] <- ClrDecimalOps()
+//module Initializer =
+//    let init() =
+//        OpsSelector.opsImplTable[OpsType.Long |> int] <- LongOps()
+//        OpsSelector.opsImplTable[OpsType.ULong |> int] <- ULongOps()
+//        OpsSelector.opsImplTable[OpsType.Double |> int] <- DoubleOps()
+//        OpsSelector.opsImplTable[OpsType.Ratio |> int] <- RatioOps()
+//        OpsSelector.opsImplTable[OpsType.BigInteger |> int] <- BigIntOps()
+//        OpsSelector.opsImplTable[OpsType.BigDecimal |> int] <- BigDecimalOps()
+//        OpsSelector.opsImplTable[OpsType.ClrDecimal |> int] <- ClrDecimalOps()
 
 
 //and [<AbstractClass; Sealed>] OpsImpls =

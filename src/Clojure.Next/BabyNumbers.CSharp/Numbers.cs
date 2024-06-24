@@ -105,7 +105,7 @@ public static class Numbers
         }
     }
 
-   public interface Ops
+    public interface Ops
     {
         Ops combine(Ops y);
         Ops opsWith(LongOps x);
@@ -538,7 +538,7 @@ public static class Numbers
                 return CLRDECIMAL_OPS;
 
             default:
-                    return LONG_OPS;
+                return LONG_OPS;
         }
     }
 
