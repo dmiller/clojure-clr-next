@@ -18,52 +18,77 @@ Here is a very reduced model of the kind of situation I was running into.
 
 ```F#
 type C(v:int) = 
-    member this.V = v
+    member val V = v with get, set
 
-type B(x:int ) =
-    static member val EmptyC = C(0)
-    member this.X = x
+type B(v:int ) =
+    static member val StaticEmptyC = C(0) with get, set
+    member val InstanceEmptyC = C(0) with get, set
+    member this.V = v
 ```
- Compiling to IL and decompiling to C# (thanks, [sharplab.io[(https://sharplab.io)), we get (with some editing):
+
+ Compiling to IL and decompiling to C# (thanks, [sharplab.io](https://sharplab.io)), we get (with some editing):
 
  ```C#
-     public class C
-    {
-        internal int v;
-        public int V { get => v; }
-       public C(int v)  { this.v = v; }   
+    public class C
+    {        
+        internal int V@;
+        public C(int v)  {  V@ = v; }
+    
+        public int V
+        {  
+            get { return V@;  }
+            set { V@ = value; }
+        }
     }
-
+     
     public class B
     {
-        internal int x;
-        internal static C EmptyC@;
-        internal static int init@7;
+        internal int v;
+        internal static C StaticEmptyC@;
+        internal C InstanceEmptyC@;
+        internal static int init@3;
 
-        public static C EmptyC
+        public static C StaticEmptyC
         {
             get
             {
-                if (init@7 < 1)
+                if (init@3 < 1)
                 {
                     LanguagePrimitives.IntrinsicFunctions.FailStaticInit();
                 }
-                return EmptyC@;
+                return StaticEmptyC@;
+            }
+            set
+            {
+                if (init@3 < 1)
+                {
+                    LanguagePrimitives.IntrinsicFunctions.FailStaticInit();
+                }
+                StaticEmptyC@ = value;
             }
         }
 
-        public int X { get => x; }
-        
-        public B(int x) { this.x = x; |
+        public C InstanceEmptyC
+        {
+            get { return InstanceEmptyC@; }
+            set { InstanceEmptyC@ = value;  }
+        }
+
+        public int V { get { return v; } }
+
+        public B(int v)
+        {
+            this.v = v;
+            InstanceEmptyC@ = new C(0);
         }
 
         static B()
         {
             $_.init@ = 0;
-            int init@8 = $_.init@;
+            int init@4 = $_.init@;
         }
     }
-}
+
 namespace <StartupCode$_>
 {
     internal static class $_
@@ -72,14 +97,14 @@ namespace <StartupCode$_>
 
         public static void main@()
         {
-            B.EmptyC@ = new C(0);
-            B.init@7 = 1;
+            B.StaticEmptyC@ = new C(0);
+            B.init@3 = 1;
         }
     }
 }
 ```
 
-The variable such as `$_.init@` and `B.init@7` are used to detect circularity conditions in static field initializations.   It appears that one pays a small price on every static field reference to test that initialization has happened properly.
+The variable such as `$_.init@` and `B.init@3` are used to detect circularity conditions in static field initializations.   It appears that one pays a small price on every static field reference to test that initialization has happened properly.
 
 I had read in a few places online that the tiered compilation of the modern JITter would get rid of this overhead eventually.  But I wasn't seeing it.  
 
@@ -89,13 +114,17 @@ I thought surely all the warmup that BenchmarkDotNet does on the code before doi
 
 I discovered this by accident.  I was benchmarking something else (still involving a static field reference) and accidentally compared the same code to itself three times.  The first run was considerably slower than the second and third runs.  The second and third runs were essentially identical.
 
-For the classes above, I benchmarked accessing `B.EmptyC.v`.  Here are three successive runs showing exactly this behavior:
+For the classes above, I ran two copies of the code for calling StaticEmptyC and for Instance_EmptyC.
 
-| Method | Mean     | Error    | StdDev   | Ratio | RatioSD |
-|------- |---------:|---------:|---------:|------:|--------:|
-| BC     | 40.11 ns | 0.769 ns | 1.052 ns |  1.00 |    0.00 |
-| BC2    | 34.65 ns | 0.240 ns | 0.200 ns |  0.86 |    0.02 |
-| BC3    | 35.11 ns | 0.238 ns | 0.211 ns |  0.87 |    0.02 |
+
+| Method                  | Mean     | Error    | StdDev   | Ratio | RatioSD |
+|------------------------ |---------:|---------:|---------:|------:|--------:|
+| Static_EmptyC           | 39.70 ns | 0.794 ns | 0.779 ns |  1.00 |    0.00 |
+| Static_EmptyC_2ndTime   | 37.10 ns | 0.743 ns | 0.730 ns |  0.93 |    0.02 |
+| Instance_EmptyC         | 32.88 ns | 0.493 ns | 0.437 ns |  0.83 |    0.02 |
+| Instance_EmptyC_2ndTime | 33.26 ns | 0.425 ns | 0.397 ns |  0.84 |    0.02 |
+
+We see that we get a speed up in Static_EmptyC_2ndTime running the same code as Static_EmptyC.  Also, accessing an instance variable is faster.  I do not know why this is the case.
 
 In the earlier post, I described a technique to get rid of the static initialization cheks but having the consumer of the numerics package do an initialization step.  I went back to my original benchmarks and ran them twice.  Once with static initializations and the checks you see above and once with the user initialization code that got rid of the checks.  
 
