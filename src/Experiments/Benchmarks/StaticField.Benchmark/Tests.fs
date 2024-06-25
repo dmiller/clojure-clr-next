@@ -3,28 +3,16 @@
 open BenchmarkDotNet.Attributes
 
 
-type A (v:int) = 
-
-    static let letEmptyA = A(0)
-    static member val StaticVal = A(0)
-
-    static member Empty = letEmptyA
-
-    member this.V = v
-
-
-
 type B(v:int ) =
+    
+    static member val StaticEmptyC = C(0) with get, set
 
-    static member val EmptyC = C(0)
-    static member val EmptyA = A(0)
+    member val InstanceEmptyC = C(0) with get, set
 
     member this.V = v
 
 and C(v:int) = 
-
-
-    member this.V = v
+    member val V = v with get, set
 
 
 
@@ -34,68 +22,42 @@ let NumIters = 100
 
 type Tests() = 
     
+    member val SomeB = B(20) with get, set
 
-    //[<Benchmark(Baseline=true)>]
-    //member this.StaticVal() =  
-    //    let mutable i : int =0
-    //    for iter in 0 .. NumIters do
-    //        i <- i + A.StaticVal.V
-    //    i
-    
-    //[<Benchmark>]
-    //member _.StaticVal2() = 
-    //    let mutable i : int =0
-    //    for iter in 0 .. NumIters do
-    //        i <- i + A.StaticVal.V
-    //    i
+    [<GlobalSetup>]
+    member this.GlobalSetup() =
+        this.SomeB <- B(10)
 
-    
-    //[<Benchmark>]
-    //member _.StaticVal3() = 
-    //    let mutable i : int =0
-    //    for iter in 0 .. NumIters do
-    //        i <- i + A.StaticVal.V
-    //    i
 
 
     [<Benchmark(Baseline=true)>]
-    member this.BC() =  
+    member this.Static_EmptyC() =  
         let mutable i : int =0
         for iter in 0 .. NumIters do
-            i <- i + B.EmptyC.V
+            i <- i + B.StaticEmptyC.V
         i
     
     [<Benchmark>]
-    member _.BC2() = 
+    member _.Static_EmptyC_2ndTime() = 
         let mutable i : int =0
         for iter in 0 .. NumIters do
-            i <- i + B.EmptyC.V
-        i
+            i <- i + B.StaticEmptyC.V
 
     
     [<Benchmark>]
-    member _.BC3() = 
+    member this.Instance_EmptyC() = 
         let mutable i : int =0
         for iter in 0 .. NumIters do
-            i <- i + B.EmptyC.V
+            i <- i + this.SomeB.InstanceEmptyC.V
         i
-
 
 
     [<Benchmark>]
-    member this.BA() =  
+    member this.Instance_EmptyC_2ndTime() = 
         let mutable i : int =0
         for iter in 0 .. NumIters do
-            i <- i + B.EmptyA.V
+            i <- i + this.SomeB.InstanceEmptyC.V
         i
-    
-    [<Benchmark>]
-    member _.BA2() = 
-        let mutable i : int =0
-        for iter in 0 .. NumIters do
-            i <- i + B.EmptyA.V
-        i
-
 
 
 
