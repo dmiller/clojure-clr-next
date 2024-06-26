@@ -23,6 +23,7 @@ let NumIters = 100
 type Tests() = 
     
     member val SomeB = B(20) with get, set
+    member val SomeCSharpB = Test.CSharpB(20) with get, set
 
     [<GlobalSetup>]
     member this.GlobalSetup() =
@@ -43,6 +44,12 @@ type Tests() =
         for iter in 0 .. NumIters do
             i <- i + B.StaticEmptyC.V
 
+    [<Benchmark>]
+    member _.Static_EmptyC_3rdTime() = 
+        let mutable i : int =0
+        for iter in 0 .. NumIters do
+            i <- i + B.StaticEmptyC.V
+
     
     [<Benchmark>]
     member this.Instance_EmptyC() = 
@@ -57,6 +64,36 @@ type Tests() =
         let mutable i : int =0
         for iter in 0 .. NumIters do
             i <- i + this.SomeB.InstanceEmptyC.V
+        i
+
+
+    [<Benchmark>]
+    member this.CSharp_Static_EmptyC() =  
+        let mutable i : int =0
+        for iter in 0 .. NumIters do
+            i <- i + Test.CSharpB.StaticEmptyC.V
+        i
+    
+    [<Benchmark>]
+    member _.CSharp_Static_EmptyC_2ndTime() = 
+        let mutable i : int =0
+        for iter in 0 .. NumIters do
+            i <- i + Test.CSharpB.StaticEmptyC.V
+
+    
+    [<Benchmark>]
+    member this.CSharp_Instance_EmptyC() = 
+        let mutable i : int =0
+        for iter in 0 .. NumIters do
+            i <- i + this.SomeCSharpB.InstanceEmptyC.V
+        i
+
+
+    [<Benchmark>]
+    member this.CSharp_Instance_EmptyC_2ndTime() = 
+        let mutable i : int =0
+        for iter in 0 .. NumIters do
+            i <- i + this.SomeCSharpB.InstanceEmptyC.V
         i
 
 
