@@ -5,13 +5,15 @@ date: 2024-06-18 00:00:00 -0500
 categories: general
 ---
 
-I must have made an error in one of benchmarks mentioned in an earlier post.  Here I do a little more analysis and provide a correction to my commens and to the code.
+I must have made an error benchmarking static initialziations, detailed in a preceding post.  Here I do a little more analysis and provide a correction to my comments and to the code.
 
-In  [A mega-dose of micro-benchmarks, Part 2 -- By the numbers]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %}), there was a section toward the end that discussed the performance hit of static initialization. I believe the analysis given there is incorrect.
+In  [A mega-dose of micro-benchmarks, Part 2 -- By the numbers]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %}), there was a section toward the end that discussed the performance hit of static initialization. Further investigation proved that previous analysis was incorrect.
+
+__TL;DR__: I made a claim that a static initialization being done in the `Numbers` package was causing a non-trivial performance hit compared to the C# code. The earlier analysis was wrong. And in the long run, it really doesn't matter.
 
 Did I mention that micro-benchmarking is hard?
 
-__TL;DR__: I made a claim that a static initialization being done in the `Numbers` package was causing a performance hit compared to the C# code. Something was very wrong in those numbers, but there was an element of truth.  And in the long run, it really doesn't matter.
+## The example
 
 Here is a very reduced model of the kind of situation I was running into.
 
@@ -104,32 +106,41 @@ namespace <StartupCode$_>
 }
 ```
 
-The variable such as `$_.init@` and `B.init@3` are used to detect circularity conditions in static field initializations.   It appears that one pays a small price on every static field reference to test that initialization has happened properly.
+The variables such as `$_.init@` and `B.init@3` are used to detect circularity conditions in static field initializations.  It appears that one pays a small price on every static field reference to test that initialization has happened properly.
+It's an F# thing; you won't see this in C# compiled code.  
 
-I had read in a few places online that the tiered compilation of the modern JITter would get rid of this overhead eventually.  But I wasn't seeing it.  
+I had read in a few places online that the tiered compilation of the modern JITter would get rid of this overhead eventually.  But my earlier benchmark was showing a big it.
 
-It takes patience.
+I did something wrong in that benchmark.  There may have been other factors I had not isolated.
 
-I thought surely all the warmup that BenchmarkDotNet does on the code before doing the actual benchmarking runs would be enough.  Not so.
+And I was suspicious, so I did a much more specific benchmark isolating the static initialization issue.
 
-I discovered this by accident.  I was benchmarking something else (still involving a static field reference) and accidentally compared the same code to itself three times.  The first run was considerably slower than the second and third runs.  The second and third runs were essentially identical.
+Regarding the static initialization checks, I had read online in a few places that tiered compilation would eventually get around this overhead.  But I was not seeing that in my benchmarks.  I thought surely all the warmup that BenchmarkDotNet does on the code before doing the actual benchmarking runs would be enough.  Not so.
 
-For the classes above, I ran two copies of the code for calling StaticEmptyC and for Instance_EmptyC.
+Patience, padawan.
+
+I discovered the need for patience quite by accident.  While writing the benchmarks, I committed a copy-and-paste error and accidentally executed the exact same method call on three different runs.  And they got faster.  The first run was noticeably slower than the second and third runs.  The second and third runs were essentially identical.
+
+Here is my final benchmark output.  Three runs test calling `B.StaticEmptyC.V`; you can see that the first run is slowest.  Two runs call  `b.InstanceEmptyC.V` to compare static field access to instance field access; a little better, but we are way down in sub-nanosecond range here  (each call is doing 100 iterations).  For comparision, I added the C# equivalent code to the benchmark.  Here we don't see any warmup effect and the static and instance versions are essentially identical.
 
 
-| Method                  | Mean     | Error    | StdDev   | Ratio | RatioSD |
-|------------------------ |---------:|---------:|---------:|------:|--------:|
-| Static_EmptyC           | 39.70 ns | 0.794 ns | 0.779 ns |  1.00 |    0.00 |
-| Static_EmptyC_2ndTime   | 37.10 ns | 0.743 ns | 0.730 ns |  0.93 |    0.02 |
-| Instance_EmptyC         | 32.88 ns | 0.493 ns | 0.437 ns |  0.83 |    0.02 |
-| Instance_EmptyC_2ndTime | 33.26 ns | 0.425 ns | 0.397 ns |  0.84 |    0.02 |
 
-We see that we get a speed up in Static_EmptyC_2ndTime running the same code as Static_EmptyC.  Also, accessing an instance variable is faster.  I do not know why this is the case.
+| Method                         | Mean     | Error    | StdDev   | Ratio |
+|------------------------------- |---------:|---------:|---------:|------:|
+| Static_EmptyC                  | 39.98 ns | 0.554 ns | 0.491 ns |  1.00 |
+| Static_EmptyC_2ndTime          | 37.09 ns | 0.296 ns | 0.277 ns |  0.93 |
+| Static_EmptyC_3rdTime          | 36.94 ns | 0.222 ns | 0.197 ns |  0.92 |
+| Instance_EmptyC                | 34.13 ns | 0.247 ns | 0.231 ns |  0.85 |
+| Instance_EmptyC_2ndTime        | 34.04 ns | 0.352 ns | 0.329 ns |  0.85 |
+| CSharp_Static_EmptyC           | 32.85 ns | 0.384 ns | 0.359 ns |  0.82 |
+| CSharp_Static_EmptyC_2ndTime   | 33.24 ns | 0.312 ns | 0.276 ns |  0.83 |
+| CSharp_Instance_EmptyC         | 33.61 ns | 0.349 ns | 0.326 ns |  0.84 |
+| CSharp_Instance_EmptyC_2ndTime | 33.64 ns | 0.327 ns | 0.273 ns |  0.84 |
 
-In the earlier post, I described a technique to get rid of the static initialization cheks but having the consumer of the numerics package do an initialization step.  I went back to my original benchmarks and ran them twice.  Once with static initializations and the checks you see above and once with the user initialization code that got rid of the checks.  
 
-No essential difference.
 
-I thought it better not to put the burden of remembering to call an initialization function on the user of the package, so I reverted that change and went back to the code using static initialization.
+In the earlier post, I described a technique to get rid of the static initialization checks but at the cost of having the consumer of the numerics package do an initialization step.  I went back to my original benchmarks and ran them twice.  Once with static initializations and the checks you see above and once with the user initialization code that got rid of the checks.  No essential difference.  I went back to the original code.
 
-I"m sure I learned some lesson here.  Not sure what it is.
+I"m sure I learned some lessons here.  Mostly on the uselessness of benchmarking in the sub-nanosecond range.  I would not have bothered, but I wanted to measure the hit of the static initialization checks.  And I would not have spent any more time on it, being essentially trivial, if I had not been misled by some mistake I made in my first benchmark.
+
+Onward.
