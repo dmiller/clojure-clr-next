@@ -8,7 +8,7 @@ categories: general
 The first of several posts on implementing immutable, persistent Hash Array Mapped Tries.  This post describes the data structure at a high level; subsequent posts will provide F# code for the base implementation and then discuss transiency.
 
 - [Part 1: Making a hash of things (this post)]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-1 %})
-- [Part 2: The root of the matter]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-2 %})
+- [Part 2: The root]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-2 %})
 - [Part 3: The guts]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-3 %})
 - [Part 4: Transiency]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-4 %})
 - [Part 5: Performance and alternative coding]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-5 %})
