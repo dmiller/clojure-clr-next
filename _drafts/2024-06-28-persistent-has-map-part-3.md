@@ -48,7 +48,7 @@ Looking at one of the `find` methods may help:
 
 ```F#
         member this.find(shift, hash, key, nf) =
-            // Determin the index (bit-position) you should be looking at, based on the key and the level of this node.
+            // Determine the index (bit-position) you should be looking at, based on the key and the level of this node.
             let bit = NodeOps.bitPos (hash, shift)
 
             if (bitmap &&& bit) = 0 then
@@ -76,7 +76,7 @@ Looking at one of the `find` methods may help:
 ```
 
 The `assoc` and `without` methods will have similar methods of traversal.  The question is what you do when get to bottom.
-Let's start with `assoc`.  It's going to make `without` look trivial (unfortunately).
+Let's start with `assoc`.
 
 ```F#
         // shift -- level in tree in in terms of number of bits to shift (multiple of 5)
@@ -241,9 +241,6 @@ The little detail of `PersistentHashMap.createNode` is that it will create a `Bi
 That may be a bit long.  Here's a scorecard for the cases encountered in `assoc`:
 
 
-
-Doing `assoc` on a `BitmapNode` is a bit more complex, in fact the most complicated code in the implementation.  A table to ouline the logic:
-
 | Entry present? |                  |                                   |                                                                         | Map count |
 |----------------|------------------|-----------------------------------|-------------------------------------------------------------------------|:---------:|
 | No entry       | >= 1/2 full      |                                   | Create an `ArrayNode` copying this node and inserting new K/V pair      | +1        |
@@ -254,10 +251,56 @@ Doing `assoc` on a `BitmapNode` is a bit more complex, in fact the most complica
 | Has entry      | Entry is SHMNode |                                   | Do the `assoc` on the subnode.<br>If same node comes back, then this is a no-op. <br>Else create a `BitmapIndexedNode` copying this one<br>with the new node replacing the existing one. | no change or +1 |
 
 
+ Compared to `assoc`, `without` is a bit simpler.
 
 
+ ```F#
+        member this.without(shift, hash, key) =
 
-I'll leave `without` as an exercise.  Compared to `assoc`, it is a walk in the park.
+            let bit = NodeOps.bitPos (hash, shift)
+
+            if (bitmap &&& bit) = 0 then
+                // no entry at this index -- the key is not in the map, so this is a no-op
+                upcast this
+            else
+                // there is an entry, let's see if it a node or a key/value pair
+
+                let idx = this.index (bit)
+                let keyOrNull = array[2 * idx]
+                let valOrNode = array[2 * idx + 1]
+
+                if isNull keyOrNull then
+                    // we have a node at this index -- recurse down a level
+                    let existingNode = (valOrNode :?> INode)
+                    let n = existingNode.without (shift + 5, hash, key)
+
+                    if LanguagePrimitives.PhysicalEquality n existingNode then
+                        // we got back what we started with -- the key is not in the map, so this is a no-op
+                        upcast this
+                    elif not (isNull n) then
+                        // we got back a new node -- we have to replace the existing node with the new
+                        upcast BitmapIndexedNode(null, bitmap, NodeOps.cloneAndSet (array, 2 * idx + 1, upcast n))
+                    elif bitmap = bit then
+                        // we got back null AND that subnode is the only entry in this node
+                        // we are empty -- return null
+                        null
+                    else
+                        // we got back null, but there are other entries in this node
+                        // remove the entry (and mark the bitmap accordingly)
+                        upcast BitmapIndexedNode(null, bitmap ^^^ bit, NodeOps.removePair (array, idx))
+                elif Util.equiv (key, keyOrNull) then
+                    // we had a key/value pair and the key matches the key we are looking for
+                    if bitmap = bit then
+                        // this key is the only entry.  removing it makes empty.
+                        null
+                    else
+                        // there are other entries -- remove this one
+                        upcast BitmapIndexedNode(null, bitmap ^^^ bit, NodeOps.removePair (array, idx))
+                else
+                    // there is a key here, but it is not the key we are looking for
+                    // the key we are looking for is not here, so this is a no-op
+                    upcast this
+ ```
 
 ## The `ArrayNode` node type
 
