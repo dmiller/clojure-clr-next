@@ -10,33 +10,61 @@ The first of several posts on implementing immutable, persistent Hash Array Mapp
 - [Part 1: Making a hash of things (this post)]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-1 %})
 - [Part 2: The root]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-2 %})
 - [Part 3: The guts]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-3 %})
-- [Part 4: Transiency]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-4 %})
-- [Part 5: Performance and alternative coding]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-5 %})
+- [Part 4: Other matters]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-4 %})
 
 
 # Making a hash of things
 
 The most complex data structure in the Clojure catalog has to be `clojure.lang.PersistentHashMap`. This is Phil Bagwell's [Hash Array Mapped Trie (HAMT)](https://en.wikipedia.org/wiki/Hash_array_mapped_trie) as modified by Rich Hickey to be immutable and persistent.  (Bagwell's original paper is available [here](http://infoscience.epfl.ch/record/64398/files/idealhashtrees.pdf.)) 
 
+We want to build maps taking associating keys (of arbitrary type) with their corresponding values.  We are interested in the following operations:
 
- ## Hashing
+- `assoc` -- add a key/value pair to the map
+- `without` -- remove a key's entry from the map
+- `find` -- find the value associated with a key  
 
-HAMTs can viewed a mash-up of simple hash tables, binary search trees and the ideas we covered when discussing  _persistent bit-partitioned vector tries_  (see [Persistent vectors, Part 2 -- Immutability and persistence]({{site.baseurl}}{% post_url 2023-02-12-PersisentVector-part-2 %})).  In fact, we'll start the last of these.
+(The full gamut of basic operation on maps in the Clojure ecosystem is larger. These three are definitional;
+most of the rest involve iterating over the key/value pairs in the map and performing various operations on them.)
 
-In the `PersistentVector` data structure, we have a very specific kind of key-value mapping.  Specifically, the keys are integer values in a contiguous range (0 to N-1).  For more general key types, a common approach is to introduce a hash function.  A hash function takes a key and produces a hash code, an integer that is used to index into a data structure.
-The efficiency of this approach is impacted by two factors. First, the hash codes generally can run across the the entire range of the integer type; in simple hash tables, this is typically dealt with by taking the hash value and modding it to the size of the array being used for storage.  Second, two keys can map to the same hash code (modded or not); some mechanism must be used to manage these _collisions_.
+Because we are living in the land of the persistent and immutable, the general case for the `assoc` and `without` operations is to generate a new map with the desired change.  The original map is left unchanged.  (The `find` operation is a read-only operation and does not change the map.)  For efficiency, we will need the new map to share as much structure are possible with the original map.
 
-The theory on hash tables of this type is extensive; you can get started [here](https://en.wikipedia.org/wiki/Hash_table).
+HAMTs can viewed a mash-up of simple hash tables, binary search trees and the ideas we covered when discussing  _persistent bit-partitioned vector tries_  (see [Persistent vectors, Part 2 -- Immutability and persistence]({{site.baseurl}}{% post_url 2023-02-12-PersisentVector-part-2 %})). 
 
-Another approach uses trees instead of arrays.  As an example, we could store key/value pairs in a binary tree.  Treating the hash code as a sequence of bits and mapping 1 to Left and 0 to Right, the hash code of an item describes a path through the tree.  One does not need to use all the bits, just enough to distinguish a given key from all the others.  Assuming 5-bit hashcodes, this picture illustrates how a given set of four keys would be distributed.
+Let's look at some candidates structures.
+
+ ## Simple hash tables
+
+The theory on hash tables of this type is extensive; you can get started [here](https://en.wikipedia.org/wiki/Hash_table).  
+The simplest hash table uses an array to store the values in the map.
+A _hash function_ is applied to a key to determine the location at which to store its value.
+The hash function should produce a good distribution of hash codes across the range of possible keys.
+The hash function might produce arbitrary integers; we mod the hash code to the size of the array to produce the index.
+
+One has to deal with the two keys hashing to the same index, i.e. key _collision_. Many techniques have been proposed.  Look at the article.
+
+Simple hash tables are not designed for immutability.  One would need to copy the entire array on each key/value change. You could contemplate using something like `PersistentVector` for the array storage.  But ... don't.  There are trade-offs in the the size of the `PersistentVector` as you start off, the need to grow it (which, given how modding comes in, requires recomputing indexes and moving all the elements to new positiions, which means lots of copying), and on and on.  It's just not going to work.
+
+## Tree indexing
+
+Rather than modding in integer-valued hash code to a small-ish range in order to index into an array, we could try to use the entire key value.  
+This approach uses trees instead of arrays.  As an example, we could store key/value pairs in a binary tree.  Treating the hash code as a sequence of bits and mapping 1 to Left and 0 to Right, the hash code of an item describes a path through the tree.  One does not need to use all the bits, just enough to distinguish a given key from all the others.  Assuming 5-bit hashcodes, this picture illustrates how a given set of four keys would be distributed.
 
 ![Binary search tree](/assets/images/BinaryTree-1.png)
 
 Again, one must deal with collisions.  
 
-## Hash Array Mapped Trees
 
-Binary branching is not efficient.  One can end up with trees that are quite deep and that are fragmented in memory.  Depth correlates with the number of memory accesses.  Fragmentation makes accesses are expensive.   We can take a lesson from `PersistenVector` regarding chunking the branch points into arrays implementing a (small-power-of-two)-way branching instead of binary branching.
+There are some problems to deal with. The tree can become unbalanced, leading to some branches being very long. This affects retrieval and copying performance.  There are a variety of ways of managing the tree structure to promote balance.  One can use a self-balancing tree structure such as an AVL tree or a red-black tree.  (In fact, a persistent implementation of red-black trees is the underlying structure for `PersistentTreeMap`, used when entries need to be kept in sorted order.)
+
+Even with balancing, a binary branching structure leads to poor memory management.   Many nodes must be accessed along the path determined by the key.  These nodes are going to scattered in memory, leading to lots of memory accesses and poor cache performance.  One can address this by chunking the tree into arrays.
+
+## `PersistentVector`
+
+The `PersistentVector` class solves some of these problems.  Its chief feature is using multi-way branching at each node to improve memory-access efficiency.  `PersistenVector` is a kind of map; an index into the vector is a key. The mechanism of tree traversal in `PV` shows how we can use chunks of the integer to determine branching.  There are two differences from the general mapping situation: (1) we are restricted to integer keys in a contiguous range, (2) there are lots of empty positions in the vector.
+
+A good approach would be to use the mechanisms of multi-way branching from `PV`, remove the restriction on key values, and deal with the sparseness of the keys. 
+
+## Hash Array Mapped Trees
 
 And this leads us to the _hash array mapped trie/tree_ (HAMT). Nodes have a (small-power-of-two)-way branching factor. The branch to choose at a particular level is based on several contiguous bits in the hash.  Which bits depend on the branching factor (power of two) and the level in the tree.  Using four as the branching factor, we might see a configuration such as the following:
 
@@ -46,9 +74,9 @@ In the `PersistentVector` structure, indexes are contiguous; there are no gaps. 
 
 First, we absolutely must detect a gap -- that a given hash code has no entry.  We can do this by not having a branch out of an index node.  But this can lead to a lot of wasted space in the array in the node.  We can compactify the array, providing entries only for occupied cells.  But now given the index, we must first determine if it is occupied and then, if occupied, determine what index in the compacted array it maps to.  This is done with a bitmap and a bit of bit manipulation.
 
-So we will allocate array storage only  for the occupied cells. The node will have a bitmap telling us which cells would be occupied in the full array.  Then we use a neat trick to map an index to the array cell holding its value tha involves calculating the number of one bits (sometimes known as the _population count_) in a masked section of the bitmap.  (See below.)
+We will allocate array storage only for the occupied cells. The node will have a bitmap telling us which cells would be occupied in the full array.  Then we use a neat trick to map an index to the array cell holding its value; this trick involves calculating the number of one bits (sometimes known as the _population count_) in a masked section of the bitmap.  (See below.)
 
-One last efficiency hack.  In a given node's array, we can store either key/value pair or links to the index the next level down.  This way we need only go down the tree as far as necessary to find the key/value pair.  This is a form of _path compression_.
+One last efficiency hack.  In a given node's array, we can store key/value pair and/or links to the index the next level down.  This way we need only go down the tree as far as necessary to find the key/value pair.  This is a form of _path compression_.
 
 Here's a rough sketch.   Let's assume a branching factor of 32 (a common choice).  Five bits can be used to provide an index in the range `[0,31]`.  We begin with the rightmost five bits to compute the index to check.  At the next level, we take the second five bits, etc. (We did the same thing in `PersistentVector`.) Say we are two levels down from the root, and supposed the hash for our key is 0xDD707.  (I'll ignore the zeros on the most significant end.)  Then we need to extract the third set of five bits.  From this picture
 

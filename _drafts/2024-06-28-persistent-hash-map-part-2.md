@@ -270,4 +270,4 @@ Finally, the `without` operation:
 
 There is the usual special case handling for the `null` key.  When we do the operation on the root, getting back the same root indicates the key was not present, so removing it was a no-op.  Otherwise, we have a new root and reduced count.
 
-
+In the [next post]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-3 %}), we look at the structure of the `INode` interface and the three node types that implement it.

@@ -10,7 +10,7 @@ We take a look at the internal nodes that implement the core algorithms of the `
 
 ## Background
 
-Take a look at [The root]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-2 %}) for what lies above what we deal with here.
+Take a look at [The root]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-2 %}) for the context in which these node types occur.
 
 ## The `INode` interface
 
@@ -35,14 +35,14 @@ type INode =
     abstract iteratorT: d: KVMangleFn<'T> -> IEnumerator<'T>
 ```
 
-We will cover the first four methods: `assoc`, `without`,  the first two `find` operations.
+We will cover  `assoc`, `without`, and the second `find`.  (The first `find` is almost identical.)  These are the primary operations defining map behavior.
 
- `getNodeSeq` is used to get a sequence to iterate through the entries at the node in question and below.  This is straightforward; I'm not going bother with it here. Similarly for the `kvReduce`, `fold` and other operations.   The overloads of `assoc` and `without` that take an `AtomicBoolean` first argument are used for the `transient` version of the map, which we will cover [later]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-4 %}).
+The overloads of `assoc` and `without` that take an `AtomicBoolean` first argument are used for the `transient` version of the map, which we will cover [later]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-4 %}).
 
    
 ## The `BitmapIndexedNode` node
 
-The `BitmapIndexedNode` node is what we described in the first of this series of post.  It contains a compressed array of entries -- there are no empty slots.  A bitmap indicates which slots are occupied.  We us the `bitCount` technique to find the actual index for an entry that is present.  An entry can be a key-value pair or another node.  The array itself is double-sized. It contains alternating key/value pairs.  If your key maps to `i`, look at `array[2*i]`.  If that is null, then `array[2*i+1]` will contain a node -- you're going to need to go down to the next level.  if `array[2*i]` is not `null`, then it is an actualy key. (This is why we can't put null keys down in the guts and have to hold them up at the main node.)  It may or may not be the key you ar looking for.  You have to check.  But no matter: if `array[2*i]` is not `null`, then `array[2*i]` & `array[2*i+1]` are a key-value pair.
+The `BitmapIndexedNode` node is what we described in [the first]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-1 %}) of this series of posts.  It contains a compressed array of entries -- there are no empty slots.  A bitmap indicates which slots are occupied.  We us the `bitCount` technique to find the actual index for an entry that is present.  An entry can be a key-value pair or another node.  The array itself is double-sized. It contains alternating key/value pairs.  If your key maps to `i`, look at `array[2*i]`.  If that is null, then `array[2*i+1]` will contain a node -- you're going to need to go down to the next level.  If `array[2*i]` is not `null`, then it is an actual key.  and `array[2*i]` & `array[2*i+1]` are a key-value pair.  (This is why we manage `null` key presence in the root object. `null` in a key position indicates no key present.)
 
 Looking at one of the `find` methods may help:
 
@@ -71,12 +71,13 @@ Looking at one of the `find` methods may help:
                     // Return the value associated with the key.
                     valOrNode
                 else
-                    // They key i snot null, it is not an actual key.  But it is not the key we are looking for.
+                    // They key is not null, it is not an actual key.  But it is not the key we are looking for.
                     nf
 ```
 
-The `assoc` and `without` methods will have similar methods of traversal.  The question is what you do when get to bottom.
-Let's start with `assoc`.
+The `assoc` and `without` methods will have similar methods of traversal to find where a key should be.  Let's start with `assoc`.  We are given a key/value pair.  We need to find where the key should reside.  Once there, we need to either add the pair if the key is not present or replace the value if the key is present (assuming the new value differs from the current value).
+
+One slight wrinkle is that if we need to add this key, the new `BitmapIndexedNode` that would result might be too full. (More on what that means later.)  In such a case, we switch from using a `BitmapIndexedNode` to an `ArrayNode`, to be discussed in detail in the next section.  For now, just hide your eyes when you walk past the code that builds the `ArrayNode`; it is not pretty. 
 
 ```F#
         // shift -- level in tree in in terms of number of bits to shift (multiple of 5)
@@ -103,7 +104,10 @@ Let's start with `assoc`.
 
                 // if we are above a threshold size, we switch from a BitmapIndexedNode to an ArrayNode (see below)
                 if n >= 16 then
-                    // all the code below is just what it takes to transition from a BitmapIndexedNode to an ArrayNode.
+                    // -------------------------------------------------------------
+
+                    // all the code below (through the next line of dashes) is  what it takes 
+                    // to transition from a BitmapIndexedNode to an ArrayNode 
                     
                     // This will be the new array of entries for the ArrayNode
                     let nodes: INode[] = Array.zeroCreate 32
@@ -140,6 +144,9 @@ Let's start with `assoc`.
                             j <- j + 2
 
                     upcast ArrayNode(null, n + 1, nodes)
+
+                    // -------------------------------------------------------------
+
                 else
                     // we are not too full -- we can just add the key/value pair to the BitmapIndexedNode's array 
                     // (of course, we have to create a new array and a new  node)
@@ -500,7 +507,7 @@ This means only that the hash value of the new key matches the hash code of the 
                     .assoc (shift, h, key, value, addedLeaf)
 ```
 
-
+Take all the comments out and it's not _all_ that much code.
 
 =========================================================
 
