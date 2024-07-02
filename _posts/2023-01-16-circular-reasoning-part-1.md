@@ -87,7 +87,7 @@ type MyClass(x:int) =
         member this.seq() = upcast this
 ```
 
-The problem is that aliases are not sticky.  Any program from the outside would not see that `MyClass` implements `IPersisentCollection`.  It would see `IPersistentCollectionT<ISeq>`.  I'm not sure I'm willing to violate expectations to that extent.
+The problem is that aliases are not sticky.  Any program from the outside would not see that `MyClass` implements `IPersistentCollection`.  It would see `IPersistentCollectionT<ISeq>`.  I'm not sure I'm willing to violate expectations to that extent.
 
 An alternative would be to create real types:
 

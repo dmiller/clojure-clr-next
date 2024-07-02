@@ -10,9 +10,9 @@ We continue our discussion of `PersistentHashMap` with a discussion of transienc
 
 The previous posts in this series are:
 
-- [Part 1: Making a hash of things (this post)]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-1 %})
-- [Part 2: The root]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-2 %})
-- [Part 3: The guts]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-3 %})
+- [Part 1: Making a hash of things (this post)]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-1 %})
+- [Part 2: The root]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-2 %})
+- [Part 3: The guts]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-3 %})
 
 # Transiency
 
@@ -79,4 +79,4 @@ Given that each variation was causing me to rework hundreds of lines of code, I 
 
 # Onward
 
-We conclude this series of posts with a [look at performance]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-5 %}) and a comparison of the F# and Clojure versions of `PersistentHashMap`.
+We conclude this series of posts with a [look at performance]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-5 %}) and a comparison of the F# and Clojure versions of `PersistentHashMap`.

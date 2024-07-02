@@ -10,7 +10,7 @@ We take a look at the internal nodes that implement the core algorithms of the `
 
 ## Background
 
-Take a look at [The root]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-2 %}) for the context in which these node types occur.
+Take a look at [The root]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-2 %}) for the context in which these node types occur.
 
 ## The `INode` interface
 
@@ -37,12 +37,12 @@ type INode =
 
 We will cover  `assoc`, `without`, and the second `find`.  (The first `find` is almost identical.)  These are the primary operations defining map behavior.
 
-The overloads of `assoc` and `without` that take an `AtomicBoolean` first argument are used for the `transient` version of the map, which we will cover [later]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-4 %}).
+The overloads of `assoc` and `without` that take an `AtomicBoolean` first argument are used for the `transient` version of the map, which we will cover [later]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-4 %}).
 
    
 ## The `BitmapIndexedNode` node
 
-The `BitmapIndexedNode` node is what we described in [the first]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-1 %}) of this series of posts.  It contains a compressed array of entries -- there are no empty slots.  A bitmap indicates which slots are occupied.  We us the `bitCount` technique to find the actual index for an entry that is present.  An entry can be a key-value pair or another node.  The array itself is double-sized. It contains alternating key/value pairs.  If your key maps to `i`, look at `array[2*i]`.  If that is null, then `array[2*i+1]` will contain a node -- you're going to need to go down to the next level.  If `array[2*i]` is not `null`, then it is an actual key.  and `array[2*i]` & `array[2*i+1]` are a key-value pair.  (This is why we manage `null` key presence in the root object. `null` in a key position indicates no key present.)
+The `BitmapIndexedNode` node is what we described in [the first]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-1 %}) of this series of posts.  It contains a compressed array of entries -- there are no empty slots.  A bitmap indicates which slots are occupied.  We us the `bitCount` technique to find the actual index for an entry that is present.  An entry can be a key-value pair or another node.  The array itself is double-sized. It contains alternating key/value pairs.  If your key maps to `i`, look at `array[2*i]`.  If that is null, then `array[2*i+1]` will contain a node -- you're going to need to go down to the next level.  If `array[2*i]` is not `null`, then it is an actual key.  and `array[2*i]` & `array[2*i+1]` are a key-value pair.  (This is why we manage `null` key presence in the root object. `null` in a key position indicates no key present.)
 
 Looking at one of the `find` methods may help:
 

@@ -8,6 +8,12 @@ categories: general
 The first of several posts on implementing immutable, persistent Hash Array Mapped Tries.  This post describes the data structure at a high level; subsequent posts will provide F# code for the base implementation and then discuss transiency.
 
 
+- Part 1: Making a hash of things (this post)
+- [Part 2: The root]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-2 %})
+- [Part 3: The guts]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-3 %})
+- [Part 4: Other matters]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-4 %})
+- [Part 5: At a loss]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-5 %})
+
 
 # Making a hash of things
 
@@ -24,7 +30,7 @@ most of the rest involve iterating over the key/value pairs in the map and perfo
 
 Because we are living in the land of the persistent and immutable, the general case for the `assoc` and `without` operations is to generate a new map with the desired change.  The original map is left unchanged.  (The `find` operation is a read-only operation and does not change the map.)  For efficiency, we will need the new map to share as much structure are possible with the original map.
 
-HAMTs can viewed a mash-up of simple hash tables, binary search trees and the ideas we covered when discussing  _persistent bit-partitioned vector tries_  (see [Persistent vectors, Part 2 -- Immutability and persistence]({{site.baseurl}}{% post_url 2023-02-12-PersisentVector-part-2 %})). 
+HAMTs can viewed a mash-up of simple hash tables, binary search trees and the ideas we covered when discussing  _persistent bit-partitioned vector tries_  (see [Persistent vectors, Part 2 -- Immutability and persistence]({{site.baseurl}}{% post_url 2023-02-12-PersistentVector-part-2 %})). 
 
 Let's look at some candidates structures.
 
@@ -151,4 +157,4 @@ If we want to modify the data of node 6 to be Q, we must make copies of all node
 
  The original tree still exists, unmodified.  Copying and resuse are the secrets to immutability, persistence, and efficiency.
 
- And now we can code.  In the [next post]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-2 %}), I'll cover the basics of an implementation of `PersistentHashMap` in F#. 
+ And now we can code.  In the [next post]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-2 %}), I'll cover the basics of an implementation of `PersistentHashMap` in F#. 
