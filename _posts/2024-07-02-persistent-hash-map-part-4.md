@@ -16,7 +16,7 @@ The previous posts in this series are:
 
 # Transiency
 
-I refer you to the [discussion]({{site.baseurl}}{% post_url 2023-02-18-PersisentVector-part-3 %}) of transiency in the `PersistentVector` series.
+I refer you to the [discussion]({{site.baseurl}}{% post_url 2023-02-18-PersistentVector-part-3 %}) of transiency in the `PersistentVector` series.
 
 As for `PersistentVector`, `PersistentHashMap` supports interfaces such as `IEditableCollection`, `ITransientCollection`, `ITransientAssociative`.  There is one additional, map-specific transiency inteface:
 
