@@ -4,6 +4,7 @@ open System
 open System.Collections
 open System.Collections.Generic
 open Clojure.Numerics
+open System.Text
 
 
 ////////////////////////////////////
@@ -898,6 +899,8 @@ and [<AllowNullLiteral>] INode =
     abstract iterator: d: KVMangleFn<obj> -> IEnumerator
     abstract iteratorT: d: KVMangleFn<'T> -> IEnumerator<'T>
 
+    abstract printContents: prefix: string -> unit  (* debug helper *)
+
 and [<AbstractClass; Sealed>] private NodeOps() =
 
     static member cloneAndSet(arr: 'T array, i: int, a: 'T) : 'T array =
@@ -936,6 +939,15 @@ and [<AbstractClass; Sealed>] private NodeOps() =
         seq { 0..2 .. 2 * count - 1 }
         |> Seq.tryFindIndex (fun i -> Util.equiv (key, items[i]))
         |> Option.defaultValue -1
+
+    // Debug helper
+    static member nodeTypeDesignator(node: INode) =
+        match node with
+        | :? ArrayNode -> "A"
+        | :? BitmapIndexedNode -> "B"
+        | :? HashCollisionNode -> "C"
+        | _ -> "?"
+
 
 and [<AbstractClass; Sealed>] private NodeIter() =
     static member getEnumerator(array: obj[], d: KVMangleFn<obj>) : IEnumerator =
@@ -1354,6 +1366,10 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
                 .assoc(edit, shift, key1hash, key1, val1, box)
                 .assoc (edit, shift, key2hash, key2, val2, box)
 
+    member _.printContents() =
+        printfn "PersistentHashMap: count=%d, hasNull=%b"  count hasNull
+        if not (isNull root) then root.printContents ("*"+ NodeOps.nodeTypeDesignator(root) + ":")
+
 
 
 and private TransientHashMap(e, r, c, hn, nv) =
@@ -1637,6 +1653,25 @@ and [<Sealed>] private ArrayNode(e, c, a) =
                 }
 
             s.GetEnumerator()
+
+        member this.printContents(prefix) : unit =
+            let sb = StringBuilder(prefix)
+
+            for i = 0 to array.Length - 1 do
+                let node = array.[i]
+
+                if not (isNull node) then
+                    sb.AppendFormat(" {0}:{1}", i, NodeOps.nodeTypeDesignator(node)) |> ignore
+
+            printfn "%s" (sb.ToString())
+
+            
+            for i = 0 to array.Length - 1 do
+                let node = array.[i]
+
+                if not (isNull node) then
+                    let newPrefix = prefix + "-" + i.ToString() + ":" + NodeOps.nodeTypeDesignator(node) + ":"
+                    node.printContents (newPrefix)
 
 
     static member foldTasks(tasks: Func<obj>[], combinef: IFn, fjtask: IFn, fjfork: IFn, fjjoin: IFn) =
@@ -1976,6 +2011,35 @@ and [<Sealed; AllowNullLiteral>] internal BitmapIndexedNode(e, b, a) =
 
         member _.iteratorT(d) = NodeIter.getEnumeratorT (array, d)
 
+        member this.printContents(prefix) : unit =
+            let sb = StringBuilder(prefix)
+
+            let mutable j = 0
+
+            for i = 0 to 31 do
+                if ((bitmap >>> i) &&& 1) <> 0 then
+                    if isNull array[j] then
+                        // we have a node
+                        let child = array.[j + 1] :?> INode
+                        sb.AppendFormat(" {0}:{1}", i, NodeOps.nodeTypeDesignator(child)) |> ignore
+                    else
+                        // we have a key-value pair
+                        sb.AppendFormat(" {0} = Key {1}, ", i, array[j]) |> ignore
+                    j <- j + 2
+
+            printfn "%s" (sb.ToString())
+
+            j <- 0
+            for i = 0 to 31 do
+                if ((bitmap >>> i) &&& 1) <> 0 then
+                    if isNull array[j] then
+                        // we have a node
+                        let child = array.[j + 1] :?> INode
+                        let newPrefix = prefix + "-" + i.ToString() + ":" + NodeOps.nodeTypeDesignator(child) + ":"
+                        child.printContents (newPrefix)
+                    j <- j + 2
+
+
     member this.ensureEditable(e: AtomicBoolean) : BitmapIndexedNode =
         if LanguagePrimitives.PhysicalEquality myedit e then
             this
@@ -2126,6 +2190,14 @@ and HashCollisionNode(edit: AtomicBoolean, hash: int, c, a) =
         member _.iterator(d) = NodeIter.getEnumerator (array, d)
 
         member _.iteratorT(d) = NodeIter.getEnumeratorT (array, d)
+
+        member _.printContents(prefix) : unit =
+            let sb = StringBuilder(prefix)
+
+            for i = 0 to array.Length - 1 do
+                if i % 2 = 0 then sb.AppendFormat(" {0}:Key {1}, ", i, array[i]) |> ignore
+
+            printfn "%s" (sb.ToString())
 
 
     member this.ensureEditable(e) =

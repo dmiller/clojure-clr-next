@@ -705,6 +705,8 @@ and [<Sealed; AllowNullLiteral>] internal BNode(e, b, ks, vs) =
 
         member _.iteratorT(d) = BNodeIter.getEnumeratorT (kns, vals, NodeOps.bitCount bitmap, d)
 
+        member _.printContents(prefix) = ()
+
     member this.ensureEditable(e: AtomicBoolean) : BNode =
         if LanguagePrimitives.PhysicalEquality myedit e then
             this
@@ -864,6 +866,7 @@ and CNode(edit: AtomicBoolean, hash: int, c, a) =
 
         member _.iteratorT(d) = NodeIter.getEnumeratorT (array, d)
 
+        member _.printContents(prefix) = ()
 
     member this.ensureEditable(e) =
         if LanguagePrimitives.PhysicalEquality e edit then
