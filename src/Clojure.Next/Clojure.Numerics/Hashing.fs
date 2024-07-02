@@ -8,7 +8,7 @@ open System.Collections
 // along with Murmur3.  Also have moved the IHashEq interface here,
 //  so it is not possible for it to be here.
 
-let hash x =
+let hash (x:obj) =
     match x with
     | null -> 0
     | _ -> x.GetHashCode()
