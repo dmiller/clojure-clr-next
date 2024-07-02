@@ -1,6 +1,6 @@
 ---
 layout: post
-title: `PersistentHashMap`, part 2 -- The guts
+title: PersistentHashMap, part 2 -- The guts
 date: 2024-07-02 00:00:00 -0500
 categories: general
 ---

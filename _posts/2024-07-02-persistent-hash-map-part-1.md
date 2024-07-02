@@ -1,6 +1,6 @@
 ---
 layout: post
-title: `PersistentHashMap`, Part 1 -- Making a hash of things
+title: PersistentHashMap, Part 1 -- Making a hash of things
 date: 2024-07-02 00:00:00 -0500
 categories: general
 ---
