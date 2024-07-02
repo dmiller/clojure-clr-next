@@ -1,6 +1,6 @@
 ---
 layout: post
-title: PersistentHashMap, part 2 -- The guts
+title: PersistentHashMap, part 3 -- The guts
 date: 2024-07-02 00:00:00 -0500
 categories: general
 ---
@@ -509,89 +509,5 @@ This means only that the hash value of the new key matches the hash code of the 
 
 Take all the comments out and it's not _all_ that much code.
 
-=========================================================
-
-
-
-
-## Not bitter at all
-
-After writing all this, I decided to benchmark my two versions of the code: (a) the translation of the C# code; and (b) the 'proper' F# code explained above.
-
-In translating the C# version--itself a very direct translation of the Java code--I did try to write fairly idiomatic F# code.  Minor differences are things like the three node types being classes that implement a common interface.  The major differences lie in the internal structure of those nodes.  For example, in the C#-translation, the `BitmapNode`'s array does not contain a discriminated union of consisting of key-value pairs vs nodes.  Rather, it contains an array with 2*n elements.  When a hash segment translates to `i`, one checks `entries[2*i]`.  If it is `null`, then `entries[2*i+1]`
- will be the node to recurse to.   If it is not `null`', then it is a key and `entries[2*i+1]` is its paired value.  One then checks to see if is the key of interest and acts accordingly.
-
- Note that this method ascribes a special meaning to a `null` where a key might be.  Thus `null`s cannot be keys in the nodes themselves.  This is handled by special casing `null' key presence in the top-level code.
-
- I wondered what penalty the proper code would incur for the F# fanciness of discriminated unions, option types, etc.  So I wrote a benchmark using Benchmark.Net. (Yay!)  I chose to test `assoc`, figuring it would stand in also for `without` and `find`.  I tested by inserting 1000 and 10000 random integer values.
-
- The results were not happy.  `MakeSHMByAssoc` tests the code above; `MakePHMByAssoc` tests the C# translation;  `MakePHMByTransient` tests the use of transients in the translated C# code.  (Ignore the last one for now.)  Read and weep:
-
-
-|             Method | count |           Mean |  Ratio |  Allocated |
-|------------------- |------ |---------------:|-------:|-----------:|
-|     MakeSHMByAssoc |  1000 |    45,228.8 us |  80.33 |  769.03 KB |
-|     MakePHMByAssoc |  1000 |       570.7 us |   1.00 |  803.81 KB |
-| MakePHMByTransient |  1000 |       399.6 us |   0.70 |  251.22 KB |
-|                    |       |                |        |            |
-|     MakeSHMByAssoc | 10000 | 3,320,067.3 us | 415.32 | 9129.06 KB |
-|     MakePHMByAssoc | 10000 |     7,879.8 us |   1.00 | 9388.42 KB |
-| MakePHMByTransient | 10000 |     3,765.6 us |   0.47 | 1644.79 KB |
-
-I expected a hit.  I did not expect ratios like 80X and 415X in performance.  
-I was also perplexed by the fact that it was allocating less memory.  
-Surely a bunch of `isint` IL instructions versus `null` checks would not be so bad.
-
-I went to bed.  
-
-And when I woke up (not with a sudden insight, but with ... never mind).  
-In my several moments of wakefulness, the answer came to me.  
-In moving from the class-defined nodes to the discriminated union, the semantics of equality changed from reference to structural.  
-Reference semantics is just doing a pointer check, which is appropriate here as we want to know if we got back exactly the same node as we had before, in code like this:
-
-```F#
-                let newNode =
-                    node.assoc (shift + 5) hash key value addedLeaf
-
-                if newNode = node then
-                    this
-                else
-                    ArrayNode(count, cloneAndSet (nodes, idx, Some newNode))
-
-```
-With reference semantics, that little `=` is a nice call to `Object.ReferenceEquals` which becomes some really trivial IL/assembler.  
-With structural semantics, that little `=` turns into a ferocious CPU cycle eater that traverse both data structures, including the arrays.   
-The fix?  Just one little annotation:
-
-```F#
-[<ReferenceEquality>] SHMNode = ...
-```
-
-And we have tamed the beast:
-
-
-|             Method | count |       Mean | Ratio |  Allocated |
-|------------------- |------ |-----------:|------:|-----------:|
-|     MakeSHMByAssoc |  1000 |   443.0 us |  0.78 |  773.03 KB |
-|     MakePHMByAssoc |  1000 |   563.2 us |  1.00 |   805.4 KB |
-| MakePHMByTransient |  1000 |   440.9 us |  0.78 |  252.03 KB |
-|                    |       |            |       |            |
-|     MakeSHMByAssoc | 10000 | 8,002.8 us |  0.99 | 9125.06 KB |
-|     MakePHMByAssoc | 10000 | 8,106.0 us |  1.00 | 9387.96 KB |
-| MakePHMByTransient | 10000 | 3,893.0 us |  0.48 | 1644.87 KB |
-
-I am amazed that the 'proper' code beats the 'optimized' code.  I'm not sure how the F# compiler and runtime does it.
-
-## Coda: Transients
-
-The idea behind transient collections in Clojure is to allow efficient mass editing of a data structure such as a map efficiently using mutability, while protecting other threads from seeing those edits in an incomplete state.  To do so, access to the data structure is restrcited to a single thread.  Transitory mutability that cannot be seen still counts as immutability.  
-
-Transients work best when doing a large number of operations all at once.  It requires a special transient type at the root.  It uses the same node types but requires those node types to implement special versions of key methods such as `assoc` and `without`.  For example, when inserting a key/value pair in a `BitmapNode`, rather than creating a new `BitmapNode` node, it can just modify the array of the existing node.
-
-Adding this to the code above is non-trivial.  The arrays in the nodes are mutable, but one may have to change the array (if we need to increase or decrease the array size, e.g.), and things like the `bitmap` in a `BitmapNode` or the `count` in an `ArrayNode` will have to changed.  This requires mutable fields, something discriminated unions don't allow directly.   The obvious solutions are to use `ref` types in those fields or to move from the discriminated union for the node types back to classes/interface. 
-
-I didn't think I'd have to contemplate this:  Given the closeness in performance, do I stick with the convoluted translation (Java -> C# -> F#) or go with the code above?  I think I have to deal with transients and the other cruft needed to finish the persistent hash-array mapped trie in the Clojure context in order to make that call.  
-
-Stay tuned.
-
+The [next post]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-4 %}) will cover transiency and some alternative coding techniques.  
 
