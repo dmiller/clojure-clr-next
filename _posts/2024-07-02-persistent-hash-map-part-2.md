@@ -1,7 +1,7 @@
 ---
 layout: post
 title: `PersistentHashMap`, part 2 -- The root
-date: 2024-06-28 00:00:00 -0500
+date: 2024-07-02 00:00:00 -0500
 categories: general
 ---
 
@@ -9,7 +9,7 @@ I'll sketch the code for the root of the `PersistentHashMap` structure in this p
 
 ## Refresher
 
-You can refer to the [first post]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-1 %}) in this series for the background on HAMTs.
+You can refer to the [first post]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-1 %}) in this series for the background on HAMTs.
 
 ## Interfaces
 
@@ -270,4 +270,4 @@ Finally, the `without` operation:
 
 There is the usual special case handling for the `null` key.  When we do the operation on the root, getting back the same root indicates the key was not present, so removing it was a no-op.  Otherwise, we have a new root and reduced count.
 
-In the [next post]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-3 %}), we look at the structure of the `INode` interface and the three node types that implement it.
+In the [next post]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-3 %}), we look at the structure of the `INode` interface and the three node types that implement it.

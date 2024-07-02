@@ -1,16 +1,17 @@
 ---
 layout: post
 title: `PersistentHashMap`, Part 1 -- Making a hash of things
-date: 2024-06-28 00:00:00 -0500
+date: 2024-07-02 00:00:00 -0500
 categories: general
 ---
 
 The first of several posts on implementing immutable, persistent Hash Array Mapped Tries.  This post describes the data structure at a high level; subsequent posts will provide F# code for the base implementation and then discuss transiency.
 
-- [Part 1: Making a hash of things (this post)]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-1 %})
-- [Part 2: The root]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-2 %})
-- [Part 3: The guts]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-3 %})
-- [Part 4: Other matters]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-4 %})
+- [Part 1: Making a hash of things (this post)]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-1 %})
+- [Part 2: The root]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-2 %})
+- [Part 3: The guts]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-3 %})
+- [Part 4: Other matters]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-4 %})
+- [Part 5: At a loss]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-5 %})
 
 
 # Making a hash of things
@@ -155,4 +156,4 @@ If we want to modify the data of node 6 to be Q, we must make copies of all node
 
  The original tree still exists, unmodified.  Copying and resuse are the secrets to immutability, persistence, and efficiency.
 
- And now we can code.  In the [next post]({{site.baseurl}}{% post_url 2024-06-28-persisent-hash-map-part-2 %}), I'll cover the basics of an implementation of `PersistentHashMap` in F#. 
+ And now we can code.  In the [next post]({{site.baseurl}}{% post_url 2024-07-02-persisent-hash-map-part-2 %}), I'll cover the basics of an implementation of `PersistentHashMap` in F#. 
