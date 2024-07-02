@@ -920,7 +920,7 @@ and [<AbstractClass; Sealed>] private NodeOps() =
 
     // Random goodness
 
-    static member hash(k) = Hashing.hasheq (k)
+    static member hash (k:obj) = Hashing.hasheq k
     static member mask(hash: int, shift: int) = (hash >>> shift) &&& 0x01f
     static member bitPos(hash, shift) = 1 <<< NodeOps.mask (hash, shift)
 
@@ -1141,8 +1141,7 @@ and PersistentHashMap private (meta: IPersistentMap, count: int, root: INode, ha
                 hasNull
             else
                 (not (isNull root))
-                && root.find (0, NodeOps.hash (k), k, PersistentHashMap.notFoundValue)
-                   <> PersistentHashMap.notFoundValue
+                &&  not <| LanguagePrimitives.PhysicalEquality  (root.find (0, NodeOps.hash (k), k, PersistentHashMap.notFoundValue)) PersistentHashMap.notFoundValue
 
         override _.entryAt(k) =
             if isNull k then
