@@ -97,3 +97,59 @@ type CategoryVersusOps() =
     [<Benchmark>]
     member this.NextOps2() = Clojure.Numerics.OpsSelector.ops(this.testedVal)
 
+
+
+type HashStringUTests() = 
+
+    [<Params( 100 )>]
+    member val size: int = 0 with get, set
+
+    static member getValue (i : int) : string =
+        match i % 4 with
+        | 0 -> "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        | 1 -> "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        | 2 -> "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        | _ -> "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  
+    [<Benchmark(Baseline = true)>]
+    member this.FirstHashStringU() = 
+        let mutable x : uint32 = 0u
+
+        for i = 0 to this.size-1 do
+            x <- x + clojure.lang.Murmur3.HashStringU( HashStringUTests.getValue(i))
+        x
+        
+    [<Benchmark>]
+    member this.NextHashStringU() = 
+        let mutable x : uint32 = 0u
+
+        for i = 0 to this.size-1 do
+            x <- x + Clojure.Numerics.Murmur3.HashStringU( HashStringUTests.getValue(i))
+        x
+        
+[<MemoryDiagnoser ;HardwareCounters(HardwareCounter.BranchMispredictions,HardwareCounter.BranchInstructions,HardwareCounter.CacheMisses)   >]
+type HasheqTests() =
+
+    [<Params( 1_000)>]
+    member val size: int = 0 with get, set
+
+    static member getValue (i : int) : obj =
+        match i % 4 with
+        | 0 -> 1.3 :> obj
+        | 1 -> "buckle my shoe" :> obj
+        | 2 -> System.DateTime.Now :> obj
+        | _ -> 12 :> obj
+  
+    [<Benchmark(Baseline = true)>]  
+    member this.FirstHasheq() =
+        let mutable x : int = 0
+        for i = 0 to this.size-1 do
+            x <- x + clojure.lang.Util.hasheq( HasheqTests.getValue(i))
+        x
+
+    [<Benchmark>]  
+    member this.NextHasheq() =
+        let mutable x : int = 0
+        for i = 0 to this.size-1 do
+            x <- x + Clojure.Numerics.Hashing.hasheq( HasheqTests.getValue(i))
+        x

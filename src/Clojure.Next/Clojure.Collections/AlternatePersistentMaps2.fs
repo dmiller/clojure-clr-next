@@ -178,8 +178,7 @@ type PHashMap(meta: IPersistentMap, count: int, root: INode2 option) =
             match root with
             | None -> false
             | Some n ->
-                n.find (0, NodeOps.hash (k), k, PHashMap.notFoundValue)
-                <> PHashMap.notFoundValue
+                LanguagePrimitives.PhysicalEquality (n.find (0, NodeOps.hash (k), k, PHashMap.notFoundValue)) PHashMap.notFoundValue
 
         override _.entryAt(k) =
             match root with

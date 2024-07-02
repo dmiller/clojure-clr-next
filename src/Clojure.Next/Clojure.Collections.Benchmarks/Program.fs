@@ -7,30 +7,38 @@ open NumericsBenchmarks
 [<EntryPoint>]
 let main argv =
 
-    //Clojure.Numerics.Initializer.init() |> ignore
+    // tests on numerics implementation
 
-    //BenchmarkRunner.Run<RTEquiv>() |> ignore
-
+    //BenchmarkRunner.Run<isNumericTests>() |> ignore
     //BenchmarkRunner.Run<NumericEquivTests>() |> ignore
     //BenchmarkRunner.Run<NumericConverterTests>() |> ignore
-    
-    BenchmarkRunner.Run<CategoryVersusOps>() |> ignore
-   
+    //BenchmarkRunner.Run<CategoryVersusOps>() |> ignore
+    //BenchmarkRunner.Run<HashStringUTests>() |> ignore
+    //BenchmarkRunner.Run<HasheqTests>() |> ignore
+    BenchmarkRunner.Run<UtilEquivTests>() |> ignore
 
+
+    // Tests on PersistentVector 
 
     //BenchmarkRunner.Run<PVCons>() |> ignore
     //BenchmarkRunner.Run<PVTransientConj>() |> ignore
     //BenchmarkRunner.Run<PVNth>() |> ignore
     //BenchmarkRunner.Run<PersistentVsTransient>() |> ignore
 
-    
-    //BenchmarkRunner.Run<PMCreateWithCheck>() |> ignore
-    //BenchmarkRunner.Run<PMCreateByAssoc>() |> ignore
+
+    // Tests on PersistentArrayMap
+
+    //BenchmarkRunner.Run<PAMCreateWithCheck>() |> ignore
+    //BenchmarkRunner.Run<PAMCreateByAssoc>() |> ignore
 
 
-    //BenchmarkRunner.Run<PHMCons>() |> ignore
-    //BenchmarkRunner.Run<PHMTransientConj>() |> ignore
+    // Tests on PersistentHashMap
+
+    //BenchmarkRunner.Run<PHMAssoc>() |> ignore
+    //BenchmarkRunner.Run<PHMTransientAssoc>() |> ignore
     //BenchmarkRunner.Run<PHMContainsKey>() |> ignore
+    //BenchmarkRunner.Run<PHMContainsMissingKey>() |> ignore
+
 
 
 
