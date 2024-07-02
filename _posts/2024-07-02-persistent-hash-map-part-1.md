@@ -34,7 +34,7 @@ HAMTs can viewed a mash-up of simple hash tables, binary search trees and the id
 
 Let's look at some candidates structures.
 
- ## Simple hash tables
+## Simple hash tables
 
 The theory on hash tables of this type is extensive; you can get started [here](https://en.wikipedia.org/wiki/Hash_table).  
 The simplest hash table uses an array to store the values in the map.
@@ -51,7 +51,8 @@ Simple hash tables are not designed for immutability.  One would need to copy th
 Rather than modding in integer-valued hash code to a small-ish range in order to index into an array, we could try to use the entire key value.  
 This approach uses trees instead of arrays.  As an example, we could store key/value pairs in a binary tree.  Treating the hash code as a sequence of bits and mapping 1 to Left and 0 to Right, the hash code of an item describes a path through the tree.  One does not need to use all the bits, just enough to distinguish a given key from all the others.  Assuming 5-bit hashcodes, this picture illustrates how a given set of four keys would be distributed.
 
-![Binary search tree](/assets/images/BinaryTree-1.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/BinaryTree-1.png" alt="Binary search tree example" />
+
 
 Again, one must deal with collisions.  
 
@@ -70,7 +71,7 @@ A good approach would be to use the mechanisms of multi-way branching from `PV`,
 
 And this leads us to the _hash array mapped trie/tree_ (HAMT). Nodes have a (small-power-of-two)-way branching factor. The branch to choose at a particular level is based on several contiguous bits in the hash.  Which bits depend on the branching factor (power of two) and the level in the tree.  Using four as the branching factor, we might see a configuration such as the following:
 
-![HAMT example](/assets/images/HAMT-1.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/HAMT-1.png" alt="HAMT example" />
 
 In the `PersistentVector` structure, indexes are contiguous; there are no gaps.  With HAMTs, there can be considerable sparseness.   We have to deal with the gaps.  In the process of doing so, we can gain several efficiencies.   
 
@@ -82,14 +83,15 @@ One last efficiency hack.  In a given node's array, we can store key/value pair 
 
 Here's a rough sketch.   Let's assume a branching factor of 32 (a common choice).  Five bits can be used to provide an index in the range `[0,31]`.  We begin with the rightmost five bits to compute the index to check.  At the next level, we take the second five bits, etc. (We did the same thing in `PersistentVector`.) Say we are two levels down from the root, and supposed the hash for our key is 0xDD707.  (I'll ignore the zeros on the most significant end.)  Then we need to extract the third set of five bits.  From this picture
 
-![HAMT example](/assets/images/HAMT-2.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/HAMT-2.png" alt="HAMT example" />
+
 
 we compute an index of 21.   If we were not working with compacted array storage, we would just look at `entries[21]` for the node in question and see if it represented a key/value pair, a link to another node one level down, or was empty.   However, if we are using compacted array storage, we must figure out where index 21 is mapped to.  Of course, it might be that index 21 is empty and hence not in the array.  We check that by seeing if bit 21 is set in the node's bitmap.  If not, then the key is not present.
 
 Suppose the node in question has bitmap 0xD36FCB4.  It is set in bits 2, 4, 5, 7, 10, 11, 12, 13, 14, 15, 17, 18, 20, 21, 24, 27.  So index 21 is indeed occupied in this node's array.  
 But mapped to what index in the node's array? Well, you can count how many bits prior to 21 are set.  That is 13 in this case.  So to find intended index 21 we look in index 13 in the compacted array.
 
-![HAMT example](/assets/images/HAMT-3.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/HAMT-3.png" alt="HAMT example" />
 
 ## Top-level code
 
@@ -145,15 +147,15 @@ There are plenty of tutorials available online with wonderful pictures and anima
 
  In immutable collections, operations that modify the collection, such as an insertion or a deletion do not modify the data structure.  Say we have a tree-shaped data structure and we are doing an insertion into the tree.  We will make a copy of the tree with the new item inserted, leaving the original tree intact.   We can do this reasonably efficienty  if we are clever enough to have our new tree share as much structure of the old tree as possible, the parts that don't need to change.  This is safe if the starting tree is immutable because the parts from the original tree are guaranteed not to change.  Consider the following binary tree.  Nodes are labeled with _id:datum_.
 
-![Original tree](/assets/images/PersistentTree-1.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/PersistentTree-1.png" alt="Original tree" />
 
 If we want to modify the data of node 6 to be Q, we must make copies of all nodes from 6 back to the root (thus, nodes 4 and 1).  They point to the nodes in the original tree when possible and to the new nodes where required to create the correct structure with a minimum of duplication:
 
-![New tree](/assets/images/PersistentTree-2.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/PersistentTree-2.png" alt="New tree" />
 
  For clarity, here is the new tree standing alone.
 
-![New tree, alone](/assets/images/PersistentTree-3.png)
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/PersistentTree-3.png" alt="New tree, alone" />
 
  The original tree still exists, unmodified.  Copying and resuse are the secrets to immutability, persistence, and efficiency.
 
