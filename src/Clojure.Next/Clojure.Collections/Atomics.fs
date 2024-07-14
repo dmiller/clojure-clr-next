@@ -74,7 +74,6 @@ type AtomicLong(v: int64) =
     member this.get() = value
 
     member this.getAndSet(update: int64) = Interlocked.Exchange(&value, update)
-
     
     member this.set(update: int64) = Interlocked.Exchange(&value, update)
 
@@ -85,4 +84,28 @@ type AtomicLong(v: int64) =
     member this.incrementAndGet() = Interlocked.Increment(&value)
 
     member this.getAndIncrement() = Interlocked.Increment(&value) - 1L
+
+// Implements the Java java.util.concurrent.atomic.AtomicInteger class.  
+[<Sealed;AllowNullLiteral>]
+type AtomicInteger(v: int) =
+
+    let mutable value = v
+
+    new() = AtomicInteger(0)
+
+    override _.ToString() = value.ToString()
+
+    member this.get() = value
+
+    member this.getAndSet(update: int) = Interlocked.Exchange(&value, update)
+    
+    member this.set(update: int) = Interlocked.Exchange(&value, update)
+
+    member this.compareAndSet(expect: int, update: int) =
+        let oldVal = Interlocked.CompareExchange(&value, expect, update)
+        oldVal  = expect
+
+    member this.incrementAndGet() = Interlocked.Increment(&value)
+
+    member this.getAndIncrement() = Interlocked.Increment(&value) - 1
 

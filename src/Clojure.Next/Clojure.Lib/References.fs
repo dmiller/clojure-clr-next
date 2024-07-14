@@ -5,11 +5,11 @@ open System.Runtime.CompilerServices
 open System
 open System.Threading
 open System.Collections.Generic
-
+open Clojure.Numerics
 
 // Provides a basic implementation of IReference functionality.
 // The JVM implementation does not make this abstract, but we're never going to instantiate one of these directly.
-[<AbstractClass>]
+[<AbstractClass;AllowNullLiteral>]
 type AReference(m : IPersistentMap) =
 
     let mutable meta = m
@@ -34,8 +34,8 @@ type AReference(m : IPersistentMap) =
         member this.meta() = meta
 
 
-// Provides a basic implementation of IReference functionality.
-[<AbstractClass>]
+// Provides a basic implementation of IRef functionality.
+[<AbstractClass;AllowNullLiteral>]
 type ARef(m) =
     inherit AReference(m)
 
@@ -54,12 +54,12 @@ type ARef(m) =
     interface IDeref with
          member _.deref() =
             raise
-            <| NotImplementedException("Derived classes must implement Associative.containsKey(key)")
+            <| NotImplementedException("Derived classes must implement IDeref.deref()")
 
     // Invoke an IFn on value to validate the value.
     // The IFn can indicate a failed validation by returning false-y or throwing an exception.
 
-    static member Validate(vf : IFn, value: obj) =
+    static member validate(vf : IFn, value: obj) =
         if isNull vf then
             ()
         else
@@ -72,11 +72,11 @@ type ARef(m) =
             if not ret then
                 raise <| InvalidOperationException("Invalid reference state")
 
-    member this.Validate(value: obj) = ARef.Validate(validator, value)
+    member this.validate(value: obj) = ARef.validate(validator, value)
 
     interface IRef with
         member this.setValidator(vf) =        
-            ARef.Validate(vf, (this:>IDeref).deref())
+            ARef.validate(vf, (this:>IDeref).deref())
             validator <- vf
 
         member _.getValidator() = validator
@@ -90,7 +90,6 @@ type ARef(m) =
             this :> IRef
 
         member _.getWatches() = watches
-
 
     member this.notifyWatches(oldval, newval) =
         let ws = watches
@@ -107,8 +106,8 @@ type ARef(m) =
             loop ((ws :> Seqable).seq())
 
 
-
 // Holds values inside a Ref
+// Does this ever need to be null?
 [<Sealed>]
 type private TVal(v: obj, pt: int64) as this = 
 
@@ -146,29 +145,31 @@ type private TVal(v: obj, pt: int64) as this =
         value <- v
         point <- pt
 
-
-
 type private LTState = 
-    | Running = 0
-    | Committing = 1
-    | Retry = 2
-    | Killed = 3
-    | Committed = 4
+    | NotStarted = 0
+    | Running = 1
+    | Committing = 2
+    | Retry = 3
+    | Killed = 4
+    | Committed = 5
+    | Stopped = 6
 
 exception RetryEx of string
 exception AbortEx of string
 
-type private LTInfo(initState: LTState, startPoint: int64) = 
+type LTInfo(initState: LTState, startPoint: int64) = 
 
     let mutable status : int64 = initState |> int64
     let latch = CountdownLatch(1)
 
+    new() = LTInfo(LTState.NotStarted, -1L)
+
     member _.Latch = latch
     member _.StartPoint = startPoint
 
-    member _.Status
-        with get() = status
-        and set(v) = status <- v
+    member _.State
+        with get() = enum<LTState>(int32 status)
+        and set(v:LTState) = status <- int64 v
     
     member this.compareAndSet(oldVal: LTState, newVal: LTState) =
         let origVal = Interlocked.CompareExchange(&status, newVal |> int64, oldVal |> int64)
@@ -184,12 +185,10 @@ type private LTInfo(initState: LTState, startPoint: int64) =
 // Pending call of a function on arguments.
 type private CFn  = { fn: IFn; args: ISeq }
 
-
 type LTNotify = { ref: Ref; oldVal: obj; newVal: obj }
 
-
 // Provides transaction semantics for Agents, Refs, etc.
-and LockingTransaction() =
+and [<Sealed>] LockingTransaction() =
 
     // The number of times to retry a transaction in case of a conflict.
     [<Literal>]
@@ -210,16 +209,14 @@ and LockingTransaction() =
     [<DefaultValue;ThreadStatic>]
     static val mutable private currentTransaction : LockingTransaction option
 
-
     // The current point.
-
     // Used to provide a total ordering on transactions for the purpose of determining preference on transactions when there are conflicts.
     // Transactions consume a point for init, for each retry, and on commit if writing.
     static member private lastPoint : AtomicLong  = AtomicLong()
 
     // The state of the transaction.
     //  Encapsulated so things like Refs can look.
-    let mutable info : LTInfo option = None
+    let mutable info : LTInfo = LTInfo()
 
     // The point at the start of the current retry (or first try).
     let mutable readPoint : int64 = 0L
@@ -248,6 +245,8 @@ and LockingTransaction() =
     // The set of Refs holding read locks.
     let ensures = HashSet<Ref>()
 
+    member _.Info = info
+
     // Point manipulation
 
     // Get a new read point value.
@@ -261,23 +260,20 @@ and LockingTransaction() =
     // Actions
 
     // Stop this transaction.
-    member private this.stop(status: LTState) =
-        match info with
-        | Some i ->
-            lock i (fun () ->
-                i.Status <- status |> int64
-                i.Latch.CountDown()
-            )
-            info <- None
+    member private this.stop(state: LTState) =
+        if info.State <> LTState.NotStarted then
+            lock info (fun () ->
+                info.State <- state
+                info.Latch.CountDown())
+            info.State <- LTState.Stopped
             vals.Clear()
             sets.Clear()
             commutes.Clear()
             // Java commented out: _actions.Clear()
-        | None -> ()
 
     member private this.tryWriteLock(r: Ref) =
         try 
-            if not (r.TryEnterWriteLock(LockWaitMsecs)) then
+            if not (r.tryEnterWriteLock(LockWaitMsecs)) then
                 raise retryEx
         with 
         | :? ThreadInterruptedException -> raise retryEx
@@ -285,7 +281,7 @@ and LockingTransaction() =
     member private this.releaseIfEnsured(r: Ref) =
         if ensures.Contains(r) then
             ensures.Remove(r) |> ignore
-            r.ExitReadLock()
+            r.exitReadLock()
 
     member private this.blockAndBail(refinfo: LTInfo) =
         this.stop(LTState.Retry)
@@ -295,7 +291,20 @@ and LockingTransaction() =
         | :? ThreadInterruptedException -> ()
         raise retryEx
 
-    member private this.lock(Ref r) =
+    member private this.barge(refinfo: LTInfo) =
+        let mutable barged = false
+
+        // if this transaction is older
+        //   try to abort the other
+
+        if this.bargeTimeElapsed && startPoint < refinfo.StartPoint then
+            barged <- refinfo.compareAndSet(LTState.Running, LTState.Killed)
+            if barged then
+                refinfo.Latch.CountDown()
+        barged
+
+    member private this.lock(r : Ref) =
+
         // can't upgrade read lock, so release it.
         this.releaseIfEnsured(r)
 
@@ -304,1040 +313,465 @@ and LockingTransaction() =
             this.tryWriteLock(r)
             unlocked <- false
 
-            if r.CurrentValPoint() > readPoint then
+            if r.currentValPoint() > readPoint then
                 raise retryEx
 
-            let refinfo = r.TInfo
+            let success() = 
+                r.TInfo <- info
+                r.tryGetVal()
 
-            // write lock conflict
-            if refinfo.IsRunning && refinfo <> info then
+            match r.TInfo with
+            | None -> success()
+            | Some (refinfo:LTInfo) when refinfo.isRunning && not <| obj.ReferenceEquals(refinfo, info) ->
                 if not (this.barge(refinfo)) then
-                    r.ExitWriteLock()
+                    r.exitWriteLock()
                     unlocked <- true
                     this.blockAndBail(refinfo)
-
-            r.TInfo <- info
-            r.TryGetVal()
+                else
+                   success()
+            | _ -> success()
         finally
             if not unlocked then
-                r.ExitWriteLock()
+                r.exitWriteLock()
 
 
+    // Kill this transaction.
+    member this.abort() =
+        this.stop(LTState.Killed)
+        raise <| AbortEx("")
 
-(*
+    // Determine if sufficient clock time has elapsed to barge another transaction.
+    member private _.bargeTimeElapsed = (int64 Environment.TickCount) - startTime > BargeWaitTicks
 
-        object Lock(Ref r)
-        {
-            // can't upgrade read lock, so release it.
-            ReleaseIfEnsured(r);
 
-            bool unlocked = true;
+    // Get the transaction running on this thread (throw exception if no transaction). 
+    static member getEx() =
+        let t = LockingTransaction.currentTransaction
+        match t with
+        | None -> 
+            raise <| InvalidOperationException("No transaction running")
+        | Some x when x.Info.State = LTState.NotStarted -> 
+            raise <| InvalidOperationException("No transaction running")
+        | Some x -> x
+
+    // Get the transaction running on this thread (or None if no transaction).
+    static member getRunning() =
+        let t = LockingTransaction.currentTransaction
+        match t with
+        | Some t when t.Info.State = LTState.NotStarted -> None
+        | x -> x
+
+    // Is there a transaction running on this thread?
+    static member isRunning() = LockingTransaction.getRunning().IsSome
+
+    // Run a function in a transaction.
+    // TODO: This can be called on something more general than  an IFn.
+    // We can could define a delegate for this, probably use ThreadStartDelegate.
+    // Should still have a version that takes IFn.
+    // The Java original has a version that takes a Callable.
+    // How would we generalize this?
+
+    static member runInTransaction(fn:IFn) : obj =
+        let t = LockingTransaction.currentTransaction
+        match t with
+        | None ->
+            LockingTransaction.currentTransaction <- Some(LockingTransaction())
             try
-            {
-                TryWriteLock(r);
-                unlocked = false;
-
-                if (r.CurrentValPoint() > _readPoint)
-                    throw _retryex;
-
-                Info refinfo = r.TInfo;
-
-                // write lock conflict
-                if (refinfo != null && refinfo != _info && refinfo.IsRunning)
-                {
-                    if (!Barge(refinfo))
-                    {
-                        r.ExitWriteLock();
-                        unlocked = true;
-                        return BlockAndBail(refinfo);
-                    }
-                }
-
-                r.TInfo = _info;
-                return r.TryGetVal();
-            }
+                LockingTransaction.getEx().run(fn)
             finally
-            {
-                if (!unlocked)
-                {
-                    r.ExitWriteLock();
-                }
-            }
-        }
-
-
-        /// <summary>
-        /// Kill this transaction.
-        /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Justification = "<Pending>")]
-        void Abort()
-        {
-            Stop(KILLED);
-            throw new AbortException();
-        }
-
-        /// <summary>
-        /// Determine if sufficient clock time has elapsed to barge another transaction.
-        /// </summary>
-        /// <returns><value>true</value> if enough time has elapsed; <value>false</value> otherwise.</returns>
-        private bool BargeTimeElapsed()
-        {
-            return Environment.TickCount - _startTime > BargeWaitTicks;
-        }
-
-        /// <summary>
-        /// Try to barge a conflicting transaction.
-        /// </summary>7
-        /// <param name="refinfo">The info on the other transaction.</param>
-        /// <returns><value>true</value> if we killed the other transaction; <value>false</value> otherwise.</returns>
-        private bool Barge(Info refinfo)
-        {
-            bool barged = false;
-            // if this transaction is older
-            //   try to abort the other
-            if (BargeTimeElapsed() && _startPoint < refinfo.StartPoint)
-            {
-                barged = refinfo.Status.compareAndSet(RUNNING, KILLED);
-                if (barged)
-                    refinfo.Latch.CountDown();
-            }
-            return barged;
-        }
-
-        /// <summary>
-        /// Get the transaction running on this thread (throw exception if no transaction). 
-        /// </summary>
-        /// <returns>The running transaction.</returns>
-        public static LockingTransaction GetEx()
-        {
-            LockingTransaction t = _transaction;
-            if (t == null || t._info == null)
-                throw new InvalidOperationException("No transaction running");
-            return t;
-        }
-
-        /// <summary>
-        /// Get the transaction running on this thread (or null if no transaction).
-        /// </summary>
-        /// <returns>The running transaction if there is one, else <value>null</value>.</returns>
-        static internal LockingTransaction GetRunning()
-        {
-            LockingTransaction t = _transaction;
-            if (t == null || t._info == null)
-                return null;
-            return t;
-        }
-
-        /// <summary>
-        /// Is there a transaction running on this thread?
-        /// </summary>
-        /// <returns><value>true</value> if there is a transaction running on this thread; <value>false</value> otherwise.</returns>
-        /// <remarks>Initial lowercase in name for core.clj compatibility.</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public static bool isRunning()
-        {
-            return GetRunning() != null;
-        }
-
-        /// <summary>
-        /// Invoke a function in a transaction
-        /// </summary>
-        /// <param name="fn">The function to invoke.</param>
-        /// <returns>The value computed by the function.</returns>
-        /// <remarks>Initial lowercase in name for core.clj compatibility.</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public static object runInTransaction(IFn fn)
-        {
-            // TODO: This can be called on something more general than  an IFn.
-            // We can could define a delegate for this, probably use ThreadStartDelegate.
-            // Should still have a version that takes IFn.
-            LockingTransaction t = _transaction;
-            Object ret;
-
-            if (t == null)
-            {
-                _transaction = t = new LockingTransaction();
-                try
-                {
-                    ret = t.Run(fn);
-                }
-                finally
-                {
-                    _transaction = null;
-                }
-            }
+                LockingTransaction.currentTransaction <- None
+        | Some t ->
+            if t.Info.State = LTState.NotStarted then
+                t.run(fn)
             else
-            {
-                if (t._info != null)
-                    ret = fn.invoke();
-                else
-                    ret = t.Run(fn);
-            }
-
-            return ret;
-        }
+                fn.invoke()
 
 
+    // Determine if the exception wraps a RetryEx at some level.
+    static member containsNestedRetryEx(ex: Exception)=
+        let rec loop (e: Exception) =
+            match e with
+            | null -> false
+            | :? RetryEx -> true
+            | _ -> loop e.InnerException
+        loop ex
+ 
+    // Start a transaction and invoke a function.
+    // TODO: Define an overload called on ThreadStartDelegate or something equivalent.
 
-        /// <summary>
-        /// Start a transaction and invoke a function.
-        /// </summary>
-        /// <param name="fn">The function to invoke.</param>
-        /// <returns>The value computed by the function.</returns>
-        object Run(IFn fn)
-        {
-            // TODO: Define an overload called on ThreadStartDelegate or something equivalent.
+    member this.run(fn:IFn) : obj =
+        let mutable finished = false
+        let mutable ret = null
+        let locked = ResizeArray<Ref>()
+        let notify = ResizeArray<LTNotify>()
+            
+        let mutable i = 0
 
-            bool done = false;
-            object ret = null;
-            List<Ref> locked = new List<Ref>();
-            List<Notify> notify = new List<Notify>();
-
-            for (int i = 0; !done && i < RetryLimit; i++)
-            {
+        while not finished && i < RetryLimit do 
+            try
                 try
-                {
-                    GetReadPoint();
-                    if (i == 0)
-                    {
-                        _startPoint = _readPoint;
-                        _startTime = Environment.TickCount;
-                    }
+                    this.getReadPoint()
 
-                    _info = new Info(RUNNING, _startPoint);
-                    ret = fn.invoke();
+                    if i = 0 then
+                        startPoint <- readPoint
+                        startTime <- int64 Environment.TickCount
+
+                    info <- LTInfo(LTState.Running, startPoint)
+                    ret <- fn.invoke()
 
                     // make sure no one has killed us before this point,
                     // and can't from now on
-                    if (_info.Status.compareAndSet(RUNNING, COMMITTING))
-                    {
-                        foreach (KeyValuePair<Ref, List<CFn>> pair in _commutes)
-                        {
-                            Ref r = pair.Key;
-                            if (_sets.Contains(r))
-                                continue;
 
-                            bool wasEnsured = _ensures.Contains(r);
-                            // can't upgrade read lock, so release
-                            ReleaseIfEnsured(r);
-                            TryWriteLock(r);
-                            locked.Add(r);
+                    if info.compareAndSet(LTState.Running,LTState.Committing) then
 
-                            if (wasEnsured && r.CurrentValPoint() > _readPoint )
-                                throw _retryex;
+                        for pair in commutes do
+                            let r = pair.Key
+                            if sets.Contains(r) then
+                                ()
+                            else
+                                let wasEnsured = ensures.Contains(r)
+                                // can't upgrade read lock, so release
+                                this.releaseIfEnsured(r)
+                                this.tryWriteLock(r)
+                                locked.Add(r)
 
-                            Info refinfo = r.TInfo;
-                            if ( refinfo != null && refinfo != _info && refinfo.IsRunning)
-                            {
-                                if (!Barge(refinfo))
-                                {
-                                    throw _retryex;
-                                }
-                            }
-                            object val = r.TryGetVal();
-                            _vals[r] = val;
-                            foreach (CFn f in pair.Value)
-                                _vals[r] = f.Fn.applyTo(RT.cons(_vals[r], f.Args));
-                        }
-                        foreach (Ref r in _sets)
-                        {
-                            TryWriteLock(r);
-                            locked.Add(r);
-                        }
+                                if wasEnsured && r.currentValPoint() > readPoint then
+                                    raise retryEx
+
+                                match r.TInfo with
+                                | Some refinfo when refinfo <> info && refinfo.isRunning ->
+                                    if not (this.barge(refinfo)) then
+                                        raise retryEx
+                                | _ -> ()
+
+                                let v = r.tryGetVal()
+                                vals.[r] <- v
+                                for f in pair.Value do
+                                    vals.[r] <- f.fn.applyTo(RTSeq.cons(vals.[r], f.args))
+
+                        for r in sets do
+                            this.tryWriteLock(r)
+                            locked.Add(r)
+
                         // validate and enqueue notifications
-                        foreach (KeyValuePair<Ref, object> pair in _vals)
-                        {
-                            Ref r = pair.Key;
-                            r.Validate(pair.Value);
-                        }
+                        for pair in vals do
+                            let r = pair.Key
+                            r.validate(pair.Value)
 
                         // at this point, all values calced, all refs to be written locked
                         // no more client code to be called
-                        long commitPoint = GetCommitPoint();
-                        foreach (KeyValuePair<Ref, object> pair in _vals)
-                        {
-                            Ref r = pair.Key;
-                            object oldval = r.TryGetVal();
-                            object newval = pair.Value;
-                          
-                            r.SetValue(newval, commitPoint);
-                            if (r.getWatches().count() > 0)
-                                notify.Add(new Notify(r, oldval, newval));
-                        }
+                        let commitPoint = LockingTransaction.getCommitPoint()
+                        for pair in vals do
+                            let r = pair.Key
+                            let oldval = r.tryGetVal()
+                            let newval = pair.Value
+                            r.setValue(newval, LockingTransaction.getCommitPoint())
+                            if (r:>IRef).getWatches().count() > 0 then
+                                notify.Add({ ref = r; oldVal = oldval; newVal = newval })
 
-                        done = true;
-                        _info.Status.set(COMMITTED);
-                    }
-                }
-                catch (RetryEx)
-                {
-                    // eat this so we retry rather than fall out
-                }
-                catch (Exception ex)
-                {
-                    if (ContainsNestedRetryEx(ex))
-                    {
-                        // Wrapped exception, eat it.
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                finally
-                {
-                    for (int k = locked.Count - 1; k >= 0; --k)
-                    {
-                        locked[k].ExitWriteLock();
-                    }
-                    locked.Clear();
-                    foreach (Ref r in _ensures)
-                        r.ExitReadLock();
-                    _ensures.Clear();
-                    Stop(done ? COMMITTED : RETRY);
-                    try
-                    {
-                        if (done) // re-dispatch out of transaction
-                        {
-                            foreach (Notify n in notify)
-                            {
-                                n._ref.NotifyWatches(n._oldval, n._newval);
-                            }
-                            foreach (Agent.Action action in _actions)
-                            {
-                                Agent.DispatchAction(action);
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        notify.Clear();
-                        _actions.Clear();
-                    }
-                }
-            }
-            if (!done)
-                throw new InvalidOperationException("Transaction failed after reaching retry limit");
-            return ret;
-        }
-
-        /// <summary>
-        /// Determine if the exception wraps a <see cref="RetryEx">RetryEx</see> at some level.
-        /// </summary>
-        /// <param name="ex">The exception to test.</param>
-        /// <returns><value>true</value> if there is a nested  <see cref="RetryEx">RetryEx</see>; <value>false</value> otherwise.</returns>
-        /// <remarks>Needed because sometimes our retry exceptions get wrapped.  You do not want to know how long it took to track down this problem.</remarks>
-        private static bool ContainsNestedRetryEx(Exception ex)
-        {
-            for (Exception e = ex; e != null; e = e.InnerException)
-                if (e is RetryEx)
-                    return true;
-            return false;
-        }
-
-        /// <summary>
-        /// Add an agent action sent during the transaction to a queue.
-        /// </summary>
-        /// <param name="action">The action that was sent.</param>
-        internal void Enqueue(Agent.Action action)
-        {
-            _actions.Add(action);
-        }
-
-        /// <summary>
-        /// Get the value of a ref most recently set in this transaction (or prior to entering).
-        /// </summary>
-        /// <param name="r"></param>
-        /// <param name="tvals"></param>
-        /// <returns>The value.</returns>
-        internal object DoGet(Ref r)
-        {
-            if (!_info.IsRunning)
-                throw _retryex;
-            if (_vals.ContainsKey(r))
-            {
-                return _vals[r];
-            }
-            try
-            {
-                r.EnterReadLock();
-                if (r.TVals == null)
-                    throw new InvalidOperationException(r.ToString() + " is not bound.");
-                Ref.TVal ver = r.TVals;
-                do
-                {
-                    if (ver.Point <= _readPoint)
-                    {
-                        return ver.Val;
-                    }
-                } while ((ver = ver.Prior) != r.TVals);
-            }
+                        finished <- true
+                        info.set(LTState.Committed) |> ignore
+                with
+                    | :? RetryEx -> ()
+                    | ex when not (LockingTransaction.containsNestedRetryEx(ex)) -> reraise()
             finally
-            {
-                r.ExitReadLock();
-            }
-            // no version of val precedes the read point
-            r.AddFault();
-            throw _retryex;
-        }
-
-        /// <summary>
-        /// Set the value of a ref inside the transaction.
-        /// </summary>
-        /// <param name="r">The ref to set.</param>
-        /// <param name="val">The value.</param>
-        /// <returns>The value.</returns>
-        internal object DoSet(Ref r, object val)
-        {
-            if (!_info.IsRunning)
-                throw _retryex;
-            if (_commutes.ContainsKey(r))
-                throw new InvalidOperationException("Can't set after commute");
-            if (!_sets.Contains(r))
-            {
-                _sets.Add(r);
-                Lock(r);
-            }
-            _vals[r] = val;
-            return val;
-        }
-
-        /// <summary>
-        /// Touch a ref.  (Lock it.)
-        /// </summary>
-        /// <param name="r">The ref to touch.</param>
-        internal void DoEnsure(Ref r)
-        {
-            if (!_info.IsRunning)
-                throw _retryex;
-            if (_ensures.Contains(r))
-                return;
-
-            r.EnterReadLock();
-
-            // someone completed a write after our shapshot
-            if (r.CurrentValPoint() > _readPoint)
-            {
-                r.ExitReadLock();
-                throw _retryex;
-            }
-
-            Info refinfo = r.TInfo;
-
-            // writer exists
-            if (refinfo != null && refinfo.IsRunning)
-            {
-                r.ExitReadLock();
-                if (refinfo != _info)  // not us, ensure is doomed
-                    BlockAndBail(refinfo);
-            }
-            else
-                _ensures.Add(r);
-        }
-
-
-        /// <summary>
-        /// Post a commute on a ref in this transaction.
-        /// </summary>
-        /// <param name="r">The ref.</param>
-        /// <param name="fn">The commuting function.</param>
-        /// <param name="args">Additional arguments to the function.</param>
-        /// <returns>The computed value.</returns>
-        internal object DoCommute(Ref r, IFn fn, ISeq args)
-        {
-            if (!_info.IsRunning)
-                throw _retryex;
-            if (!_vals.ContainsKey(r))
-            {
-                object val = null;
+                for k = locked.Count - 1 downto 0 do
+                    locked.[k].exitWriteLock()
+                locked.Clear()
+                for r in ensures do
+                    r.exitReadLock()
+                ensures.Clear()
+                this.stop(if finished then LTState.Committed else LTState.Retry)
                 try
-                {
-                    r.EnterReadLock();
-                    val = r.TryGetVal();
-                }
+                    if finished then  // re-dispatch out of transaction
+                        for n in notify do
+                            n.ref.notifyWatches(n.oldVal, n.newVal)
+                        for a in actions do
+                            Agent.dispatchAction(a)
                 finally
-                {
-                    r.ExitReadLock();
-                }
-                _vals[r] = val;
-            }
-            if (!_commutes.TryGetValue(r, out List<CFn> fns))
-                _commutes[r] = fns = new List<CFn>();
-            fns.Add(new CFn(fn, args));
-            object ret = fn.applyTo(RT.cons(_vals[r], args));
-            _vals[r] = ret;
+                    notify.Clear()
+                    actions.Clear()
+                    
+                
+            i <- i + 1
 
-            return ret;
-        }
+        if not finished then
+            raise <| InvalidOperationException("Transaction failed after reaching retry limit")
 
-        #endregion
-    }
-}
+        ret
+
+        // Add an agent action sent during the transaction to a queue.
+        member this.enqueue(action: AgentAction) = actions.Add(action)
+
+        // Get the value of a ref most recently set in this transaction (or prior to entering).
+        member this.doGet(r: Ref) : obj =
+            if info.isRunning then
+                if vals.ContainsKey(r) then
+                    vals.[r]
+                else
+                    let valOpt = 
+                        try
+                            r.enterReadLock()
+
+                            let rec loop (ver:TVal) : obj option =
+                                if ver.Point <= readPoint then
+                                    Some ver.Value
+                                elif Object.ReferenceEquals(ver.Prior, r.getTVals()) then
+                                    None
+                                else
+                                    loop ver.Prior
+
+                            loop (r.getTVals())
+
+                        finally
+                            r.exitReadLock()
+
+                    match valOpt with
+                    |None ->
+                        // no version of val precedes the read point
+                        r.addFault()
+                        raise retryEx
+                    |Some v -> v
+            else 
+                raise retryEx
+
+        // Set the value of a ref inside the transaction.
+        member this.doSet(r: Ref, v: obj) =
+            if info.isRunning then
+                if commutes.ContainsKey(r) then
+                    raise <| InvalidOperationException("Can't set after commute")
+                if not (sets.Contains(r)) then
+                    sets.Add(r) |> ignore
+                    this.lock(r) |> ignore
+                vals.[r] <- v
+                v
+            else
+                raise retryEx
+
+        // Touch a ref.  (Lock it.)
+        member this.doEnsure(r: Ref) =
+            if info.isRunning then
+                if ensures.Contains(r) then
+                    ()
+                else
+                    r.enterReadLock()
+
+                    // someone completed a write after our snapshot
+                    if r.currentValPoint() > readPoint then
+                        r.exitReadLock()
+                        raise retryEx
+                    
+                    match r.TInfo with
+                    | Some refinfo when refinfo.isRunning ->
+                        r.exitReadLock()
+                        if refinfo <> info then
+                            this.blockAndBail(refinfo)
+                    | _ -> ensures.Add(r) |> ignore
+
+            else 
+                raise retryEx
+
+        // Post a commute on a ref in this transaction.
+        
+        member this.doCommute(r:Ref, fn:IFn, args:ISeq) : obj =
+            if not info.isRunning then
+                raise retryEx
+            
+            if not (vals.ContainsKey(r)) then
+                let v = 
+                    try
+                        r.enterReadLock()
+                        r.tryGetVal()
+                    finally
+                        r.exitReadLock()
+                vals[r] <- v
+
+            let mutable fns : ResizeArray<CFn> = null
+            if not (commutes.TryGetValue(r, &fns)) then
+                fns <- ResizeArray<CFn>()
+                commutes[r] <- fns
+            fns.Add({ fn = fn; args = args })
+            let v = fn.applyTo(RTSeq.cons(vals[r], args))
+            vals[r] <- v
+            v
 
 
-*)
-
-
-and Ref() =
+and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     inherit ARef(null)
 
-
-
-(*
-
-    public class Ref : ARef, IFn, IComparable<Ref>, IRef, IDisposable
-    {
-
-
-        #region Data
-
-        /// <summary>
-        /// Values at points in time for this reference.
-        /// </summary>
-        TVal _tvals;
-
-        /// <summary>
-        /// Values at points in time for this reference.
-        /// </summary>
-        internal TVal TVals
-        {
-            get { return _tvals; }
-        }
-
-        /// <summary>
-        /// Number of faults for the reference.
-        /// </summary>
-        readonly AtomicInteger _faults;
-
-        /// <summary>
-        /// Reader/writer lock for the reference.
-        /// </summary>
-        readonly ReaderWriterLockSlim _lock;
-
-        /// <summary>
-        /// Info on the transaction locking this ref.
-        /// </summary>
-        LockingTransaction.Info _tinfo;
-
-        /// <summary>
-        /// Info on the transaction locking this ref.
-        /// </summary>
-        public LockingTransaction.Info TInfo
-        {
-            get { return _tinfo; }
-            set { _tinfo = value; }
-        }
-
-        /// <summary>
-        /// An id uniquely identifying this reference.
-        /// </summary>
-        readonly long _id;
-
-
-        /// <summary>
-        /// An id uniquely identifying this reference.
-        /// </summary>
-        public long Id
-        {
-            get { return _id; }
-        }
-
-        volatile int _minHistory = 0;
-        public int MinHistory
-        {
-            get { return _minHistory; }
-            set { _minHistory = value; }
-        }
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public Ref setMinHistory(int minHistory)
-        {
-            _minHistory = minHistory;
-            return this;
-        }
-
-        volatile int _maxHistory = 10;
-
-        public int MaxHistory
-        {
-            get { return _maxHistory; }
-            set { _maxHistory = value; }
-        }
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public Ref setMaxHistory(int maxHistory)
-        {
-            _maxHistory = maxHistory;
-            return this;
-        }
-
-
-        /// <summary>
-        /// Used to generate unique ids.
-        /// </summary>
-        static readonly AtomicLong _ids = new AtomicLong();
-
-        bool _disposed = false;
-
-        #endregion
-
-        #region C-tors & factory methods
-
-        /// <summary>
-        ///  Construct a ref with given initial value.
-        /// </summary>
-        /// <param name="initVal">The initial value.</param>
-        public Ref(object initVal)
-            : this(initVal, null)
-        {
-        }
-
-
-        /// <summary>
-        ///  Construct a ref with given initial value and metadata.
-        /// </summary>
-        /// <param name="initVal">The initial value.</param>
-        /// <param name="meta">The metadat to attach.</param>
-        public Ref(object initval, IPersistentMap meta)
-            : base(meta)
-        {
-            _id = _ids.getAndIncrement();
-            _faults = new AtomicInteger();
-            _lock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
-            _tvals = new TVal(initval, 0);
-        }
-
-        #endregion
-
-        #region Debugging
-
-        ///// <summary>
-        ///// I was having a hard day.
-        ///// </summary>
-        ///// <returns></returns>
-        //public string DebugStr()
-        //{
-        //    StringBuilder sb = new StringBuilder();
-        //    sb.Append("<Ref ");
-        //    sb.Append(Id);
-        //    sb.Append(", ");
-        //    if (_tinfo == null)
-        //        sb.Append("NO");
-        //    else
-        //        sb.AppendFormat("{0} {1}", _tinfo.Status.get(), _tinfo.StartPoint);
-        //    sb.Append(", ");
-        //    if (_tvals == null)
-        //        sb.Append("TVals: NO");
-        //    else
-        //    {
-        //        sb.Append("TVals: ");
-        //        TVal t = _tvals;
-        //        do
-        //        {
-        //            sb.Append(t.Point);
-        //            sb.Append(" ");
-        //        } while ((t = t.Prior) != _tvals);
-        //    }
-        //    sb.Append(">");
-        //    return sb.ToString();
-        //}
-
-        #endregion
-
-        #region History counts
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public int getHistoryCount()
-        {
-            try
-            {
-                EnterWriteLock();
-                return HistCount();
-            }
-            finally
-            {
-                ExitWriteLock();
-            }
-        }
-
-        int HistCount()
-        {
-            if (_tvals == null)
-                return 0;
-            else
-            {
-                int count = 0;
-                for (TVal tv = _tvals.Next; tv != _tvals; tv = tv.Next)
-                    count++;
-                return count;
-            }
-        }
-
-        #endregion       
-
-        #region IDeref Members
-
-        /// <summary>
-        /// Gets the (immutable) value the reference is holding.
-        /// </summary>
-        /// <returns>The value</returns>
-        public override object deref()
-        {
-            LockingTransaction t = LockingTransaction.GetRunning();
-            if (t == null)
-            {
-                object ret = currentVal();
-                //Console.WriteLine("Thr {0}, {1}: No-trans get => {2}", Thread.CurrentThread.ManagedThreadId,DebugStr(), ret);
-                return ret;
-            }
-            return t.DoGet(this);
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        object currentVal()
-        {
-            try
-            {
-                _lock.EnterReadLock();
-                if (_tvals != null)
-                    return _tvals.Val;
-                throw new InvalidOperationException(String.Format("{0} is unbound.", ToString()));
-            }
-            finally
-            {
-                _lock.ExitReadLock();
-            }
-        }
-
-        #endregion
-
-        #region  Interface for LockingTransaction
-
-        /// <summary>
-        /// Get the read lock.
-        /// </summary>
-        internal void EnterReadLock()
-        {
-            _lock.EnterReadLock();
-        }
-
-        /// <summary>
-        /// Release the read lock.
-        /// </summary>
-        internal void ExitReadLock()
-        {
-            _lock.ExitReadLock();
-        }
-
-        /// <summary>
-        /// Get the write lock.
-        /// </summary>
-        internal void EnterWriteLock()
-        {
-            _lock.EnterWriteLock();
-        }
-
-
-        /// <summary>
-        /// Get the write lock.
-        /// </summary>
-        internal bool TryEnterWriteLock(int msecTimeout)
-        {
-            return _lock.TryEnterWriteLock(msecTimeout);
-        }
-
-        /// <summary>
-        /// Release the write lock.
-        /// </summary>
-        internal void ExitWriteLock()
-        {
-            _lock.ExitWriteLock();
-        }
-
-        /// <summary>
-        /// Add to the fault count.
-        /// </summary>
-        public void AddFault()
-        {
-            _faults.incrementAndGet();
-        }
-
-        /// <summary>
-        /// Get the read/commit point associated with the current value.
-        /// </summary>
-        /// <returns></returns>
-        public long CurrentValPoint()
-        {
-            return _tvals != null ? _tvals.Point : -1;
-        }
-
-        /// <summary>
-        /// Try to get the value (else null).
-        /// </summary>
-        /// <returns>The value if it has been set; <value>null</value> otherwise.</returns>
-        public object TryGetVal()
-        {
-            return _tvals?.Val;
-        }
-
-        /// <summary>
-        /// Set the value.
-        /// </summary>
-        /// <param name="val">The new value.</param>
-        /// <param name="commitPoint">The transaction's commit point.</param>
-        internal void SetValue(object val, long commitPoint)
-        {
-            int hcount = HistCount();
-
-            if (_tvals == null)
-                _tvals = new TVal(val, commitPoint);
-            else if ( (_faults.get() > 0 && hcount < _maxHistory) || hcount < _minHistory )
-            {
-                _tvals = new TVal(val, commitPoint, _tvals);
-                _faults.set(0);
-            }
-            else
-            {
-                _tvals = _tvals.Next;
-                _tvals.SetValue(val, commitPoint);
-            }
-        }
-
-        #endregion
-
-        #region Ref operations
-
-        /// <summary>
-        /// Set the value (must be in a transaction).
-        /// </summary>
-        /// <param name="val">The new value.</param>
-        /// <returns>The new value.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public object set(object val)
-        {
-            return LockingTransaction.GetEx().DoSet(this, val);
-        }
-
-        /// <summary>
-        /// Apply a commute to the reference. (Must be in a transaction.)
-        /// </summary>
-        /// <param name="fn">The function to apply to the current state and additional arguments.</param>
-        /// <param name="args">Additional arguments.</param>
-        /// <returns>The computed value.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public object commute(IFn fn, ISeq args)
-        {
-            return LockingTransaction.GetEx().DoCommute(this, fn, args);
-        }
-
-        /// <summary>
-        /// Change to a computed value.
-        /// </summary>
-        /// <param name="fn">The function to apply to the current state and additional arguments.</param>
-        /// <param name="args">Additional arguments.</param>
-        /// <returns>The computed value.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public object alter(IFn fn, ISeq args)
-        {
-            LockingTransaction t = LockingTransaction.GetEx();
-            return t.DoSet(this, fn.applyTo(RT.cons(t.DoGet(this), args)));
-        }
-
-        /// <summary>
-        /// Touch the reference.  (Add to the tracking list in the current transaction.)
-        /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public void touch()
-        {
-            LockingTransaction.GetEx().DoEnsure(this);
-        }
-
-        #endregion
-
-        #region IFn Members
-
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public IFn fn()
-        {
-            return (IFn)deref();
-        }
-
-        public object invoke()
-        {
-            return fn().invoke();
-        }
-
-        public object invoke(object arg1)
-        {
-            return fn().invoke(arg1);
-        }
-
-        public object invoke(object arg1, object arg2)
-        {
-            return fn().invoke(arg1, arg2);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3)
-        {
-            return fn().invoke(arg1, arg2, arg3);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13, object arg14)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13, object arg14,
-                             object arg15)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13, object arg14,
-                             object arg15, object arg16)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15,
-                               arg16);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13, object arg14,
-                             object arg15, object arg16, object arg17)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15,
-                               arg16, arg17);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13, object arg14,
-                             object arg15, object arg16, object arg17, object arg18)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15,
-                               arg16, arg17, arg18);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13, object arg14,
-                             object arg15, object arg16, object arg17, object arg18, object arg19)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15,
-                               arg16, arg17, arg18, arg19);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13, object arg14,
-                             object arg15, object arg16, object arg17, object arg18, object arg19, object arg20)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15,
-                               arg16, arg17, arg18, arg19, arg20);
-        }
-
-        public object invoke(object arg1, object arg2, object arg3, object arg4, object arg5, object arg6, object arg7,
-                             object arg8, object arg9, object arg10, object arg11, object arg12, object arg13, object arg14,
-                             object arg15, object arg16, object arg17, object arg18, object arg19, object arg20,
-                             params object[] args)
-        {
-            return fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15,
-                               arg16, arg17, arg18, arg19, arg20, args);
-        }
-
-        public object applyTo(ISeq arglist)
-        {
-            return AFn.ApplyToHelper(this, arglist);
-        }
-
-        #endregion
-
-        #region IComparable<Ref> Members
-
-        /// <summary>
-        /// Compare to another ref.
-        /// </summary>
-        /// <param name="other">The other ref.</param>
-        /// <returns><value>true</value> if they are identical; <value>false</value> otherwise.</returns>
-        public int CompareTo(Ref other)
-        {
-            if ( other is null)
-                return 1;
+    // Generates unique ids.
+    static let ids : AtomicLong = AtomicLong()
     
-            return _id.CompareTo(other._id);
-        }
+    // An id uniquely identifying this reference.
+    let id : int64 = ids.getAndIncrement()
+    
+    // Values at points in time for this reference.
+    let mutable tvals : TVal = TVal(initVal, 0)
 
-        #endregion
+    // Number of faults for the reference.
+    let faults = AtomicInteger()
 
-        #region object overrides
+    // Reader/writer lock for the reference.
+    let lock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion)
 
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(this, obj))
-                return true;
+    // Info on the transaction locking this ref.
+    let mutable tinfo : LTInfo option = None
 
-            return obj is Ref r && _id == r._id;
-        }
+    let mutable disposed = false
 
-        public override int GetHashCode()
-        {
-            return Murmur3.HashLong(_id) ;    // _id.GetHashCode()
-        }
-        #endregion
+    [<VolatileField>]
+    let mutable minHistory = 0 
+
+    [<VolatileField>]
+    let mutable maxHistory = 10
+
+    member _.Id = id
+    member _.TInfo
+        with get () = tinfo
+        and set(v) = tinfo <- Some v
+
+    member _.getTVals() = tvals
+
+    member this.setTinfo(v) = tinfo <- Some v
+
+    override _.ToString() = sprintf "<Ref %d>" id
+    override this.Equals(o) = 
+        match o with
+        | _ when Object.ReferenceEquals(this, o) -> true
+        | :? Ref as r -> id = r.Id
+        | _ -> false
+    override _.GetHashCode() = Murmur3.HashLong(id)
+
+    interface IComparable<Ref> with
+        member this.CompareTo(o) =
+            match o with
+            | null -> 1
+            | _ -> id.CompareTo(o.Id)
+
+    member _.MinHistory 
+        with get() = minHistory
+        and set(v) = minHistory <- v
+    
+    member _.MaxHistory
+        with get() = maxHistory
+        and set(v) = maxHistory <- v
+
+    member this.SetMinHistory(v) = minHistory <- v; this
+    member this.SetMaxHistory(v) = maxHistory <- v; this
+
+    member private _.Dispose(disposing: bool) =
+        if not disposed then
+            if disposing then
+                if not (isNull lock) then
+                    lock.Dispose()
+            disposed <- true
+
+    interface IDisposable with
+        member this.Dispose() =
+                this.Dispose(true);
+                GC.SuppressFinalize(this)
+
+    member _.enterReadLock() = lock.EnterReadLock()
+    member _.exitReadLock() = lock.ExitReadLock()
+    member _.enterWriteLock() = lock.EnterWriteLock()
+    member _.exitWriteLock() = lock.ExitWriteLock()
+    member _.tryEnterWriteLock(msecTimeout : int) = lock.TryEnterWriteLock(msecTimeout)
+
+    member private _.histCount() =
+        let mutable count = 0
+        let mutable tv = tvals.Next
+        while LanguagePrimitives.PhysicalEquality tv  tvals do
+            count <- count + 1
+            tv <- tv.Next
+        count
+
+    member this.getHistoryCount() =
+        try
+            this.enterWriteLock()
+            this.histCount()
+        finally
+            this.exitWriteLock()
+
+    member private this.currentVal() = 
+        try
+            lock.EnterReadLock()
+            tvals.Value
+        finally
+            lock.ExitReadLock()
+
+    interface IDeref with
+        member this.deref() =
+            match LockingTransaction.getRunning() with
+            | None -> this.currentVal()
+            | Some t -> t.doGet(this)
+
+    // Add to the fault count.
+    member _.addFault() = faults.incrementAndGet() |> ignore
+
+    // Get the read/commit point associated with the current value.
+    member _.currentValPoint() = tvals.Point
+
+    // Try to get the value (else null).
+    member _.tryGetVal() : obj = tvals.Value
+
+    // Set the value
+    member this.setValue(v: obj, commitPoint: int64) =
+        let hcount = this.histCount()
+        if (faults.get() > 0 && hcount < maxHistory) || hcount < minHistory then
+            tvals <- TVal(v, commitPoint, tvals)
+            faults.set(0) |> ignore
+        else
+            tvals <- tvals.Next
+            tvals.SetValue(v, commitPoint)
+
+
+    // Transaction operations
+
+    // Set the value (must be in a transaction).
+    member this.set(v: obj) = LockingTransaction.getEx().doSet(this, v)
+
+    // Apply a commute to the reference. (Must be in a transaction.)
+    member this.commute(fn: IFn, args: ISeq) = LockingTransaction.getEx().doCommute(this, fn, args)
+
+    // Change to a computed value.
+    member this.alter(fn: IFn, args: ISeq) = 
+        let t = LockingTransaction.getEx()
+        t.doSet(this, fn.applyTo(RTSeq.cons(t.doGet(this), args)))
+
+    // Touch the reference.  (Add to the tracking list in the current transaction.)
+    member this.touch() = LockingTransaction.getEx().doEnsure(this)
+
+    // the long painful IFn implementation
+
+    member this.fn() = (this:>IDeref).deref() :?> IFn
+
+    interface IFn with
+        member this.applyTo(args: ISeq) = AFn.applyToHelper(this, args)
+        member this.invoke() = this.fn().invoke()
+        member this.invoke(arg1) = this.fn().invoke(arg1)
+        member this.invoke(arg1, arg2) = this.fn().invoke(arg1, arg2)
+        member this.invoke(arg1, arg2, arg3) = this.fn().invoke(arg1, arg2, arg3)
+        member this.invoke(arg1, arg2, arg3, arg4) = this.fn().invoke(arg1, arg2, arg3, arg4)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20)
+        member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, [<ParamArray>] args) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, args)
+            
+(*
+        // do we need these?
 
         #region operator overrides
 
@@ -1378,294 +812,112 @@ and Ref() =
 
             return x.CompareTo(y) > 0;
         }
-
-        #endregion
-
-        #region IDisposable
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        private void Dispose(bool disposing)
-        {
-            if (!_disposed)
-            {
-                if (disposing)
-                {
-                    if ( _lock != null )
-                        _lock.Dispose();
-                }
-
-                _disposed = true;
-            }
-        }
-
-        #endregion
-    }
-}
-
-
-
 *)
 
 and AgentAction() =
     inherit Object()
 
-and Agent() =
-    inherit ARef()
+and ActionQueue = 
+    { q : IPersistentStack; error: Exception }
 
+    static member Empty : ActionQueue = {q = PersistentQueue.empty; error = null}
+
+
+
+
+// Represents an Agent.
+// The Java implementation plays many more games with thread pools.  The CLR does not provide such support.
+// TODO: think about the task library.  (I did the original CLR implementation under .NET 3.x, before the task library came out.)
+
+and [<Sealed>] Agent(v: obj, meta: IPersistentMap) =
+    inherit ARef(meta)
+
+    // The current state of the agent.
+    [<VolatileField>]
+    let mutable _state : obj = v
+
+    [<VolatileField>]
+    let mutable errorMode = Agent.continueKeyword
+
+    [<VolatileField>]
+    let mutable errorHandler : IFn = null
+
+    // Agent errors, a sequence of Exceptions.
+    [<VolatileField>]
+    let mutable errors : ISeq = null
+
+    // A collection of agent actions enqueued during the current transaction.  Per thread.
+    [<DefaultValue;ThreadStatic>]
+    static val mutable private nested : IPersistentVector
+
+
+    // A queue of pending actions.
+    let aq = AtomicReference<ActionQueue>(ActionQueue.Empty)
+
+
+    do setState(v)
+
+    static member continueKeyword : Keyword = Keyword.intern(null, "continue")
+    new(v) = Agent(v, null) 
+
+    member _.getState = _state
+    member _.getQueueCount = aq.Get().q.count();
+
+    member _.addError(e) = errors <- RTSeq.cons(e, errors)
+
+    static member Nested
+        with get() = Agent.nested
+        and set(v) = Agent.nested <- v
+
+    member this.setState(newState : obj) =
+        (this :> ARef).validate(newState)
+        let ret = not <| Object.ReferenceEquals(_state,newState)
+        _state <- newState
+        ret
+
+
+    member _.getError() = aq.Get().error 
+
+    member _.getErrorMode() = errorMode
+    member _.setErrorMode(kw: Keyword) = errorMode <- kw
+    member _.getErrorHandler() = errorHandler
+    member _.setErrorHandler(f: IFn) = errorHandler <- f
+
+    [<MethodImpl(MethodImplOptions.Synchronized)>]
+    member this.restart(newState: obj, clearActions: bool) : obj =
+        if this.getError() = null then
+            raise <| InvalidOperationException("Agent does not need a restart")
+        (this :> ARef).validate(newState)
+        _state <- newState
+        if clearActions then
+            aq.Set(ActionQueue.Empty)
+        else
+            let mutable restarted = false
+            let mutable prior : ActionQueue = null
+            while not restarted do
+                prior <- aq.Get()
+                restarted <- aq.CompareAndSet(prior, {prior with q = prior.q; error = null})
+            if prior.q.count() > 0 then
+                ((prior.q.peek()) :?> AgentAction).execute()
+        newState
+
+
+    // Send a message to the agent.
+    member this.dispatch(fn: IFn, args: ISeq, solo: bool) =
+        let error = this.getError()
+        if not <| isNull error then
+            raise <| InvalidOperationException("Agent is failed, needs restart", error)
+        let action = AgentAction(this, fn, args, solo)
+        Agent.dispatchAction(action)
+        this
+        
+
+
+    //member this.validate(v:obj) =
+    //    ARef.validate((this :> IRef).getValidator(),v);
 
     (*
     
-    
-    /**
- *   Copyright (c) Rich Hickey. All rights reserved.
- *   The use and distribution terms for this software are covered by the
- *   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
- *   which can be found in the file epl-v10.html at the root of this distribution.
- *   By using this software in any fashion, you are agreeing to be bound by
- * 	 the terms of this license.
- *   You must not remove this notice, or any other, from this software.
- **/
-
-/**
- *   Author: David Miller
- **/
-
-using System;
-using System.Runtime.CompilerServices;
-using System.Threading;
-
-namespace clojure.lang
-{
-    /// <summary>
-    /// Represents an Agent.
-    /// </summary>
-    /// <remarks>
-    /// <para>See the Clojure documentation for more information.</para>
-    /// <para>The Java implementation plays many more games with thread pools.  The CLR does not provide such support. We need to revisit this in CLR 4.  
-    /// Until then: TODO: Implement our own thread pooling?</para>
-    /// </remarks>
-    public sealed class Agent : ARef
-    {
-        #region ActionQueue class
-
-        class ActionQueue
-        {
-            public readonly IPersistentStack _q;
-            public readonly Exception _error; // non-null indicates fail state
-            static internal readonly ActionQueue EMPTY = new ActionQueue(PersistentQueue.EMPTY, null);
-
-            public ActionQueue(IPersistentStack q, Exception error)
-            {
-                _q = q;
-                _error = error;
-            }
-        }
-        
-        static readonly Keyword ContinueKeyword = Keyword.intern(null, "continue");
-        //static readonly Keyword FailKeyword = Keyword.intern(null, "fail");
-
-        #endregion
-
-        #region Data
-
-        /// <summary>
-        /// The current state of the agent.
-        /// </summary>
-        private volatile object _state;
-
-        /// <summary>
-        /// The current state of the agent.
-        /// </summary>
-        public object State
-        {
-          get { return _state; }
-        }
-
-        /// <summary>
-        /// A queue of pending actions.
-        /// </summary>
-        private readonly AtomicReference<ActionQueue> _aq = new AtomicReference<ActionQueue>(ActionQueue.EMPTY);
-
-        /// <summary>
-        /// Number of items in the queue.
-        /// </summary>
-        public int QueueCount
-        {
-            get
-            {
-                return _aq.Get()._q.count();
-            }
-        }
-
-        /// <summary>
-        /// Number of items in the queue.  For core.clj compatibility.
-        /// </summary>
-        /// <returns></returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public int getQueueCount()
-        {
-            return QueueCount;
-        }
-
-        volatile Keyword _errorMode = ContinueKeyword;
-        volatile IFn _errorHandler = null;
-
-        ///// <summary>
-        ///// Agent errors, a sequence of Exceptions.
-        ///// </summary>
-        //private volatile ISeq _errors = null;
-
-        ///// <summary>
-        ///// Agent errors, a sequence of Exceptions.
-        ///// </summary>
-        //public ISeq Errors
-        //{
-        //    get { return _errors; }
-        //}
-
-
-        ///// <summary>
-        ///// Add an error.
-        ///// </summary>
-        ///// <param name="e">The exception to add.</param>
-        //public void AddError(Exception e)
-        //{
-        //    _errors = RT.cons(e, _errors);
-        //}
-
-
-        /// <summary>
-        /// A collection of agent actions enqueued during the current transaction.  Per thread.
-        /// </summary>
-        [ThreadStatic]
-        private static IPersistentVector _nested;
-
-        /// <summary>
-        /// A collection of agent actions enqueued during the current transaction.  Per thread.
-        /// </summary>
-        public static IPersistentVector Nested
-        {
-            get { return _nested; }
-            set { _nested = value; }
-        }
-
-        #endregion
-
-        #region C-tors & factory methods
-
-        /// <summary>
-        /// Construct an agent with given state and null metadata.
-        /// </summary>
-        /// <param name="state">The initial state.</param>
-        public Agent(object state)
-            : this(state, null)
-        {
-        }
-
-        /// <summary>
-        /// Construct an agent with given state and metadata.
-        /// </summary>
-        /// <param name="state">The initial state.</param>
-        /// <param name="meta">The metadata to attach.</param>
-        public Agent(Object state, IPersistentMap meta)
-            :base(meta)
-        {
-            SetState(state);
-        }
-        
-        #endregion
-
-        #region State manipulation
-        
-        /// <summary>
-        /// Set the state.
-        /// </summary>
-        /// <param name="newState">The new state.</param>
-        /// <returns><value>true</value> if the state changed; <value>false</value> otherwise.</returns>
-        private bool SetState(object newState)
-        {
-            Validate(newState);
-            bool ret = _state != newState;
-            _state = newState;
-            return ret;
-        }
-
-        #endregion
-
-        #region Agent methods
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public Exception getError()
-        {
-            return _aq.Get()._error;
-        }
-
-        ///// <summary>
-        ///// Clear the agent's errors.
-        ///// </summary>
-        ///// <remarks>Lowercase-name and  for core.clj compatibility.</remarks>
-        //public void clearErrors()
-        //{
-        //    _errors = null;
-        //}
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public void setErrorMode(Keyword k)
-        {
-            _errorMode = k;
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public Keyword getErrorMode()
-        {
-            return _errorMode;
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public void setErrorHandler(IFn f)
-        {
-            _errorHandler = f;
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public IFn getErrorHandler()
-        {
-            return _errorHandler;
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public object restart(object newState, bool clearActions)
-        {
-            if (getError() == null)
-                throw new InvalidOperationException("Agent does not need a restart");
-
-            Validate(newState);
-            _state = newState;
-
-            if (clearActions)
-                _aq.Set(ActionQueue.EMPTY);
-            else
-            {
-                bool restarted = false;
-                ActionQueue prior = null;
-                while (!restarted)
-                {
-                    prior = _aq.Get();
-                    restarted = _aq.CompareAndSet(prior, new ActionQueue(prior._q, null));
-                }
-
-                if (prior._q.count() > 0)
-                    ((Action)prior._q.peek()).execute();
-            }
-
-            return newState;
-        }
 
 
 
