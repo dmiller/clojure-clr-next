@@ -63,3 +63,11 @@ let getEquivPred(k1:obj) =
     | :? ICollection
     | :? IDictionary -> equivColl
     | _ -> equivEquals
+
+let hasheq(o:obj) : int =
+    match o with
+    | null -> 0
+    | :? IHashEq as he -> he.hasheq()
+    | _ when Numbers.IsNumeric(o) -> Numbers.hasheq(o)
+    | :? string as s -> Murmur3.HashString(s)
+    | _ -> o.GetHashCode()

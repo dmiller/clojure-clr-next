@@ -814,13 +814,62 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
         }
 *)
 
-and AgentAction() =
-    inherit Object()
+// An encapulated message to an agent
+and AgentAction(agent: Agent, fn: IFn, args: ISeq, solo: bool) =
+
+    member this.execute() : unit =
+        try
+            if solo then
+                let thread = new Thread(ParameterizedThreadStart(this.executeAction))
+                thread.Start(null)
+            else
+                ThreadPool.QueueUserWorkItem(WaitCallback(this.executeAction)) |> ignore
+        with
+        | e -> 
+            if not <| isNull (agent.getErrorHandler()) then
+                try 
+                    agent.getErrorHandler().invoke(e) |> ignore
+                with
+                | _ -> ()  // ignore errorHandler errors
+
+    member _.executeAction(state: obj) : unit =
+        try
+            Agent.Nested <- PersistentVector.EMPTY
+        
+            let mutable error : Exception = null
+
+            try 
+                let oldval = agent.getState
+                let newval = fn.applyTo(RTSeq.cons(oldval, args))
+                agent.setState(newval) |> ignore
+                agent.notifyWatches(oldval, newval)
+            with
+            | e -> error <- e
+   
+            if isNull error then
+                Agent.releasePendingSends() |> ignore
+            else
+                Agent.Nested <- null   // allow errorHandler to send
+                if not <| isNull (agent.getErrorHandler()) then
+                    try 
+                        agent.getErrorHandler().invoke(agent, error) |> ignore
+                    with
+                    | _ -> ()  // ignore errorHandler errors
+                if Object.ReferenceEquals(agent.getErrorMode(), Agent.continueKeyword) then
+                    error <- null
+
+            
+
+
+        finally
+            Agent.Nested <- null
+    
+
 
 and ActionQueue = 
     { q : IPersistentStack; error: Exception }
 
-    static member Empty : ActionQueue = {q = PersistentQueue.empty; error = null}
+    static member Empty : ActionQueue = {q = PersistentQueue.Empty; error = null}
 
 
 
@@ -829,7 +878,7 @@ and ActionQueue =
 // The Java implementation plays many more games with thread pools.  The CLR does not provide such support.
 // TODO: think about the task library.  (I did the original CLR implementation under .NET 3.x, before the task library came out.)
 
-and [<Sealed>] Agent(v: obj, meta: IPersistentMap) =
+and [<Sealed>] Agent(v: obj, meta: IPersistentMap) as this =
     inherit ARef(meta)
 
     // The current state of the agent.
@@ -854,14 +903,15 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) =
     // A queue of pending actions.
     let aq = AtomicReference<ActionQueue>(ActionQueue.Empty)
 
+    do this.setState(v) |> ignore
 
-    do setState(v)
+    new(v) = Agent(v, null) 
 
     static member continueKeyword : Keyword = Keyword.intern(null, "continue")
-    new(v) = Agent(v, null) 
 
     member _.getState = _state
     member _.getQueueCount = aq.Get().q.count();
+    member _.getErrorHandler = errorHandler
 
     member _.addError(e) = errors <- RTSeq.cons(e, errors)
 
@@ -869,7 +919,7 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) =
         with get() = Agent.nested
         and set(v) = Agent.nested <- v
 
-    member this.setState(newState : obj) =
+    member this.setState(newState : obj) : bool =
         (this :> ARef).validate(newState)
         let ret = not <| Object.ReferenceEquals(_state,newState)
         _state <- newState
@@ -911,6 +961,19 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) =
         Agent.dispatchAction(action)
         this
         
+    // Enqueue nested actions.
+    static member releasePendingSends() : int = 
+        let sends = Agent.Nested
+        if isNull sends then
+            0
+        else
+            for i in 0 .. sends.count() - 1 do
+                let a = sends.nth(i)  :?> AgentAction
+                a.getAgent().enqueue(a)
+            Agent.Nested <- PersistentVector.EMPTY
+            sends.count()
+
+
 
 
     //member this.validate(v:obj) =
