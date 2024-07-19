@@ -181,17 +181,14 @@ type BigDecimal private (coeff, exp, precision) =
             let decrease = -delta |> uint
             let p = lhs.Precision
 
-            if p < decrease then
-                BigDecimal(BigInteger.Zero, newExponent, 0u)
-            else
-                let newPrecision = p - decrease
+            let newPrecision = if p < decrease then 0u else p - decrease
 
-                let r =
-                    lhs.Round
-                        ({ precision = newPrecision
-                           roundingMode = mode })
+            let r =
+                lhs.Round
+                    ({ precision = newPrecision
+                       roundingMode = mode })
 
-                if (r.Exponent = newExponent) then r else BigDecimal.Rescale(r, newExponent, mode)
+            if (r.Exponent = newExponent) then r else BigDecimal.Rescale(r, newExponent, mode)
 
         let decreaseExponent delta =
             // delta positive => decrease the exponent => multiply by 10^some power and don't underflow
