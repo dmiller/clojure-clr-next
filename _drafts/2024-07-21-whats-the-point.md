@@ -1,0 +1,334 @@
+---
+layout: post
+title: What's the point?  BigDecimal in review
+date: 2024-07-21 00:00:00 -0500
+categories: general
+---
+
+More accurately, where's the point?  Recently I had to dig into the `BigDecimal` implementation to fix a reported bug. Every time I have to look at the `BigDecimal` code, it is a journey of rediscovery.  I'm going to write down a few things to save me some time in the future.
+
+# General Decimal Arithmetic Specification
+
+A number of the implementations of BigDecimal that I looked at implemented some variation of the specfication given in [The General Decimal Arithmetic Specification](http://speleotrove.com/decimal/decarith.pdf).  The specification is a bit ... long.  74 pages.  And dense.  But between the spec and the implementations, one can get enough insight to proceed.
+
+Most implementations I looked at targeted a subset of the spec, generally the X3.274 subset that is specified in an appendix of the GDAS.  This relieves us from having to deal with a number of complications, including:  NaNs, infinite values, subnormal values, and negative zero. But there is enough to provide a challenge.
+
+# What is a number?
+
+The GDAS provides an abstract model for finite numbers--we we're not going to worry about infinities and other oddities.
+A finite number is defined by three integer parameters:
+
+- `sign`: 0 for positive, 1 for negative
+- `coefficient`: an integer which is zero of or positive.
+- `exponent`: a signed integer
+
+(There is a lot of discussion about allowed values for these parameters.  You're welcome to have a go at it.)
+
+The numerical _value_ of a finite number is given by the formula:
+
+```math
+ value = (-1)^sign * coefficient * 10^exponent
+```
+In what follows, I'll use the abstract representation for clarity.  It will be notated as `[sign,coeff,exp]`.
+Sometimes for convenience, I'll slip into a notaion related to  our implementation, where we combine the _sign_ and _coefficient_ and represent the resulting signed integer using `BigDecimal`.  For example, I might notate the 
+number `123.45` would be represented as `[0, 12345, -2]` or `[12345, -2]`, depending on the context.  There should be no confusion.
+
+The first thing to understand is this:
+
+> This abstract definition deliberately allows for multiple representations of values which are numerically equal but are visually distinct (such as 1 and 1.00).  [GDAS, p. 10]
+
+What is `1`? `1.00`?  Simple. The former is `[1, 0]` and the latter is `[100, -2]`.
+
+# Conversions
+
+The GDAS defines specific algorithms from converting an abstract representation to a string and string to an abstract representation.  The algorithms are not complicated, but a little longer than we need to get into.  Here are some examples from the GDAS:
+
+```math
+[0, 123,   0]   <=>    "123"
+[1, 123,   0]   <=>    "-123"
+[0, 123,   1]   <=>    "1.23E+3"
+[0, 123,   3]   <=>    "1.23E+5"
+[0, 123,  -1]   <=>    "12.3"
+[0, 123,  -5]   <=>    "0.00123"
+[0, 123, -10]   <=>    "1.23E-8"
+[1, 123, -12]   <=>    "-1.23E-10"
+[0,   0,   0]   <=>    "0"
+[0,   0,  -2]   <=>    "0.00"
+[0,   0,   2]   <=>    "0E+2"
+[1,   0,   0]   <=>    "-0"         // except we won't have negative zero in our implementation
+[0,   5,  -6]   <=>    "0.000005"
+[0,  50,  -7]   <=>    "0.0000050"
+[0,   5,  -7]   <=>    "5E-7"
+```
+You understand now why I will stick with the abstract representation. However, the reading and printing algorithms will need implementing.
+
+# Contexts
+
+The GDAS provides "arbitrary precision"; that is rarely what one wants. One can do the following:
+
+```clojure
+(+ 100000000M 1E-20M) ;; => 100000000.00000000000000000001M
+```
+
+but one finds it hard to image a situation where 29 digits of precision are really necessary.  But, you do you.
+
+In case you would like to limit the precision, the GDAS provides a `context` object which can be used to control the precision and other parameters affecting arithmetic operations.  We need only these:
+
+- `precision`: "An integer which must be positive (greater than 0). This sets the maximum number of 
+significant digits that can result from an arithmetic operation." [GDAS, p 13]
+- `rounding`: "A named value which indicates the algorithm to be used when rounding is necessary. 
+Rounding is applied when a result _coefficient_ has more significant digits than the value 
+of _precision_; in this case the result coefficient is shortened to _precision_ digits and may 
+then be incremented by one (which may require a further shortening), depending on 
+the rounding algorithm selected and the remaining digits of the original _coefficient_. The 
+exponent is adjusted to compensate for any shortening. " [GDAS, p 13]"
+
+There are five rounding 'algorithms'  -- usually called _rounding mode_ that must be implemented:
+Again quoting from GDAS:
+
+| Mode      | Description |
+|---------- | ----------- |
+| _round-down_ |  (Round toward 0; truncate.) The discarded digits are ignored; the result is unchanged. |
+| _round-half-up_ | If the discarded digits represent greater than or equal to half (0.5) of the value of a one in the next left position then the result coefficient  should be incremented by 1 (rounded up).  Otherwise the discarded digits are ignored. |
+| _round-half-even_ | If the discarded digits represent greater than half (0.5) the value of a one in the next left position then the result coefficient should be incremented by 1 (rounded up). If they represent less than half, then the result coefficient is not adjusted (that is, the discarded digits are ignored). <br/> Otherwise (they represent exactly half) the result coefficient is unaltered if its rightmost digit is even, or incremented by 1 (rounded up) if its rightmost digit is odd (to make an even digit). |
+| _round-ceiling_ | (Round toward +∞.) If all of the discarded digits are zero or if the sign is 1 the result is unchanged. Otherwise, the result coefficient should be ncremented by 1 (rounded up). |
+| _round-floor_ | (Round toward -∞.) If all of the discarded digits are zero or if the sign is 0 the result is unchanged. Otherwise, the sign is 1 and the result coefficient should be incremented by 1. |
+
+In Clojure, the dynamic `Var` named `*math-context*` is used to hold the current context.  The `Numbers` suite of arithmetic operations will use this context to determine the precision and rounding mode for the operation.  The context can be set using the `with-precision` macro.  For example:
+
+```clojure
+ (with-precision 10 :rounding HalfUp 
+    (+ 1000000000M 1E-20M))        ;; => 1000000000M
+```
+
+Note: if `:rounding` is not specified, the default is `HalfUp`.
+
+Some operations require an explicit context, typically when the result of an operation with no rounding does not have exactly representable result.  Division is the poster child.
+
+```clojure
+ (/ 10M 2M)  ;; => 5M
+ (/ 10M 3M)  ;; => throws ArithmeticException!  
+             ;;    "Non-terminating decimal expansion; no exact representable decimal result."
+
+ (with-precision 4 :rounding HalfUp
+           (/ 10M 3M))                 ;; => 3.333M   
+```
+
+# Basic arithmetic
+
+The GDAS provides algorithms for the basic arithemetic operations.  Some of them are rather involved.  In fact, in my original implementation in C#, I have comments specifically noting places where I felt compelled to "port while looking", i.e, I pretty much just straight translated the code from the OpenJDK implementation.  
+
+We can look at one operation, addition, to get a feel for how arithmetic computations are done, especially with regard to how the context comes into play for limiting precision and rounding.
+
+Paraphrasing the GDAS (which combines the description of additoin and subtraction -- I'm subtracting the subtraction part):
+
+- The _coefficient_ of the result is computed by adding the _aligned coefficients_ of the two operands.  
+- The _aligned coefficients_ are computed by comparing the `exponent`s of the operands:
+    - If the exponents are equal, the aligned coefficients are the same as the original coefficients.
+    - Otherwise, the aligned coefficent of the number with the larger exponent is multiplied by `10^n`, where `n` is the absolute value difference between the exponents; the aligned coefficient of the other operand is the same as the original coefficient.
+- The result _exponent_ is the minimum of the exponents of the two operands.
+    
+ In other words, basically you do the equivalent of shifting in order to align the decimal points.  Without talking about decimal points, just exponents.  
+
+ An example, using our notation for numbers:
+
+ ```math
+ [2751, -1] + [4356, 1] = [2751, -1] + [435600, -1] 
+                        = [438351, -1]
+ ```
+Or in the way we usually do arithmetic:
+
+```math   
+     275.1
++  43560.0
+----------
+   43835.1
+```
+
+- The result is then rounded to _precision_ digits if necessary, counting from the most significant digit of the result.
+
+Now, this is where you are going to get into trouble.  Precision is how many digits you want to keep.  Rounding with a context does not make it easy to say -- give me just an integer result.
+
+Given these definitions for our friend in the previous example:
+
+```clojure
+(def d5 275.1M)
+(def d6 4356E1M)
+```
+
+fill in the following table for evalauting:
+
+```clojure
+(with-precision N (+ d5 d6)
+```
+
+| N  | Result |
+|----:|--------|
+| 10 |  |
+|  6 |  |
+|  5 |  |
+|  4 |  |
+|  3 |  |
+|  2 |  |
+|  1 |  |
+|  0 |  |
+
+I just went ahead and ran the code.
+
+```clojure
+(map #(with-precision % (+ d5 d6)) '(10 6 5 4 3 2 1))
+;; => (43835.1M 
+;;     43835.1M 
+;;     43835M 
+;;     4.384E+4M 
+;;     4.38E+4M 
+;;     4.4E+4M 
+;;     4E+4M
+;;     43835.1M)
+```
+
+Or
+
+| N  | Result |
+|----:|--------:|
+| 10 |  43835.1 |
+|  6 |  43835.1 |
+|  5 |  43835   |
+|  4 |  43840   |
+|  3 |  43800   |
+|  2 |  44000   |
+|  1 |  40000   |
+|  0 |  43835.1 |
+
+(Remember that a precision of 0 means no precision limit.)
+
+What if you really want to round a result to get an integer?
+See below.  But first, let's write some code to at least get us through addition.  It is easiest to discuss the rounding operation concretely.
+
+# It's coding time
+
+Let's get a context type going first.  We need an enum to cover the rounding modes.  
+
+```F#
+type RoundingMode =
+    | Up
+    | Down
+    | Ceiling
+    | Floor
+    | HalfUp
+    | HalfDown
+    | HalfEven
+    | Unnecessary
+```
+The context is a record type.
+
+```F#
+
+[<Struct>]
+type Context =
+    { precision: uint32
+      roundingMode: RoundingMode }
+
+    // There are some standard contexts that can be used
+
+    /// Standard precision for 32-bit decimal
+    static member val Decimal32 =
+        { precision = 7u
+          roundingMode = HalfEven }
+    /// Standard precision for 64-bit decimal
+    static member val Decimal64 =
+        { precision = 16u
+          roundingMode = HalfEven }
+
+    static member val Unlimited =
+        { precision = 0u
+          roundingMode = HalfUp }
+    /// Default mode
+    static member val Default =
+        { precision = 9ul
+          roundingMode = HalfUp }
+
+    // And some factory methods
+
+    /// Create a Context with specified precision and roundingMode = HalfEven
+    static member ExtendedDefault precision =
+        { precision = precision
+          roundingMode = HalfEven }
+    /// Create a Context from the given precision and rounding mode
+    static member Create(precision, roundingMode) =
+        { precision = precision
+          roundingMode = roundingMode }
+```
+
+Now we can start implementing `BigDecimal`.  For exposition purposes, I'll present the code out of order.  You'll need to rearrange for an F# compilation to work.
+
+We just need to keep three fields. The coefficient is a `BigInteger` and the exponent is an `int`. In addition, we lazily compute the precision of the number itself.  We provide the precision in our private constructor, but almost always we call the constructor with 0 for that parameter, indicating _not-yet-computed_.
+
+```F#
+[<Sealed>]
+type BigDecimal private (coeff, exp, precision) =
+
+    // Precision
+
+    // Constructor precision is shadowed with a mutable.
+    // Value of 0 indicates precision not computed
+    let mutable precision: uint = precision
+
+    // Compute actual precision and cache it.
+    member private _.GetPrecision() =
+        match precision with
+        | 0u -> precision <- Math.Max(ArithmeticHelpers.getBIPrecision (coeff), 1u)
+        | _ -> ()
+
+        precision
+
+    // Public properties related to precision
+
+    member this.Precision = this.GetPrecision()
+    member _.RawPrecision = precision
+    member this.IsPrecisionKnown = this.RawPrecision <> 0u
+```
+
+I'll talk about that little helper function to compute the precision of a `BigInteger` later on.
+
+Now let's take a look at addition.  We'll provide two versions, one talking a context and one not.
+If we don't take a context, then there is no rounding involved.  Just align and add the coefficients  and use the exponent of the smaller one.
+
+```F#
+    member this.Add(y: BigDecimal) =
+        let xa, ya = BigDecimal.align this y in BigDecimal(xa.Coefficient + ya.Coefficient, xa.Exponent, 0u)
+
+```
+
+We will define `align` to give us back
+
+
+
+
+
+
+
+# BigInteger
+
+When Clojure first appeared, it supported all the primitive numeric types of Java and also the `java.math.BigInteger` and `java.math.BigDecimal` classes: The lisp reader supports literals of those types (`123N` or '`123.45M` respectively); the `Numbers` suite of arithemetical operations supports them in a natural way.
+
+For porting to the CLR, this presented a bit of a problem. At that time, there were no standard packages for these types in the Base Class Libary (BCL).  If ClojureCLR was going to provide support for arbitrary precision integers and decimals, the choices seemed to be either find some libraries to include or write our own.  I chose the latter approach, in part because there seemed to be a definite distaste for including third-party libraries in the Clojure eco-system.  Okay, also in part because I thought it would be fun.
+
+So I looked around at some implementations of `BigInteger` packages, decided on what I wanted to provide -- I needed to support at least the basic methods available in the Java version -- and started coding.  That was relatively straightforward.  I could look at `Microsoft.Scripting.Math.BigInteger` (part of the IronPython project) and the `java.math.BigInteger` source code from OpenJDK. But mostly I relied on Donald Knuth's _The Art of Computer Programming, Volume 2_.  It was worth doing just for the excuse to read that book.
+
+There is the added advantage that we have a pretty intuitive feeling for integer arithmetic. If you can add two integers represented as sequences of digits in the range '0' to '9', how hard can it be to add two integers represented as sequences of _'digits'_ in the range '0' to `UInt32.MaxValue`?   See?  You're almost there..
+
+# BigDecimal
+
+`BigDecimal` was a another game entirely.  We are not in the land of floating-point.  Given that we allow arbitray precision, even types such as `System.Decimal` in the CLR do not give any real guidance.  I needed a semantics to code.  Trying to distill that from the few implementations I found did not seem like a fun thing.  Fortunately, there is a standard most of these implementations are trying to follow: [The General Decimal Arithmetic Specification](http://speleotrove.com/decimal/decarith.pdf).  
+
+The specification is a bit ... long.  74 pages.  And dense.  But between the spec and the implementations, one can get enough insight to proceed.
+
+The implementations I remember looking at (I did this 15 years ago) were
+
+- [the OpenJDK implementation of `java.math.BigDecimal](https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/math/BigDecimal.java -- written in Java
+- [the IronPython implementation](https://github.com/IronLanguages/ironpython3/blob/main/Src/StdLib/Lib/decimal.py) - written in Python
+- [the IronRuby implementation](https://github.com/IronLanguages/ironruby/tree/master/Src/Libraries/BigDecimal) - written in C#
+
+
+
