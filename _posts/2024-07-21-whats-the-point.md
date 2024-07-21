@@ -470,7 +470,6 @@ So I looked around at some implementations of `BigInteger` packages, decided on 
 
 The coding was not terribly hard: We have a pretty intuitive feeling for integer arithmetic. If you can add two integers represented as sequences of digits in the range '0' to '9', how hard can it be to add two integers represented as sequences of _'digits'_ in the range '0' to `UInt32.MaxValue`?   (We use arrays of `uint32` to represent values.)  See?  You're almost there..
 
-# BigDecimal
 
 `BigDecimal` was a another game entirely.  This is not floating-point, so no inspiration there.   Even the `System.Decimal` class in the CLR is of no help in this world. 
 Fortunately, I found references to the GDAS early in the process. 
