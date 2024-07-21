@@ -628,18 +628,13 @@ type BigDecimal private (coeff, exp, precision) =
     /// Align the bigger BigDecimal by increasing its coefficient and decreasing its exponent
     static member private computeAlign (big: BigDecimal) (small: BigDecimal) =
         let deltaExp = (big.Exponent - small.Exponent) |> uint
-
-        BigDecimal
-            (big.Coefficient
-             * ArithmeticHelpers.biPowerOfTen (deltaExp),
-             small.Exponent,
-             0u)
+        big.Coefficient * ArithmeticHelpers.biPowerOfTen (deltaExp)
 
     /// Create matching pair with the same alignment (exponent)
     static member private align (x: BigDecimal) (y: BigDecimal) =
-        if y.Exponent > x.Exponent then (x, BigDecimal.computeAlign y x)
-        elif x.Exponent > y.Exponent then (BigDecimal.computeAlign x y, y)
-        else (x, y)
+        if y.Exponent > x.Exponent then (x.Coefficient, BigDecimal.computeAlign y x, x.Exponent)
+        elif x.Exponent > y.Exponent then (BigDecimal.computeAlign x y, y.Coefficient, y.Exponent )
+        else (x.Coefficient, y.Coefficient, y.Exponent)
 
 
     //////////////////////////////////
@@ -648,8 +643,8 @@ type BigDecimal private (coeff, exp, precision) =
 
     interface IComparable<BigDecimal> with
         member this.CompareTo(y: BigDecimal) =
-            let x1, y1 = BigDecimal.align this y
-            x1.Coefficient.CompareTo(y1.Coefficient)
+            let x1, y1, _ = BigDecimal.align this y
+            x1.CompareTo(y1)
 
     interface IComparable with
         member this.CompareTo y =
@@ -769,7 +764,7 @@ type BigDecimal private (coeff, exp, precision) =
     //  Addition and subtraction
 
     member this.Add(y: BigDecimal) =
-        let xa, ya = BigDecimal.align this y in BigDecimal(xa.Coefficient + ya.Coefficient, xa.Exponent, 0u)
+        let xc, yc, exp = BigDecimal.align this y in BigDecimal(xc + yc, exp, 0u)
 
     member this.Add(y: BigDecimal, c: Context) =
         // TODO: Optimize for one arg or the other being zero.
@@ -788,7 +783,7 @@ type BigDecimal private (coeff, exp, precision) =
     static member (+)(x: BigDecimal, y: BigDecimal) = x.Add(y)
 
     member this.Subtract(y: BigDecimal) =
-        let xa, ya = BigDecimal.align this y in BigDecimal(xa.Coefficient - ya.Coefficient, xa.Exponent, 0u)
+        let xc, yc, exp = BigDecimal.align this y in BigDecimal(xc - yc, exp, 0u)
 
     member this.Subtract(y: BigDecimal, c: Context) =
         // TODO: Optimize for one arg or the other being zero.
