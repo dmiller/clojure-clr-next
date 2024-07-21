@@ -296,16 +296,89 @@ If we don't take a context, then there is no rounding involved.  Just align and 
 
 ```F#
     member this.Add(y: BigDecimal) =
-        let xa, ya = BigDecimal.align this y in BigDecimal(xa.Coefficient + ya.Coefficient, xa.Exponent, 0u)
-
+        let xc, yc, exp = BigDecimal.align this y in BigDecimal(xc + yc, exp, 0u)
 ```
 
-We will define `align` to give us back
+We will define `align` to give us back the aligned coefficents and the smaller exponent from the two `BigDecimal`s.
+
+```F#
+    /// Return the aligned coefficients and the smaller exponent
+    static member private align (x: BigDecimal) (y: BigDecimal) =
+        if y.Exponent > x.Exponent then (x.Coefficient, BigDecimal.computeAlign y x, x.Exponent)
+        elif x.Exponent > y.Exponent then (BigDecimal.computeAlign x y, y.Coefficient, y.Exponent )
+        else (x.Coefficient, y.Coefficient, y.Exponent)
+```
 
 
+The `computeAlign` function is simple.  It just multiplies the coefficient of the larger exponent by 10 raised to the difference in exponents.  The larger value is the first argument.
 
+```F#
+    static member private computeAlign (big: BigDecimal) (small: BigDecimal) =
+        let deltaExp = (big.Exponent - small.Exponent) |> uint
+        big.Coefficient * ArithmeticHelpers.biPowerOfTen (deltaExp)
+```
 
+The `biPowerOfTen` function is a simple helper function to compute `BigInteger` powers of ten. 
 
+When contexts are involved, we have to deal with rounding:
+
+```F#
+    member this.Add(y: BigDecimal, c: Context) =
+        let result = this.Add(y)
+
+        if c.precision = 0u
+           || c.roundingMode = RoundingMode.Unnecessary then
+            result
+        else
+            BigDecimal.round result c
+```
+
+When rounding is not required, we can just return the result of doing non-context addition.  Otherwise, we call the `round` function.   
+
+Rounding is required if the precision of the result is greater than the precision of the context.  
+The precision of the result is just the number of digits in its `BigInteger` coefficient.  Suppose we have the 
+`BigDecimal` value  `[123456789, -2]` (= 1234567.89) and the context precision is 4.  We need to reduce the coefficient to four digits, leaving us with either `1234` or `1235`, depending on the rounding mode.  We get the 1234 by dividing by a power of ten, the power being the difference in precision.  Here the the difference is `9 - 4 = 5`, so we divide the coefficent by 100000.  This yields 1234.  Rounding up means adding 1, yielding 1235.  Finally, to construct the result, we need the correct exponent.  We divided by 10000, so we should multiply by the same amount; equivalently, increase the exponent by 5.  The result is `[1235, 3]` or 1235000.  In other words:
+
+```F#
+    static member private round (v: BigDecimal) c =
+        let vp = v.GetPrecision()
+
+        if (vp <= c.precision) then
+            // No rounding required: precision is less than or equal to context precision
+            v
+        else
+            // Rounding required
+            let drop = vp - c.precision
+            let divisor = ArithmeticHelpers.biPowerOfTen (drop)
+
+            let rounded =
+                BigDecimal.roundingDivide2 v.Coefficient divisor c.roundingMode
+
+            // read below
+            let exp =
+                BigDecimal.checkExponentE ((int64 v.Exponent) + (int64 drop)) rounded.IsZero
+
+            let result = BigDecimal(rounded, exp, 0u)
+
+            if c.precision > 0u then BigDecimal.round result c else result
+```
+
+We'll push the work of dividing the coefficient off to `roundingDivide2`, which we'll cover in a moment.
+What follows that call needs a little explanation.  
+
+The call to `checkExponentE` is to ensure that the exponent is not too large.  Our exponents are limited to the range of `int32`.  The increment of the exponent might cause an overflow.  We do the arithmetic in `int64`.  `checkExponentE` will make sure it is in bounds (and also checks if we have a zero result, for which we can just set the exponent to 1).   If the exponent is too large, it throws an exception.  
+
+After that, we construct the result -- _and call `round` again!
+
+This second call covers a certain edge case.  The clue is in the GDAS description of rounding modes:
+
+> When a result is rounded, the coefficient may become longer than the current precision. 
+In this case the least significant digit of the coefficient (it will be a zero) is removed 
+(reducing the precision by one), and the exponent is incremented by one. 
+
+An example: Context = (4, HalfUp).  Number is [999996789, -2].  As in our previous example, we divide by 10000, yielding 99999.  Rounding up gives 100000.  The exponent is increased by 1, giving [100000, 3].  However, our precision is now 5, not four.  Rounding again will give us [1000, 4].  
+
+Instead of rounding, we could have checked the new coefficient's precision.  If it is to large, divide by 10 and increment the exponent, as the GDAS says. That is exactly when the second call to `round` does.  We could perhaps save a few instructions by writing the more specific explanation  Repeat until the precision is less than or equal to the context precision.  This is what the second call to `round` does.
 
 
 # BigInteger
