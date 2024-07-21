@@ -167,9 +167,13 @@ type BigDecimal private (coeff, exp, precision) =
             let exp =
                 BigDecimal.checkExponentE ((int64 v.Exponent) + (int64 drop)) rounded.IsZero
 
-            let result = BigDecimal(rounded, exp, 0u)
+            // check for the case where we had a 9999... that rounded up to 10000...
 
-            if c.precision > 0u then BigDecimal.round result c else result
+            if (ArithmeticHelpers.getBIPrecision(rounded) > c.precision && c.precision > 0u) then
+                let newCoeff =  rounded / ArithmeticHelpers.biTen
+                BigDecimal(newCoeff, exp+1, c.precision)
+            else
+                BigDecimal(rounded, exp, c.precision)
 
     static member Round(v: BigDecimal, c: Context) = BigDecimal.round v c
     member x.Round(c: Context) = BigDecimal.Round(x, c)
