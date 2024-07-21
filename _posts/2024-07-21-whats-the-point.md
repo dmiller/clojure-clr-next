@@ -476,7 +476,7 @@ Fortunately, I found references to the GDAS early in the process.
 
 I also look at various implementations of `BigDecimal` in other languages. I think my primary sources were:
 
-- [the OpenJDK implementation](https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/math/BigDecimal.java -- written in Java
+- [the OpenJDK implementation](https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/math/BigDecimal.java) -- written in Java
 - [the IronPython implementation](https://github.com/IronLanguages/ironpython3/blob/main/Src/StdLib/Lib/decimal.py) - written in Python
 - [the IronRuby implementation](https://github.com/IronLanguages/ironruby/tree/master/Src/Libraries/BigDecimal) - written in C#
 
