@@ -2,6 +2,8 @@
 open PersistentVectorBenchmarks
 open PersistentHashMapBenchmarks
 open NumericsBenchmarks
+open BigDecimalBenchmarks
+open System.Numerics
 
 
 [<EntryPoint>]
@@ -15,8 +17,9 @@ let main argv =
     //BenchmarkRunner.Run<CategoryVersusOps>() |> ignore
     //BenchmarkRunner.Run<HashStringUTests>() |> ignore
     //BenchmarkRunner.Run<HasheqTests>() |> ignore
-    BenchmarkRunner.Run<UtilEquivTests>() |> ignore
+    //BenchmarkRunner.Run<UtilEquivTests>() |> ignore
 
+    BenchmarkRunner.Run<BigDecimalBenmark>() |> ignore
 
     // Tests on PersistentVector 
 
@@ -40,6 +43,22 @@ let main argv =
     //BenchmarkRunner.Run<PHMContainsMissingKey>() |> ignore
 
 
+    //let mutable biSN = BigInteger.One
+    //let mutable biCL = clojure.lang.BigInteger.One
+
+    //for i = 1 to 100 do
+    //    biSN <- biSN * BigInteger(10)
+    //    biCL <- biCL.Multiply(clojure.lang.BigInteger.Ten)
+
+    //    let precSNUA = getBIPrecisionUArray biSN
+    //    let precSNS = getBIPrecisionString  biSN
+    //    let precCL = biCL.Precision
+
+    //    if precSNUA <> precCL  || precSNS <> precCL then
+    //        printfn "Precision mismatch: %A %A %A %A" i precSNUA precSNS precCL
+
+        
+        
 
 
     0 // return an integer exit code

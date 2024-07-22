@@ -9,6 +9,7 @@
     <None Include="PersistentHashMapResults.md" />
     <None Include="PersisentVectorResults.md" />
     <None Include="README.md" />
+    <Compile Include="BigDecimalBenchmarks.fs" />
     <Compile Include="NumericsBenchmarks.fs" />
     <Compile Include="PersistentVectorBenchmarks.fs" />
     <Compile Include="PersistentHashMapBenchmarks.fs" />
