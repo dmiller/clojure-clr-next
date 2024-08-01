@@ -471,7 +471,7 @@ and [<Sealed>] LockingTransaction() =
                             let r = pair.Key
                             let oldval = r.tryGetVal()
                             let newval = pair.Value
-                            r.setValue(newval, LockingTransaction.getCommitPoint())
+                            r.setValue(newval, commitPoint)
                             if (r:>IRef).getWatches().count() > 0 then
                                 notify.Add({ ref = r; oldVal = oldval; newVal = newval })
 
