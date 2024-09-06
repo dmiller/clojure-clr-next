@@ -127,8 +127,8 @@ You can access the first overload with either of these:
 The second overload is accessed with:
 
 ```clojure
-(dm.interop.C6/sm1 12 #^"System.String[]" (into-array String ["abc" "de" "f"]))
-(dm.interop.C6/sm1 12 #^"System.String[]" (into-array ["abc" "de" "f"]))
+(ParamsTest/StaticParams 12 #^"System.String[]" (into-array String ["abc" "de" "f"]))
+(ParamsTest/StaticParams 12 #^"System.String[]" (into-array ["abc" "de" "f"]))
 ```
 ## Generic methods
 
