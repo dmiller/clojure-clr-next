@@ -686,7 +686,7 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     member private _.histCount() =
         let mutable count = 0
         let mutable tv = tvals.Next
-        while LanguagePrimitives.PhysicalEquality tv  tvals do
+        while LanguagePrimitives.PhysicalEquality tv tvals do
             count <- count + 1
             tv <- tv.Next
         count
