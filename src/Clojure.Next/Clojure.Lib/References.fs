@@ -10,16 +10,20 @@ open System.Runtime.CompilerServices
 // Holds values inside a Ref
 // Does this ever need to be null?
 [<Sealed>]
-type internal RefVal(v: obj, pt: int64) as this = 
+type internal RefVal(v: obj, pt: int64, preceding : RefVal, following : RefVal) = 
 
     let mutable value : obj = v
     let mutable point : int64 = pt
 
     // these implement a doubly-linked circular list
     // the default constructor creates a self-linked node
-    let mutable prior : RefVal = this
-    let mutable next : RefVal = this
+    let mutable prior : RefVal = preceding
+    let mutable next : RefVal = following
 
+    // Create a new RefVal with itself as the only member of the list.
+    new(v, pt) as this = RefVal(v, pt, this, this)
+
+    // Create a new RefVal and insert it after the given RefVal.
     new(v, pt, pr : RefVal) as this = 
         RefVal(v, pt)
         then
@@ -28,23 +32,25 @@ type internal RefVal(v: obj, pt: int64) as this =
             pr.Next <- this
             this.Next.Prior <- this
 
-    member _.Value 
-        with get() = value
-        and private set(v) = value <- v
-    
-    member _.Point = point
-   
-    member _.Next
-        with get() = next
-        and private set(v) = next <- v
+    member _.Value with get() = value
+    member _.Point with get() = point
 
     member _.Prior 
         with get() = prior
         and private set(v) = prior <- v
 
+    member _.Next 
+        with get() = next
+        and private set(v) = next <- v
+
     member this.SetValue(v, pt) =
         value <- v
         point <- pt
+
+    // Set this node to be a list of one node, discarding the rest of the list.
+    member this.Trim() = 
+        prior <- this
+        next <- this
 
 type LTState = 
     | Running = 1
@@ -213,14 +219,14 @@ and [<Sealed>] LockingTransaction() =
             this.tryWriteLock(r)
             unlocked <- false
 
-            if r.currentValPoint() > readPoint then
+            if r.currentPoint() > readPoint then
                 raise retryEx
 
             let success() = 
-                r.TInfo <- info
-                r.tryGetVal()
+                r.TxInfo <- info
+                r.currentVal()
 
-            match r.TInfo with
+            match r.TxInfo with
             | None -> success()
             | Some (refinfo:LTInfo) when refinfo.isRunning && not <| obj.ReferenceEquals(refinfo, info) ->
                 if not (this.barge(refinfo)) then
@@ -342,16 +348,16 @@ and [<Sealed>] LockingTransaction() =
                                 this.tryWriteLock(r)
                                 locked.Add(r)
 
-                                if wasEnsured && r.currentValPoint() > readPoint then
+                                if wasEnsured && r.currentPoint() > readPoint then
                                     raise retryEx
 
-                                match r.TInfo with
+                                match r.TxInfo with
                                 | Some refinfo when refinfo <> newLTInfo && refinfo.isRunning ->
                                     if not (this.barge(refinfo)) then
                                         raise retryEx
                                 | _ -> ()
 
-                                let v = r.tryGetVal()
+                                let v = r.currentVal()
                                 vals.[r] <- v
                                 for f in pair.Value do
                                     vals.[r] <- f.fn.applyTo(RTSeq.cons(vals.[r], f.args))
@@ -370,7 +376,7 @@ and [<Sealed>] LockingTransaction() =
                         let commitPoint = LockingTransaction.getCommitPoint()
                         for pair in vals do
                             let r = pair.Key
-                            let oldval = r.tryGetVal()
+                            let oldval = r.currentVal()
                             let newval = pair.Value
                             r.setValue(newval, commitPoint)
                             if (r:>IRef).getWatches().count() > 0 then
@@ -423,12 +429,12 @@ and [<Sealed>] LockingTransaction() =
                             let rec loop (ver:RefVal) : obj option =
                                 if ver.Point <= readPoint then
                                     Some ver.Value
-                                elif Object.ReferenceEquals(ver.Prior, r.getTVals()) then
+                                elif Object.ReferenceEquals(ver.Prior, r.getRVals()) then
                                     None
                                 else
                                     loop ver.Prior
 
-                            loop (r.getTVals())
+                            loop (r.getRVals())
 
                         finally
                             r.exitReadLock()
@@ -464,11 +470,11 @@ and [<Sealed>] LockingTransaction() =
                     r.enterReadLock()
 
                     // someone completed a write after our snapshot
-                    if r.currentValPoint() > readPoint then
+                    if r.currentPoint() > readPoint then
                         r.exitReadLock()
                         raise retryEx
                     
-                    match r.TInfo with
+                    match r.TxInfo with
                     | Some refinfo when refinfo.isRunning ->
                         r.exitReadLock()
                         if not <| Object.ReferenceEquals(refinfo,info.Value) then
@@ -488,7 +494,7 @@ and [<Sealed>] LockingTransaction() =
                 let v = 
                     try
                         r.enterReadLock()
-                        r.tryGetVal()
+                        r.currentVal()
                     finally
                         r.exitReadLock()
                 vals[r] <- v
@@ -502,7 +508,6 @@ and [<Sealed>] LockingTransaction() =
             vals[r] <- v
             v
 
-
 and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     inherit ARef(null)
 
@@ -512,8 +517,9 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     // An id uniquely identifying this reference.
     let id : int64 = ids.getAndIncrement()
     
-    // Values at points in time for this reference.
-    let mutable tvals : RefVal = RefVal(initVal, 0)
+    // Values at points in time for this reference.  
+    // Initial value has timestamp 0.
+    let mutable rvals : RefVal = RefVal(initVal, 0)
 
     // Number of faults for the reference.
     let faults = AtomicInteger()
@@ -522,8 +528,9 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     let lock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion)
 
     // Info on the transaction locking this ref.
-    let mutable tinfo : LTInfo option = None
+    let mutable txInfo : LTInfo option = None
 
+    // For implementing IDisposable
     let mutable disposed = false
 
     [<VolatileField>]
@@ -533,20 +540,24 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     let mutable maxHistory = 10
 
     member _.Id = id
-    member _.TInfo
-        with get () = tinfo
-        and set(v) = tinfo <- v
+    member _.TxInfo
+        with get () = txInfo
+        and set(v) = txInfo <- v
 
-    member internal _.getTVals() = tvals
+    member internal _.getRVals() = rvals
 
-    member this.setTinfo(v) = tinfo <- Some v
+    member this.setTxInfo(v) = txInfo <- Some v
+
+    // Object overrides
 
     override _.ToString() = sprintf "<Ref %d>" id
+
     override this.Equals(o) = 
         match o with
         | _ when Object.ReferenceEquals(this, o) -> true
         | :? Ref as r -> id = r.Id
         | _ -> false
+
     override _.GetHashCode() = Murmur3.HashLong(id)
 
     interface IComparable<Ref> with
@@ -555,39 +566,19 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
             | null -> 1
             | _ -> id.CompareTo(o.Id)
 
-    member _.MinHistory 
-        with get() = minHistory
-        and set(v) = minHistory <- v
-    
-    member _.MaxHistory
-        with get() = maxHistory
-        and set(v) = maxHistory <- v
+    // History bounds manipulation
 
+    member _.MinHistory with get() = minHistory    
+    member _.MaxHistory with get() = maxHistory
+
+    // the contract with clojure.core requires these to return the ref
     member this.SetMinHistory(v) = minHistory <- v; this
     member this.SetMaxHistory(v) = maxHistory <- v; this
 
-    member private _.Dispose(disposing: bool) =
-        if not disposed then
-            if disposing then
-                if not (isNull lock) then
-                    lock.Dispose()
-            disposed <- true
-
-    interface IDisposable with
-        member this.Dispose() =
-                this.Dispose(true);
-                GC.SuppressFinalize(this)
-
-    member _.enterReadLock() = lock.EnterReadLock()
-    member _.exitReadLock() = lock.ExitReadLock()
-    member _.enterWriteLock() = lock.EnterWriteLock()
-    member _.exitWriteLock() = lock.ExitWriteLock()
-    member _.tryEnterWriteLock(msecTimeout : int) = lock.TryEnterWriteLock(msecTimeout)
-
     member private _.histCount() =
         let mutable count = 0
-        let mutable tv = tvals.Next
-        while LanguagePrimitives.PhysicalEquality tv tvals do
+        let mutable tv = rvals.Next
+        while LanguagePrimitives.PhysicalEquality tv rvals do
             count <- count + 1
             tv <- tv.Next
         count
@@ -599,37 +590,50 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
         finally
             this.exitWriteLock()
 
-    member private this.currentVal() = 
+    // Get rid of the history, keeping just the current value
+    member this.trimHistory() =
         try
-            lock.EnterReadLock()
-            tvals.Value
+            this.enterWriteLock()
+            rvals.Trim()
         finally
-            lock.ExitReadLock()
+            this.exitWriteLock()
 
-    interface IDeref with
-        member this.deref() =
-            match LockingTransaction.getRunning() with
-            | None -> this.currentVal()
-            | Some t -> t.doGet(this)
+    // Convenience methods for locking, primarily for LockingTransaction to use.
+
+    member _.enterReadLock() = lock.EnterReadLock()
+    member _.exitReadLock() = lock.ExitReadLock()
+    member _.enterWriteLock() = lock.EnterWriteLock()
+    member _.exitWriteLock() = lock.ExitWriteLock()
+    member _.tryEnterWriteLock(msecTimeout : int) = lock.TryEnterWriteLock(msecTimeout)
+
 
     // Add to the fault count.
     member _.addFault() = faults.incrementAndGet() |> ignore
 
-    // Get the read/commit point associated with the current value.
-    member _.currentValPoint() = tvals.Point
+    // Get properties of current (root) rval.
+    member _.currentPoint() = rvals.Point
+    member _.currentVal() = rvals.Value  
 
-    // Try to get the value (else null).
-    member _.tryGetVal() : obj = tvals.Value
+    interface IDeref with
+        member this.deref() =
+            match LockingTransaction.getRunning() with
+            | None -> 
+                try 
+                    this.enterReadLock()
+                    rvals.Value
+                finally
+                    this.exitReadLock()
+            | Some t -> t.doGet(this)
 
     // Set the value
     member this.setValue(v: obj, commitPoint: int64) =
         let hcount = this.histCount()
         if (faults.get() > 0 && hcount < maxHistory) || hcount < minHistory then
-            tvals <- RefVal(v, commitPoint, tvals)
+            rvals <- RefVal(v, commitPoint, rvals)
             faults.set(0) |> ignore
         else
-            tvals <- tvals.Next
-            tvals.SetValue(v, commitPoint)
+            rvals <- rvals.Next
+            rvals.SetValue(v, commitPoint)
 
 
     // Transaction operations
@@ -676,50 +680,20 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
         member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19)
         member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20)
         member this.invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, [<ParamArray>] args) = this.fn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, args)
-            
-(*
-        // do we need these?
 
-        #region operator overrides
 
-        public static bool operator ==(Ref x, Ref y)
-        {
-            if (ReferenceEquals(x, y))
-                return true;
+    member private _.Dispose(disposing: bool) =
+        if not disposed then
+            if disposing then
+                if not (isNull lock) then
+                    lock.Dispose()
+            disposed <- true
 
-            if (x is null)
-                return false;
+    interface IDisposable with
+        member this.Dispose() =
+                this.Dispose(true);
+                GC.SuppressFinalize(this)
 
-            return x.CompareTo(y) == 0;
-        }
-
-        public static bool operator !=(Ref x, Ref y)
-        {
-            return !(x == y);
-        }
-
-        public static bool operator <(Ref x, Ref y)
-        {
-            if (ReferenceEquals(x, y))
-                return false;
-
-            if ( x is null)
-                throw new ArgumentException("Cannot compare null","x");
-
-            return x.CompareTo(y) < 0;
-        }
-
-        public static bool operator >(Ref x, Ref y)
-        {
-            if (ReferenceEquals(x, y))
-                return false;
-
-            if ( x is null)
-                throw new ArgumentException("Cannot compare null","x");
-
-            return x.CompareTo(y) > 0;
-        }
-*)
 
 // An encapulated message to an agent
 and AgentAction(agent: Agent, fn: IFn, args: ISeq, solo: bool) =
