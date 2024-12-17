@@ -5,6 +5,7 @@ open System.Threading
 open Clojure.Collections
 open Clojure.Lib
 open Expecto
+open System.Diagnostics
 
 type TxAction =
     | RefSet of index: int * value: int
@@ -64,27 +65,34 @@ let createHandles(scripts : TxScript list) =
 let createRefs(scripts : TxScript list) =
     Array.init (getRefCount(scripts)) (fun i -> new Clojure.Lib.Ref(0, null))
 
-let createExecuteScriptAsync(script : TxScript, handles: ManualResetEvent array, refs: Clojure.Lib.Ref array) =
+
+let writeDebugMsg(id: int, stepNum: int, msg: string) =
+    Debug.WriteLine($"Script {id}, Step {stepNum}: {msg}")
+    Debug.Flush()
+
+let createExecuteScriptAsync(id: int, script : TxScript, handles: ManualResetEvent array, refs: Clojure.Lib.Ref array) =
     let txfn = { new AFn() with
                     member this.ToString() = "a"
                  interface IFn with
                     member _.invoke() = 
-                        try 
-                            script.Steps 
-                            |> List.iter (fun step ->
-                                                match step with
-                                                | RefSet(i, v) -> refs[i].set(v) |> ignore
-                                                | CommuteIncr i -> refs[i].commute(incrFn, null) |> ignore
-                                                | AlterIncr i -> refs.[i].alter(incrFn, null)  |> ignore
-                                                | Wait i -> handles.[i].WaitOne()|> ignore
-                                                | Trigger i -> handles.[i].Set()|> ignore)
-                            NormalExit
-                        with 
-                        | ex -> ExceptionThrown(ex)
-                    
+                        script.Steps 
+                        |> List.iteri (fun stepNum step ->
+                            match step with
+                            | RefSet(i, v) -> writeDebugMsg(id, stepNum, $"ref-set {i} = {v}");  refs[i].set(v) |> ignore
+                            | CommuteIncr i -> writeDebugMsg(id, stepNum, $"commute {i}"); refs[i].commute(incrFn, null) |> ignore
+                            | AlterIncr i -> writeDebugMsg(id, stepNum, $"alter {i}"); refs.[i].alter(incrFn, null)  |> ignore
+                            | Wait i -> writeDebugMsg(id, stepNum, $"wait {i}");  handles.[i].WaitOne() |> ignore; writeDebugMsg(id, stepNum, $"wait {i} completed")|> ignore
+                            | Trigger i -> writeDebugMsg(id, stepNum, $"trigger {i}"); handles.[i].Set()|> ignore)
+                        12                   
                 }
-    async {
-        return LockingTransaction.runInTransaction(txfn);
+    async {        
+        let result = 
+            try 
+                LockingTransaction.runInTransaction(txfn) |> ignore
+                NormalExit
+            with 
+            | ex -> ExceptionThrown(ex)
+        return result
     }
 
 let performTests(script: TxScript, result : TxExit, refs: Clojure.Lib.Ref array) =
@@ -113,14 +121,12 @@ let performTests(script: TxScript, result : TxExit, refs: Clojure.Lib.Ref array)
 let runTests(scripts : TxScript list, handles : ManualResetEvent array, refs : Clojure.Lib.Ref array) = 
     let results = 
         scripts
-        |> List.map (fun s -> createExecuteScriptAsync(s, handles, refs))
+        |> List.mapi (fun i s -> createExecuteScriptAsync(i, s, handles, refs))
         |> Async.Parallel
         |> Async.RunSynchronously
 
-    let typedResults = results |> Array.map (fun r -> r :?> TxExit)
-
     scripts
-    |> List.zip( typedResults |> Array.toList)
+    |> List.zip( results |> Array.toList)
     |> List.iter (fun (r, s) -> performTests(s, r, refs))
 
 let execute(scripts : TxScript list) =
