@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="CountdownLatch.fs" />
+    <Compile Include="RefAbstracts.fs" />
     <Compile Include="References.fs" />
     <Compile Include="Namespace.fs" />
   </ItemGroup>
