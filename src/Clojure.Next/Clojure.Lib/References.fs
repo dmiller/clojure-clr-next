@@ -8,20 +8,16 @@ open Clojure.Numerics
 open System.Runtime.CompilerServices
 
 // Holds values inside a Ref
-// Does this ever need to be null?
 [<Sealed>]
-type internal RefVal(v: obj, pt: int64, preceding : RefVal, following : RefVal) = 
+type internal RefVal(v: obj, pt: int64) as this = 
 
     let mutable value : obj = v
     let mutable point : int64 = pt
 
     // these implement a doubly-linked circular list
     // the default constructor creates a self-linked node
-    let mutable prior : RefVal = preceding
-    let mutable next : RefVal = following
-
-    // Create a new RefVal with itself as the only member of the list.
-    new(v, pt) as this = RefVal(v, pt, this, this)
+    let mutable prior : RefVal = this
+    let mutable next : RefVal = this
 
     // Create a new RefVal and insert it after the given RefVal.
     new(v, pt, pr : RefVal) as this = 
@@ -578,7 +574,7 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     member private _.histCount() =
         let mutable count = 0
         let mutable tv = rvals.Next
-        while LanguagePrimitives.PhysicalEquality tv rvals do
+        while not (LanguagePrimitives.PhysicalEquality tv rvals) do
             count <- count + 1
             tv <- tv.Next
         count
