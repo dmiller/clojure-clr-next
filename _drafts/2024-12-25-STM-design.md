@@ -1,6 +1,6 @@
 ---
 layout: post
-title: STM, part one -- Background
+title: STM in Clojure - Design
 date: 2024-12-15 06:00:00 -0500
 categories: general
 ---
@@ -141,12 +141,217 @@ T1 will still see the world as it was at timestamp 24 if (a) require Refs to kee
 Because keeping every value across all time would be quite expensive, the size of the history is limited.  One can set the `:min-history` and `:max-history` when the Ref is created (defaulting to 0 and 10, respectively) or call `set-min-history` and `set-max-history` to change the values on the fly.  The size of the list will be dynamically adjusted to keep the history within the bounds.  (As we shall see.) 
 
 
+## Let's code
+
+As suggested above, I'm going to leave out some details of the implementation that are not relevant to STM directly.
+There are two primary classes to deliver: `Ref` and `LockingTransaction`.  In F#, these will be mutally recursive classes.
+
+`Ref` is by far the simpler of the two.  
+It primarily holds the history list of values, 
+forwards certain operations to the transaction currently running (on its thread), 
+and provides some basic operations to support `LockingTransaction`.
+
+[The code below is presented in incorrect order for presentation.]
+
+The history list is implemented using a doubly-linked circular list.  
+The list is never empty; it always starts with an entry for the initial value given when the `Ref` is created.
+The initial value will be associated with timestamp 0.
+The 'root' of the list, the node that the `Ref` holds diretly, will always have the most recent value.
+
+All accesses to this list must be protected by locking.  The conditions specified by our earlier guarantees matches up with the semantic of a `System.Threading.ReaderWriterLockSlim`.
+It is incumbent on the `LockingTransaction` to acquire the lock in read mode when it is reading the value of a `Ref` 
+and in write mode when it is updating the value of a `Ref`.  We will provide utility methods to make this easy.
+
+Let's get started.  We define the class `Refval` to be a node in the double-linked circular list for holding values.
+It must hold a value, a timestamp, and points to the next and previous nodes in the list.
+The default constructor will create a node representing a list of one element, i.e., the next and previous pointers will point to the node itself.  
 
 
+```F#
+type RefVal(v: obj, pt: int64) as this
+    // these initializations are sufficient to create a circular list of one element
+    let mutable value : obj = v
+    let mutable point : int64 = pt
+    let mutable prior : RefVal = this
+    let mutable next : RefVal = this
+
+    // When we need to add a new node to the list, we need to know its value, timestamp, and its neighbors.    
+    new(v, pt, pr : RefVal) as this = 
+        RefVal(v, pt)
+        then
+            this.Prior <- pr
+            this.Next <- pr.Next
+            pr.Next <- this
+            this.Next.Prior <- this
+
+    // Ref will need some accessors to do iterations
+    member _.Value with get() = value
+    member _.Point with get() = point
+    member _.Prior with get() = prior
+    member _.Next with get() = next
+
+    // We will need to update the value in the root node
+    member _.SetValue(v: obj, pt: int64) = 
+        value <- v
+        point <- pt
+
+    // There is one special operation to reset the root node so that the list has only this one element.
+    member this.Trim() = 
+        prior <- this
+        next <- this
+```
+
+Now we can proceed with the `Ref` class.
+
+```F#
+[<AllowNullLiteral>]
+type Ref(initVal: obj)
+    // Initialize the root node with the initial value and timestamp 0
+    let mutable refVals = RefVal(initVal, 0L)
+
+    // We need a lock to protect access
+    let lock = new System.Threading.ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion)
+
+    // We need a field to hold the 'stamp' a transaction puts on the Ref. 
+    // The details do not matter to us here.
+    let mutable tinfo : LTInfo option = None
+
+    // We need this history size bounds.    
+    [<VolatileField>]
+    let mutable minHistory = 0 
+
+    [<VolatileField>]
+    let mutable maxHistory = 10
+
+    // This little goodie we'll need later. 
+    // It counts the number of read faults that have occurred, used to decide when we need to grow the history list.
+    let faults = AtomicInteger()
+```
+
+We're going to need some basic accessors for `LockingTransaction` and clojure.core to use.
 
 
+```F#
+    member _.TInfo
+        with get () = tinfo
+        and set(v) = tinfo <- v
 
+    member _.MinHistory with get() = minHistory
+    member _.MaxHistory with get() = maxHistory
+    member this.SetMinHistory(v) = minHistory <- v; this
+    member this.SetMaxHistory(v) = maxHistory <- v; this
+```
 
+Some little helpers for dealing with locking:
 
+```F#
+    member _.enterReadLock() = lock.EnterReadLock()
+    member _.exitReadLock() = lock.ExitReadLock()
+    member _.enterWriteLock() = lock.EnterWriteLock()
+    member _.exitWriteLock() = lock.ExitWriteLock()
+    member _.tryEnterWriteLock(msecTimeout : int) = lock.TryEnterWriteLock(msecTimeout)
+```
 
+We get to see a little locking action here.  `getHistoryCount` is needed to implement `get-history-count` in Clojure itself.
+We need to acquire at least a read lock anytime we access `refVals`.
 
+```F#
+    // Count the entries in the values list
+    // the caller should lock
+    member private _.histCount() =
+        let mutable count = 0
+        let mutable tv = tvals.Next
+        while LanguagePrimitives.PhysicalEquality tv tvals do
+            count <- count + 1
+            tv <- tv.Next
+        count
+
+    member this.getHistoryCount() =
+        try
+            this.enterWriteLock()
+            this.histCount()
+        finally
+            this.exitWriteLock()
+
+    // Get rid of the history, keeping just the current value
+    member _.trimHistory() =
+        try
+            this.enterWriteLock()
+            refVals.Trim()
+        finally
+            this.exitWriteLock()
+```
+
+A few more convenience methods. 
+
+```F#
+    // These need to be called with a lock acquired.
+    member _.currentPoint() = refVals.Point
+    member _.currentValue() = refVals.Value
+
+    // Add to the fault count.
+    member _.addFault() = faults.incrementAndGet() |> ignore
+```
+
+We have a few more public methods to implement to complete the interface.  `Ref` needs to implement interface `IDeref`.
+Here is where we get our first interaction with the transaction. 
+As mentioned previously, what `deref` looks at depends on whether it is called in a transaction scope or not.
+`LockingTransaction.getRunning()` will return `None` if we are not in a transaction.  
+Otherwise, it will return the transaction object.  
+If we are running in a transaction scope, we have to ask the transaction to supply the value because there might be an in-transaction value for this `Ref`.
+If not, we just access the current value.
+
+```F#
+    interface IDeref with
+        member this.deref() =
+            match LockingTransaction.getRunning() with
+            | None -> 
+                try 
+                    this.enterReadLock()
+                    refVals.Value
+                finally
+                    this.exitReadLock()
+            | Some t -> t.doGet(this)
+```
+
+The operations `ref-set`, `alter`, and `commute` are all implemented in  `LockingTransaction`.
+`LockingTransaction.getEx()` will return the transaction object if we are in a transaction scope and throw an exception if we are not.
+
+```F#
+    // Set the value (must be in a transaction).
+    member this.set(v: obj) = LockingTransaction.getEx().doSet(this, v)
+
+    // Apply a commute to the reference. (Must be in a transaction.)
+    member this.commute(fn: IFn, args: ISeq) = LockingTransaction.getEx().doCommute(this, fn, args)
+
+    // Change to a computed value.
+    member this.alter(fn: IFn, args: ISeq) = 
+        let t = LockingTransaction.getEx()
+        t.doSet(this, fn.applyTo(RTSeq.cons(t.doGet(this), args)))
+
+    // Touch the reference.  (Add to the tracking list in the current transaction.)
+    member this.touch() = LockingTransaction.getEx().doEnsure(this)
+```
+
+The last operation for `Ref` is used by `LockingTransaction` to update the value of a `Ref` in the Ref world.
+Here is where history comes into play.  We will expand the history list in two situations:  
+(a) the current list is size is less than the minimum history size; 
+and (b) we had a fault in getting the value of this `Ref` and we are less than the maximum history size.
+The fault count incremented in the `LockedTransaction` code.  
+We will reset the fault count to zero when we increase the list.
+These two conditions are tested for in the `if` clause below.
+If either condition is satisfied, we add a new `RefVal` node to the list.
+If neither condition is met we replace the oldest value in the list with the new value and make it the new root node.
+(The statement `refVals <- refVals.Next` is doing the heavy lifting here.  Draw a map.)
+
+```F#
+   // Set the value
+    member this.setValue(v: obj, commitPoint: int64) =
+        let hcount = this.histCount()
+        if (faults.get() > 0 && hcount < maxHistory) || hcount < minHistory then
+            refVals <- RefVal(v, commitPoint, refVals)
+            faults.set(0) |> ignore
+        else
+            refVals <- refVals.Next
+            refVals.SetValue(v, commitPoint)
+```
