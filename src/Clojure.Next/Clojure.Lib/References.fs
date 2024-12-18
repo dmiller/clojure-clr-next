@@ -19,7 +19,6 @@ type internal RefVal private (v: obj, pt: int64) =
     let mutable prior : RefVal = Unchecked.defaultof<RefVal>
     let mutable next : RefVal =  Unchecked.defaultof<RefVal>
 
-
     // Create a new RefVal and insert it after the given RefVal.
     member this.insertAfter(v, pt) = 
         let r = RefVal(v, pt)        
@@ -56,12 +55,12 @@ type internal RefVal private (v: obj, pt: int64) =
         next <- this
 
 type LTState = 
-    | Running = 1
-    | Committing = 2
-    | Retry = 3
-    | Killed = 4
-    | Committed = 5
-    | Stopped = 6
+    | Running = 1L
+    | Committing = 2L
+    | Retry = 3L
+    | Killed = 4L
+    | Committed = 5L
+    | Stopped = 6L
 
 exception RetryEx of string
 exception AbortEx of string
@@ -75,7 +74,7 @@ type LTInfo(initState: LTState, startPoint: int64) =
     member _.StartPoint = startPoint
 
     member _.State
-        with get() = enum<LTState>(int32 status)
+        with get() = Microsoft.FSharp.Core.LanguagePrimitives.EnumOfValue<int64, LTState>(status)
         and set(v:LTState) = status <- int64 v
     
     member this.compareAndSet(oldVal: LTState, newVal: LTState) =
@@ -83,10 +82,10 @@ type LTInfo(initState: LTState, startPoint: int64) =
         origVal = (oldVal |> int64)
 
     member this.set(newVal: LTState) =
-        Interlocked.Exchange(&status, newVal |> int64) |> int64
+        Interlocked.Exchange(&status, newVal |> int64)
 
     member this.isRunning =
-        let s = enum<LTState> (Interlocked.Read(&status) |> int32) 
+        let s = Microsoft.FSharp.Core.LanguagePrimitives.EnumOfValue<int64, LTState>(Interlocked.Read(&status)) 
         s = LTState.Running || s = LTState.Committing   
 
 // Pending call of a function on arguments.
@@ -251,7 +250,6 @@ and [<Sealed>] LockingTransaction() =
 
     // Determine if sufficient clock time has elapsed to barge another transaction.
     member private _.bargeTimeElapsed = (int64 Environment.TickCount) - startTime > BargeWaitTicks
-
 
     // Get the transaction running on this thread (throw exception if no transaction). 
     static member getEx() =
