@@ -13,6 +13,7 @@ type TxAction =
     | AlterIncr of index: int
     | Wait of index: int
     | Trigger of index: int
+    | SleepMilliseconds of int
 
 type TxExit =
     | NormalExit
@@ -82,7 +83,8 @@ let createExecuteScriptAsync(id: int, script : TxScript, handles: ManualResetEve
                             | CommuteIncr i -> writeDebugMsg(id, stepNum, $"commute {i}"); refs[i].commute(incrFn, null) |> ignore
                             | AlterIncr i -> writeDebugMsg(id, stepNum, $"alter {i}"); refs.[i].alter(incrFn, null)  |> ignore
                             | Wait i -> writeDebugMsg(id, stepNum, $"wait {i}");  handles.[i].WaitOne() |> ignore; writeDebugMsg(id, stepNum, $"wait {i} completed")|> ignore
-                            | Trigger i -> writeDebugMsg(id, stepNum, $"trigger {i}"); handles.[i].Set()|> ignore)
+                            | Trigger i -> writeDebugMsg(id, stepNum, $"trigger {i}"); handles.[i].Set()|> ignore
+                            | SleepMilliseconds ms -> writeDebugMsg(id, stepNum, $"sleep {ms}"); Thread.Sleep(ms) |> ignore; writeDebugMsg(id, stepNum, $"sleep {ms} completed") |> ignore)
                         12                   
                 }
     async {        

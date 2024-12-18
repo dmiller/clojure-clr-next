@@ -9,24 +9,31 @@ open System.Runtime.CompilerServices
 
 // Holds values inside a Ref
 [<Sealed>]
-type internal RefVal(v: obj, pt: int64) as this = 
+type internal RefVal private (v: obj, pt: int64) = 
 
     let mutable value : obj = v
     let mutable point : int64 = pt
 
     // these implement a doubly-linked circular list
     // the default constructor creates a self-linked node
-    let mutable prior : RefVal = this
-    let mutable next : RefVal = this
+    let mutable prior : RefVal = Unchecked.defaultof<RefVal>
+    let mutable next : RefVal =  Unchecked.defaultof<RefVal>
+
 
     // Create a new RefVal and insert it after the given RefVal.
-    new(v, pt, pr : RefVal) as this = 
-        RefVal(v, pt)
-        then
-            this.Prior <- pr
-            this.Next <- pr.Next
-            pr.Next <- this
-            this.Next.Prior <- this
+    member this.insertAfter(v, pt) = 
+        let r = RefVal(v, pt)        
+        r.Prior <- this
+        r.Next <- this.Next
+        this.Next <- r
+        r.Next.Prior <- r
+        r
+
+    static member  createSingleton(v, pt) = 
+        let r = RefVal(v, pt)
+        r.Prior <- r
+        r.Next <- r
+        r
 
     member _.Value with get() = value
     member _.Point with get() = point
@@ -515,7 +522,7 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     
     // Values at points in time for this reference.  
     // Initial value has timestamp 0.
-    let mutable rvals : RefVal = RefVal(initVal, 0)
+    let mutable rvals : RefVal = RefVal.createSingleton(initVal, 0)
 
     // Number of faults for the reference.
     let faults = AtomicInteger()
@@ -625,7 +632,7 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
     member this.setValue(v: obj, commitPoint: int64) =
         let hcount = this.histCount()
         if (faults.get() > 0 && hcount < maxHistory) || hcount < minHistory then
-            rvals <- RefVal(v, commitPoint, rvals)
+            rvals <- rvals.insertAfter(v, commitPoint)
             faults.set(0) |> ignore
         else
             rvals <- rvals.Next

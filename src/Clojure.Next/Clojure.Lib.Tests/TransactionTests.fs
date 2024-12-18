@@ -112,11 +112,24 @@ let ConflictingRefTests =
               execute scripts
 
 
-          ftestCase "Force one to complete before other see final change"
+          testCase "Force one to complete before other see final change"
           <| fun _ ->
               let script1 =
                   { Steps = [ RefSet(0,10); Trigger(0); ]
                     Tests = [ TxTest.Normal; Ref(0,99)] }
+
+              let script2 =
+                  { Steps = [ Wait(0); RefSet(0,99);  ]
+                    Tests = [ TxTest.Normal; Ref(0,99)] }
+
+              let scripts = [ script1; script2 ]
+              execute scripts
+
+          ftestCase "Force one to retry"
+          <| fun _ ->
+              let script1 =
+                  { Steps = [ RefSet(0,5); Trigger(0); SleepMilliseconds(2_000_000)]
+                    Tests = [ TxTest.Normal; Ref(0,5)] }
 
               let script2 =
                   { Steps = [ Wait(0); RefSet(0,99);  ]
