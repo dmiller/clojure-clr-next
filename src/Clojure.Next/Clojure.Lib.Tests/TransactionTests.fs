@@ -98,7 +98,7 @@ let ConflictingRefTests =
         "Conflicting Ref Tests"
         [
 
-          ftestCase "Commute should change cause by other transaction"
+          testCase "Commute should see change cause by other transaction"
           <| fun _ ->
               let script1 =
                   { Steps = [ CommuteIncr(0); Trigger(0); Wait(1) ]
@@ -106,6 +106,20 @@ let ConflictingRefTests =
 
               let script2 =
                   { Steps = [ Wait(0); RefSet(0,98); Trigger(1) ]
+                    Tests = [ TxTest.Normal; Ref(0,99)] }
+
+              let scripts = [ script1; script2 ]
+              execute scripts
+
+
+          ftestCase "Force one to complete before other see final change"
+          <| fun _ ->
+              let script1 =
+                  { Steps = [ RefSet(0,10); Trigger(0); ]
+                    Tests = [ TxTest.Normal; Ref(0,99)] }
+
+              let script2 =
+                  { Steps = [ Wait(0); RefSet(0,99);  ]
                     Tests = [ TxTest.Normal; Ref(0,99)] }
 
               let scripts = [ script1; script2 ]
