@@ -68,14 +68,13 @@ You should look at the API documentation for relevant functions.
 
 I'm going to ignore some aspects of Refs and transations such as validators and watchers.  And I'm going to ignore agents.  Though they are important tools in using Refs, they are incidental to the main logic of the STM implementation.
 
-## Design thinking
+## Design thinking - in reverse
 
-I don't want to derive all of MVCC from first principles, but a little thinking through scenarios will help motivate what we are going to see in the code.
+I don't want to derive all of MVCC from first principles.  In fact, the analysis below is really reverse design; I looked at the code and came up with rationales.  So let's get started.
 
 The timeline of Ref values proceeds in discrete steps.  Any given point, in the world outside of any ongoing transaction, we see a consistent set of values across all the Refs that have been created.  There may be transactions running, but we do not see anything they are up to until they commit. When a transaction commits, it will update the Ref world atomically; from the point of view of anyone outside that transaction, the changes will appear to have happened all at once.  We will never see a state where only a subset of the changes to Ref values made by the transaction have been applied.
 
-Internally to transactions and to the Refs themselves, timestamps are used to keep track of the order of events.  Timestamps are integers and are monotically increasing with time.  Transactions get assigned timestamps when they are created, when they are forced to retry execution after a conflict and when they commit.  They are used internally to determine the relative age of transactions.
-In addition, the value currently assigned to a Ref will have a timestamp associated with it, in fact, the timestamp assigned to the commit action that set the value. For reasons we will go into later, a Ref can keep a history of values with older timestamps.  A snapshot of the "Ref world" would be a set of values in effect at a particular time.
+Internally to transactions and to the Refs themselves, timestamps are used to keep track of the order of events.  Timestamps are integers and are monotically increasing with time.  Transactions get assigned timestamps when they are created, when they are forced to retry execution after a conflict and when they commit.  The timestamps are used internally to determine the relative age of transactions. In addition, the value currently assigned to a Ref will have a timestamp associated with it, the timestamp assigned to the commit action that set the value. For reasons we will go into later, a Ref can keep a history of values with older timestamps.  A snapshot of the "Ref world" would be a set of values in effect at a particular time.
 
 Let's say we have Refs `r1`, `r2`, and `r3` with the following histories, indicated with the notation '<value, timestamp>':
 
@@ -106,6 +105,8 @@ Suppose now that transaction T1 commits with commit timestamp 29 and updates `r1
 Atomicity requires that either both changes are made or neither.  Consistency requires that no one ever sees the Ref world in an intermediate state where, say, `r1` has been updated but `r3` has not.  The easiest way to achieve this is to have T1 acquire locks on `r1` and `r3` before making any changes.  T1 will then update those refs before releasing the locks.  
 
 You might have heard that MVCC doesn't involve locks.  It's bit more nuanced than that.  What MVCC avoids is coarse-grained locking and locks with non-trivial temporal extent. While T1 is running, before it gets to the point of committing, it is doing its various computations.  It is _not_ locking the refs it is updating, except briefly when it has to read a value or do a little bookkeeping.  Only at the point of committing does it lock the refs it is updating.  And there is no user code being run while those refs are locked.  The locks are held just long enough to update the data structures.
+
+Or so I believed.  In the code today, Refs that have been ensured hold read locks for an indefinite period, with observable results. More below.
 
 Isolation is achieved by making invisibile to the outside any changes made to a ref (via `ref-set`, `alter`, or `commute`) until the transaction commits.  While executing, the transaction _will_ see the changes it has made.  This is accomplished by having the transaction keep track of the 'in-transaction-value' of any ref it has updated. Thus, the `deref` operation operates differently inside a transaction than outside.
 
@@ -146,4 +147,82 @@ T1 will still see the world as it was at timestamp 24 if (a) we require Refs to 
 
 Because keeping every value across all time would be quite expensive, the size of the history is limited.  One can set the `:min-history` and `:max-history` when the Ref is created (defaulting to 0 and 10, respectively) or call `set-min-history` and `set-max-history` to change the values on the fly.  The size of the list will be dynamically adjusted to keep the history within the bounds.  (As we shall see.) 
 
-Time to [look at the code]({{site.baseurl}}{% post_url 2024-12-26-STM-code %}).
+## Locking peril
+
+As I was working through the code, I became very puzzled by how locking was working.  The control flow is not exactly transparent -- not surprising given that we are working with multi-threading and expect there to be conflicts, and that conflicts result in throwing exceptions.  That's complexity times three.
+
+Eventually I discovered that a premise I was working with incorrect.  The premise was that all locking was short-term.  And that is just not true.  Doing an ensure operation on a Ref gives rise to a long-term read lock that can actually block other transactions and force retries.   I discovered this when looking for clues in the [online documentation for ensure](https://clojure.github.io/clojure/clojure.core-api.html#clojure.core/ensure).  If you scroll to the bottom, you find this comment:
+
+    The doc string says:
+
+        Allows for more concurrency than (ref-set ref @ref)
+
+    What it doesn’t say is that ensure may degrade performance very seriously, as it is prone to livelock: see CLJ-2301. (ref-set ref @ref) is certainly more reliable than (ensure ref).
+
+The issue [CLJ-2301](https://clojure.atlassian.net/jira/software/c/projects/CLJ/issues/CLJ-2301) has an example that demonstrates the problem.  (It also has links to two old mailing list discussions that resulted in this issue being created.)  These items are from 2017.  The issue is ranked Minor -- don't hold your breath.
+
+Before we hit actual code, it will be helpful to work through the relationships among `ensure`, `commute`, and `ref-set` and how locking comes into play.  (`alter` is identical to `ref-set` in its effects, so we will ignore it.)
+
+The three operations -- let's refer to them as `E`(nsure), `C`(ommute) (ref-)`S`(et) represent three levels of commitment.
+
+- E = I depend on this value.  I'm not going to change it.  But if someone changes it while I'm working, I'll need to retry.
+- C = I will be changing the value of this Ref.  I will compute an in-transaction value for it.  However, when we commit, I'll recompute the value for it based on the then-current value, so it is okay if someone changes it while I'm working.
+- S = I will be changing the value of this Ref.  If someone else changes it while I'm working, I'll need to retry.
+
+The three do interact.  In particular, let's consider a pair of operations in sequence.
+
+| First op | Second op | Result |
+|:---:|:---:|:---------------------------|
+|  S  |  S  |  The second value set will be used. |
+|  S  |  E  |  The ensure is a no-op.  We are already committed to change the Ref. |
+|  S  |  C  |  This is okay.  We will re-reun the commute function at the end of the commit phase. |
+|  C  |  S  |  Invalid operation, exception thrown that will abort the transaction. |
+|  C  |  E  |  These are independent. Both operations will be in effect. |
+|  C  |  C  |  We have two functions to call at commit time.  The more the merrier. |
+|  E  |  S  |  We remove the Ref from the list of ensured Refs and put in the list of set Refs.  |
+|  E  |  E  |  The second is a no-op. |
+|  E  |  C  | These are independent. Both operations will be in effect. |
+
+I don't know anywhere these interactions are talked about.  Determining them from the code takes work.  
+C->S is easy -- it throws an exception and there is actually a comment in the code. S->E requires looking inside a double-nested conditional and seeing what _doesn't_ happen.
+
+At mininum, a `LockingTransaction` will need to track:
+
+- `ensureds` - the set of ensured Refs
+- `sets` - the set of `ref-set` / `altered` Refs
+- `vals` - a dictionary mapping a Ref its in-transaction value
+- `commutes` - a dictionary mapping a Ref to a list of commute actions
+
+The operations do the following:
+
+| Op  | Effect |
+|:---:|:-------|
+|  C  | Add the action to the list of actions for the Ref. |
+|  E  | If the Ref is in `sets` do nothing; else add to `ensureds`. |
+|  S  | If the Ref is in `commutes`, throw an invalid operation exception; otherwise, if the Ref is in `ensureds`, remove it. Add the Ref to `sets` and record the new value for it in `vals`.  |
+
+## Let's lock this down
+
+A `Ref` is quite a bit simpler.  Primarily, it holds the history list of values and lock to control access to that list so we don't have multiple transactions tromping all over the list with no discipline. In addition, as mentioned above it holds the 'stamp' of a transaction that currently has primacy on changing its value.  The lock is a reader-writer lock.  It supports multiple readers and only one writer.  New readers can lock if there is no write lock.  A write-lock can be acquired only if it is free (no readers and no writer).
+
+The operations do the following:
+
+| Op  | Locking |
+|:---:|:-------|
+|  C  | Get a read lock, update data structures, release lock. |
+|  E  | If already ensured, do nothing. Else: Get a read lock.  If someone has set the value on the Ref after our snapshot timestamp, release the lock and cause a retry.  If the Ref has a stamp on it, release the lock;  if the stamper is not us, cause a retry. otherwise, add the Ref to `ensureds` and _DO NOT RELEASE THE LOCK_ |
+|  S  | If the Ref is in `ensureds` release the read lock. (Anything in `ensureds` has acquired a read lock.) Try to get a write lock.  Do updates, throw, whatever needs to be done.  Release the write lock if you acquired it. |
+
+
+Note that for E, when successful, we are holding a read lock.  Other people can read, but no one can write.  This leads to the problem mentioned in CLJ-2301.
+
+Note that for S, we said 'try to get a write lock'.  The operation to `LT.TryWriteLock` tries to acquire the write lock with a timeout.  if the timeout elapses, it throws a retry exception -- we have resource contention here and need to retry.
+This operation also checks for an existing stamp of another transaction that is still running and does barge-or-(block-and-bail) as mentioned above.
+
+When do the read locks on ensured Refs get released?  That happens at the end of each iteration of the (re)try loop, whether we have successfully committed or been thrown into doing a retry.
+
+## Finally ...
+
+We are dealing with a multi-threaded computational structure with significant chance of resource contention that results in retrying operations.  The control flow is implicit and spread across maybe a dozen methods.  We have locks being acquired in one place and release far away (both temporally and in the code).  There are a few comments.  I did not know through the first five readings of the code how key the comment -- "// The set of Refs holding read locks." -- actually was;  it really meant what it said.
+
+Enough analysis.  Time to [look at the code]({{site.baseurl}}{% post_url 2024-12-26-STM-code %}).
