@@ -721,10 +721,11 @@ and [<AllowNullLiteral>] Ref(initVal: obj, meta: IPersistentMap) =
 
 
 // An encapulated message to an agent
-and AgentAction(agent: Agent, fn: IFn, args: ISeq, solo: bool) =
+and [<Sealed>] AgentAction(agent: Agent, fn: IFn, args: ISeq, solo: bool) =
 
     member this.Agent = agent
 
+    // Send the message
     member this.execute() : unit =
         try
             if solo then
@@ -741,13 +742,11 @@ and AgentAction(agent: Agent, fn: IFn, args: ISeq, solo: bool) =
                 with
                 | _ -> ()  // ignore errorHandler errors
 
+    // Worker method to execute the action on a thread.
     member _.executeAction(state: obj) : unit =
         try
             Agent.Nested <- PersistentVector.EMPTY :> IPersistentVector
 
-            let x : IFn = null
-            x.invoke(1,2) |> ignore
-        
             let mutable error : Exception = null
 
             try 
@@ -771,17 +770,24 @@ and AgentAction(agent: Agent, fn: IFn, args: ISeq, solo: bool) =
                 if Object.ReferenceEquals(agent.getErrorMode(), Agent.continueKeyword) then
                     error <- null
 
+            let mutable popped = false
+            let mutable next : ActionQueue = ActionQueue.Empty
+
+            while not popped do
+                let prior = agent.ActionQueue.Get()
+                next <- {q = prior.q.pop(); error = error}
+                popped <- agent.ActionQueue.CompareAndSet(prior, next)
+
+            if (isNull error && next.q.count() > 0) then
+                ((next.q.peek()) :?> AgentAction).execute()
+
         finally
             Agent.Nested <- null
-    
-
 
 and ActionQueue = 
     { q : IPersistentStack; error: Exception }
 
     static member Empty : ActionQueue = {q = PersistentQueue.Empty; error = null}
-
-
 
 
 // Represents an Agent.
@@ -809,9 +815,10 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) as this =
     [<DefaultValue;ThreadStatic>]
     static val mutable private nested : IPersistentVector
 
-
     // A queue of pending actions.
     let aq = AtomicReference<ActionQueue>(ActionQueue.Empty)
+
+    member _.ActionQueue : AtomicReference<ActionQueue> = aq
 
     do this.setState(v) |> ignore
 
@@ -879,6 +886,9 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) as this =
         this
 
     // Send an action
+    // If there is transaction running on this thread, defer execution until the transaction ends (enqueue on the transaction).
+    // If there is already an action running, enqueue it (
+    // Otherwise, queue it for execution.
     static member dispatchAction(action: AgentAction) =
         let transOpt = LockingTransaction.getRunning()
         match transOpt with
@@ -909,6 +919,9 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) as this =
 
     // For compatibility
     // if we ever implement separate queueing, we'll need to do something here.
+    // Comment in C# code: 
+    //      Shutdown all threads executing.
+    //      We need to work on this.</remarks>
     static member public shutdown() = ()
 
     // Enqueue nested actions
@@ -922,268 +935,3 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) as this =
                 a.Agent.enqueue(a)
             Agent.nested <- PersistentVector.EMPTY
             sends.count()
-
-
-
-
-    //member this.validate(v:obj) =
-    //    ARef.validate((this :> IRef).getValidator(),v);
-
-    (*
-    
-
-
-        /// <summary>
-        /// Send an action (encapsulated message).
-        /// </summary>
-        /// <param name="action">The action to execute.</param>
-        /// <remarks>
-        /// <para>If there is a transaction running on this thread, 
-        /// defer execution until the transaction ends 
-        /// (enqueue the action on the transaction).</para>
-        /// <para>If there is already an action running, enqueue it (nested).</para>
-        /// <para>Otherwise, queue it for execution.</para>
-        /// </remarks>
-        internal static void DispatchAction(Action action)
-        {
-            LockingTransaction trans = LockingTransaction.GetRunning();
-            if (trans != null)
-                trans.Enqueue(action);
-            else if (_nested != null)
-                _nested = _nested.cons(action);
-            else
-                action.Agent.Enqueue(action);
-        }
-
-        /// <summary>
-        /// Enqueue an action in the pending queue.
-        /// </summary>
-        /// <param name="action">The action to enqueue.</param>
-        /// <remarks>Spin-locks to update the queue.</remarks>
-        void Enqueue(Action action)
-        {
-            bool queued = false;
-            ActionQueue prior = null;
-            while (!queued)
-            {
-                prior = _aq.Get();
-                queued = _aq.CompareAndSet(prior, new ActionQueue((IPersistentStack)prior._q.cons(action), prior._error));
-            }
-
-            if (prior._q.count() == 0 && prior._error == null )
-                action.execute();
-        }
-
-
-        #endregion
-
-        #region IDeref Members
-
-        /// <summary>
-        /// Gets the (immutable) value the reference is holding.
-        /// </summary>
-        /// <returns>The value</returns>
-        public override object deref()
-        {
-            return _state;
-        }
-
-        #endregion
-
-        #region core.clj compatability
-
-        /// <summary>
-        /// Shutdown all threads executing.
-        /// </summary>
-        /// <remarks>We need to work on this.</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public static void shutdown()
-        {
-            // JAVA: soloExecutor.shutdown();
-            // JAVA: pooledExecutor.shutdown();
-
-            // TODO: record active jobs and shut them down?
-        }
-        #endregion
-
-        /// <summary>
-        /// An encapsulated message.
-        /// </summary>
-        internal sealed class Action
-        {
-            #region Data
-
-            /// <summary>
-            /// The agent this message is for.
-            /// </summary>
-            readonly Agent _agent;
-
-            /// <summary>
-            /// The agent this message is for.
-            /// </summary>
-            public Agent Agent
-            {
-                get { return _agent; }
-            } 
-
-            /// <summary>
-            /// The function to call to create the new state.
-            /// </summary>
-            readonly IFn _fn;
-
-            /// <summary>
-            /// The arguments to call (in addition to the current state).
-            /// </summary>
-            readonly ISeq _args;
-
-            /// <summary>
-            /// Should execute on its own thread (not a thread-pool thread).
-            /// </summary>
-            readonly bool _solo;
-
-            #endregion
-
-            #region Ctors
-
-            /// <summary>
-            /// Create an encapsulated message to an agent.
-            /// </summary>
-            /// <param name="agent">The agent the message is for.</param>
-            /// <param name="fn">The function to compute the new value.</param>
-            /// <param name="args">Additional arguments (in addition to the current state).</param>
-            /// <param name="solo">Execute on its own thread?</param>
-            public Action(Agent agent, IFn fn, ISeq args, bool solo)
-            {
-                _agent = agent;
-                _fn = fn;
-                _args = args;
-                _solo = solo;
-            }
-
-            #endregion
-
-            #region Executing the action
-
-            /// <summary>
-            /// Send the message.
-            /// </summary>
-            [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-            public void execute()
-            {
-                try
-                {
-                    if (_solo)
-                    {
-                        // TODO:  Reuse/cleanup these threads
-                        Thread thread = new Thread(ExecuteAction);
-                        //thread.Priority = ThreadPriority.Lowest;
-                        thread.Start(null);
-                    }
-                    else
-                        ThreadPool.QueueUserWorkItem(ExecuteAction);
-                }
-                catch (Exception error)
-                {
-                    if (_agent._errorHandler != null)
-                    {
-                        try
-                        {
-                            _agent._errorHandler.invoke(_agent, error);
-                        }
-                        catch (Exception)
-                        {
-                            // ignore _errorHandler errors
-                        }
-                    }
-                }
-            }
-
-            /// <summary>
-            /// Worker method to execute the action on a thread.
-            /// </summary>
-            /// <param name="state">(not used)</param>
-            /// <remarks>corresponds to doRun in Java version</remarks>
-            void ExecuteAction(object state)
-            {
-                try
-                {
-                    Agent.Nested = PersistentVector.EMPTY;
-
-                    Exception error = null;
-
-                    try
-                    {
-                        object oldval = _agent.State;
-                        object newval = _fn.applyTo(RT.cons(_agent.State, _args));
-                        _agent.SetState(newval);
-                        _agent.NotifyWatches(oldval,newval);
-                    }
-                    catch (Exception e)
-                    {
-                        error = e;
-                    }
-
-                    if (error == null)
-                        releasePendingSends();
-                    else
-                    {
-                        Nested = null;  // allow errorHandler to send
-                        if (_agent._errorHandler != null)
-                        {
-                            try
-                            {
-                                _agent._errorHandler.invoke(_agent, error);
-                            }
-                            catch (Exception)
-                            {
-                                // ignore error handler errors
-                            }
-                        }
-                        if (_agent._errorMode == ContinueKeyword)
-                            error = null;
-                    }
-
-                    bool popped = false;
-                    ActionQueue next = null;
-                    while (!popped)
-                    {
-                        ActionQueue prior = _agent._aq.Get();
-                        next = new ActionQueue(prior._q.pop(), error);
-                        popped = _agent._aq.CompareAndSet(prior, next);
-                    }
-
-                    if (error==null && next._q.count() > 0)
-                        ((Action)next._q.peek()).execute();
-                }
-                finally
-                {
-                    Nested = null;
-                }
-            }
-
-            #endregion
-        }
-
-        /// <summary>
-        /// Enqueue nested actions.
-        /// </summary>
-        /// <returns></returns>
-        /// <remarks>lowercase for core.clj compatibility</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public static int releasePendingSends()
-        {
-            IPersistentVector sends = Agent.Nested;
-            if (sends == null)
-                return 0;
-            for (int i = 0; i < sends.count(); i++)
-            {
-                Action a = (Action)sends.valAt(i);
-                a.Agent.Enqueue(a);
-            }
-            Nested = PersistentVector.EMPTY;
-            return sends.count();
-        }
-    }
-}
-
-    *)
