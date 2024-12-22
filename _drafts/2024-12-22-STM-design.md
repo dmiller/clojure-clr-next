@@ -1,15 +1,15 @@
 ---
 layout: post
 title: STM in Clojure - Design
-date: 2024-12-15 06:00:00 -0500
+date: 2024-12-22 00:00:00 -0500
 categories: general
 ---
 
 We look at software transactional memory (STM) as implemented in Clojure. In magnificent detail.
 
 - Part 1: STM in Clojure - Design  (this post)
-- [Part 2: STM in Clojure - Code]({{site.baseurl}}{% post_url 2024-12-26-STM-code %})
-- [Part 3: STM in Clojure - Testing]({{site.baseurl}}{% post_url 2024-12-27-STM-testing %})
+- [Part 2: STM in Clojure - Code]({{site.baseurl}}{% post_url 2024-12-22-STM-code %})
+- [Part 3: STM in Clojure - Testing]({{site.baseurl}}{% post_url 2024-12-22-STM-testing %})
 
 ## Introduction
 
@@ -207,4 +207,4 @@ When do the read locks on ensured Refs get released?  That happens at the end of
 
 We are dealing with a multi-threaded computational structure with significant chance of resource contention that results in retrying operations.  The control flow is implicit and spread across maybe a dozen methods.  We have locks being acquired in one place and released far away (both temporally and in the code).  There are few comments.  I did not know through the first five readings of the code how key the comment -- "// The set of Refs holding read locks." -- actually was;  it really meant what it said.
 
-But I think I've got it down.  Time to [look at the code]({{site.baseurl}}{% post_url 2024-12-26-STM-code %}).
+But I think I've got it down.  Time to [look at the code]({{site.baseurl}}{% post_url 2024-12-22-STM-code %}).
