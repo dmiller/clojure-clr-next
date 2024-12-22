@@ -15,9 +15,16 @@ type internal RefVal private (v: obj, pt: int64) =
     let mutable point : int64 = pt
 
     // these implement a doubly-linked circular list
-    // the default constructor creates a self-linked node
+    // to avoid self-reference check penalties, we use factories to get these initialized properly
     let mutable prior : RefVal = Unchecked.defaultof<RefVal>
     let mutable next : RefVal =  Unchecked.defaultof<RefVal>
+
+    // create a list of one element
+    static member  createSingleton(v, pt) = 
+        let r = RefVal(v, pt)
+        r.Prior <- r
+        r.Next <- r
+        r
 
     // Create a new RefVal and insert it after the given RefVal.
     member this.insertAfter(v, pt) = 
@@ -28,12 +35,7 @@ type internal RefVal private (v: obj, pt: int64) =
         r.Next.Prior <- r
         r
 
-    static member  createSingleton(v, pt) = 
-        let r = RefVal(v, pt)
-        r.Prior <- r
-        r.Next <- r
-        r
-
+    // some accessors
     member _.Value with get() = value
     member _.Point with get() = point
 
@@ -45,11 +47,12 @@ type internal RefVal private (v: obj, pt: int64) =
         with get() = next
         and private set(v) = next <- v
 
+    // Used by Ref to update the value in root node
     member this.SetValue(v, pt) =
         value <- v
         point <- pt
 
-    // Set this node to be a list of one node, discarding the rest of the list.
+    // Set this node to be a list of one node (itself), discarding the rest of the list.
     member this.Trim() = 
         prior <- this
         next <- this
@@ -65,18 +68,30 @@ type LTState =
 exception RetryEx of string
 exception AbortEx of string
 
+// Encapsulates the status of a LockingTransaction
+// Created anew each iteration of the (re)try code.
+[<Sealed>]
 type LTInfo(initState: LTState, startPoint: int64) = 
 
+    // The actual value for the status is an LTState.
+    // Stored here as an int64, which is the underlying represenation of an LTState
+    //    so that we can Interlocked methods to modify.
     let mutable status : int64 = initState |> int64
+
+    // Used to signal potential watchers (other) transactions that we have changed status
+    //     so they can stop waiting.
     let latch = CountdownLatch(1)
+
+    // Accessors
 
     member _.Latch = latch
     member _.StartPoint = startPoint
 
-    member _.State
+    member this.State
         with get() = Microsoft.FSharp.Core.LanguagePrimitives.EnumOfValue<int64, LTState>(status)
-        and set(v:LTState) = status <- int64 v
+        and set(v:LTState) = this.set(v) |> ignore
     
+    // We use Interlocked methods because of possible contention between transactions
     member this.compareAndSet(oldVal: LTState, newVal: LTState) =
         let origVal = Interlocked.CompareExchange(&status, newVal |> int64, oldVal |> int64)
         origVal = (oldVal |> int64)
@@ -88,15 +103,16 @@ type LTInfo(initState: LTState, startPoint: int64) =
         let s = Microsoft.FSharp.Core.LanguagePrimitives.EnumOfValue<int64, LTState>(Interlocked.Read(&status)) 
         s = LTState.Running || s = LTState.Committing   
 
-// Pending call of a function on arguments.
+// Pending call of a function on arguments.  Used by the commute operation.
 type private CFn  = { fn: IFn; args: ISeq }
 
+// Encapsulates a notification to be sent to watchers
 type LTNotify = { ref: Ref; oldVal: obj; newVal: obj }
 
 // Provides transaction semantics for Agents, Refs, etc.
 and [<Sealed>] LockingTransaction() =
 
-    // The number of times to retry a transaction in case of a conflict.
+    // The number of times to retry a transaction in case of conflicts.
     [<Literal>]
     let RetryLimit = 10000
 
@@ -104,25 +120,49 @@ and [<Sealed>] LockingTransaction() =
     [<Literal>]
     let LockWaitMsecs = 100
 
-    // How old another transaction must be before we 'barge' it.
+    // How old this transaction must be before it is allowed to barge other (newer) transactions.
     // Java version has BARGE_WAIT_NANOS, set at 10*1_000_000.
-    // If I'm thinking correctly tonight, that's 10 milliseconds.
     // Ticks here are 100 nanos, so we should have  10 * 1_000_000/100 = 100_000.
     [<Literal>]
     let BargeWaitTicks = 100_000L
 
+    // Transaction on the current thread
+
     // The transaction running on the current thread.  (Thread-local.)
     [<DefaultValue;ThreadStatic>]
     static val mutable private currentTransaction : LockingTransaction option
+    
+    // Get the transaction running on this thread (throw exception if no transaction). 
+    static member getEx() =
+        let transOpt = LockingTransaction.currentTransaction
+        match transOpt with
+        | None -> 
+            raise <| InvalidOperationException("No transaction running")
+        | Some t ->
+            match t.Info with
+            | None -> 
+                raise <| InvalidOperationException("No transaction running")
+            | Some info -> t
+
+    // Get the transaction running on this thread (or None if no transaction).
+    static member getRunning() =
+        let transOpt = LockingTransaction.currentTransaction
+        match transOpt with
+        | None -> None
+        | Some t ->
+            match t.Info with
+            | None -> None
+            | Some info -> transOpt
+
+    // Is there a transaction running on this thread?
+    static member isRunning() = LockingTransaction.getRunning().IsSome
+
+    // Point management
 
     // The current point.
     // Used to provide a total ordering on transactions for the purpose of determining preference on transactions when there are conflicts.
     // Transactions consume a point for init, for each retry, and on commit if writing.
     static member private lastPoint : AtomicLong  = AtomicLong()
-
-    // The state of the transaction.
-    //  Encapsulated so things like Refs can look.
-    let mutable info : LTInfo option = None
 
     // The point at the start of the current retry (or first try).
     let mutable readPoint : int64 = 0L
@@ -130,8 +170,24 @@ and [<Sealed>] LockingTransaction() =
     // The point at the start of the transaction.
     let mutable startPoint : int64 = 0L
 
+    // Get a new read point value.
+    member this.getReadPoint() =
+        readPoint <- LockingTransaction.lastPoint.incrementAndGet()
+
+    // Get a commit point value.
+    static member getCommitPoint() =
+        LockingTransaction.lastPoint.incrementAndGet()
+
+
     // The system ticks at the start of the transaction.
+    // Used to initialize the LTInfo
     let mutable startTime : int64 = 0L
+
+    // The state of the transaction.
+    //  Encapsulated so things like Refs can look.
+    let mutable info : LTInfo option = None
+
+    member _.Info = info
 
     // Cached retry exception.
     let retryEx = RetryEx("")
@@ -150,18 +206,6 @@ and [<Sealed>] LockingTransaction() =
 
     // The set of Refs holding read locks.
     let ensures = HashSet<Ref>()
-
-    member _.Info = info
-
-    // Point manipulation
-
-    // Get a new read point value.
-    member this.getReadPoint() =
-        readPoint <- LockingTransaction.lastPoint.incrementAndGet()
-
-    // Get a commit point value.
-    static member getCommitPoint() =
-        LockingTransaction.lastPoint.incrementAndGet()
 
     // Actions
 
@@ -229,7 +273,6 @@ and [<Sealed>] LockingTransaction() =
                 r.currentVal()
 
             match r.TxInfo with
-            | None -> success()
             | Some (refinfo:LTInfo) when refinfo.isRunning && not <| obj.ReferenceEquals(refinfo, info) ->
                 if not (this.barge(refinfo)) then
                     r.exitWriteLock()
@@ -251,30 +294,6 @@ and [<Sealed>] LockingTransaction() =
     // Determine if sufficient clock time has elapsed to barge another transaction.
     member private _.bargeTimeElapsed = (int64 Environment.TickCount) - startTime > BargeWaitTicks
 
-    // Get the transaction running on this thread (throw exception if no transaction). 
-    static member getEx() =
-        let transOpt = LockingTransaction.currentTransaction
-        match transOpt with
-        | None -> 
-            raise <| InvalidOperationException("No transaction running")
-        | Some t ->
-            match t.Info with
-            | None -> 
-                raise <| InvalidOperationException("No transaction running")
-            | Some info -> t
-
-    // Get the transaction running on this thread (or None if no transaction).
-    static member getRunning() =
-        let transOpt = LockingTransaction.currentTransaction
-        match transOpt with
-        | None -> None
-        | Some t ->
-            match t.Info with
-            | None -> None
-            | Some info -> transOpt
-
-    // Is there a transaction running on this thread?
-    static member isRunning() = LockingTransaction.getRunning().IsSome
 
     // Run a function in a transaction.
     // TODO: This can be called on something more general than  an IFn.
@@ -417,9 +436,13 @@ and [<Sealed>] LockingTransaction() =
         // Add an agent action sent during the transaction to a queue.
         member this.enqueue(action: AgentAction) = actions.Add(action)
 
+        // Operations called by Ref to implement the primary Ref methods in clojure.core:  ref-set, alter, commute, @/deref
+        // Each of these must check if the transaction is running and throw a RetryEx if not.
+        // (Even though in the Ref, GetEx is called, which means we were running at the time, we might have gotten killed in the interim.
+
         // Get the value of a ref most recently set in this transaction (or prior to entering).
         member this.doGet(r: Ref) : obj =
-            if info.Value.isRunning then    // doGet is called from inside a running transaction, so this should not fail.
+            if info.Value.isRunning then
                 if vals.ContainsKey(r) then
                     vals.[r]
                 else
@@ -449,9 +472,11 @@ and [<Sealed>] LockingTransaction() =
             else 
                 raise retryEx
 
+
+
         // Set the value of a ref inside the transaction.
         member this.doSet(r: Ref, v: obj) =
-            if info.Value.isRunning then // doSet is called from inside a running transaction, so this should not fail.
+            if info.Value.isRunning then
                 if commutes.ContainsKey(r) then
                     raise <| InvalidOperationException("Can't set after commute")
                 if not (sets.Contains(r)) then
@@ -464,7 +489,7 @@ and [<Sealed>] LockingTransaction() =
 
         // Touch a ref.  (Lock it.)
         member this.doEnsure(r: Ref) =
-            if info.Value.isRunning then                 // doEnsure is called within a transaction, so this should not fail.
+            if info.Value.isRunning then
                 if ensures.Contains(r) then
                     ()
                 else
@@ -478,17 +503,16 @@ and [<Sealed>] LockingTransaction() =
                     match r.TxInfo with
                     | Some refinfo when refinfo.isRunning ->
                         r.exitReadLock()
-                        if not <| Object.ReferenceEquals(refinfo,info.Value) then
+                        if not <| Object.ReferenceEquals(refinfo,info) then
                             this.blockAndBail(refinfo)
-                    | _ -> ensures.Add(r) |> ignore
+                    | _ -> ensures.Add(r) |> ignore  // Note: in this case, the read lock is NOT released. Any ensured Ref is read-locked.
 
             else 
                 raise retryEx
 
-        // Post a commute on a ref in this transaction.
-        
+        // Post a commute on a ref in this transaction.        
         member this.doCommute(r:Ref, fn:IFn, args:ISeq) : obj =
-            if not info.Value.isRunning then                               // doCommute is called within a transaction, so this should not fail.
+            if not info.Value.isRunning then
                 raise retryEx
             
             if not (vals.ContainsKey(r)) then
