@@ -8,6 +8,7 @@ open System.Linq
 open System.Text
 open System.Collections.Concurrent
 open System.IO
+open System.Threading
 
 
 module DefaultImports =
@@ -70,7 +71,15 @@ type Namespace(name : Symbol) =
     // Some accessors
     member _.Name = name
     member _.Aliases = aliases.Get()
-    member _.Mappings = mappings.Get()
+    member _.Mappings = mappings.Get()    
+    
+    override _.ToString() = name.ToString()
+
+    ///////////////////////////////////////////
+    //
+    // Namespace manipulation
+    //
+    ///////////////////////////////////////////
 
     static member All = namespaces.Values |> RT0.seq
 
@@ -93,31 +102,11 @@ type Namespace(name : Symbol) =
         let (result, ns) = namespaces.TryGetValue(name)
         ns
 
-    override _.ToString() = name.ToString()
-
-    // This comes from the Java verion.
-    // During loading of the clojure runtime source, it never gets past the t1 <> t2 test.
-    // Not sure we need it, but I'm not getting rid of it.
-    static member areDifferentInstancesOfSameClassName(t1 : Type, t2 : Type) =
-        not <| Object.ReferenceEquals(t1,t2) && t1.FullName.Equals(t2.FullName)
-
-    
-    member this.referenceClass(sym : Symbol, value : Type) =
-        if not <| isNull sym.Namespace  then
-            raise <| ArgumentException("Can't intern namespace-qualified symbol")
-
-        // traditional race condition hacking -- keep looping until we find the symbol/type pair in the map.
-        let mutable map = this.Mappings
-        let mutable c = map.valAt(sym) :?> Type
-        while (isNull c || Namespace.areDifferentInstancesOfSameClassName(c, value)) do
-            let newMap = map.assoc(sym, value)
-            mappings.CompareAndSet(map, newMap) |> ignore
-            map <- this.Mappings
-            c <- map.valAt(sym) :?> Type
-
-        if not <| Object.ReferenceEquals(c,value) then
-                raise <| InvalidOperationException(sprintf "%A already refers to: %A in namespace: %A" sym c name)
-        c
+    ///////////////////////////////////////////
+    //
+    // Interning
+    //
+    ///////////////////////////////////////////
 
     // Determine if a mapping is interned
     // An interned mapping is one where a var's ns matches the current ns and its sym matches the mapping key.
@@ -240,7 +229,126 @@ type Namespace(name : Symbol) =
         else 
             o
 
+    // Remove a symbol from the namespace
+    // It is illegal to remove a namespace-qualified symbol.
+    member this.unmap(sym: Symbol) =
+        if not <| isNull sym.Namespace then
+            raise <| ArgumentException("Can't unintern a namespace-qualified symbol")
 
+        let mutable map = this.Mappings
+        while map.containsKey(sym) do
+            let newMap = map.without(sym)
+            mappings.CompareAndSet(map, newMap) |> ignore
+            map <- this.Mappings
+
+    // This comes from the Java verion.
+    // During loading of the clojure runtime source, it never gets past the t1 <> t2 test.
+    // Not sure we need it, but I'm not getting rid of it.
+    static member private areDifferentInstancesOfSameClassName(t1 : Type, t2 : Type) =
+        not <| Object.ReferenceEquals(t1,t2) && t1.FullName.Equals(t2.FullName)
+
+    
+    member private this.referenceClass(sym : Symbol, value : Type) =
+        if not <| isNull sym.Namespace  then
+            raise <| ArgumentException("Can't intern namespace-qualified symbol")
+
+        // traditional race condition hacking -- keep looping until we find the symbol/type pair in the map.
+        let mutable map = this.Mappings
+        let mutable c = map.valAt(sym) :?> Type
+        while (isNull c || Namespace.areDifferentInstancesOfSameClassName(c, value)) do
+            let newMap = map.assoc(sym, value)
+            mappings.CompareAndSet(map, newMap) |> ignore
+            map <- this.Mappings
+            c <- map.valAt(sym) :?> Type
+
+        if not <| Object.ReferenceEquals(c,value) then
+                raise <| InvalidOperationException(sprintf "%A already refers to: %A in namespace: %A" sym c name)
+        c
+
+
+    // Map a symbol to a Type (import)
+    // Named import instead of ImportType for core.clj compatibility.
+    member this.importClass(sym: Symbol, t: Type) =
+        this.referenceClass(sym, t)
+
+    // Mape a symbol to a Type (import) using the type name for the symbol name.
+    // Named import instead of ImportType for core.clj compatibility.
+    member this.importClass(t: Type) =
+        this.importClass(Symbol.intern (Util.nameForType(t)), t)
+
+    // Add a symbol to Var reference.
+    member this.refer(sym: Symbol, v: Var) =
+        this.reference(sym, v) :?> Var
+
+    ///////////////////////////////////////////
+    //
+    // Mappings
+    //
+    ///////////////////////////////////////////
+
+    // Get the value mapped to a symbol.
+    member this.getMapping(sym: Symbol) =
+        this.Mappings.valAt(sym)
+
+    // Find the Var mapped to a Symbol.
+    member this.findInternedVar(sym: Symbol) =
+        let o = this.Mappings.valAt(sym)
+        match o with
+        | :? Var as v when Object.ReferenceEquals(v.Namespace,this) -> v
+        | _ -> null
+
+    ///////////////////////////////////////////
+    //
+    // Aliases
+    //
+    ///////////////////////////////////////////
+
+    // Find a Namespace aliased by a Symbol.
+    member this.lookupAlias(alias: Symbol) =
+        this.Aliases.valAt(alias) :?> Namespace
+
+    // Add an alias for a namespace.
+    member this.addAlias(alias: Symbol, ns: Namespace) =
+        if isNull alias then
+            raise <| ArgumentNullException("alias","Expecting Symbol + Namespace")
+        if isNull ns then
+            raise <| ArgumentNullException("ns","Expecting Symbol + Namespace")
+
+        // race condition
+        let mutable map = this.Aliases
+        while not <| map.containsKey(alias) do
+            let newMap = map.assoc(alias, ns)
+            aliases.CompareAndSet(map, newMap) |> ignore
+            map <- this.Aliases
+
+        // you can rebind an alias, but only to the initially-aliased namespace
+
+        if not <| Object.ReferenceEquals(map.valAt(alias), ns) then
+            raise <| InvalidOperationException($"Alias {alias} already exists in namespace {name}, aliasing {map.valAt(alias)}")
+
+        // Remove an alias.
+        // Race condition
+        member this.removeAlias(alias: Symbol) =
+            let mutable map = this.Aliases
+            while map.containsKey(alias) do
+                let newMap = map.without(alias)
+                aliases.CompareAndSet(map, newMap) |> ignore
+                map <- this.Aliases
+
+        ///////////////////////////////////////////
+        //
+        // core.clj compatibility
+        //
+        ///////////////////////////////////////////
+
+        // Get the namespace name.
+        member this.getName() = name
+
+        // Get the mappings of the namespace.
+        member this.getMappings() = this.Mappings
+
+        // Get the aliases.
+        member this.getAliases() = this.Aliases
     
 and [<Sealed;AllowNullLiteral>] Var(ns: Namespace, sym: Symbol, root: obj) = 
     inherit ARef(null)
@@ -257,11 +365,55 @@ and [<Sealed;AllowNullLiteral>] Var(ns: Namespace, sym: Symbol, root: obj) =
 
     static member intern(ns: Namespace, sym: Symbol, root: obj) = new Var(ns, sym, root)  // TODO: Fix this when we get to the real code.
 
+and [<Sealed>] private TBox(thread: Thread, v: obj) =
+
+    [<VolatileField>]
+    let mutable value = v
+
+    member _.Value 
+        with get() = value
+        and  set(v) = value <- v
+
+and [<Sealed>] private Unbound(v: Var) =
+    inherit AFn()
+
+    override _.ToString (): string = $"Unbound: {v.ToString}"
+
+and private Frame = 
+    { Bindings : Associative;
+      Prev: Frame option} 
+    with 
+        interface ICloneable with
+            member this.Clone() = { Bindings = this.Bindings; Prev = None }
+
+
 and [<Sealed;AbstractClass>] RTVar() = 
 
     static member ClojureNamespace = Namespace.findOrCreate(Symbol.intern "clojure.core")
 
+    // Pre-defined Vars (namespace-related)
+
+    static member CurrentNSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), RTVar.ClojureNamespace).setDynamic()
+    static member InNSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("in-ns"), false)
+    static member NSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), false)
+
+
+    // Pre-defined Vars (I/O-related)
+
     static member ErrVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*err*"), new StreamWriter(Console.OpenStandardError())).setDynamic()
+    static member OutVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*out*"), new StreamWriter(Console.OpenStandardOutput())).setDynamic()
+    static member InVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*in*"), new StreamReader(Console.OpenStandardInput())).setDynamic()
+
+    static member PrintReadablyVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-readably*"), true).setDynamic()
+    static member PrintMetaVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-meta*"), false).setDynamic()
+    static member PrintDupVar =     Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-dup*"), false).setDynamic()
+    static member FlushOnNewlineVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*flush-on-newline*"), true).setDynamic()
+    static member PrintInitializedVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-initialized*"), false).setDynamic()
+    static member PrOnVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("pr-on"))
+    static member AllowSymbolEscapeVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*allow-symbol-escape*"), true).setDynamic()
+
+    // Pre-defined Vars (miscellaneous)
+
 
     // original comment: duck typing stderr plays nice with e.g. swank 
     static member errPrintWriter() : TextWriter =
@@ -276,216 +428,5 @@ and [<Sealed;AbstractClass>] RTVar() =
     (*
 
 
-
-        /// <summary>
-        /// Remove a symbol mapping from the namespace.
-        /// </summary>
-        /// <param name="sym">The symbol to remove.</param>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public void unmap(Symbol sym)
-        {
-            if (sym.Namespace != null)
-                throw new ArgumentException("Can't unintern a namespace-qualified symbol");
-
-            IPersistentMap map = Mappings;
-            while (map.containsKey(sym))
-            {
-                IPersistentMap newMap = map.without(sym);
-                _mappings.CompareAndSet(map, newMap);
-                map = Mappings;
-            }
-        }
-
-        /// <summary>
-        /// Map a symbol to a Type (import).
-        /// </summary>
-        /// <param name="sym">The symbol to associate with a Type.</param>
-        /// <param name="t">The type to associate with the symbol.</param>
-        /// <returns>The Type.</returns>
-        /// <remarks>Named importClass instead of ImportType for core.clj compatibility.</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public Type importClass(Symbol sym, Type t)
-        {
-            return ReferenceClass(sym, t);
-        }
-
-
-        /// <summary>
-        /// Map a symbol to a Type (import) using the type name for the symbol name.
-        /// </summary>
-        /// <param name="t">The type to associate with the symbol</param>
-        /// <returns>The Type.</returns>
-        /// <remarks>Named importClass instead of ImportType for core.clj compatibility.</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public Type importClass(Type t)
-        {
-            string n = Util.NameForType(t);   
-            return importClass(Symbol.intern(n), t);
-        }
-
-        /// <summary>
-        /// Add a <see cref="Symbol">Symbol</see> to <see cref="Var">Var</see> reference.
-        /// </summary>
-        /// <param name="sym"></param>
-        /// <param name="var"></param>
-        /// <returns></returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public Var refer(Symbol sym, Var var)
-        {
-            return (Var)reference(sym, var);
-        }
-
-        #endregion
-
-        #region Mappings
-
-        /// <summary>
-        /// Get the value mapped to a symbol.
-        /// </summary>
-        /// <param name="name">The symbol to look up.</param>
-        /// <returns>The mapped value.</returns>
-        public object GetMapping(Symbol name)
-        {
-            return Mappings.valAt(name);
-        }
-
-        /// <summary>
-        /// Find the <see cref="Var">Var</see> mapped to a <see cref="Symbol">Symbol</see>.
-        /// </summary>
-        /// <param name="sym">The symbol to look up.</param>
-        /// <returns>The mapped var.</returns>
-        public Var FindInternedVar(Symbol sym)
-        {
-            return (Mappings.valAt(sym) is Var v && v.Namespace == this) ? v : null;
-        }
-
-        #endregion
-
-        #region Aliases
-
-        /// <summary>
-        /// Find the <see cref="Namespace">Namespace</see> aliased by a <see cref="Symbol">Symbol</see>.
-        /// </summary>
-        /// <param name="alias">The symbol alias.</param>
-        /// <returns>The aliased namespace</returns>
-        public Namespace LookupAlias(Symbol alias)
-        {
-            return (Namespace)Aliases.valAt(alias);
-        }
-
-        /// <summary>
-        /// Add an alias for a namespace.
-        /// </summary>
-        /// <param name="alias">The alias for the namespace.</param>
-        /// <param name="ns">The namespace being aliased.</param>
-        /// <remarks>Lowercase name for core.clj compatibility</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public void addAlias(Symbol alias, Namespace ns)
-        {
-            if (alias == null)
-                throw new ArgumentNullException(nameof(alias),"Expecting Symbol + Namespace");
-            if ( ns == null )
-                throw new ArgumentNullException(nameof(ns), "Expecting Symbol + Namespace");
-
-            IPersistentMap map = Aliases;
-
-            // race condition
-            while (!map.containsKey(alias))
-            {
-                IPersistentMap newMap = map.assoc(alias, ns);
-                _aliases.CompareAndSet(map, newMap);
-                map = Aliases;
-            }
-            // you can rebind an alias, but only to the initially-aliased namespace
-            if (!map.valAt(alias).Equals(ns))
-                throw new InvalidOperationException(String.Format("Alias {0} already exists in namespace {1}, aliasing {2}",
-                    alias, _name, map.valAt(alias)));
-        }
-
-        /// <summary>
-        /// Remove an alias.
-        /// </summary>
-        /// <param name="alias">The alias name</param>
-        /// <remarks>Lowercase name for core.clj compatibility</remarks>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public void removeAlias(Symbol alias)
-        {
-            IPersistentMap map = Aliases;
-            while (map.containsKey(alias))
-            {
-                IPersistentMap newMap = map.without(alias);
-                _aliases.CompareAndSet(map, newMap);
-                map = Aliases;
-            }
-        }
-
-
-        #endregion
-
-        #region core.clj compatibility
-
-        /// <summary>
-        /// Get the namespace name.
-        /// </summary>
-        /// <returns>The <see cref="Symbol">Symbol</see> naming the namespace.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public Symbol getName()
-        {
-            return Name;
-        }
-
-        /// <summary>
-        /// Get the mappings of the namespace.
-        /// </summary>
-        /// <returns>The mappings.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public IPersistentMap getMappings()
-        {
-            return Mappings;
-        }
-
-        /// <summary>
-        /// Get the aliases.
-        /// </summary>
-        /// <returns>A map of aliases.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-        public IPersistentMap getAliases()
-        {
-            return Aliases;
-        }
-
-
-        #endregion
-
-        #region ISerializable Members
-
-        [System.Security.SecurityCritical]
-        public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.SetType(typeof(NamespaceSerializationHelper));
-            info.AddValue("_name",_name);
-        }
-
-        [Serializable]
-        class NamespaceSerializationHelper : IObjectReference
-        {
-#pragma warning disable 649
-            readonly Symbol _name;
-#pragma warning restore 649
-
-            #region IObjectReference Members
-
-            public object GetRealObject(StreamingContext context)
-            {
-               return Namespace.findOrCreate(_name);
-            }
-
-            #endregion
-        }
-
-        #endregion
-    }
-}
-    
     
     *)
