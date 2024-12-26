@@ -9,6 +9,7 @@ open System.Text
 open System.Collections.Concurrent
 open System.IO
 open System.Threading
+open System.Runtime.CompilerServices
 
 
 module DefaultImports =
@@ -144,7 +145,7 @@ type Namespace(name : Symbol) =
 
         while isNull o do
             if isNull v then
-                v <- Var(this, sym)
+                v <- Var.createInternal(this, sym)
             let newMap = map.assoc(sym, v)
             mappings.CompareAndSet(map, newMap) |> ignore
             map <- this.Mappings
@@ -161,7 +162,7 @@ type Namespace(name : Symbol) =
             if isNull v then
                 // in this case, we didn't create a Var in the loop above, meaning we didn't loop at all, meaning o already had a value.
                 // We need to create a Var to use.
-                v <- Var(this, sym)
+                v <- Var.createInternal(this, sym)
             // make sure we can replace the existing value with the new one.
             if (this.checkReplacement(sym, o, v)) then
                 // replacement ok.  keep going until we get the new value in.
@@ -349,23 +350,18 @@ type Namespace(name : Symbol) =
 
         // Get the aliases.
         member this.getAliases() = this.Aliases
-    
-and [<Sealed;AllowNullLiteral>] Var(ns: Namespace, sym: Symbol, root: obj) = 
-    inherit ARef(null)
 
-    [<VolatileField>]
-    let mutable dynamic = false
+and [<AllowNullLiteral>] private Frame(bindings: Associative, prev: Frame) =
 
-    new(ns, sym) = Var(ns, sym, null)  // TODO: Fix this when we get to the real code.
-    member _.Namespace = ns
-    member _.Name = sym
+    member _.Bindings = bindings
+ 
+    interface ICloneable with
+        member this.Clone() = Frame(bindings, null)
 
-    member this.setDynamic() = dynamic <- true; this
-    member this.setDynamic(b: bool) = dynamic <- b; this
+    static member Top : Frame = Frame(PersistentHashMap.Empty, null)
 
-    static member intern(ns: Namespace, sym: Symbol, root: obj) = new Var(ns, sym, root)  // TODO: Fix this when we get to the real code.
 
-and [<Sealed>] private TBox(thread: Thread, v: obj) =
+and [<Sealed;AllowNullLiteral>] private TBox(thread: Thread, v: obj) =
 
     [<VolatileField>]
     let mutable value = v
@@ -374,17 +370,347 @@ and [<Sealed>] private TBox(thread: Thread, v: obj) =
         with get() = value
         and  set(v) = value <- v
 
+    member _.Thread with get() = thread
+    
+and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) = 
+    inherit ARef(PersistentHashMap.Empty)
+
+    // revision counter
+    [<VolatileField>]
+    let mutable rev : int = 0
+
+    // If true, supports dynamic binding
+    [<VolatileField>]
+    let mutable dynamic = false
+
+    // The root value
+    [<VolatileField>]
+    let mutable root = null
+
+    // Whether the Var has a thread-bound value
+    let threadBound = AtomicBoolean(false)
+
+    [<DefaultValue;ThreadStatic>]
+    static val mutable private currentFrame : Frame
+
+    static member private CurrentFrame 
+        with get() = 
+            if isNull Var.currentFrame then Var.currentFrame <- Frame.Top
+            Var.currentFrame
+        and set (v) = Var.currentFrame <- v
+
+
+    member _.incrementRev() = rev <- rev + 1
+    member _.setRoot(newValue:obj) = root <- newValue
+    member _.setThreadBound(b: bool) = threadBound.Set(b)
+
+    override _.ToString() =
+        match ns with
+        | null -> $"""#<Var: {if isNull sym then "--unnamed--" else sym.ToString()}>"""
+        | _ -> $"#'{ns}/{sym}"
+    // To avoid initialization checks that would be caused by the circular dependency between the Var and the Unbound value in its root,
+    // I made the constructor private and created a factory method to create a Var.
+    // Called createInternal to avoid name collision with the 'create' method in the public interface.
+    static member internal createInternal(ns: Namespace, sym: Symbol) = 
+        let v = new Var(ns, sym)
+        v.setRoot(Unbound(v))
+        v
+
+    static member internal createInternal(ns: Namespace, sym: Symbol, initValue: obj) = 
+        let v = new Var(ns, sym)
+        v.setRoot(initValue)
+        v.incrementRev()
+        v
+
+    member _.Namespace = ns
+    member _.Name = sym
+
+
+    ////////////////////////////////
+    //
+    //  Special values
+    //
+    ////////////////////////////////
+
+    static member private privateKey = Keyword.intern(null,"private")
+    static member private privateMeta = PersistentArrayMap([|Var.privateKey, true|])
+    static member private macroKey = Keyword.intern(null,"macro")
+    static member private nameKey = Keyword.intern(null,"name")
+    static member private nsKey = Keyword.intern(null,"ns")
+    static member private tagKey = Keyword.intern(null,"tag")
+
+    static member private dissocFn = 
+        { new AFn() with
+            member _.ToString (): string = "Var.dissocFn"
+          interface IFn with
+            member _.invoke(m,k) = RTSeq.dissoc(m,k)
+        }
+
+    static member private assocFn = 
+        { new AFn() with
+            member _.ToString (): string = "Var.dissocFn"
+          interface IFn with
+            member _.invoke(m,k, v) = RTSeq.assoc(m, k, v)
+        }
+
+    ////////////////////////////////
+    //
+    //  Factory methods
+    //
+    ////////////////////////////////
+
+    // Intern a named var in a namespace.
+    static member intern(ns: Namespace, sym: Symbol) = ns.intern(sym)
+    
+
+    // Intern a named var in a namespace (creating the namespece if necessary).
+    static member intern(nsName: Symbol, sym: Symbol) = 
+        let ns = Namespace.findOrCreate(nsName)
+        Var.intern(ns,sym)
+
+    // Intern a named var in a namespace, with given value (if has a root value already, then change only if replaceRoot is true).
+    static member intern(ns: Namespace, sym: Symbol, root: obj, replaceRoot: bool ) = 
+        let dvout = ns.intern(sym)
+        if not <| dvout.hasRoot() || replaceRoot then
+            dvout.bindRoot(root)
+        dvout
+
+    // Intern a named var in a namespace, with given value.
+    static member intern(ns: Namespace, sym: Symbol, root: obj) = Var.intern(ns, sym, root, true) 
+
+    static member internPrivate(nsName:string, sym :string) = 
+        let ns = Namespace.findOrCreate(Symbol.intern nsName)
+        let v = Var.intern(ns, Symbol.intern sym)
+        v.setMeta(Var.privateMeta)
+        v
+
+    // Create an uninterned Var.
+    static member create() = Var.createInternal(null, null);
+
+    ////////////////////////////////
+    //
+    //  Binding stack
+    //
+    ////////////////////////////////
+
+    // Push a new frame of bindings onto the binding stack.
+    static member pushThreadBindings(bindings: Associative) =
+        let f = Var.CurrentFrame
+        let mutable bmap = f.Bindings
+
+        let rec loop (bs:ISeq) =
+            match bs with
+            | null -> ()
+            | _ ->
+                let e = bs.first() :?> IMapEntry
+                let v = e.key() :?> Var
+                if not <| v.isDynamic then
+                    raise <| new InvalidOperationException($"Can't dynamically bind non-dynamic var: {v.Namespace}/{v.Name}")
+                v.validate(e.value())
+                v.setThreadBound(true)
+                bmap <- bmap.assoc(v, TBox(Thread.CurrentThread, e.value()))
+                loop (bs.next())
+
+        loop (bindings.seq())
+
+        Var.CurrentFrame <- Frame(bmap, f)
+
+    // Pop the topmost binding frame from the stack.
+    static member popThreadBindings() =
+        let f = Var.CurrentFrame
+        if isNull f then
+            raise <| new InvalidOperationException("Pop without matching push")
+        if (Object.ReferenceEquals(f, Frame.Top)) then
+            Var.CurrentFrame = null
+        else
+            Var.CurrentFrame = f
+
+    // Get the thread-local bindings of the top frame.
+    static member getThreadBindings() : Associative =
+        let f = Var.CurrentFrame
+
+        let rec loop (bs:ISeq) (ret:IPersistentMap) =
+            match bs with
+            | null -> ret
+            | _ ->
+                let e = bs.first() :?> IMapEntry
+                let v = e.key() :?> Var
+                let tbox = e.value() :?> TBox
+                loop (bs.next()) (ret.assoc(v, tbox.Value))
+
+        loop (f.Bindings.seq()) PersistentHashMap.Empty
+
+    // Get the box of the current binding on the stack for this var, or null if no binding.
+    member this.getThreadBinding() =
+        if threadBound.Get() then
+            let e = Var.CurrentFrame.Bindings.entryAt(this)
+            match e with
+            | null -> null
+            | _ -> e.value() :?> TBox
+        else null
+
+    ////////////////////////////////
+    //
+    //  Frame management
+    //
+    ////////////////////////////////
+
+    static member getThreadBindingFrame() = Var.CurrentFrame
+
+    static member cloneThreadBindingFrame() = (Var.CurrentFrame :> ICloneable).Clone()
+
+    static member resetThreadBindingFrame(f: Frame) = Var.CurrentFrame <- f
+
+    ////////////////////////////////
+    //
+    //  Meta management
+    //
+    ////////////////////////////////
+
+    // Set the metadata attached to this var.
+    // The metadata must contain entries for the namespace and name.
+    member this.setMeta(m: IPersistentMap) =
+        (this :> IReference).resetMeta(m.assoc(Var.nameKey,sym).assoc(Var.nsKey,ns)) |> ignore
+
+    // Add a macro=true flag to the metadata.
+    member this.setMacro() = (this :> IReference).alterMeta(Var.assocFn,RTSeq.list2(Var.macroKey,true)) |> ignore
+
+    // Is the Var a macro?
+    member this.isMacro with get() = RT0.booleanCast((this :> IMeta).meta().valAt(Var.macroKey))
+
+    // Is the var public?
+    member this.isPublic with get() = not <| RT0.booleanCast((this :> IMeta).meta().valAt(Var.privateKey))
+
+    // Get the tag on the var.
+    member this.tag 
+        with get() = (this :> IMeta).meta().valAt(Var.tagKey)
+        and set(v) = (this :> IReference).alterMeta(Var.assocFn, RTSeq.list2(Var.tagKey,v)) |> ignore
+
+    ////////////////////////////////
+    //
+    //  Dynamic flag management
+    //
+    ////////////////////////////////
+
+    member this.setDynamic() = dynamic <- true; this
+
+    member this.setDynamic(b: bool) = dynamic <- b; this
+    
+    member _.isDynamic = dynamic
+
+
+    ////////////////////////////////
+    //
+    //  Value management
+    //
+    ////////////////////////////////
+
+    // Does the Var have a root value?
+    member _.hasRoot() = 
+        match root with
+        | :? Unbound -> false
+        | _ -> true
+
+    // Get the root value.
+    member _.getRawRoot() = root
+
+    // Does the Var have a value? (root or  thread-bound)
+    member this.isBound 
+        with get() = this.hasRoot() || (threadBound.Get() && Var.CurrentFrame.Bindings.containsKey(this))
+
+    // Set the value of the var
+    // It is an error to set the root binding with this method
+    member this.set(v: obj) = 
+        this.validate(v)
+        let tbox = this.getThreadBinding()
+        match tbox with
+        | null -> raise <| new InvalidOperationException($"Can't change/establish root binding of: {sym} with set")
+        | _ -> 
+            if not <| Object.ReferenceEquals(Thread.CurrentThread,tbox.Thread) then
+                raise <| new InvalidOperationException($"Can't set!: {sym} from non-binding thread")
+            tbox.Value <- v
+            v
+
+    // Change the root value.  (And clear the macro flag.)
+    [<MethodImpl(MethodImplOptions.Synchronized)>]
+    member this.bindRoot(v: obj) =
+        this.validate(v)
+        let oldRoot = root
+        this.setRoot(v)
+        this.incrementRev()
+        (this:>IReference).alterMeta(Var.dissocFn, RTSeq.list1(Var.macroKey)) |> ignore
+        this.notifyWatches(oldRoot, v)
+
+    // Change the root value.
+    [<MethodImpl(MethodImplOptions.Synchronized)>]
+    member this.swapRoot(v: obj) =
+        this.validate(v)
+        let oldRoot = root
+        this.setRoot(v)
+        this.incrementRev()
+        this.notifyWatches(oldRoot, v)
+
+    // Unbind the Var's root value
+    [<MethodImpl(MethodImplOptions.Synchronized)>]
+    member this.unbindRoot() =
+        this.setRoot(Unbound(this))
+        this.incrementRev()
+ 
+    // Set the Var's root to a computed value
+    [<MethodImpl(MethodImplOptions.Synchronized)>]
+    member this.commuteRoot(fn: IFn) =
+        let newRoot = fn.invoke
+        this.validate(newRoot)
+        let oldRoot = root
+        this.setRoot(newRoot)
+        this.incrementRev()
+        this.notifyWatches(oldRoot,newRoot)
+
+    // Change the var's root to a computed value (based on current value and supplied arguments).
+    [<MethodImpl(MethodImplOptions.Synchronized)>]
+    member this.alterRoot(fn : IFn, args : ISeq) =
+        let newRoot = fn.applyTo(RTSeq.cons(root,args))
+        this.validate(newRoot)
+        let oldRoot = root
+        this.setRoot(newRoot)
+        this.incrementRev()
+        this.notifyWatches(oldRoot,newRoot)
+        newRoot
+
+    ////////////////////////////////
+    //
+    //  interface definitions
+    //
+    ////////////////////////////////
+
+    // Gets the value the Var is holding.
+    // When IDeref was added and get() was renamed to deref(), this was put in.
+    // Why?  Perhaps to void having to change calls to Var.get() all over the place.
+
+    member this.get() = 
+        if threadBound.Get() then
+            (this:>IDeref).deref()
+        else
+            root;
+
+    interface IDeref with
+        member this.deref() = 
+            let tbox = this.getThreadBinding()
+            if not <| isNull tbox then
+                tbox.Value
+            else
+                root
+
+    interface IRef with
+        override this.setValidator(vf: IFn) = 
+            if this.hasRoot() then
+                this.validate(fv,root)
+            (this :> ARef)validator <- vf
+
 and [<Sealed>] private Unbound(v: Var) =
     inherit AFn()
 
     override _.ToString (): string = $"Unbound: {v.ToString}"
-
-and private Frame = 
-    { Bindings : Associative;
-      Prev: Frame option} 
-    with 
-        interface ICloneable with
-            member this.Clone() = { Bindings = this.Bindings; Prev = None }
 
 
 and [<Sealed;AbstractClass>] RTVar() = 

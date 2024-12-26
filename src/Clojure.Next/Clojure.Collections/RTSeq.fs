@@ -74,6 +74,15 @@
     let list4(arg1, arg2, arg3, arg4) = listStar4(arg1,arg2,arg3,arg4,null)
     let list5(arg1, arg2, arg3, arg4, arg5) = listStar5(arg1,arg2,arg3,arg4,arg5,null)
 
+    let assoc(coll:obj, key:obj, value: obj) =
+        match coll with
+        | null -> coll
+        | _ -> (coll :?> IPersistentMap).assoc(key,value)
+
+    let dissoc(coll:obj, key:obj) =
+        match coll with
+        | null -> coll
+        | _ -> (coll :?> IPersistentMap).without(key)
 
 
 (*
