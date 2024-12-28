@@ -7,8 +7,37 @@ open System.Runtime.CompilerServices
 
     // Some of the sequence functions from the original RT that need only PersistentList and Cons
 
-[<AbstractClass;Sealed>] 
-type RTSeq() =
+
+// Because of the need to look before you leap (make sure one element exists)
+// this is more complicated than the JVM version:  In JVM-land, you can hasNext before you move.
+
+[<Sealed>]
+type private ChunkEnumeratorSeqHelper(_iter : IEnumerator) =
+    inherit AFn()
+
+    [<Literal>]
+    let chunkSize = 32
+
+    static member chunkEnumeratorSeq(iter : IEnumerator) =
+        if not <| iter.MoveNext() then null
+        else ChunkEnumeratorSeqHelper.primedChunkEnumeratorSeq(iter)
+
+    static member primedChunkEnumeratorSeq(iter : IEnumerator) =
+        LazySeq(ChunkEnumeratorSeqHelper(iter))
+
+    interface IFn with
+        member this.invoke() =
+            let arr = Array.zeroCreate(chunkSize)
+            let mutable more = true;
+            let mutable i = 0;
+            while more && i < chunkSize do
+                arr.[i] <- _iter.Current
+                more <- _iter.MoveNext()
+                i <- i + 1
+            
+            ChunkedCons(ArrayChunk(arr,0,i), if more then ChunkEnumeratorSeqHelper.primedChunkEnumeratorSeq(_iter) else null)
+
+and [<AbstractClass;Sealed>]  RTSeq() =
 
     static do 
         RT0.setSeq(RTSeq.seq) 
@@ -25,9 +54,9 @@ type RTSeq() =
         match coll with 
         | null -> null
         | :? Seqable as seq -> seq.seq()
-        | _ when typeof<Array>.IsAssignableFrom(coll.GetType()) ->  ArraySeq.createFromObject(arr)
+        | _ when typeof<Array>.IsAssignableFrom(coll.GetType()) ->  ArraySeq.createFromObject(coll)
         | :? string as str -> StringSeq.create(str)
-        | :? IEnumerable as ie -> chunkEnumeratorSeq(ie.GetEnumerator())  // java: Iterable  -- reordered clauses so others take precedence.
+        | :? IEnumerable as ie -> ChunkEnumeratorSeqHelper.chunkEnumeratorSeq(ie.GetEnumerator())  // java: Iterable  -- reordered clauses so others take precedence.
         | _ -> failwithf "Don't know how to create ISeq from: %s" (coll.GetType().FullName)
 
 
