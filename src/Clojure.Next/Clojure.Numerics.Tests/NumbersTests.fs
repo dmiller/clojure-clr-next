@@ -1080,7 +1080,7 @@ let testAdd =
               Expect.isFalse (Numbers.TestBit(0b1101,1))  "1101 test 1 = false" 
 
 
-          ftestCase "test equiv"
+          testCase "test equiv"
           <| fun _ ->
 
               let i1 : obj = 1

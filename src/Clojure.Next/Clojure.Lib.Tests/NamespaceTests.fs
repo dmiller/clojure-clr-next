@@ -24,7 +24,7 @@ let BasicNamespaceTests =
         "Basic Namespace Tests"
         [
 
-          ftestCase "findOrCreate creates a new namespace"
+          testCase "findOrCreate creates a new namespace"
           <| fun _ ->
             removeNamespaces()
             let sym = Symbol.intern "abc"

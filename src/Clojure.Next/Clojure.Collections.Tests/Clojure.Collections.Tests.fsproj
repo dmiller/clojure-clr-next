@@ -12,6 +12,7 @@
     <Compile Include="KeywordTests.fs" />
     <Compile Include="ConsTests.fs" />
     <Compile Include="PersistentListTests.fs" />
+    <Compile Include="StringSeqTests.fs" />
     <Compile Include="OtherSequencesTests.fs" />
     <Compile Include="RangeTests.fs" />
     <Compile Include="PersistentVectorTests.fs" />
