@@ -66,30 +66,30 @@ let stringSeqISeqTests =
     testList
         "StringSeq ISeq tests"
         [
-            ftestCase "StringSeq has correct ISeq values"
+            testCase "StringSeq has correct ISeq values"
             <| fun _ ->
                 verifyISeqContents (StringSeq.create("abcde")) [ 'a'; 'b'; 'c'; 'd'; 'e' ]
 
-            ftestCase "StringSeq with meta has correct ISeq values"
+            testCase "StringSeq with meta has correct ISeq values"
             <| fun _ ->
                 let s = StringSeq.create("abcde")
                 let sm = (s:>IObj).withMeta(metaForSimpleTests) :?> StringSeq
                 verifyISeqContents sm [ 'a'; 'b'; 'c'; 'd'; 'e' ]
 
 
-            ftestCase "StringSeq.rest preserves meta"
+            testCase "StringSeq.rest preserves meta"
             <| fun _ ->
                 let s = StringSeq.create("abcde")
                 let sm = (s:>IObj).withMeta(metaForSimpleTests) :?> StringSeq
                 verifyIseqRestMaintainsMeta sm
 
-            ftestCase "StringSeq.rest preserves type"
+            testCase "StringSeq.rest preserves type"
             <| fun _ ->
                 let s = StringSeq.create("abcde")
                 let sm = (s:>IObj).withMeta(metaForSimpleTests) :?> StringSeq
                 verifyISeqRestTypes sm typeof<StringSeq>
 
-            ftestCase "StringSeq cons works"
+            testCase "StringSeq cons works"
             <| fun _ ->
                 verifyISeqCons (StringSeq.create("abcde")) 12 [ 'a'; 'b'; 'c'; 'd'; 'e' ]
 

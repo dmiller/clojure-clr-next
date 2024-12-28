@@ -212,7 +212,7 @@ type ArraySeq() =
     static member create(array : obj array) : IArraySeq = 
         if isNull array || array.Length = 0 then null else new ArraySeq_object(null,array,0)
     static member create(array : obj array, firstIndex : int) : IArraySeq = 
-        if isNull array || array.Length <= firstIndex then null else new ArraySeq_object(null,array,firstIndex)
+        if isNull array || array.Length <= firstIndex || firstIndex < 0 then null else new ArraySeq_object(null,array,firstIndex)
     static member createFromObject(array : obj): IArraySeq  = 
         if isNull array || not (array :? Array) || (array :?> Array).Length = 0 then null
         else
