@@ -1,25 +1,53 @@
-﻿module Clojure.Collections.RTSeq
+﻿namespace Clojure.Collections
 
-// Some of the sequence functions from the original RT that need only PersistentList and Cons
+open System
+open System.Collections
+open Clojure.Numerics
+open System.Runtime.CompilerServices
+
+    // Some of the sequence functions from the original RT that need only PersistentList and Cons
+
+[<AbstractClass;Sealed>] 
+type RTSeq() =
+
+    static do 
+        RT0.setSeq(RTSeq.seq) 
+
+    // TODO: Another candidate for protocols
+
+    static member seq (coll:obj) : ISeq =
+        match coll with
+        | :? ASeq as a -> a
+        | :? LazySeq as lseq -> (lseq :> Seqable).seq()
+        | _ -> RTSeq.seqFrom(coll)
+        
+    static member private seqFrom(coll:obj) : ISeq =
+        match coll with 
+        | null -> null
+        | :? Seqable as seq -> seq.seq()
+        | _ when typeof<Array>.IsAssignableFrom(coll.GetType()) ->  ArraySeq.createFromObject(arr)
+        | :? string as str -> StringSeq.create(str)
+        | :? IEnumerable as ie -> chunkEnumeratorSeq(ie.GetEnumerator())  // java: Iterable  -- reordered clauses so others take precedence.
+        | _ -> failwithf "Don't know how to create ISeq from: %s" (coll.GetType().FullName)
 
 
-    let cons (x: obj, coll: obj) : ISeq =
+    static member cons (x: obj, coll: obj) : ISeq =
         match coll with
         | null -> upcast PersistentList(x)
         | :? ISeq as s -> upcast Cons(x, s)
         | _ -> upcast Cons(x, RT0.seq (coll))
 
-    let meta (x:obj) = 
+    static member meta (x:obj) = 
         match x with
         | :? IMeta as m -> m.meta()
         | _ -> null
 
-    let conj(coll:IPersistentCollection, x:obj) : IPersistentCollection =
+    static member conj(coll:IPersistentCollection, x:obj) : IPersistentCollection =
         match coll with
         | null -> PersistentList(x)
         | _ -> coll.cons(x)
 
-    let next(x:obj) =
+    static member next(x:obj) =
         let seq =
             match x with
             | :? ISeq as s -> s
@@ -28,7 +56,7 @@
         | null -> null
         | _ -> seq.next()
 
-    let more(x:obj) =
+    static member more(x:obj) =
         let seq =
             match x with
             | :? ISeq as s -> s
@@ -37,7 +65,7 @@
         | null -> null
         | _ -> seq.more()
 
-    let first(x:obj) =
+    static member first(x:obj) =
         let seq =
             match x with
             | :? ISeq as s -> s
@@ -47,114 +75,228 @@
         | null -> null
         | _ -> seq.first()
 
-    let second(x:obj) = first(next(x))
-    let third(x:obj) = first(next(next(x)))
-    let fourth(x:obj) = first(next(next(next(x))))
+    static member second(x:obj) = RTSeq.first(RTSeq.next(x))
+    static member third(x:obj) = RTSeq.first(RTSeq.next(RTSeq.next(x)))
+    static member fourth(x:obj) = RTSeq.first(RTSeq.next(RTSeq.next(RTSeq.next(x))))
 
-    let peek(x:obj) = 
+    static member peek(x:obj) = 
         match x with
         | null -> null
         | _ -> (x :?> IPersistentStack).peek()
 
-    let pop(x:obj) = 
+    static member pop(x:obj) = 
         match x with
         | null -> null
         | _ -> (x :?> IPersistentStack).pop()
 
-    let listStar1(arg1, rest) = cons(arg1, rest)
-    let listStar2(arg1, arg2, rest) = cons(arg1, cons(arg2, rest))
-    let listStar3(arg1, arg2, arg3, rest) = cons(arg1, cons(arg2, cons(arg3, rest)))
-    let listStar4(arg1, arg2, arg3, arg4, rest) = cons(arg1, cons(arg2, cons(arg3, cons(arg4, rest))))
-    let listStar5(arg1, arg2, arg3, arg4, arg5, rest) = cons(arg1, cons(arg2, cons(arg3, cons(arg4, cons(arg5, rest)))))
+    static member listStar(arg1, rest) = RTSeq.cons(arg1, rest)
+    static member listStar(arg1, arg2, rest) = RTSeq.cons(arg1, RTSeq.cons(arg2, rest))
+    static member listStar(arg1, arg2, arg3, rest) = RTSeq.cons(arg1, RTSeq.cons(arg2, RTSeq.cons(arg3, rest)))
+    static member listStar(arg1, arg2, arg3, arg4, rest) = RTSeq.cons(arg1, RTSeq.cons(arg2, RTSeq.cons(arg3, RTSeq.cons(arg4, rest))))
+    static member listStar(arg1, arg2, arg3, arg4, arg5, rest) = RTSeq.cons(arg1, RTSeq.cons(arg2, RTSeq.cons(arg3, RTSeq.cons(arg4, RTSeq.cons(arg5, rest)))))
 
-    let list0() = null
-    let list1(arg1) = PersistentList(arg1)
-    let list2(arg1, arg2) = listStar2(arg1,arg2,null)
-    let list3(arg1, arg2, arg3) = listStar3(arg1,arg2,arg3,null)
-    let list4(arg1, arg2, arg3, arg4) = listStar4(arg1,arg2,arg3,arg4,null)
-    let list5(arg1, arg2, arg3, arg4, arg5) = listStar5(arg1,arg2,arg3,arg4,arg5,null)
+    static member list0() = null
+    static member list(arg1) = PersistentList(arg1)
+    static member list(arg1, arg2) = RTSeq.listStar(arg1,arg2,null)
+    static member list(arg1, arg2, arg3) = RTSeq.listStar(arg1,arg2,arg3,null)
+    static member list(arg1, arg2, arg3, arg4) = RTSeq.listStar(arg1,arg2,arg3,arg4,null)
+    static member list(arg1, arg2, arg3, arg4, arg5) = RTSeq.listStar(arg1,arg2,arg3,arg4,arg5,null)
 
-    let assoc(coll:obj, key:obj, value: obj) =
+    static member assoc(coll:obj, key:obj, value: obj) =
         match coll with
         | null -> coll
         | _ -> (coll :?> IPersistentMap).assoc(key,value)
 
-    let dissoc(coll:obj, key:obj) =
+    static member dissoc(coll:obj, key:obj) =
         match coll with
         | null -> coll
         | _ -> (coll :?> IPersistentMap).without(key)
 
+        
 
-(*
+and [<Sealed; AllowNullLiteral>] LazySeq private (m1, fn1, s1) =
+    inherit Obj(m1)
+    let mutable fn: IFn = fn1
+    let mutable s: ISeq = s1
+    let mutable sv: obj = null
 
+    private new(m1: IPersistentMap, s1: ISeq) = LazySeq(m1, null, s1)
+    new(fn: IFn) = LazySeq(null, fn, null)
 
-        public static ISeq list()
-        {
-            return null;
-        }
-
-
-        public static ISeq list(object arg1)
-        {
-            return new PersistentList(arg1);
-        }
-
-
-        public static ISeq list(object arg1, object arg2)
-        {
-            return listStar(arg1, arg2, null);
-        }
+    override this.GetHashCode() =
+        match (this :> ISeq).seq () with
+        | null -> 1
+        | s -> Hashing.hash s
 
 
-        public static ISeq list(object arg1, object arg2, object arg3)
-        {
-            return listStar(arg1, arg2, arg3, null);
-        }
+    override this.Equals(o: obj) =
+        match (this :> ISeq).seq (), o with
+        | null, :? Sequential
+        | null, :? IList -> RT0.seq (o) = null
+        | null, _ -> false
+        | s, _ -> s.Equals(o)
+
+    interface IObj with
+        override this.withMeta(meta: IPersistentMap) =
+            if LanguagePrimitives.PhysicalEquality ((this :> IMeta).meta ()) meta then
+                this :> IObj
+            else
+                LazySeq(meta, (this :> ISeq).seq ()) :> IObj
+
+    member _.sval() : obj =
+        if not (isNull fn) then
+            sv <- fn.invoke ()
+            fn <- null
+
+        match sv with
+        | null -> upcast s
+        | _ -> sv
 
 
-        public static ISeq list(object arg1, object arg2, object arg3, object arg4)
-        {
-            return listStar(arg1, arg2, arg3, arg4, null);
-        }
+    interface Seqable with
+
+        [<MethodImpl(MethodImplOptions.Synchronized)>]
+        override this.seq() =
+
+            this.sval () |> ignore
+
+            if not (isNull sv) then
+
+                let rec getNext (x: obj) =
+                    match x with
+                    | :? LazySeq as ls -> getNext (ls.sval ())
+                    | _ -> x
+
+                let ls = sv
+                sv <- null
+                s <- RT0.seq (getNext ls)
+
+            s
 
 
-        public static ISeq list(object arg1, object arg2, object arg3, object arg4, object arg5)
-        {
-            return listStar(arg1, arg2, arg3, arg4, arg5, null);
-        }
+    interface IPersistentCollection with
+        member _.count() =
+            let rec countAux (s: ISeq) (acc: int) : int =
+                match s with
+                | null -> acc
+                | _ -> countAux (s.next ()) (acc + 1)
 
+            countAux s 0
 
+        member this.cons(o) = upcast (this :> ISeq).cons (o)
+        member _.empty() = upcast PersistentList.Empty
 
+        member this.equiv(o) =
+            match (this :> ISeq).seq () with
+            | null ->
+                match o with
+                | :? IList
+                | :? Sequential -> RT0.seq (o) = null
+                | _ -> false
+            | s -> s.equiv (o)
 
-        public static ISeq listStar(object arg1, ISeq rest)
-        {
-            return cons(arg1, rest);
-        }
+    interface ISeq with
+        member this.first() =
+            (this :> ISeq).seq () |> ignore
+            if isNull s then null else s.first ()
 
+        member this.next() =
+            (this :> ISeq).seq () |> ignore
+            if isNull s then null else s.next ()
 
-        public static ISeq listStar(object arg1, object arg2, ISeq rest)
-        {
-            return cons(arg1, cons(arg2, rest));
-        }
+        member this.more() =
+            (this :> ISeq).seq () |> ignore
 
+            if isNull s then upcast PersistentList.Empty else s.more ()
 
-        public static ISeq listStar(object arg1, object arg2, object arg3, ISeq rest)
-        {
-            return cons(arg1, cons(arg2, cons(arg3, rest)));
-        }
+        member this.cons(o: obj) : ISeq = RTSeq.cons (o, (this :> ISeq).seq ())
 
+    interface IPending with
+        member _.isRealized() = isNull fn
 
-        public static ISeq listStar(object arg1, object arg2, object arg3, object arg4, ISeq rest)
-        {
-            return cons(arg1, cons(arg2, cons(arg3, cons(arg4, rest))));
-        }
+    interface IHashEq with
+        member this.hasheq() = Hashing.hashOrdered (this)
 
+    interface IEnumerable with
+        member this.GetEnumerator() = upcast new SeqEnumerator(this)
 
-        public static ISeq listStar(object arg1, object arg2, object arg3, object arg4, object arg5, ISeq rest)
-        {
-            return cons(arg1, cons(arg2, cons(arg3, cons(arg4, cons(arg5, rest)))));
-        }
+    interface IList with
+        member _.Add(_) =
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
+        member _.Clear() =
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
 
-*)
+        member _.Insert(i, v) =
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
+
+        member _.Remove(v) =
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
+
+        member _.RemoveAt(i) =
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
+
+        member _.IsFixedSize = true
+        member _.IsReadOnly = true
+
+        member this.Item
+            with get index =
+                if index < 0 then
+                    raise <| ArgumentOutOfRangeException("index", "Index must be non-negative")
+
+                let rec loop i (s: ISeq) =
+                    if i = index then
+                        s.first ()
+                    elif isNull s then
+                        raise <| ArgumentOutOfRangeException("index", "Index past end of list")
+                    else
+                        loop (i + 1) (s.next ())
+
+                loop 0 this // TODO: See IndexOf. Should this be called on x or x.seq() ??  Check original Java code.
+            and set _ _ = raise <| InvalidOperationException("Cannot modify an immutable sequence")
+
+        member this.IndexOf(v) =
+            let rec loop i (s: ISeq) =
+                if isNull s then -1
+                else if Util.equiv (s.first (), v) then i
+                else loop (i + 1) (s.next ())
+
+            loop 0 ((this :> ISeq).seq ())
+
+        member this.Contains(v) =
+            let rec loop (s: ISeq) =
+                if isNull s then false
+                else if Util.equiv (s.first (), v) then true
+                else loop (s.next ())
+
+            loop ((this :> ISeq).seq ())
+
+    interface ICollection with
+        member this.Count = (this :> IPersistentCollection).count ()
+        member _.IsSynchronized = true
+        member this.SyncRoot = upcast this
+
+        member this.CopyTo(arr: Array, idx) =
+            if isNull arr then
+                raise <| ArgumentNullException("array")
+
+            if idx < 0 then
+                raise <| ArgumentOutOfRangeException("arrayIndex", "must be non-negative")
+
+            if arr.Rank <> 1 then
+                raise <| ArgumentException("Array must be 1-dimensional")
+
+            if idx >= arr.Length then
+                raise <| ArgumentException("index", "must be less than the length")
+
+            if (this :> IPersistentCollection).count () > arr.Length - idx then
+                raise
+                <| InvalidOperationException("Not enough available space from index to end of the array.")
+
+            let rec loop (i: int) (s: ISeq) =
+                if not (isNull s) then
+                    arr.SetValue(s.first (), i)
+                    loop (i + 1) (s.next ())
+
+            loop idx (this :> ISeq)
 

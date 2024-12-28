@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="NamespaceTests.fs" />
     <Compile Include="TransactionTester.fs" />
     <Compile Include="TransactionTests.fs" />
     <Compile Include="Main.fs" />

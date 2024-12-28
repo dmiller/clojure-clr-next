@@ -1,294 +1,108 @@
 ﻿namespace Clojure.Collections
 
+open System
+open System.Collections
+open Clojure.Numerics
+
+type IArraySeq = 
+    inherit IObj
+    inherit ISeq
+    inherit IList
+    inherit IndexedSeq
+    inherit IReduce
+    abstract member toArray : unit -> obj[]
+    abstract member array : unit -> obj
+    abstract member index : unit -> int
+
+type TypedArraySeq<'T when 'T : equality >(_meta : IPersistentMap, _array: 'T array, _index : int) = 
+    inherit ASeq(_meta)
+
+    abstract member Convert : obj -> 'T
+    abstract member NextOne : unit -> ISeq
+    abstract member DuplicateWithMeta : IPersistentMap -> IObj
+
+    default _.Convert (x : obj) =  x :?> 'T
+    default _.NextOne() = new TypedArraySeq<'T>(_meta, _array, _index + 1)
+    default this.DuplicateWithMeta(newMeta) = if Object.ReferenceEquals(newMeta,_meta) then this else new TypedArraySeq<'T>(newMeta, _array, _index)
+
+     // TODO: first/reduce do a Numbers.num(x) conversion  -- do we need that?  (comment in C#)
+
+    interface IPersistentCollection with
+        override this.cons(o) = (this:>ISeq).cons(o)
+        override this.count() = _array.Length - _index
+
+    interface ISeq with
+        override _.first() = _array.[_index]
+        override this.next() = if _index + 1 < _array.Length then this.NextOne() else null
+
+    interface IObj with
+        override this.withMeta(newMeta) = this.DuplicateWithMeta(newMeta)
+
+    interface Counted with
+        override this.count() = _array.Length - _index
+
+    interface IndexedSeq with
+        member _.index() = _index
+
+    interface IReduce with
+        override this.reduce(f) = 
+            if isNull _array then
+                null
+            else 
+                let rec loop (acc:obj) (i:int) =
+                    if i >= _array.Length then
+                        acc
+                    else
+                       match f.invoke(acc,_array[i]) with
+                       | :? Reduced as red -> (red:>IDeref).deref()
+                       | nextAcc -> loop nextAcc (i+1)
+                loop _array[_index] (_index+1)
+
+        override this.reduce(f, init) = 
+            if isNull _array then
+                null
+            else 
+                let rec loop (acc:obj) (i:int) =
+                    if i >= _array.Length then
+                        acc
+                    else
+                       match f.invoke(acc,_array[i]) with
+                       | :? Reduced as red -> (red:>IDeref).deref()
+                       | nextAcc -> loop nextAcc (i+1)
+                loop (f.invoke(init,_array[_index])) (_index+1)
+
+    interface IList with
+        override this.IndexOf(value : obj) = this.indexOf(value)
+
+
+    member this.indexOf(value : obj) = 
+        let v = this.Convert(value)
+        let rec loop (i:int) =
+            if i >= _array.Length then -1
+            elif v.Equals(_array.[i]) then i
+            else loop (i + 1)
+        loop _index
+
+
+    interface IArraySeq with
+        override this.toArray() = 
+            let sz = _array.Length - _index
+            let items = Array.zeroCreate sz
+            Array.Copy(_array, _index, items, 0, sz)
+            items
+        override this.array() = _array
+        override this.index() = _index
+
+type NumericArraySeq<'T when 'T : equality>(meta : IPersistentMap, array : 'T array, index: int) = 
+    inherit TypedArraySeq<'T>(meta,array,index)
+
+    interface IList with
+        override this.IndexOf(value : obj) = 
+            if Numbers.IsNumeric(value) then 
+                base.indexOf(value) 
+            else 
+                -1
 
-
-
-
-// Coming later.
-
-
-
-
-
-
-
-
-
-
-
-//namespace clojure.lang
-//{
-//    public interface IArraySeq : IObj, ISeq, IList, IndexedSeq, IReduce
-//    {
-//        object[] ToArray();
-//        object Array();
-//        int Index();
-//    }
-
-//    public static class ArraySeq
-//    {
-//        #region C-tors and factory methods
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public IArraySeq create()
-//        {
-//            return null;
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public IArraySeq create(params object[] array)
-//        {
-//            return (array == null || array.Length == 0)
-//                ? null
-//                : new ArraySeq_object(null,array, 0);
-//        }
-
-//        // Not in the Java version, but I can really use this
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        static public IArraySeq create(object[] array, int firstIndex)
-//        {
-//            return (array == null || array.Length <= firstIndex )
-//                ? null
-//                : new ArraySeq_object(null, array, firstIndex);
-//        }
-
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
-//        internal static IArraySeq createFromObject(Object array)
-//        {
-//            if (!(array is Array aa) || aa.Length == 0)
-//                return null;
-
-//            Type elementType = array.GetType().GetElementType();
-//            switch (Type.GetTypeCode(elementType))
-//            {
-//                case TypeCode.Boolean:
-//                    return new ArraySeq_bool(null, (bool[])aa, 0);
-//                case TypeCode.Byte:
-//                    return new ArraySeq_byte(null, (byte[])aa, 0);
-//                case TypeCode.Char:
-//                    return new ArraySeq_char(null, (char[])aa, 0);
-//                case TypeCode.Decimal:
-//                    return new ArraySeq_decimal(null, (decimal[])aa, 0);
-//                case TypeCode.Double:
-//                    return new ArraySeq_double(null, (double[])aa, 0);
-//                case TypeCode.Int16:
-//                    return new ArraySeq_short(null, (short[])aa, 0);
-//                case TypeCode.Int32:
-//                    return new ArraySeq_int(null, (int[])aa, 0);
-//                case TypeCode.Int64:
-//                    return new ArraySeq_long(null, (long[])aa, 0);
-//                case TypeCode.SByte:
-//                    return new ArraySeq_sbyte(null, (sbyte[])aa, 0);
-//                case TypeCode.Single:
-//                    return new ArraySeq_float(null, (float[])aa, 0);
-//                case TypeCode.UInt16:
-//                    return new ArraySeq_ushort(null, (ushort[])aa, 0);
-//                case TypeCode.UInt32:
-//                    return new ArraySeq_uint(null, (uint[])aa, 0);
-//                case TypeCode.UInt64:
-//                    return new ArraySeq_ulong(null, (ulong[])aa, 0);
-//                default:
-//                    {
-//                        Type[] elementTypes = { elementType };
-//                        Type arraySeqType = typeof(TypedArraySeq<>).MakeGenericType(elementTypes);
-//                        object[] ctorParams = { PersistentArrayMap.EMPTY, array, 0 };
-//                        return (IArraySeq)Activator.CreateInstance(arraySeqType, ctorParams);
-//                    }
-//            }
-//        }
-
-//        #endregion
-//    }
-
-//    [Serializable]
-//    public class TypedArraySeq<T> : ASeq, IArraySeq
-//    {
-//        #region Data
-
-//        protected readonly T[] _array;
-//        protected readonly int _i;
-//        //protected readonly Type _ct;
-
-//        #endregion
-
-//        #region C-tors
-
-//        public TypedArraySeq(IPersistentMap meta, T[] array, int index)
-//            : base(meta)
-//        {
-//            _array = array;
-//            _i = index;
-//            //_ct = typeof(T);
-//        }
-
-//        #endregion
-
-//        #region Virtual methods
-
-//        protected virtual T Convert(object x)
-//        {
-//            return (T)x;
-//        }
-
-//        protected virtual ISeq NextOne()
-//        {
-//            return new TypedArraySeq<T>(_meta, _array, _i + 1);
-//        }
-
-//        protected virtual IObj DuplicateWithMeta(IPersistentMap meta)
-//        {
-//            if (_meta == meta)
-//                return this;
-
-//            return new TypedArraySeq<T>(meta, _array, _i);
-//        }
-
-//        // TODO: first/reduce do a Numbers.num(x) conversion  -- do we need that?
-
-//        #endregion
-
-//        #region IPersistentCollection members
-
-//        public override int count()
-//        {
-//            return _array.Length - _i;
-//        }
-
-//        IPersistentCollection IPersistentCollection.cons(object o)
-//        {
-//            return cons(o);
-//        }
-
-//        #endregion
-
-//        #region ISeq members
-
-//        public override object first()
-//        {
-//            return _array[_i];
-//            //return Reflector.prepRet(_ct,_array[_i]);
-//        }
-
-//        public override ISeq next()
-//        {
-//            if (_i + 1 < _array.Length)
-//                return NextOne();
-//            return null;
-//        }
-
-//        #endregion
-
-//        #region IObj members
-
-//        public override IObj withMeta(IPersistentMap meta)
-//        {
-//            return DuplicateWithMeta(meta);
-//        }
-
-//        #endregion
-
-//        #region IndexedSeq Members
-
-//        public int index()
-//        {
-//            return _i;
-//        }
-
-//        #endregion
-
-//        #region IReduce Members
-
-//        public object reduce(IFn f)
-//        {
-//            if (_array == null)
-//                return null;
-
-//            object ret = _array[_i];
-//            for (int x = _i + 1; x < _array.Length; x++)
-//            {
-//                ret = f.invoke(ret, _array[x]);
-//                if (RT.isReduced(ret))
-//                    return ((IDeref)ret).deref();
-//            }
-//            return ret;
-//        }
-
-//        public object reduce(IFn f, object start)
-//        {
-//            if (_array == null)
-//                return null;
-
-//            object ret = f.invoke(start, _array[_i]);
-//            for (int x = _i + 1; x < _array.Length; x++)
-//            {
-//                if (RT.isReduced(ret))
-//                    return ((IDeref)ret).deref(); 
-//                ret = f.invoke(ret, _array[x]);
-//            }
-//            if (RT.isReduced(ret))
-//                return ((IDeref)ret).deref(); 
-//            return ret;
-//        }
-
-//        #endregion
-
-//        #region IList members
-
-//        public override int IndexOf(object value)
-//        {
-//            T v = Convert(value);
-//            for (int j = _i; j < _array.Length; j++)
-//                if (v.Equals(_array[j]))
-//                    return j - _i;
-//            return -1;
-//        }
-      
-//        #endregion
-
-//        #region IArraySeq members
-
-//        public object[] ToArray()
-//        {
-//            int sz = _array.Length - _i;
-//            object[] items = new object[sz];
-//            System.Array.Copy(_array, _i, items, 0, sz);
-//            return items;
-//        }
-
-//        public object Array()
-//        {
-//            return _array;
-//        }
-
-//        public int Index()
-//        {
-//            return _i;
-//        }
-
-//        #endregion
-//    }
-
-//    [Serializable]
-//    public class NumericArraySeq<T> : TypedArraySeq<T>
-//    {
-//        #region Ctors
-        
-//        public NumericArraySeq(IPersistentMap meta, T[] array, int index)
-//                    :base(meta,array,index)
-//        {
-//        }
-
-//        #endregion
-
-//        #region overrides
-
-//        public override int IndexOf(object value)
-//        {
-//            return Util.IsNumeric(value) ? base.IndexOf(value) : -1;
-//        }
-
-//        #endregion
-//    }
 
 //    [Serializable]
 //    public class ArraySeq_byte : NumericArraySeq<byte>
@@ -679,3 +493,88 @@
 //        }
 //    }
 //}
+
+
+//[<AbstractClass;Sealed>]
+//type ArraySeq() = 
+//    static member create : unit -> IArraySeq
+//    static member create : obj[] -> IArraySeq
+//    static member create : obj[] * int -> IArraySeq
+//    static member createFromObject : obj -> IArraySeq
+
+
+//    public static class ArraySeq
+//    {
+//        #region C-tors and factory methods
+
+//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
+//        static public IArraySeq create()
+//        {
+//            return null;
+//        }
+
+//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
+//        static public IArraySeq create(params object[] array)
+//        {
+//            return (array == null || array.Length == 0)
+//                ? null
+//                : new ArraySeq_object(null,array, 0);
+//        }
+
+//        // Not in the Java version, but I can really use this
+//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
+//        static public IArraySeq create(object[] array, int firstIndex)
+//        {
+//            return (array == null || array.Length <= firstIndex )
+//                ? null
+//                : new ArraySeq_object(null, array, firstIndex);
+//        }
+
+//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "ClojureJVM name match")]
+//        internal static IArraySeq createFromObject(Object array)
+//        {
+//            if (!(array is Array aa) || aa.Length == 0)
+//                return null;
+
+//            Type elementType = array.GetType().GetElementType();
+//            switch (Type.GetTypeCode(elementType))
+//            {
+//                case TypeCode.Boolean:
+//                    return new ArraySeq_bool(null, (bool[])aa, 0);
+//                case TypeCode.Byte:
+//                    return new ArraySeq_byte(null, (byte[])aa, 0);
+//                case TypeCode.Char:
+//                    return new ArraySeq_char(null, (char[])aa, 0);
+//                case TypeCode.Decimal:
+//                    return new ArraySeq_decimal(null, (decimal[])aa, 0);
+//                case TypeCode.Double:
+//                    return new ArraySeq_double(null, (double[])aa, 0);
+//                case TypeCode.Int16:
+//                    return new ArraySeq_short(null, (short[])aa, 0);
+//                case TypeCode.Int32:
+//                    return new ArraySeq_int(null, (int[])aa, 0);
+//                case TypeCode.Int64:
+//                    return new ArraySeq_long(null, (long[])aa, 0);
+//                case TypeCode.SByte:
+//                    return new ArraySeq_sbyte(null, (sbyte[])aa, 0);
+//                case TypeCode.Single:
+//                    return new ArraySeq_float(null, (float[])aa, 0);
+//                case TypeCode.UInt16:
+//                    return new ArraySeq_ushort(null, (ushort[])aa, 0);
+//                case TypeCode.UInt32:
+//                    return new ArraySeq_uint(null, (uint[])aa, 0);
+//                case TypeCode.UInt64:
+//                    return new ArraySeq_ulong(null, (ulong[])aa, 0);
+//                default:
+//                    {
+//                        Type[] elementTypes = { elementType };
+//                        Type arraySeqType = typeof(TypedArraySeq<>).MakeGenericType(elementTypes);
+//                        object[] ctorParams = { PersistentArrayMap.EMPTY, array, 0 };
+//                        return (IArraySeq)Activator.CreateInstance(arraySeqType, ctorParams);
+//                    }
+//            }
+//        }
+
+//        #endregion
+//    }
+

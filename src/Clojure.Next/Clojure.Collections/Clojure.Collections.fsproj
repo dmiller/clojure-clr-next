@@ -19,10 +19,11 @@
     <Compile Include="Keyword.fs" />
     <Compile Include="SeqEnumerator.fs" />
     <Compile Include="StarterSequences.fs" />
-    <Compile Include="RTSeq.fs" />
+    <Compile Include="StringSeq.fs" />
     <Compile Include="ArraySeq.fs" />
-    <Compile Include="MoreSequences.fs" />
+    <Compile Include="RTSeq.fs" />
     <Compile Include="LazySeq.fs" />
+    <Compile Include="MoreSequences.fs" />
     <Compile Include="Chunking.fs" />
     <Compile Include="Ranges.fs" />
     <Compile Include="PersistentVector.fs" />

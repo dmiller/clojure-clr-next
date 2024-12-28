@@ -40,8 +40,6 @@ type ARef(m) =
     [<VolatileField>]
     let mutable validator : IFn  = null
 
-
-
     [<VolatileField>]
     let mutable watches : IPersistentMap = PersistentHashMap.Empty
 
@@ -90,6 +88,11 @@ type ARef(m) =
             this :> IRef
 
         member _.getWatches() = watches
+
+    // Some subclasses need to set the validator field without going through IRef.setValidator
+    //   because the latter validates with the new validator function first.
+    // See Var for an example of this.
+    member internal this.setValidatorInternal(vf) = validator <- vf
 
     member this.notifyWatches(oldval, newval) =
         let ws = watches

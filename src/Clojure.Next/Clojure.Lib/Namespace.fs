@@ -42,7 +42,7 @@ module DefaultImports =
         d
 
     let createMap() = 
-        PersistentHashMap.create(createDefaultImportDirectory())
+        PersistentHashMap.createD2(createDefaultImportDirectory())
 
     let imports = createMap()
     
@@ -82,7 +82,7 @@ type Namespace(name : Symbol) =
     //
     ///////////////////////////////////////////
 
-    static member All = namespaces.Values |> RT0.seq
+    static member All = namespaces.Values.ToList |> RT0.seq
 
     // Find or create a namespace named by the symbol.
     static member findOrCreate(name : Symbol) =  namespaces.GetOrAdd(name, fun _ -> new Namespace(name))
@@ -361,7 +361,7 @@ and [<AllowNullLiteral>] private Frame(bindings: Associative, prev: Frame) =
     static member Top : Frame = Frame(PersistentHashMap.Empty, null)
 
 
-and [<Sealed;AllowNullLiteral>] private TBox(thread: Thread, v: obj) =
+and [<Sealed;AllowNullLiteral>] TBox(thread: Thread, v: obj) =
 
     [<VolatileField>]
     let mutable value = v
@@ -372,7 +372,7 @@ and [<Sealed;AllowNullLiteral>] private TBox(thread: Thread, v: obj) =
 
     member _.Thread with get() = thread
     
-and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) = 
+and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) = 
     inherit ARef(PersistentHashMap.Empty)
 
     // revision counter
@@ -405,9 +405,9 @@ and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) =
     member _.setThreadBound(b: bool) = threadBound.Set(b)
 
     override _.ToString() =
-        match ns with
+        match _ns with
         | null -> $"""#<Var: {if isNull sym then "--unnamed--" else sym.ToString()}>"""
-        | _ -> $"#'{ns}/{sym}"
+        | _ -> $"#'{_ns}/{sym}"
     // To avoid initialization checks that would be caused by the circular dependency between the Var and the Unbound value in its root,
     // I made the constructor private and created a factory method to create a Var.
     // Called createInternal to avoid name collision with the 'create' method in the public interface.
@@ -422,7 +422,7 @@ and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) =
         v.incrementRev()
         v
 
-    member _.Namespace = ns
+    member _.Namespace = _ns
     member _.Name = sym
 
 
@@ -555,11 +555,16 @@ and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) =
     //
     ////////////////////////////////
 
-    static member getThreadBindingFrame() = Var.CurrentFrame
+    // Copying the original Java code here.
+    // getThreadBindingFrame has return type Object.
+    // resetThreadBindingFrame 
+    // I'm not sure why they did it this way.
+
+    static member getThreadBindingFrame() = Var.CurrentFrame :> obj
 
     static member cloneThreadBindingFrame() = (Var.CurrentFrame :> ICloneable).Clone()
 
-    static member resetThreadBindingFrame(f: Frame) = Var.CurrentFrame <- f
+    static member resetThreadBindingFrame(f: obj) = Var.CurrentFrame <- (f :?> Frame)
 
     ////////////////////////////////
     //
@@ -570,10 +575,10 @@ and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) =
     // Set the metadata attached to this var.
     // The metadata must contain entries for the namespace and name.
     member this.setMeta(m: IPersistentMap) =
-        (this :> IReference).resetMeta(m.assoc(Var.nameKey,sym).assoc(Var.nsKey,ns)) |> ignore
+        (this :> IReference).resetMeta(m.assoc(Var.nameKey,sym).assoc(Var.nsKey,_ns)) |> ignore
 
     // Add a macro=true flag to the metadata.
-    member this.setMacro() = (this :> IReference).alterMeta(Var.assocFn,RTSeq.list2(Var.macroKey,true)) |> ignore
+    member this.setMacro() = (this :> IReference).alterMeta(Var.assocFn,RTSeq.list(Var.macroKey,true)) |> ignore
 
     // Is the Var a macro?
     member this.isMacro with get() = RT0.booleanCast((this :> IMeta).meta().valAt(Var.macroKey))
@@ -584,7 +589,7 @@ and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) =
     // Get the tag on the var.
     member this.tag 
         with get() = (this :> IMeta).meta().valAt(Var.tagKey)
-        and set(v) = (this :> IReference).alterMeta(Var.assocFn, RTSeq.list2(Var.tagKey,v)) |> ignore
+        and set(v) = (this :> IReference).alterMeta(Var.assocFn, RTSeq.list(Var.tagKey,v)) |> ignore
 
     ////////////////////////////////
     //
@@ -638,7 +643,7 @@ and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) =
         let oldRoot = root
         this.setRoot(v)
         this.incrementRev()
-        (this:>IReference).alterMeta(Var.dissocFn, RTSeq.list1(Var.macroKey)) |> ignore
+        (this:>IReference).alterMeta(Var.dissocFn, RTSeq.list(Var.macroKey)) |> ignore
         this.notifyWatches(oldRoot, v)
 
     // Change the root value.
@@ -704,8 +709,107 @@ and [<Sealed;AllowNullLiteral>] Var private (ns: Namespace, sym: Symbol) =
     interface IRef with
         override this.setValidator(vf: IFn) = 
             if this.hasRoot() then
-                this.validate(fv,root)
-            (this :> ARef)validator <- vf
+                ARef.validate(vf,root)
+            this.setValidatorInternal(vf)
+
+
+    interface Settable with
+        member this.doSet(v) = this.set(v)
+        member this.doReset(v) = this.bindRoot(v); v
+
+
+    ////////////////////////////////
+    //
+    //  core.clj compatibility methods
+    //
+    ////////////////////////////////
+
+    // Find the var from a namespace-qualified symbol.
+    static member find(nsQualifiedSym : Symbol) : Var =
+        if isNull nsQualifiedSym.Namespace then
+            raise <| new ArgumentNullException("nsQualifiedSym","Symbol must be namespace-qualified")
+        let ns = Namespace.find(Symbol.intern(nsQualifiedSym.Namespace))
+        if isNull ns then
+            raise <| new ArgumentException($"No such namespace: {nsQualifiedSym.Namespace}")
+        ns.findInternedVar(Symbol.intern(nsQualifiedSym.Name))
+
+    // The namespace this var is interned in.
+    member _.ns = _ns
+
+    // The tag on the Var
+    member this.getTag() = this.tag
+
+    // Set the tag on the var
+    member this.setTag(tag: obj) = this.tag <- tag
+
+    ////////////////////////////////
+    //
+    //  IFn implementation
+    //
+    ////////////////////////////////
+
+    // Get the current value as a IFn.
+    // The original code did not have the direct error check here.
+    // The error would be caught later when an invoke was attempted.
+    // This should be more informative.
+
+    member this.getFn() =
+        let v = (this:>IDeref).deref()
+        match v with
+        | :? IFn as f -> f
+        | _ -> raise <| new InvalidOperationException($"Var {this} is bound to a non-function.")
+
+    // TODO: Check to see if the original use of Util.Ret1 is necessary.
+
+    interface IFn with
+        member this.applyTo(argList : ISeq ) = this.getFn().applyTo(argList)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj, arg14: obj, arg15: obj, arg16: obj, arg17: obj, arg18: obj, arg19: obj, arg20: obj, args: obj array): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, args)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj, arg14: obj, arg15: obj, arg16: obj, arg17: obj, arg18: obj, arg19: obj, arg20: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj, arg14: obj, arg15: obj, arg16: obj, arg17: obj, arg18: obj, arg19: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj, arg14: obj, arg15: obj, arg16: obj, arg17: obj, arg18: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17, arg18)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj, arg14: obj, arg15: obj, arg16: obj, arg17: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16, arg17)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj, arg14: obj, arg15: obj, arg16: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj, arg14: obj, arg15: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj, arg14: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj, arg13: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj, arg12: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj, arg11: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj, arg10: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj, arg9: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj, arg8: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj, arg7: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj, arg6: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5, arg6)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj, arg5: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4, arg5)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj, arg4: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3, arg4)
+        member this.invoke(arg1: obj, arg2: obj, arg3: obj): obj = 
+            this.getFn().invoke(arg1, arg2, arg3)
+        member this.invoke(arg1: obj, arg2: obj): obj = 
+            this.getFn().invoke(arg1, arg2)
+        member this.invoke(arg1: obj): obj = 
+            this.getFn().invoke(arg1)
+        member this.invoke(): obj = 
+            this.getFn().invoke()
+
+
+
 
 and [<Sealed>] private Unbound(v: Var) =
     inherit AFn()
