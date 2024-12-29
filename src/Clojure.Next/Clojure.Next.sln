@@ -25,6 +25,10 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Lib", "Clojure.Lib\
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Lib.Tests", "Clojure.Lib.Tests\Clojure.Lib.Tests.fsproj", "{1EB19454-E3E5-4D61-9BD5-0B69BF700138}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.IO", "Clojure.IO\Clojure.IO.fsproj", "{9824AB3E-975D-4AB9-991A-7B09671AADCB}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.IO.Tests", "Clojure.IO.Tests\Clojure.IO.Tests.fsproj", "{D22E911F-9625-44FC-A1C8-D2EE61142C54}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -75,6 +79,14 @@ Global
 		{1EB19454-E3E5-4D61-9BD5-0B69BF700138}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1EB19454-E3E5-4D61-9BD5-0B69BF700138}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1EB19454-E3E5-4D61-9BD5-0B69BF700138}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9824AB3E-975D-4AB9-991A-7B09671AADCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9824AB3E-975D-4AB9-991A-7B09671AADCB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9824AB3E-975D-4AB9-991A-7B09671AADCB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9824AB3E-975D-4AB9-991A-7B09671AADCB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D22E911F-9625-44FC-A1C8-D2EE61142C54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D22E911F-9625-44FC-A1C8-D2EE61142C54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D22E911F-9625-44FC-A1C8-D2EE61142C54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D22E911F-9625-44FC-A1C8-D2EE61142C54}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

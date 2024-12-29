@@ -100,7 +100,7 @@ let BasicNamespaceTests =
             let ns = Namespace.findOrCreate(Symbol.intern("ghi"))
             Expect.throwsT<ArgumentException> (fun () -> ns.intern(sym) |> ignore)  "interning symbol with namespace fails"
 
-          ftestCase "interning symbol creates Var"
+          testCase "interning symbol creates Var"
           <| fun _ ->
             removeNamespaces()
             let sym = Symbol.intern("def")
@@ -111,7 +111,7 @@ let BasicNamespaceTests =
             Expect.equal (v.Namespace) ns "Var namespace is the same as the namespace it was interned in"
             Expect.equal (v.Name) sym "Var name is the same as the symbol it was interned with"
 
-          ftestCase "interning symbol enters Var in map"
+          testCase "interning symbol enters Var in map"
           <| fun _ ->
             removeNamespaces()
             let sym = Symbol.intern("def")
@@ -121,7 +121,7 @@ let BasicNamespaceTests =
 
             Expect.equal v v2 "interning symbol enters Var in map"
 
-          ftestCase "interning symbol agaom finds Var"
+          testCase "interning symbol agaom finds Var"
           <| fun _ ->
             removeNamespaces()
             let sym = Symbol.intern("def")
@@ -131,7 +131,7 @@ let BasicNamespaceTests =
 
             Expect.equal v1 v2 "interning symbol again finds Var"
 
-          ftestCase "referring symbol to var in other ns and then interning prints warning to *err*"
+          testCase "referring symbol to var in other ns and then interning prints warning to *err*"
           <| fun _ ->
             removeNamespaces()
 
@@ -154,7 +154,7 @@ let BasicNamespaceTests =
             Expect.stringContains s "WARNING: ghi already refers to: #'abc/def in namespace: jkl, being replaced by: #'jkl/ghi" "should get warning"
 
 
-          ftestCase "refer of symbol with namespace fails"
+          testCase "refer of symbol with namespace fails"
           <| fun _ ->
             removeNamespaces()
 
@@ -162,7 +162,7 @@ let BasicNamespaceTests =
             let ns1 = Namespace.findOrCreate(Symbol.intern("abc"))
             Expect.throwsT<ArgumentException> (fun () -> ns1.refer(sym, Var.create()) |> ignore)  "refer of symbol with namespace fails"
 
-          ftestCase "refer enters Var"
+          testCase "refer enters Var"
           <| fun _ ->
             removeNamespaces()
 
@@ -174,7 +174,7 @@ let BasicNamespaceTests =
             Expect.equal (ns.getMapping(sym)) v "refer enters Var"
 
 
-          ftestCase "importClass on symbol with namespace fails"
+          testCase "importClass on symbol with namespace fails"
           <| fun _ ->
             removeNamespaces()
 
@@ -184,7 +184,7 @@ let BasicNamespaceTests =
             Expect.throwsT<ArgumentException> (fun () -> ns.importClass(sym, typeof<Int32>) |> ignore)  "importClass on symbol with namespace fails"
 
 
-          ftestCase "importClass enters type"
+          testCase "importClass enters type"
           <| fun _ ->
             removeNamespaces()
 
@@ -195,7 +195,7 @@ let BasicNamespaceTests =
             Expect.equal (ns.getMapping(sym)) typeof<Int32> "importClass enters type"
 
 
-          ftestCase "findInternedVar fails if non-Var value in map"
+          testCase "findInternedVar fails if non-Var value in map"
           <| fun _ ->
             removeNamespaces()
 
@@ -206,8 +206,6 @@ let BasicNamespaceTests =
             let v = ns.findInternedVar(sym)
 
             Expect.isNull v "findInternedVar fails if non-Var value in map"
-
-
 
 
             ]
