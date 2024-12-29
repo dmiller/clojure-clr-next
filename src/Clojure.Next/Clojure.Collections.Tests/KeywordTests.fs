@@ -11,7 +11,7 @@ open System
 [<Tests>]
 let KeywordTests =
 
-    ftestList
+    testList
         "Keyword tests"
         [
             testCase "Intern creates keyword based on symbol"

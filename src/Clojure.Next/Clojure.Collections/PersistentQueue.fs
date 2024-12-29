@@ -42,7 +42,7 @@ type PersistentQueue(meta: IPersistentMap, cnt: int, front: ISeq, rear: IPersist
     let mutable hashCode = 0
     let mutable hasheq = 0
 
-    static member Empty = PersistentQueue(null,0,null,null)
+    static member val Empty = PersistentQueue(null,0,null,null)
 
     override this.Equals(obj) =
         match obj with

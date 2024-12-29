@@ -118,25 +118,25 @@ let arraySeqISeqTests =
     testList
         "ArraySeq ISeq tests"
         [
-          ftestCase "ArraySeq standard constructor has correct elements"
+          testCase "ArraySeq standard constructor has correct elements"
           <| fun _ ->
                 let a0 = [| 2 :> obj; 3; 4 |]
                 let s0 = ArraySeq.create(a0)
                 verifyISeqContents s0 (a0 |> Array.toList)
 
-          ftestCase "ArraySeq constructor with index has correct elements"
+          testCase "ArraySeq constructor with index has correct elements"
           <| fun _ ->
                 let a0 = [| 2 :> obj; 3; 4 |]
                 let s0 = ArraySeq.create(a0, 1)
                 verifyISeqContents s0 (a0 |> Array.toList |> List.tail)
 
-          ftestCase "ArraySeq conses"
+          testCase "ArraySeq conses"
           <| fun _ ->
                 let a0 = [| 2 :> obj; 3; 4 |]
                 let s0 = ArraySeq.create(a0)
                 verifyISeqCons s0  12 (a0 |> Array.toList)
 
-          ftestCase "ArraySeq with with index conses"
+          testCase "ArraySeq with with index conses"
           <| fun _ ->
                 let a0 = [| 2 :> obj; 3; 4 |]
                 let s0 = ArraySeq.create(a0, 1)
@@ -150,7 +150,7 @@ let arraySeqMetaTests =
     testList
         "ArraySeq IObj/IMeta tests"
         [
-            ftestCase "IObj/IMeta work"
+            testCase "IObj/IMeta work"
             <| fun _ ->
                 let a = [| 2 :> obj; 3; 4 |]
                 let s1 = ArraySeq.create(a)

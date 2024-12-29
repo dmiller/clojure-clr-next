@@ -24,13 +24,13 @@ open System.Collections
 [<AbstractClass; Sealed>]
 type Murmur3 =
 
-    static member private Seed = 0u
-    static member private C1 = 0xcc9e2d51u
-    static member private C2 = 0x1b873593u
-    static member private R1 = 15
-    static member private R2 = 13
-    static member private M = 5
-    static member private N = 0xe6546b64u
+    static member val private Seed = 0u
+    static member val private C1 = 0xcc9e2d51u
+    static member val private C2 = 0x1b873593u
+    static member val private R1 = 15
+    static member val private R2 = 13
+    static member val private M = 5
+    static member val private N = 0xe6546b64u
 
     // hashing and combining functions
 

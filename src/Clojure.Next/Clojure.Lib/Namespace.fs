@@ -82,7 +82,7 @@ type Namespace(name : Symbol) =
     //
     ///////////////////////////////////////////
 
-    static member All = namespaces.Values.ToList |> RT0.seq
+    static member All = namespaces.Values |> RTSeq.seq
 
     // Find or create a namespace named by the symbol.
     static member findOrCreate(name : Symbol) =  namespaces.GetOrAdd(name, fun _ -> new Namespace(name))
@@ -358,7 +358,7 @@ and [<AllowNullLiteral>] private Frame(bindings: Associative, prev: Frame) =
     interface ICloneable with
         member this.Clone() = Frame(bindings, null)
 
-    static member Top : Frame = Frame(PersistentHashMap.Empty, null)
+    static member val Top : Frame = Frame(PersistentHashMap.Empty, null)
 
 
 and [<Sealed;AllowNullLiteral>] TBox(thread: Thread, v: obj) =
@@ -432,21 +432,21 @@ and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) =
     //
     ////////////////////////////////
 
-    static member private privateKey = Keyword.intern(null,"private")
-    static member private privateMeta = PersistentArrayMap([|Var.privateKey, true|])
-    static member private macroKey = Keyword.intern(null,"macro")
-    static member private nameKey = Keyword.intern(null,"name")
-    static member private nsKey = Keyword.intern(null,"ns")
-    static member private tagKey = Keyword.intern(null,"tag")
+    static member val private privateKey = Keyword.intern(null,"private")
+    static member val private privateMeta = PersistentArrayMap([|Var.privateKey, true|])
+    static member val private macroKey = Keyword.intern(null,"macro")
+    static member val private nameKey = Keyword.intern(null,"name")
+    static member val private nsKey = Keyword.intern(null,"ns")
+    static member val private tagKey = Keyword.intern(null,"tag")
 
-    static member private dissocFn = 
+    static member val private dissocFn = 
         { new AFn() with
             member _.ToString (): string = "Var.dissocFn"
           interface IFn with
             member _.invoke(m,k) = RTSeq.dissoc(m,k)
         }
 
-    static member private assocFn = 
+    static member val private assocFn = 
         { new AFn() with
             member _.ToString (): string = "Var.dissocFn"
           interface IFn with
@@ -819,28 +819,30 @@ and [<Sealed>] private Unbound(v: Var) =
 
 and [<Sealed;AbstractClass>] RTVar() = 
 
-    static member ClojureNamespace = Namespace.findOrCreate(Symbol.intern "clojure.core")
+    static member val ClojureNamespace = Namespace.findOrCreate(Symbol.intern "clojure.core")
 
     // Pre-defined Vars (namespace-related)
 
-    static member CurrentNSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), RTVar.ClojureNamespace).setDynamic()
-    static member InNSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("in-ns"), false)
-    static member NSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), false)
-
+    static member val CurrentNSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), RTVar.ClojureNamespace).setDynamic()
+    static member val InNSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("in-ns"), false)
+    static member val NsVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), false)
 
     // Pre-defined Vars (I/O-related)
 
-    static member ErrVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*err*"), new StreamWriter(Console.OpenStandardError())).setDynamic()
-    static member OutVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*out*"), new StreamWriter(Console.OpenStandardOutput())).setDynamic()
-    static member InVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*in*"), new StreamReader(Console.OpenStandardInput())).setDynamic()
+    static member val ErrVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*err*"), new StreamWriter(Console.OpenStandardError())).setDynamic()
+    static member val OutVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*out*"), new StreamWriter(Console.OpenStandardOutput())).setDynamic()
+    static member val InVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*in*"), new StreamReader(Console.OpenStandardInput())).setDynamic()
 
-    static member PrintReadablyVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-readably*"), true).setDynamic()
-    static member PrintMetaVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-meta*"), false).setDynamic()
-    static member PrintDupVar =     Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-dup*"), false).setDynamic()
-    static member FlushOnNewlineVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*flush-on-newline*"), true).setDynamic()
-    static member PrintInitializedVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-initialized*"), false).setDynamic()
-    static member PrOnVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("pr-on"))
-    static member AllowSymbolEscapeVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*allow-symbol-escape*"), true).setDynamic()
+    // Pre-defined Vars (printing-related)
+
+    static member val PrintReadablyVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-readably*"), true).setDynamic()
+    static member val PrintMetaVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-meta*"), false).setDynamic()
+    static member val PrintDupVar =     Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-dup*"), false).setDynamic()
+    static member val FlushOnNewlineVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*flush-on-newline*"), true).setDynamic()
+    static member val PrintInitializedVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*print-initialized*"), false).setDynamic()
+    static member val PrOnVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("pr-on"))
+    static member val AllowSymbolEscapeVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*allow-symbol-escape*"), true).setDynamic()
+
 
     // Pre-defined Vars (miscellaneous)
 
