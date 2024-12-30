@@ -84,6 +84,7 @@ type IPersistentMap =
     abstract cons: o: obj -> IPersistentMap
     abstract count: unit -> int 
 
+[<AllowNullLiteral>]
 type IPersistentSet =
     inherit IPersistentCollection
     inherit Counted

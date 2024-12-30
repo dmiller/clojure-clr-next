@@ -400,7 +400,7 @@ type PersistentArrayMap private (meta: IPersistentMap, arr: obj array) =
     new(arr) = PersistentArrayMap(null, arr)
     new() = PersistentArrayMap(null, Array.zeroCreate 0)
 
-    static member val internal hashtableThreshold: int = 16
+    static member val hashtableThreshold: int = 16
 
     static member val public Empty = PersistentArrayMap()
 

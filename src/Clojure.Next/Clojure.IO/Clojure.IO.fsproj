@@ -8,6 +8,12 @@
   <ItemGroup>
     <Compile Include="PushbackTextReader.fs" />
     <Compile Include="LineNumberingTextReader.fs" />
+    <Compile Include="LispReader.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+    <ProjectReference Include="..\Clojure.Lib\Clojure.Lib.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -486,6 +486,7 @@ and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) =
 
     // Create an uninterned Var.
     static member create() = Var.createInternal(null, null);
+    static member create(root:obj) = Var.createInternal(null, null, root)
 
     ////////////////////////////////
     //
@@ -843,8 +844,25 @@ and [<Sealed;AbstractClass>] RTVar() =
     static member val PrOnVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("pr-on"))
     static member val AllowSymbolEscapeVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*allow-symbol-escape*"), true).setDynamic()
 
-
     // Pre-defined Vars (miscellaneous)
+
+    static member val ReaderResolverVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*reader-resolver*"), null).setDynamic()
+    static member val ReadEvalVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*read-eval*"), RTVar._readEval).setDynamic()
+
+    static member readTrueFalseUnknown(s: string) : obj  = 
+        match s with
+        | "true" -> true
+        | "false" -> false
+        | _ -> Keyword.intern(null, "unknown")
+
+    static member val _readEval =
+        let mutable v = Environment.GetEnvironmentVariable("CLOJURE_READ_EVAL")
+        if isNull v then
+            v <- Environment.GetEnvironmentVariable("clojure.read.eval")
+        if isNull v then
+            v <- "true"
+        RTVar.readTrueFalseUnknown(v)
+
 
 
     // original comment: duck typing stderr plays nice with e.g. swank 
