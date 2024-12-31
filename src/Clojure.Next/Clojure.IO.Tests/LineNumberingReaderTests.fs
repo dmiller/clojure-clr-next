@@ -21,7 +21,7 @@ let BasicLineNumberingTextReaderTests =
         "Basic LineNumberingTextReader Tests"
         [ 
         
-          ftestCase "LNTR initializes properly"
+          testCase "LNTR initializes properly"
           <| fun _ ->
                 let rdr = new LineNumberingTextReader(new StringReader(sampleString))
 
@@ -32,7 +32,7 @@ let BasicLineNumberingTextReaderTests =
                 Expect.equal (rdr.Peek()) (int sampleString[0]) "Should be peeking at first character"
 
 
-          ftestCase "LNTR reads characters one at a time"
+          testCase "LNTR reads characters one at a time"
            <| fun _ -> 
                 let chars = sampleString.ReplaceLineEndings("\n").ToCharArray() |> Array.map int
 
@@ -81,7 +81,7 @@ let BasicLineNumberingTextReaderTests =
                     i <- i + 1
                     ch <- rdr.Read()
 
-          ftestCase "LNTR reads lines one at a time"
+          testCase "LNTR reads lines one at a time"
            <| fun _ -> 
                 let lines = sampleString.ReplaceLineEndings("\n").Split("\n")
 
@@ -110,7 +110,7 @@ let BasicLineNumberingTextReaderTests =
                     i <- i + 1
                     line <- rdr.ReadLine()
 
-          ftestCase "LNTR reads into buffer"
+          testCase "LNTR reads into buffer"
            <| fun _ -> 
                 let buffers = sampleString.ReplaceLineEndings("\n").ToCharArray() |> Array.chunkBySize 5
 
@@ -144,5 +144,5 @@ let BasicLineNumberingTextReaderTests =
               ]
 
 
-
+              //TODO: Test Unread
             

@@ -36,11 +36,9 @@ type ReaderFunction = PushbackTextReader * char * obj * obj -> obj
 type ReaderException(msg: string, line: int, column: int, inner: exn) =
     inherit Exception(msg, inner)
 
-    [<Literal>]
-    let ErrNS = "clojure.error"
-
+    static member val ErrNS = "clojure.error"
     static member val ErrLine = Keyword.intern(ReaderException.ErrNS, "line")
-    static member val ErrColumn = Keyword.intern(ErrNS, "column")
+    static member val ErrColumn = Keyword.intern(ReaderException.ErrNS, "column")
 
     member val data : IPersistentMap = if line > 0 then RTReader.map(ReaderException.ErrLine, line, ReaderException.ErrColumn, column) else null
 
@@ -158,7 +156,7 @@ type LispReader() =
         isRecursive: bool,
         opts: obj,
         pendingForms: obj) = 
-        LispReader.read(r, eofIsError, eofValue, None, null, isRecursive, opts, EnsurePending(pendingForms), (RTVar.ReaderResolverVar:>IDeref).deref() :?> ReaderResolver)
+        LispReader.read(r, eofIsError, eofValue, None, null, isRecursive, opts, LispReader.EnsurePending(pendingForms), (RTVar.ReaderResolverVar:>IDeref).deref() :?> ReaderResolver)
         
     // They all end up here
     static member private read(
@@ -184,4 +182,7 @@ type LispReader() =
             if isRecursive then
                 reraise()
             else
-                raise <| new ReaderException(r.LineNumber, r.ColumnNumber, ex)
+                match r with
+                | :? LineNumberingTextReader as lnr ->
+                    raise <| new ReaderException(ex.Message, lnr.LineNumber, lnr.ColumnNumber, ex)
+                | _ -> reraise()

@@ -19,6 +19,7 @@
     <Compile Include="PersistentVectorTests.fs" />
     <Compile Include="PersistentArrayMapTests.fs" />
     <Compile Include="PersistentHashMapTests.fs" />
+    <Compile Include="PersistentHashSetTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

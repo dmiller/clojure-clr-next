@@ -29,6 +29,7 @@
     <Compile Include="MapHelpers.fs" />
     <Compile Include="PersistentMaps.fs" />
     <Compile Include="PersistentQueue.fs" />
+    <Compile Include="PersistentSets.fs" />
   </ItemGroup>
 
   <ItemGroup>

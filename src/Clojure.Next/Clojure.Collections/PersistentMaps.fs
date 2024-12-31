@@ -214,7 +214,7 @@ type APersistentMap() =
         member this.CopyTo(arr, idx) =
             let s = (this :> Seqable).seq ()
 
-            if not <| isNull s then
+            if not <| isNull s then   // TODO -- this won't work -- check out APersistentSet for a replacement -- the C# code is worng.
                 (s :?> ICollection).CopyTo(arr, idx)
 
 
