@@ -7,6 +7,9 @@ open System
 open System.IO
 open System.Text
 open System.Text.RegularExpressions
+open Clojure.Numerics
+open System.Numerics
+open Clojure.BigArith
 
 type ReaderResolver =
     abstract currentNS : unit -> Symbol
@@ -494,10 +497,10 @@ type LispReader() =
         //static Regex symbolPat = new Regex("[:]?([\\D&&[^/]].*/)?(/|[\\D&&[^/]][^/]*)");
         //static readonly Regex arraySymbolPat = new Regex("([\\D&&[^/:]].*)/([1-9])");
 
-        static member val symbolPat = Regex("^[:]?([^\\p{Nd}/].*/)?(/|[^\\p{Nd}/][^/]*)$");
-        static member val arraySymbolPat = Regex("^([^\\p{Nd}/].*/)([1-9])$");
-        static member val keywordPat = Regex("^[:]?([^/].*/)?(/|[^/][^/]*)$");
-        static member val argPat = Regex("^%(?:(&)|([1-9][0-9]*))?$");
+        static member val symbolPat = Regex("^[:]?([^\\p{Nd}/].*/)?(/|[^\\p{Nd}/][^/]*)$")
+        static member val arraySymbolPat = Regex("^([^\\p{Nd}/].*/)([1-9])$")
+        static member val keywordPat = Regex("^[:]?([^/].*/)?(/|[^/][^/]*)$")
+        static member val argPat = Regex("^%(?:(&)|([1-9][0-9]*))?$")
 
         static member private extractNamesUsingMask(token: string, maskNS: string, maskName: string) : (string * string) =
             if String.IsNullOrEmpty(maskNS) then
@@ -566,7 +569,135 @@ type LispReader() =
                 else
                     null
 
+
+    // Symbol printing helpers
+
+    static member nameRequiresEscaping(s: string) = 
+        let isBadChar(c) = c = '|' || c = '/' || LispReader.isWhitespace(int c) || LispReader.isTerminatingMacro(int c)
+        let isBadFirstChar(c) = c = ':' || LispReader.isMacro(int c) || Char.IsDigit(c)
+   
+        if String.IsNullOrEmpty(s) then
+            true
+        else
+            let firstChar = s[0]
+
+            s.ToCharArray() |> Array.exists isBadChar ||
+            isBadChar(firstChar) || 
+            s.Contains("::") ||
+            ((firstChar = '+' || firstChar = '-') && s.Length >=2 && Char.IsDigit(s[1]))
+
+    static member vbarEscape(s:string) =
+        let sb = StringBuilder()
+        sb.Append('|') |> ignore
+        s.ToCharArray() 
+        |> Array.iter (fun c -> 
+                sb.Append(c) |> ignore
+                if c = '|' then sb.Append('|') |> ignore   )
+        sb.Append('|') |> ignore
+        sb.ToString()
+
+
+    // Reading numbers
+
+    static member val intRE = Regex("^([-+]?)(?:(0)|([1-9][0-9]*)|0[xX]([0-9A-Fa-f]+)|0([0-7]+)|([1-9][0-9]?)[rR]([0-9A-Za-z]+)|0[0-9]+)(N)?$")
+    static member val ratioRE = Regex("^([-+]?[0-9]+)/([0-9]+)$")
+    static member val floatRE = Regex("^([-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?)(M)?$")
+
+    static member readNumber(r: PushbackTextReader, initch: char) : obj =
+        let sb = StringBuilder()
+        sb.Append(initch) |> ignore
+        let rec loop() =
+            let ch = r.Read()
+            if ch = -1 || LispReader.isWhitespace(ch) || LispReader.isMacro(ch) then
+                LispReader.unread(r, ch)
+                sb.ToString()
+            else
+                sb.Append(char ch) |> ignore
+                loop()
+        let s = loop()
+        match LispReader.matchNumber(s) with
+        | None -> raise <| new FormatException($"Invalid number: {s}")
+        | Some  n -> n
+
+    // In our old clojure.lang.BigNumber, we had an 
+    static member parseBigIntegerInRadix(s: string, radix: int) =
+        // TODO:  Need to enable other radixes
+        BigInteger.Parse(s)
+
+    static member bigIntegerAsInt64(bi: BigInteger) =
+        if bi < Int64.MinValue || bi > Int64.MaxValue then
+            None
+        else
+            Some (int64 bi)
+
+
+    static member matchInteger(m: Match) : obj option =
+        if m.Groups.[2].Success then
+            if m.Groups.[8].Success then
+                Some BigInt.ZERO
+            else
+                Some 0L
+        else
+            let isNeg = m.Groups.[1].Value = "-"
+            let n = 
+                if m.Groups.[3].Success then
+                    m.Groups.[3].Value, 10
+                elif m.Groups.[4].Success then
+                    m.Groups.[4].Value, 16
+                elif m.Groups.[5].Success then
+                    m.Groups.[5].Value, 8
+                elif m.Groups.[7].Success then
+                    m.Groups.[7].Value, Int32.Parse(m.Groups.[6].Value, System.Globalization.CultureInfo.InvariantCulture)
+                else
+                    null, -1
+            match n with
+            | null, _ -> None
+            | n, radix ->
+                let bn = LispReader.parseBigIntegerInRadix(n, radix)
+                let bn = if isNeg then -bn else bn
+                Some <| 
+                if m.Groups.[8].Success then
+                    BigInt.fromBigInteger(bn)
+                else
+                    match LispReader.bigIntegerAsInt64(bn) with
+                    | Some ln -> ln :> obj
+                    | None -> BigInt.fromBigInteger(bn)
+
+    static member matchFloat(m: Match, s: string) : obj option =
+        Some <|
+                if m.Groups.[4].Success then
+                    BigDecimal.Parse(m.Groups.[1].Value)
+                else
+                    Double.Parse(s, System.Globalization.CultureInfo.InvariantCulture)
+
+    static member matchRatio(m: Match) : obj option =
+        if m.Success then
+            let numerString = m.Groups.[1].Value
+            let denomString = m.Groups.[2].Value
+            let numerString  = if numerString.[0] = '+' then numerString.Substring(1) else numerString
+            Some <|Numbers.divide(
+                Numbers.ReduceBigInt(BigInt.fromBigInteger(BigInteger.Parse(numerString))),
+                Numbers.ReduceBigInt(BigInt.fromBigInteger(BigInteger.Parse(denomString))))
+        else
+            None
+
+    // An obvious candidate for railway style
+    static member matchNumber(s: string) : obj option =
+        let m = LispReader.intRE.Match(s)
+        if m.Success then
+            LispReader.matchInteger(m)
+        else
+            let m2 = LispReader.floatRE.Match(s)
+            if m2.Success then
+                LispReader.matchFloat(m2, s)
+            else
+                let m3 = LispReader.ratioRE.Match(s)
+                LispReader.matchRatio(m3)
+
+
+
+
     (*
 
-  
+
     *)
