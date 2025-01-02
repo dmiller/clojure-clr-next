@@ -5,9 +5,13 @@ open System.Collections
 open Clojure.Numerics
 open System.Text.RegularExpressions
 open System.Reflection
+open System.Threading
 
 [<AbstractClass;Sealed>]
 type RT0() =
+
+    // Used for id generation
+    static let mutable _id = 0;
 
     // This definition will serve for RT0.seq for the time being.
     // In RTSeq, we will install a new version
@@ -195,3 +199,8 @@ type RT0() =
         match x with
         | :? bool as b -> b
         | _ -> not (isNull x)
+
+
+    // Id generation
+
+    static member nextID() = Interlocked.Increment(&_id)
