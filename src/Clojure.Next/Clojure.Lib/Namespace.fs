@@ -443,14 +443,14 @@ and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) =
         { new AFn() with
             member _.ToString (): string = "Var.dissocFn"
           interface IFn with
-            member _.invoke(m,k) = RTSeq.dissoc(m,k)
+            member _.invoke(m,k) = RTMap.dissoc(m,k)
         }
 
     static member val private assocFn = 
         { new AFn() with
             member _.ToString (): string = "Var.dissocFn"
           interface IFn with
-            member _.invoke(m,k, v) = RTSeq.assoc(m, k, v)
+            member _.invoke(m,k, v) = RTMap.assoc(m, k, v)
         }
 
     ////////////////////////////////

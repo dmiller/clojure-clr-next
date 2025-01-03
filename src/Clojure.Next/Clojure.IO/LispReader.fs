@@ -76,7 +76,18 @@ type LispReader() =
     // Keyword definitions
 
     static let UnknownKeyword = Keyword.intern(null, "unknown")
-    
+
+    static let LineKeyword = Keyword.intern(null, "line")
+    static let ColumnKeyword = Keyword.intern(null, "column")
+    static let FileKeyword = Keyword.intern(null, "file")
+    static let SourceSpanKeyword = Keyword.intern(null, "source-span")
+    static let StartLineKeyword = Keyword.intern(null, "start-line")
+    static let StartColumnKeyword = Keyword.intern(null, "start-column")
+    static let EndLineKeyword = Keyword.intern(null, "end-line")
+    static let EndColumnKeyword = Keyword.intern(null, "end-column")
+ 
+
+
     // Parser options
 
     static let OptEofKeword = Keyword.intern(null, "eof")
@@ -114,9 +125,38 @@ type LispReader() =
     static let macros = Array.zeroCreate<ReaderFunction option>(256)
     static let dispatchMacros = Array.zeroCreate<ReaderFunction option>(256)
 
+
     static do 
-        macros[0] <- None
-        // TODO: Lots of initialization here
+        macros[int '"'] <- Some LispReader.stringReader
+        macros[int ';'] <- Some LispReader.commentReader
+        //macros[int '\''] <- Some LispReader.WrappingReader(QUOTE)    // TODO: Figure out how 
+        //macros[int '@'] <- Some LispReader.WrappingReader(DEREF)
+        macros[int '^'] <- Some LispReader.metaReader
+        macros[int '`'] <- Some LispReader.syntaxQuoteReader
+        macros[int '~'] <- Some LispReader.unquoteReader
+        macros[int '('] <- Some LispReader.listReader
+        macros[int ')'] <- Some LispReader.unmatchedDelimiterReader
+        macros[int '['] <- Some LispReader.vectorReader
+        macros[int ']'] <- Some LispReader.unmatchedDelimiterReader
+        macros[int '{'] <- Some LispReader.mapReader
+        macros[int '}'] <- Some LispReader.unmatchedDelimiterReader          
+        macros[int '\\'] <- Some LispReader.characterReader
+        macros[int '%'] <- Some LispReader.argReader
+        macros[int '#'] <- Some LispReader.dispatchReader
+
+        dispatchMacros[int '^'] <- Some LispReader.metaReader
+        dispatchMacros[int '#'] <- Some LispReader.symbolicValueReader
+        dispatchMacros[int '\''] <- Some LispReader.varReader
+        dispatchMacros[int '"'] <- Some LispReader.regexReader
+        dispatchMacros[int '('] <- Some LispReader.fnReader
+        dispatchMacros[int '{'] <- Some LispReader.setReader
+        dispatchMacros[int '='] <- Some LispReader.evalReader
+        dispatchMacros[int '!'] <- Some LispReader.commentReader
+        dispatchMacros[int '<'] <- Some LispReader.unreadableReader
+        dispatchMacros[int '_'] <- Some LispReader.discardReader
+        dispatchMacros[int '?'] <- Some LispReader.conditionalReader
+        dispatchMacros[int ':'] <- Some LispReader.namespaceMapReader
+        
 
     static member isMacro(ch: int) = ch < macros.Length && macros[ch].IsSome
     static member getMacro(ch: int) = if ch < macros.Length then macros.[ch] else None
@@ -132,12 +172,12 @@ type LispReader() =
                     (false, eofValue)
         | _ -> EofOptionsDefault
 
-    static member EnsurePending(pendingForms: obj) : obj =
+    static member ensurePending(pendingForms: obj) : obj =
         match pendingForms with
         | null -> LinkedList<obj>()
         | _ -> pendingForms
 
-    static member InstallPlatformFeature(opts: obj) : obj =
+    static member installPlatformFeature(opts: obj) : obj =
         match opts with
         | null -> RTReader.mapUniqueKeys(OptFeaturesKeyword, PlatformFeatureSet)
         | :? IPersistentMap as mopts ->
@@ -174,7 +214,7 @@ type LispReader() =
         isRecursive: bool,
         opts: obj,
         pendingForms: obj) = 
-        LispReader.read(r, eofIsError, eofValue, None, null, isRecursive, opts, LispReader.EnsurePending(pendingForms), LispReader.getReaderResolver())
+        LispReader.read(r, eofIsError, eofValue, None, null, isRecursive, opts, LispReader.ensurePending(pendingForms), LispReader.getReaderResolver())
         
     // They all end up here
     // This is the main read function
@@ -207,7 +247,7 @@ type LispReader() =
         if UnknownKeyword.Equals((RTVar.ReadEvalVar :> IDeref).deref()) then
             raise <| invalidOp "Reading disallowed - *read-eval* bound to :unknown"
 
-        let fullOpts = LispReader.InstallPlatformFeature(opts)
+        let fullOpts = LispReader.installPlatformFeature(opts)
 
         let processPendingForm() : obj option =
             match pendingForms with
@@ -695,9 +735,119 @@ type LispReader() =
                 LispReader.matchRatio(m3)
 
 
+    // Readers
+
+    static member private characterReader(r: PushbackTextReader, backslash: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
 
 
-    (*
+    static member private stringReader(r: PushbackTextReader, doublequote: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private commentReader(r: PushbackTextReader, semicolon: char, opts: obj, pendingForms: obj) : obj =
+        let rec loop() =
+            let ch = r.Read()
+            if ch <> -1 && ch <> (int '\n') && ch <> (int '\r') 
+                then loop()
+        loop()
+        r   // no-op macro -- consumes characters but doesn't read anything
+
+    static member private discardReader(r: PushbackTextReader, caret: char, opts: obj, pendingForms: obj) : obj =
+        LispReader.readAux(r, opts, LispReader.ensurePending(pendingForms)) |> ignore
+        r   // no-op macro -- consumes characters but doesn't read anything
+
+    static member private listReader(r: PushbackTextReader, leftparen: char, opts: obj, pendingForms: obj) : obj =
+        let mutable startLine = -1
+        let mutable startCol = -1
+        let lntr = 
+            match r with
+            | :? LineNumberingTextReader as l -> l
+            | _ -> null
+        if not <| isNull lntr then
+            startLine <- lntr.LineNumber
+            startCol <- lntr.ColumnNumber
+
+        let list = LispReader.readDelimitedList(')', r, true, opts, LispReader.ensurePending(pendingForms)) |> Seq.toList
+        if list.Length = 0 then
+            PersistentList.Empty
+        else
+            let s = PersistentList.create(list) :?> IObj
+            if startLine <> -1 then
+                let mutable meta = RT0.meta(s) :> Associative
+                meta <- RTMap.assoc(meta, LineKeyword, RT0.getWithDefault(meta, LineKeyword, startLine))
+                meta <- RTMap.assoc(meta, ColumnKeyword, RT0.getWithDefault(meta, ColumnKeyword, startCol))
+                meta <- RTMap.assoc(meta, SourceSpanKeyword, RT0.getWithDefault(meta, SourceSpanKeyword, 
+                                            RTMap.map(StartLineKeyword, startLine,
+                                                   StartColumnKeyword, startCol,
+                                                   EndLineKeyword, lntr.LineNumber,
+                                                   EndColumnKeyword, lntr.ColumnNumber)))
+                s.withMeta(meta :?> IPersistentMap)
+            else
+                s
 
 
-    *)
+    static member private vectorReader(r: PushbackTextReader, leftbracket: char, opts: obj, pendingForms: obj) : obj =
+        LazilyPersistentVector.create(LispReader.readDelimitedList(']',r, true, opts, LispReader.ensurePending(pendingForms)))
+
+    static member private mapReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
+        let a = LispReader.readDelimitedList('}',r, true, opts, LispReader.ensurePending(pendingForms)) |> Seq.toArray
+        if (a.Length &&& 1) = 1 then
+            raise <| new ArgumentException("Map literal must contain an even number of forms")
+        RTMap.map(a)
+
+    static member private setReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private unmatchedDelimiterReader(r: PushbackTextReader, ch: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private namespaceMapReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private symbolicValueReader(r: PushbackTextReader, percent: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    //static member private wrappingReader sym:Symbol ( r: PushbackTextReader, leftparen: char, opts: obj, pendingForms: obj) : obj =
+    //    raise <| new NotImplementedException()
+
+    static member private syntaxQuoteReader(r: PushbackTextReader, backquote: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private unquoteReader(r: PushbackTextReader, comma: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private dispatchReader(r: PushbackTextReader, hash: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member metaReader(r: PushbackTextReader, caret: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member varReader(r: PushbackTextReader, quote: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private regexReader(r: PushbackTextReader, slash: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private fnReader(r: PushbackTextReader, fn: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private argReader(r: PushbackTextReader, percent: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private evalReader(r: PushbackTextReader, at: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private CtorReader(r: PushbackTextReader, tilde: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private unreadableReader(r: PushbackTextReader, tilde: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+    static member private conditionalReader(r: PushbackTextReader, hash: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new NotImplementedException()
+
+
+
+    
+
+

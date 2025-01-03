@@ -356,6 +356,15 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
 
         r
 
+
+    static member create(init: obj list) =
+        let mutable r = EmptyList.Empty :> IPersistentList
+
+        for i = init.Length - 1 downto 0 do
+            r <- downcast r.cons (init.[i])
+
+        r
+
     interface IObj with
         override this.withMeta(m) =
             if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then

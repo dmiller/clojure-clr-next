@@ -745,7 +745,7 @@ and [<Sealed>] AgentAction(agent: Agent, fn: IFn, args: ISeq, solo: bool) =
     // Worker method to execute the action on a thread.
     member _.executeAction(state: obj) : unit =
         try
-            Agent.Nested <- PersistentVector.EMPTY :> IPersistentVector
+            Agent.Nested <- PersistentVector.Empty :> IPersistentVector
 
             let mutable error : Exception = null
 
@@ -933,5 +933,5 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) as this =
             for i in 0 .. sends.count() - 1 do
                 let a = sends.nth(i)  :?> AgentAction
                 a.Agent.enqueue(a)
-            Agent.nested <- PersistentVector.EMPTY
+            Agent.nested <- PersistentVector.Empty
             sends.count()

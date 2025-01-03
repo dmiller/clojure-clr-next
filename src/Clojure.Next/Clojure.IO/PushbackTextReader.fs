@@ -4,6 +4,7 @@ open System.IO
 open System.Collections.Generic
 open System
 
+[<AllowNullLiteral>]
 type PushbackTextReader(baseReader : TextReader, capacity: int) =
     inherit TextReader()
 

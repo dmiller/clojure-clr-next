@@ -131,15 +131,28 @@ and [<AbstractClass;Sealed>]  RTSeq() =
     static member list(arg1, arg2, arg3, arg4) = RTSeq.listStar(arg1,arg2,arg3,arg4,null)
     static member list(arg1, arg2, arg3, arg4, arg5) = RTSeq.listStar(arg1,arg2,arg3,arg4,arg5,null)
 
-    static member assoc(coll:obj, key:obj, value: obj) =
-        match coll with
-        | null -> coll
-        | _ -> (coll :?> IPersistentMap).assoc(key,value)
+    static member private IEnumToArray(ie: IEnumerable) =
+        let a = ResizeArray()
+        for x in ie do
+            a.Add(x)
+        a.ToArray()
 
-    static member dissoc(coll:obj, key:obj) =
+    static member toArray(coll: obj) = 
         match coll with
-        | null -> coll
-        | _ -> (coll :?> IPersistentMap).without(key)
+        | null -> Array.Empty<Object>()
+        | :? (obj array) as oa -> oa
+        | :? string as s -> Array.ConvertAll(s.ToCharArray(), fun c -> box c)
+        | :? IEnumerable as ie -> RTSeq.IEnumToArray(ie)
+        | _ when coll.GetType().IsArray -> 
+            let s = RTSeq.seq(coll)
+            let a = Array.zeroCreate<Object>(RT0.count s)
+            let rec loop (i: int) (s: ISeq) =
+                match s with
+                | null -> a
+                | _ -> a[i] <- s.first(); loop (i + 1) (s.next())
+            loop 0 s
+            
+        | _ -> raise <| ArgumentException($"Unable to convert: {coll.GetType().FullName} to Object[]")
 
         
 
@@ -328,4 +341,5 @@ and [<Sealed; AllowNullLiteral>] LazySeq private (m1, fn1, s1) =
                     loop (i + 1) (s.next ())
 
             loop idx (this :> ISeq)
+
 

@@ -23,7 +23,7 @@ type PVCons() =
     [<Benchmark>]
     member this.NextCons() =
         let mutable pv =
-            Clojure.Collections.PersistentVector.EMPTY :> Clojure.Collections.IPersistentVector
+            Clojure.Collections.PersistentVector.Empty :> Clojure.Collections.IPersistentVector
 
         for i in 0 .. this.size do
             pv <- pv.cons (i)
@@ -50,7 +50,7 @@ type PVTransientConj() =
     [<Benchmark>]
     member this.NextTransientConj() =
         let mutable pv =
-            (Clojure.Collections.PersistentVector.EMPTY :> Clojure.Collections.IEditableCollection)
+            (Clojure.Collections.PersistentVector.Empty :> Clojure.Collections.IEditableCollection)
                 .asTransient ()
 
         for i in 0 .. this.size do
@@ -155,7 +155,7 @@ type PersistentVsTransient() =
     [<Benchmark(Baseline=true)>]
     member this.NextTransientConj() =
         let mutable pv =
-            (Clojure.Collections.PersistentVector.EMPTY :> Clojure.Collections.IEditableCollection)
+            (Clojure.Collections.PersistentVector.Empty :> Clojure.Collections.IEditableCollection)
                 .asTransient ()
 
         for i in 0 .. this.size do
@@ -167,7 +167,7 @@ type PersistentVsTransient() =
     [<Benchmark>]
     member this.NextCons() =
         let mutable pv =
-            Clojure.Collections.PersistentVector.EMPTY :> Clojure.Collections.IPersistentVector
+            Clojure.Collections.PersistentVector.Empty :> Clojure.Collections.IPersistentVector
 
         for i in 0 .. this.size do
             pv <- pv.cons (i)

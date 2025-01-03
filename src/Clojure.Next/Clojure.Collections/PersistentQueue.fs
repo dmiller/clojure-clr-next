@@ -102,7 +102,7 @@ type PersistentQueue(meta: IPersistentMap, cnt: int, front: ISeq, rear: IPersist
                 if isNull front then
                     PersistentQueue(meta, cnt + 1, RTSeq.list(o), null)
                 else
-                    PersistentQueue(meta, cnt + 1, front, (if isNull rear then PersistentVector.EMPTY  :> IPersistentVector else rear).cons(o))
+                    PersistentQueue(meta, cnt + 1, front, (if isNull rear then PersistentVector.Empty  :> IPersistentVector else rear).cons(o))
         member this.empty() = (PersistentQueue.Empty :> IObj).withMeta(meta) :?> IPersistentCollection
         member this.equiv(o) =
             match o with

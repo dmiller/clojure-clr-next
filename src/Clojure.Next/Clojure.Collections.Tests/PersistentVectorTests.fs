@@ -247,7 +247,7 @@ let persistentVectorTests =
                 
               let r100 = LongRange.create (100) :?> LongRange
 
-              let mutable mv100 = PersistentVector.EMPTY
+              let mutable mv100 = PersistentVector.Empty
 
               for i in 0 .. 99 do
                   mv100 <- (mv100 :> IPersistentVector).cons(int64(i)) :?> PersistentVector

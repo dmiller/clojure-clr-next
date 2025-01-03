@@ -194,6 +194,11 @@ type RT0() =
         | :? ILookup as look ->   look.valAt(key, notFound)
         | _ -> RT0.getFromWithDefault(coll, key, notFound)
 
+    static member meta (o: obj) : IPersistentMap =
+        match o with
+        | :? IMeta as m -> m.meta()
+        | _ -> null
+
 
     static member  booleanCast(x:obj) : bool =
         match x with
@@ -204,3 +209,7 @@ type RT0() =
     // Id generation
 
     static member nextID() = Interlocked.Increment(&_id)
+
+
+
+

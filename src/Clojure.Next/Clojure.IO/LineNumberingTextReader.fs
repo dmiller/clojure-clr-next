@@ -3,6 +3,7 @@
 open System.IO
 open System.Text
 
+[<AllowNullLiteral>]
 type LineNumberingTextReader(baseReader : TextReader, capacity: int) =
     inherit PushbackTextReader(baseReader, capacity)
 

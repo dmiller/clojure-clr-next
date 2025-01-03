@@ -490,9 +490,22 @@ type [<AllowNullLiteral>] APersistentVector() =
 //
 ////////////////////////////////
 
-
+// A persistent vector based on an array.  Holds a lazily-allocated PersistentVector if operations such as assoc() are called that require a true persistent vector.
 and [<AbstractClass; Sealed>] LazilyPersistentVector() =
-    static member createOwning([<ParamArray>] items: obj array) : IPersistentVector = null
+    static member createOwning([<ParamArray>] items: obj array) : IPersistentVector =
+        if items.Length <= 32 then
+            PersistentVector(items.Length,5,PersistentVector.EmptyNode, items)
+        else
+            PersistentVector.create(items)
+
+    static member create(o: obj) : IPersistentVector = 
+        match o with
+        | :? IReduceInit as ri -> PersistentVector.create(ri)
+        | :? ISeq as s -> PersistentVector.create(RTSeq.seq(s))
+        | :? IEnumerable as e -> PersistentVector.create1(e)
+        | _ -> LazilyPersistentVector.createOwning(RTSeq.toArray(o))
+
+
 
 
 ////////////////////////////////
@@ -613,8 +626,8 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
     new(cnt, shift, root, tail) = PersistentVector(null, cnt, shift, root, tail)
 
     static member val NoEdit = AtomicBoolean(false)
-    static member val private EmptyNode = PVNode(PersistentVector.NoEdit)
-    static member val EMPTY = PersistentVector(0, 5, PersistentVector.EmptyNode, Array.zeroCreate 0)
+    static member val internal EmptyNode = PVNode(PersistentVector.NoEdit)
+    static member val Empty = PersistentVector(0, 5, PersistentVector.EmptyNode, Array.zeroCreate 0)
 
     member internal _.Count = cnt
     member internal _.Shift = shift
@@ -782,14 +795,14 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
 
     interface IPersistentCollection with
         override _.empty() =
-            (PersistentVector.EMPTY :> IObj).withMeta (meta) :?> IPersistentCollection
+            (PersistentVector.Empty :> IObj).withMeta (meta) :?> IPersistentCollection
 
     interface IPersistentStack with
         override this.pop() =
             if cnt = 0 then
                 raise <| InvalidOperationException("Can't pop empty vector")
             elif cnt = 1 then
-                (PersistentVector.EMPTY :> IObj).withMeta (meta) :?> IPersistentStack
+                (PersistentVector.Empty :> IObj).withMeta (meta) :?> IPersistentStack
             elif cnt - this.tailoff () > 1 then
                 let newTail = Array.zeroCreate (tail.Length - 1)
                 Array.Copy(tail, newTail, newTail.Length)
@@ -947,7 +960,7 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
 
 
     static member create([<ParamArray>] items : obj array) =
-        let mutable ret = (PersistentVector.EMPTY : IEditableCollection).asTransient()
+        let mutable ret = (PersistentVector.Empty : IEditableCollection).asTransient()
         for item in items do
             ret <- ret.conj(item)
         ret.persistent() :?> PersistentVector
@@ -961,7 +974,7 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
             ilist.CopyTo(arr,0)
             PersistentVector(size,5,PersistentVector.EmptyNode,arr)
         | _ ->
-            let mutable ret = (PersistentVector.EMPTY : IEditableCollection).asTransient()
+            let mutable ret = (PersistentVector.Empty : IEditableCollection).asTransient()
             for item in items do
                 ret <- ret.conj(item)
             ret.persistent() :?> PersistentVector
@@ -976,7 +989,7 @@ and [<AllowNullLiteral>] PersistentVector(meta: IPersistentMap, cnt: int, shift:
 
 
     static member create(items : IReduceInit) =
-        let ret = (PersistentVector.EMPTY :>IEditableCollection).asTransient() :?> TransientVector
+        let ret = (PersistentVector.Empty :>IEditableCollection).asTransient() :?> TransientVector
         items.reduce(PersistentVector.transientVectorConj, ret) |> ignore
         (ret :> ITransientCollection).persistent() :?> PersistentVector
 
@@ -1404,12 +1417,12 @@ type IPVecSubVector(meta: IPersistentMap, vec:IPersistentVector, start:int, fini
                 IPVecSubVector(newMeta,vec,start,finish)
 
     interface IPersistentCollection with
-        override _.empty() =  (PersistentVector.EMPTY:>IObj).withMeta(meta) :?> IPersistentCollection
+        override _.empty() =  (PersistentVector.Empty:>IObj).withMeta(meta) :?> IPersistentCollection
 
     interface IPersistentStack with
         override _.pop() =
             if finish-1 = start then
-                upcast PersistentVector.EMPTY
+                upcast PersistentVector.Empty
             else
                 IPVecSubVector(meta,vec,start,finish-1)
 
