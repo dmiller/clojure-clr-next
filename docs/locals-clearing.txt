@@ -1,0 +1,69 @@
+
+https://clojurians.slack.com/archives/C06E3HYPR/p1491622219501604
+
+;; will OOM
+
+(defn test [x]
+  (if true
+    (do
+      (try (doseq [_ x] _) (finally))
+      1)
+    0))
+
+(test (take 1000000 (range)))
+
+;; Does not OOM
+
+(defn test [x]
+  (do
+    (try (doseq [_ x] _) (finally))
+    1))
+
+(test (take 1000000 (range)))
+
+;; related to  http://dev.clojure.org/jira/browse/CLJ-2145
+(fn foo [x]
+  (if true
+    (^:once fn* []
+     ;; x is not cleared here
+     x)))
+	 
+;; from CLJ-2145
+(fn foo [x]
+  (if true
+    (^:once fn* []
+     ;; x is not cleared here
+     x)))
+	 
+
+asdfasdfasdf    fasdfasdfasdfasdfasdfasdfasdfasdf
+
+added arg clearing on tail calls	 
+https://github.com/clojure/clojure/commit/2053768cab92920c42406a893601ce7351605795 (2008)
+	 
+added locals clearing on tail calls	 
+https://github.com/clojure/clojure/commit/e9b69139a0b501c802707363275c19686399a428  (2008)
+
+re-enabled clearing locals on tail calls, but track locals used in catch/finally clauses and avoid clearing them
+https://github.com/clojure/clojure/commit/f514ad60efe36befa659f19ea5f3bf17b247aaed
+
+first cut at fine-grained locals clearing - now locals are cleared on last use, not only on tail call args
+https://github.com/clojure/clojure/commit/76c8f45293987b80e3599535dd86482e1180661d (2009)
+
+added some manual locals clearing to AFn and RestFn
+https://github.com/clojure/clojure/commit/4d98e904d2802a6630eeb4d2e5429c7e9c3fd638   (AFn, RestFn, 2009)
+
+add manual locals clearing to Java side of nth and count
+https://github.com/clojure/clojure/commit/4f6fda54954fe7407967d65a5518906453312395  (RT.nth, RT.count, 2010)
+
+Fix to prevent top-level defs from hanging onto the head of an expression that uses a lazy seq Eg, run using java -Xmx4m : (def x (reduce + (range 1e7)))
+https://github.com/clojure/clojure/commit/004e088ab9364c77c91d09788a62365695f843c3 (InvokeExpr.Eval, 2011)
+
+Do not hold onto head when invoking multi-methods
+https://github.com/clojure/clojure/commit/6dec807840a42c948f03670f72eeb5ef90d806ea (MultiFn, 2011)
+
+Var.invoke now calls Util.ret1
+https://github.com/clojure/clojure/commit/574fe819a67d5f5bd83a8f7dde6ffe3b5d7a4ecf    (Var, 2013)	 
+
+CLJ-1793 - Clear 'this' before calls in tail position
+https://github.com/clojure/clojure/commit/72594111ef5390bdb18f239f8cf72a8237fd94e4  (compiler, various, 2017)

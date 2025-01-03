@@ -13,23 +13,23 @@
 ## Atomics
 
 |  3649 | AtomicBoolean.cs            |  X  |
-|  4773 | AtomicInteger.cs            |     |
-|  3938 | AtomicLong.cs               |     |
+|  4773 | AtomicInteger.cs            |  X  |
+|  3938 | AtomicLong.cs               |  X  |
 |  3688 | AtomicReference.cs          |  X  |
 
 
 ## Collections
 
 |  9295 | AMapEntry.cs                  |  X  |
-| 22067 | APersistentMap.cs             |     |
-|  9451 | APersistentSet.cs             |     |
+| 22067 | APersistentMap.cs             |  X  |
+|  9451 | APersistentSet.cs             |  X  |
 | 37529 | APersistentVector.cs          |  X  |
 |  2315 | ArrayChunk.cs                 |  X  |
 | 14679 | ASeq.cs                       |  X  |
 |  2116 | Associative.cs                |  X  |
-|  4848 | ATransientMap.cs              |     |
-|  2182 | ATransientSet.cs              |     |
-|  1354 | Box.cs                        |     |
+|  4848 | ATransientMap.cs              |  X  |
+|  2182 | ATransientSet.cs              |  X  |
+|  1354 | Box.cs                        |  X  |
 |  1616 | ChunkBuffer.cs                |  X  |
 |  2622 | ChunkedCons.cs                |  X  |
 |  3658 | Cons.cs                       |  X  |
@@ -75,12 +75,12 @@
 |  4292 | MapEnumerator.cs              |  X  |
 |   771 | MapEquivalence.cs             |  X  |
 |  2321 | Obj.cs                        |  X  |
-| 30967 | PersistentArrayMap.cs         |     |
-| 68282 | PersistentHashMap.cs          |     |
-|  8848 | PersistentHashSet.cs          |     |
+| 30967 | PersistentArrayMap.cs         |  X  |
+| 68282 | PersistentHashMap.cs          |  X  |
+|  8848 | PersistentHashSet.cs          |  X  |
 | 18834 | PersistentList.cs             |  X  |
-| 14033 | PersistentQueue.cs            |     |
-| 20198 | PersistentStructMap.cs        |     |
+| 14033 | PersistentQueue.cs            |  X  |
+| 20198 | PersistentStructMap.cs        |  X  |
 | 44594 | PersistentTreeMap.cs          |     |
 |  8509 | PersistentTreeSet.cs          |     |
 | 40261 | PersistentVector.cs           |  X  |
@@ -110,32 +110,32 @@
 
 ## Library
 
-| 17630 | Agent.cs                     |     |
-|  5997 | ARef.cs                      |     |
-|  3305 | AReference.cs                |     |
-|  8590 | Atom.cs                      |     |
-|  2525 | CountDownLatch.cs            |     |
+| 17630 | Agent.cs                     |  X  |
+|  5997 | ARef.cs                      |  X  |
+|  3305 | AReference.cs                |  X  |
+|  8590 | Atom.cs                      |  X  |
+|  2525 | CountDownLatch.cs            |  X  |
 |  3283 | Delay.cs                     |     |
 |  7079 | Future.cs                    |     |
-|  1739 | IAtom.cs                     |     |
-|  1672 | IAtom2.cs                    |     |
+|  1739 | IAtom.cs                     |  X  |
+|  1672 | IAtom2.cs                    |  X  |
 |   818 | IBlockingDeref.cs            |     |
 |  1200 | IProxy.cs                    |     |
 |   607 | IRecord.cs                   |     |
 |  3750 | IRef.cs                      |     |
 |  1725 | IReference.cs                |     |
-|  2220 | JavaConcurrentDictionary.cs  | ? |
-| 17573 | Keyword.cs                   |     |
-| 28708 | LockingTransaction.cs        |     |
-|  5278 | MethodImplCache.cs           |     |
+|  2220 | JavaConcurrentDictionary.cs  |  ?  |
+| 17573 | Keyword.cs                   |  X  |
+| 28708 | LockingTransaction.cs        |  X  |
+|  5278 | MethodImplCache.cs           |  X  |
 | 37081 | MultiFn.cs                   |     |
 |  1543 | Named.cs                     |     |
-| 20376 | Namespace.cs                 |     |
-| 25230 | Ref.cs                       |     |
-|  1665 | Settable.cs                  |     |
-| 12143 | Symbol.cs                    |     |
+| 20376 | Namespace.cs                 |  X  |
+| 25230 | Ref.cs                       |  X  |
+|  1665 | Settable.cs                  |  X  |
+| 12143 | Symbol.cs                    |  X  |
 |  1057 | Volatile.cs                  |     |
-| 49305 | Var.cs                       |     |
+| 49305 | Var.cs                       |  X  |
 
 
 ## Readers
@@ -145,15 +145,15 @@
 |  2734 | ReaderConditional.cs         |     |
 |   787 | IExceptionInfo.cs            |     |
 |  2704 | TaggedLiteral.cs             |     |
-|  4186 | LineNumberingTextReader.cs   |     |
+|  4186 | LineNumberingTextReader.cs   |  X  |
 |  4113 | PushbackInputStream.cs       |     |
-|  2425 | PushbackTextReader.cs        |     |
+|  2425 | PushbackTextReader.cs        |  X  |
 
 
 
 ## Compiler or core.clj support
 
-| 18565 | ArraySeq.cs                  |     |
+| 18565 | ArraySeq.cs                  |  X  |
 |  4136 | ArrayHelper.cs               |     |
 |   799 | IKeywordLookup.cs            |     |
 |   751 | ILookupSite.cs               |     |
@@ -163,7 +163,7 @@
 |  9232 | TransformerEnumerator.cs     |     |
 |  2608 | Tuple.cs                     |     |
 |  2195 | TypeNotFoundException.cs     |     |
-|  5272 | JReMatcher.cs                |     |
+|  5272 | JReMatcher.cs                |  X  |
 
 
 ## Runtime
