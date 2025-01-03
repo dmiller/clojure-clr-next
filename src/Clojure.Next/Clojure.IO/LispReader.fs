@@ -129,8 +129,8 @@ type LispReader() =
     static do 
         macros[int '"'] <- Some LispReader.stringReader
         macros[int ';'] <- Some LispReader.commentReader
-        //macros[int '\''] <- Some LispReader.WrappingReader(QUOTE)    // TODO: Figure out how 
-        //macros[int '@'] <- Some LispReader.WrappingReader(DEREF)
+        macros[int '\''] <- Some <| LispReader.wrappingReader(QuoteSym)
+        macros[int '@'] <- Some <| LispReader.wrappingReader(DerefSym)
         macros[int '^'] <- Some LispReader.metaReader
         macros[int '`'] <- Some LispReader.syntaxQuoteReader
         macros[int '~'] <- Some LispReader.unquoteReader
@@ -738,11 +738,82 @@ type LispReader() =
     // Readers
 
     static member private characterReader(r: PushbackTextReader, backslash: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        let ch = r.Read()
+        if ch = -1 then
+            raise <| new EndOfStreamException("EOF while reading character")
+        else
+            let token = LispReader.readSimpleToken(r, char ch)
+            if token.Length = 1 then
+                token[0]
+            else
+                match token with
+                | "newline" -> '\n'
+                | "space" -> ' '
+                | "tab" -> '\t'
+                | "backspace" -> '\b'
+                | "formfeed" -> '\f'
+                | "return" -> '\r'
+                | _ -> 
+                    if token.StartsWith("u") then
+                        let uc = LispReader.readUnicodeChar(token, 1, 4, 16) |> char
+                        if  uc >= '\uD800' && uc <= '\uDFFF' then // surrogate code unit?
+                            raise <| new ArgumentException("Invalid character constant: \\u" + (int uc).ToString("x"))
+                        char uc
+                    elif token.StartsWith("o") then
+                        let len = token.Length - 1
+                        if len > 3 then
+                            raise <| new ArgumentException($"Invalid octal escape sequence length: {len}")
+                        let uc = LispReader.readUnicodeChar(token, 1, len, 8)
+                        if uc > 255 then // = octal 377
+                            raise <| new InvalidOperationException($"Octal escape sequence must be in range [0, 377]: {uc}")
+                        char uc
+                    else 
+                        raise <| new ArgumentException($"Unsupported character: \\{token}")
 
 
     static member private stringReader(r: PushbackTextReader, doublequote: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        let sb = StringBuilder()
+        let rec loop() =
+            let ch = r.Read()
+            if ch = -1 then
+                raise <| new EndOfStreamException("EOF while reading string")
+            elif ch = int '"' then
+                sb.ToString()
+            elif ch = int '\\' then  // escape character
+                let ch2 = r.Read()
+                if ch2 = -1 then
+                    raise <| new EndOfStreamException("EOF while reading string")
+                else
+                    match char ch2 with
+                    | 't' -> sb.Append('\t') |> ignore
+                    | 'r' -> sb.Append('\r') |> ignore
+                    | 'n' -> sb.Append('\n') |> ignore
+                    | 'b' -> sb.Append('\b') |> ignore
+                    | 'f' -> sb.Append('\f') |> ignore
+                    | '\\' -> sb.Append('\\') |> ignore
+                    | '"' -> sb.Append('\"') |> ignore
+                    | 'u' -> 
+                        let ch3 = r.Read()
+                        if LispReader.charValueInRadix(ch3, 16) = -1 then
+                            raise <| new ArgumentException($"Invalid unicode escape sequence: \\u{char ch3}")
+                        let uc = LispReader.readUnicodeChar(r, ch3, 16, 4, true) |> char
+                        sb.Append(uc) |> ignore
+                    | _ -> 
+                        //if CharValueInRadix(ch, 8) <> -1  -- this is correct, but we end up with different error message for 8,9 than JVM, so do the following to match:
+                        if Char.IsDigit(char ch2) then
+                            let uc = LispReader.readUnicodeChar(r, ch2, 8, 3, false)
+                            if uc > 255 then  // octal 377
+                                raise <| new InvalidOperationException("Octal escape sequence must be in range [0, 377]")
+                            sb.Append(char uc) |> ignore
+                        else
+                            raise <| new ArgumentException($"Unsupported escape character: \\{char ch2}")
+
+                    loop()
+
+            else
+                sb.Append(char ch) |> ignore
+                loop()
+        loop()
 
     static member private commentReader(r: PushbackTextReader, semicolon: char, opts: obj, pendingForms: obj) : obj =
         let rec loop() =
@@ -796,19 +867,38 @@ type LispReader() =
         RTMap.map(a)
 
     static member private setReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        PersistentHashSet.createWithCheck(LispReader.readDelimitedList('}',r, true, opts, LispReader.ensurePending(pendingForms)))
 
-    static member private unmatchedDelimiterReader(r: PushbackTextReader, ch: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+    static member private unmatchedDelimiterReader(r: PushbackTextReader, rightDelim: char, opts: obj, pendingForms: obj) : obj =
+        raise <| new ArgumentException($"Unmatched delimiter: {rightDelim}")
 
+    // :a.b{:c 1} => {:a.b/c 1}
+    // ::{:c 1}   => {:a.b/c 1}  (where *ns* = a.b)
+    // ::a{:c 1}  => {:a.b/c 1}  (where a is aliased to a.b)
     static member private namespaceMapReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
         raise <| new NotImplementedException()
 
-    static member private symbolicValueReader(r: PushbackTextReader, percent: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
 
-    //static member private wrappingReader sym:Symbol ( r: PushbackTextReader, leftparen: char, opts: obj, pendingForms: obj) : obj =
-    //    raise <| new NotImplementedException()
+    static member val symbolicValuesMap = Map(
+         [  (Symbol.intern("Inf"), Double.PositiveInfinity); 
+            (Symbol.intern("NaN"), Double.NaN);
+            (Symbol.intern("-Inf"), Double.NegativeInfinity)
+         ])
+
+    static member private symbolicValueReader(r: PushbackTextReader, percent: char, opts: obj, pendingForms: obj) : obj =
+        let o = LispReader.read(r, true, null, true, opts, LispReader.ensurePending(pendingForms))
+        match o with
+        | :? Symbol as s -> 
+            let ok, d =  LispReader.symbolicValuesMap.TryGetValue(s)
+            if ok then d
+            else raise <| new ArgumentException($"Unknown symbolic value: {s}")
+        | _ -> raise <| new ArgumentException($"Invalid tokey: ##{o}")
+
+    static member private wrappingReader (sym: Symbol) : ReaderFunction =
+        fun (r: PushbackTextReader, ch: char, opts: obj, pendingForms: obj) -> 
+            let o = LispReader.readAux(r, opts, LispReader.ensurePending(pendingForms))
+            RTSeq.list(sym, o)
+
 
     static member private syntaxQuoteReader(r: PushbackTextReader, backquote: char, opts: obj, pendingForms: obj) : obj =
         raise <| new NotImplementedException()
@@ -817,7 +907,17 @@ type LispReader() =
         raise <| new NotImplementedException()
 
     static member private dispatchReader(r: PushbackTextReader, hash: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        let ch = r.Read()
+        if ch = -1 then
+            raise <| new EndOfStreamException("EOF while reading dispatch character")
+        else
+            match dispatchMacros[ch] with
+            | Some macrofn -> macrofn(r, (char ch), opts, pendingForms)
+            | None -> 
+                LispReader.unread(r, ch)
+                match LispReader.CtorReader(r, (char ch), opts, LispReader.ensurePending(pendingForms)) with
+                | null -> raise <| invalidOp($"No dispatch macro for: {char ch}")
+                | result -> result
 
     static member metaReader(r: PushbackTextReader, caret: char, opts: obj, pendingForms: obj) : obj =
         raise <| new NotImplementedException()
