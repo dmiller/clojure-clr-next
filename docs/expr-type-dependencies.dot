@@ -9,6 +9,7 @@ rankdir = RL;
 
 	AssignableExpr;
 	MaybePrimitiveExpr;
+	Expr;
 }
 
 /* Here start (mostly) the classes */
@@ -22,14 +23,13 @@ rankdir = RL;
 	CaseExpr                     -> { Expr, MaybePrimitiveExpr };
 	ConstantExpr                 -> { LiteralExpr };
 	DefExpr                      -> { Expr };
-	EmptyExpr                    -> { Expr };
-	Expr                         -> {};
-	FieldOrPropertyExpr          -> { HostExpr };
+	EmptyExpr                    -> { Expr };	
+	FieldOrPropertyExpr          -> { HostExpr, AssignableExpr };
 	FnExpr                       -> { ObjExpr };
 	HostExpr                     -> { Expr, MaybePrimitiveExpr };
 	IfExpr                       -> { Expr, MaybePrimitiveExpr };
 	ImportExpr                   -> { Expr };  
-	InstanceFieldOrPropertyExpr  -> { HostExpr };
+	InstanceFieldOrPropertyExpr  -> { FieldOrPropertyExpr };	
 	InstanceFieldExpr            -> { InstanceFieldOrPropertyExpr };
 	InstancePropertyExpr         -> { InstanceFieldOrPropertyExpr };
 	InstanceMethodExpr           -> { MethodExpr };
@@ -54,6 +54,7 @@ rankdir = RL;
 	NumberExpr                   -> { LiteralExpr };
 	ObjExpr                      -> { Expr };                          
 	RecurExpr                    -> { Expr, MaybePrimitiveExpr };
+	QualifiedMethodExpr          -> { Expr };
 	SetExpr                      -> { Expr };   
 	StaticFieldOrPropertyExpr    -> {FieldOrPropertyExpr };
 	StaticFieldExpr              -> { StaticFieldOrPropertyExpr };
