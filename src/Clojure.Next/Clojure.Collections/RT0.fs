@@ -17,6 +17,8 @@ type RT0() =
     // In RTSeq, we will install a new version
     static let mutable seqHolder : obj -> ISeq = RT0.introSeq
 
+    static member val emptyObjectArray = Array.empty
+
     // This is the default seq function for RT0
     static member private introSeq  (o: obj) : ISeq =
         match o with

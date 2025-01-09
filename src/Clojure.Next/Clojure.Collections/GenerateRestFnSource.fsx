@@ -10,13 +10,12 @@ let filename = ".\\test.out"
 let tw = new StreamWriter(filename)
 
 let writePreamble () =
-    fprintf tw "%s" """namespace Clojure.Fn
+    fprintf tw "%s" """namespace Clojure.Collections
 
 open System
-open Clojure.Collections
 
 [<AbstractClass>]
-type RestFn()
+type RestFn() =
     inherit AFunction()
 
     abstract getRequiredArity() : unit -> int
@@ -24,7 +23,7 @@ type RestFn()
     static member ontoArrayPrepend(arr : obj array, [<ParamArray>] args: obj array) =
         let mutable ret : ISeq = ArraySeq.create(arr)
         for i = args.Length downto 0 do
-            ret <- Helpers.cons(args.[i],ret)
+            ret <- RTSeq.cons(args.[i],ret)
         ret
 
 """
@@ -48,7 +47,7 @@ let writeDoInvokes (max: int) =
         + (if n = 0 then "" else ", ")
         + "args:obj "
     for i = 0 to max do
-        fprintfn tw "    abstract _.doInvoke : %s" (fnType i)
+        fprintfn tw "    abstract doInvoke : %s" (fnType i)
         fprintfn tw "    default _.doInvoke(%s) : obj = null" (argList i)
 
 

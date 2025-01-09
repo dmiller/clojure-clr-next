@@ -13,7 +13,7 @@ open System.Text
 //
 ////////////////////////////////////
 
-[<AbstractClass>]
+[<AbstractClass;AllowNullLiteral>]
 type APersistentMap() =
     inherit AFn()
 
@@ -108,6 +108,9 @@ type APersistentMap() =
 
                     loop ((this :> Seqable).seq ())
             | _ -> false
+
+    member this.doEquiv(o: obj) : bool = (this :> IPersistentCollection).equiv(o)
+
 
     interface IMeta with
         member _.meta() =
@@ -298,7 +301,7 @@ type APersistentMap() =
 //
 ////////////////////////////////////
 
-[<AbstractClass>]
+[<AbstractClass;AllowNullLiteral>]
 type ATransientMap() =
     inherit AFn()
 

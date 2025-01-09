@@ -170,3 +170,16 @@ type BoolBox(init) =
     member _.reset() = value <- false
     member _.isSet = value
     member _.isNotSet = not value
+
+// Of course, then I found that PersistentTreeMap actually used Box to return a value.
+// So here is that version.
+
+type ValueBox<'T when 'T : null >(init) =
+
+    let mutable value: 'T = init
+
+    new() = ValueBox(null)
+
+    member _.Value 
+        with get() = value
+        and set(v) = value <- v

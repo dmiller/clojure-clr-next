@@ -85,8 +85,8 @@ type LispReader() =
     static let StartColumnKeyword = Keyword.intern(null, "start-column")
     static let EndLineKeyword = Keyword.intern(null, "end-line")
     static let EndColumnKeyword = Keyword.intern(null, "end-column")
- 
-
+    static let TagKeyword = Keyword.intern(null, "tag")
+    static let ParamTagsKeyword = Keyword.intern(null, "param-tags")
 
     // Parser options
 
@@ -920,16 +920,86 @@ type LispReader() =
                 | result -> result
 
     static member metaReader(r: PushbackTextReader, caret: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        let mutable startLine = -1
+        let mutable startCol = -1
+        let lntr = 
+            match r with
+            | :? LineNumberingTextReader as l -> l
+            | _ -> null
+        if not <| isNull lntr then
+            startLine <- lntr.LineNumber
+            startCol <- lntr.ColumnNumber
+
+        let pendingForms = LispReader.ensurePending(pendingForms)
+
+        let metaAsMap = 
+            match LispReader.readAux(r, opts, pendingForms) with
+            | :? Symbol as s -> RTMap.map(TagKeyword, s)
+            | :? String as s -> RTMap.map(TagKeyword, s)
+            | :? Keyword as k -> RTMap.map(k, true)
+            | :? IPersistentVector as v -> RTMap.map(ParamTagsKeyword, v)
+            | :? IPersistentMap as m -> m
+            | _ -> raise <| new ArgumentException("Metadata must be Symbol, String, Keyword, Vector or Map")
+
+        let o = LispReader.readAux(r, opts, pendingForms)
+        match o with 
+        | :? IMeta as im ->
+            let metaAsMap = metaAsMap.assoc(LineKeyword, RT0.getWithDefault(metaAsMap, LineKeyword, startLine))
+            let metaAsMap = metaAsMap.assoc(ColumnKeyword, RT0.getWithDefault(metaAsMap, ColumnKeyword, startCol))
+            let metaAsMap = metaAsMap.assoc(SourceSpanKeyword, RT0.getWithDefault(metaAsMap, SourceSpanKeyword, 
+                                        RTMap.map(StartLineKeyword, startLine,
+                                               StartColumnKeyword, startCol,
+                                               EndLineKeyword, lntr.LineNumber,
+                                               EndColumnKeyword, lntr.ColumnNumber)))
+            match o with 
+            | :? IReference as ir -> ir.resetMeta(metaAsMap) |> ignore; o
+            | _ -> 
+                
+                let rec loop (s: ISeq) (ometa: Associative)b= 
+                    match s with
+                    | null -> (o :?> IObj).withMeta(ometa:?>IPersistentMap) :> obj
+                    | _ -> 
+                        let kv = s.first() :?> IMapEntry
+                        loop (s.next()) (RTMap.assoc(ometa, kv.key(), kv.value()))
+                loop (RT0.seq(metaAsMap)) (RT0.meta(o))    
+        | _ -> raise <| new ArgumentException("Metadata can only be applied to IMetas")
+
 
     static member varReader(r: PushbackTextReader, quote: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        let o = LispReader.readAux(r, opts, LispReader.ensurePending(pendingForms))
+        RTSeq.list(TheVarSym, o)
 
-    static member private regexReader(r: PushbackTextReader, slash: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+    static member private regexReader(r: PushbackTextReader, doublequote: char, opts: obj, pendingForms: obj) : obj =
+        let sb = StringBuilder()
+        let rec loop () =
+            let ch = r.Read()
+            if ch = -1 then
+                raise <| new EndOfStreamException("EOF while reading regex")
+            elif ch = int '"' then
+                sb.ToString()
+            else
+                sb.Append(char ch) |> ignore
+                if ch = int '\\' then
+                    let ch2 = r.Read()
+                    if ch2 = -1 then
+                        raise <| new EndOfStreamException("EOF while reading regex")
+                    else
+                        sb.Append(char ch2) |> ignore
+                loop()
+
+        loop()
+
 
     static member private fnReader(r: PushbackTextReader, fn: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        if not <| isNull ((ArgEnvVar :> IDeref).deref()) then
+            raise <| new InvalidOperationException("Nested #()s are not allowed")
+        try 
+            Var.pushThreadBindings(RTMap.map(ArgEnvVar, PersistentTreeMap.Empty))
+        finally
+            ()
+    
+
+
 
     static member private argReader(r: PushbackTextReader, percent: char, opts: obj, pendingForms: obj) : obj =
         raise <| new NotImplementedException()

@@ -406,7 +406,7 @@ type Named =
     abstract getNamespace: unit -> string
     abstract getName: unit -> string
 
-
+[<AllowNullLiteral>]
 type MapEquivalence =
     interface
     end
@@ -472,6 +472,12 @@ type IEditableCollection =
 type IDrop =
     abstract drop: n: int -> Sequential
 
+[<AllowNullLiteral>]
+type Sorted =
+    abstract comparator: unit -> IComparer
+    abstract entryKey: entry:obj -> obj
+    abstract seq: ascending:bool -> ISeq
+    abstract seqFrom: key:obj * ascending:bool -> ISeq
 
 
 

@@ -23,6 +23,8 @@
     <Compile Include="ArraySeq.fs" />
     <Compile Include="Chunking.fs" />
     <Compile Include="RTSeq.fs" />
+    <Compile Include="MethodImplCache.fs" />
+    <Compile Include="RestFn.fs" />
     <Compile Include="MoreSequences.fs" />
     <Compile Include="Ranges.fs" />
     <Compile Include="PersistentVector.fs" />
@@ -30,6 +32,7 @@
     <Compile Include="PersistentMaps.fs" />
     <Compile Include="PersistentQueue.fs" />
     <Compile Include="PersistentSets.fs" />
+    <Compile Include="PersistentTreeMap.fs" />
     <Compile Include="RTMap.fs" />
   </ItemGroup>
 
