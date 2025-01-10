@@ -33,6 +33,7 @@
     <Compile Include="PersistentQueue.fs" />
     <Compile Include="PersistentSets.fs" />
     <Compile Include="PersistentTreeMap.fs" />
+    <Compile Include="PersistentTreeSet.fs" />
     <Compile Include="RTMap.fs" />
   </ItemGroup>
 

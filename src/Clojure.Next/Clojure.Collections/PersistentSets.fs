@@ -64,6 +64,8 @@ type APersistentSet(_impl : IPersistentMap) =
         member _.cons (o: obj): IPersistentCollection = raise <| InvalidOperationException("Concrete subclasses must define cons")
         member _.empty (): IPersistentCollection = raise <| InvalidOperationException("Concrete subclasses must define empty")
 
+    member this.doEquiv( arg: obj) : bool = (this :> IPersistentCollection).equiv(arg)
+
     interface IFn with
         member this.invoke (arg1: obj): obj = (this :> IPersistentSet).get()
 
