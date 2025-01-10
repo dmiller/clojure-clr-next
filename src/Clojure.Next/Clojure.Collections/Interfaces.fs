@@ -395,7 +395,7 @@ type IReduce =
 
 [<AllowNullLiteral>]
 type IKVReduce =
-    abstract kvreduce: f: IFn * inti: obj -> obj
+    abstract kvreduce: f: IFn * init: obj -> obj
 
 [<AllowNullLiteral>]
 type IPending =

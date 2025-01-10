@@ -5,6 +5,7 @@ open TestHelpers
 open System.Collections
 open Clojure.Collections
 open System
+open System.Collections.Generic
 
 
 [<Tests>]
@@ -77,7 +78,7 @@ let basicPersistentHashSetCreateTests =
 
  
 
-          ftestCase "createWithCheck with duplicate keys throws"
+          testCase "createWithCheck with duplicate keys throws"
           <| fun _ ->
               
               Expect.throwsT<ArgumentException> (fun () -> PersistentHashSet.createWithCheck ( 1, "a",  1, "c")  |> ignore) "creeteCheck on param arg should throw on duplicate key"
@@ -107,3 +108,6 @@ let PersistentHashSetIObjTests =
               verifyWithMetaHasCorrectMeta phsm
               verifyWithMetaNoChange phs
               verifyWithMetaReturnType phs typeof<PersistentHashSet> ]
+
+
+// TODO: big tests? 

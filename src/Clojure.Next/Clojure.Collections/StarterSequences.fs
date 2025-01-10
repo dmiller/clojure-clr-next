@@ -77,6 +77,7 @@ type ASeq(m) =
     static member  countsMismatch(o1:obj, o2:obj) = 
         (o1 :? Counted) && (o2 :? Counted) && (o1:?>Counted).count() <> (o2:?>Counted).count()
 
+    member this.DoCount() = (this :> IPersistentCollection).count()
  
     interface IPersistentCollection with
         member this.cons(o) =
