@@ -863,8 +863,6 @@ and [<Sealed;AbstractClass>] RTVar() =
             v <- "true"
         RTVar.readTrueFalseUnknown(v)
 
-
-
     // original comment: duck typing stderr plays nice with e.g. swank 
     static member errPrintWriter() : TextWriter =
         let w = (RTVar.ErrVar :> IDeref).deref()
@@ -874,6 +872,15 @@ and [<Sealed;AbstractClass>] RTVar() =
         | _ -> failwith "Unknown type for *err*"
 
 
+    static member var(nsString: string, nameString: string) : Var =
+        let ns = Namespace.findOrCreate(Symbol.intern(null, nsString))
+        let name = Symbol.intern(null, nameString)
+        Var.intern(ns, name)
+
+    static member var(nsString: string, nameString: string, init: obj) : Var =
+        let ns = Namespace.findOrCreate(Symbol.intern(null, nsString))
+        let name = Symbol.intern(null, nameString)
+        Var.intern(ns, name, init)
 
     (*
 

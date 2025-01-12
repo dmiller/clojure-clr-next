@@ -10,6 +10,7 @@ open System.Text.RegularExpressions
 open Clojure.Numerics
 open System.Numerics
 open Clojure.BigArith
+open Clojure.Reflection
 
 type ReaderResolver =
     abstract currentNS : unit -> Symbol
@@ -72,6 +73,8 @@ type LispReader() =
     static let ListSym = Symbol.intern("clojure.core", "list")
     static let WithMetaSym = Symbol.intern("clojure.core", "with-meta")
     static let SeqSym = Symbol.intern("clojure.core", "seq")
+    static let FnSym = Symbol.intern("fn*")
+    static let AmpersandSym = Symbol.intern("&")
 
     // Keyword definitions
 
@@ -990,22 +993,70 @@ type LispReader() =
         loop()
 
 
-    static member private fnReader(r: PushbackTextReader, fn: char, opts: obj, pendingForms: obj) : obj =
+    static member private fnReader(r: PushbackTextReader, lparen: char, opts: obj, pendingForms: obj) : obj =
         if not <| isNull ((ArgEnvVar :> IDeref).deref()) then
             raise <| new InvalidOperationException("Nested #()s are not allowed")
         try 
             Var.pushThreadBindings(RTMap.map(ArgEnvVar, PersistentTreeMap.Empty))
+            r.Unread(int '(')
+            let form = LispReader.readAux(r, opts, LispReader.ensurePending(pendingForms))
+            let mutable args = PersistentVector.Empty :> IPersistentVector
+            let argSyms = (ArgEnvVar :> IDeref).deref() :?> PersistentTreeMap
+            let rargs = (argSyms :> Reversible).rseq()
+            if not <| isNull rargs then
+                let highArg =  ((rargs.first() :?> IMapEntry).key()) :?> int
+                if highArg > 0 then
+                    for i = 1 to highArg do
+                        let sym = 
+                            match (argSyms :> ILookup).valAt(i) with 
+                            | null -> LispReader.garg(i)
+                            | _ as s -> s :?> Symbol
+                        args <- args.cons(sym)
+                let restSym = (argSyms :> ILookup).valAt(-1)
+                if not <| isNull restSym then
+                    args <- args.cons(AmpersandSym)
+                    args <- args.cons(restSym)
+            RTSeq.list(FnSym, args, form)
+
         finally
-            ()
-    
-
-
-
+            Var.popThreadBindings() |> ignore
+ 
     static member private argReader(r: PushbackTextReader, percent: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        let token = LispReader.readSimpleToken(r, '%')
+        if isNull ((ArgEnvVar :> IDeref).deref()) then
+            LispReader.interpretToken(token,None)
+        else 
+            let m = LispReader.argPat.Match(token)
+            if not m.Success then
+                raise <| new ArgumentException("arg literal must be %, %& or %integer")
+            if m.Groups.[1].Success then // %&
+                LispReader.registerArg(-1)
+            else    
+                let arg = 
+                    if m.Groups.[2].Success then Int32.Parse(m.Groups.[2].Value, System.Globalization.CultureInfo.InvariantCulture) 
+                    else 1
+                LispReader.registerArg(arg)
+
+    static member private registerArg(n: int) =
+        let argSyms = (ArgEnvVar :> IDeref).deref() :?> PersistentTreeMap
+        if isNull argSyms then
+            raise <| new InvalidOperationException("arg literal not in #()")
+        else
+            let arg = (argSyms :> ILookup).valAt(n) :?> Symbol
+            if isNull arg then
+                let newArg = LispReader.garg(n)
+                ArgEnvVar.set((argSyms :> IPersistentMap).assoc(n,newArg)) |> ignore
+                newArg
+            else
+                arg
 
     static member private evalReader(r: PushbackTextReader, at: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        if not <| RT0.booleanCast((RTVar.ReadEvalVar :> IDeref).deref()) then
+            raise <| new InvalidOperationException("EvalReader not allowed when *read-eval* is false")
+
+        let o = LispReader.read(r, true,null, true, opts, LispReader.ensurePending(pendingForms))
+        match o with
+        | :? Symbol as s -> RTType.classForName
 
     static member private CtorReader(r: PushbackTextReader, tilde: char, opts: obj, pendingForms: obj) : obj =
         raise <| new NotImplementedException()
