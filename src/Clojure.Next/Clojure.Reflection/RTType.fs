@@ -98,6 +98,9 @@ type RTType private () =
 
 and [<Sealed>] ClrArraySpec(_dimensions: int, _isBound: bool) =
 
+    member internal _.Dimensions = _dimensions
+    member internal _.IsBound = _isBound
+
     member internal this.Resolve(t: Type) = 
         if _isBound then
             t.MakeArrayType(1)
@@ -281,30 +284,54 @@ and [<Sealed>] ClrTypeSpec() =
                                     if spec.IsArray then 
                                         status <- Some (Error "generic args after array spec")
                                     else 
-                                        while pos < name.Length && status.IsNone do
+                                        let mutable finished = false
+                                        while pos < name.Length && status.IsNone && not finished do
                                             pos <- ClrTypeSpec.SkipSpace(name, pos)
                                             let aqn = name[pos] = '['
                                             if aqn then
                                                 pos <- pos + 1  // skip [ to the start of the type
                                             let arg = ClrTypeSpec.Parse(name, &pos, true, aqn)
                                             match arg with
-                                            | Ok spec ->  args.Add(spec)
-                                            | Error _ -> status <- Some arg                                            
-                                            if pos >= name.Length then
-                                                status <- Some (Error "Invalid generic arguments spec")
-                                            elif name[pos] = ']' then
-                                                ()  // end of generic args
-                                            elif name[pos] = ',' then
-                                                pos <- pos + 1  // skip ',' to start of the next arg
-                                            else
-                                                status <- Some (Error "Invalid generic arguments separator")
-                                        if pos >= name.Length || name[pos] <> ']' then
+                                            | Error _ -> status <- Some arg   
+                                            | Ok argSpec -> 
+                                                args.Add(argSpec)                                         
+                                                if pos >= name.Length then
+                                                    status <- Some (Error "Invalid generic arguments spec")
+                                                elif name[pos] = ']' then
+                                                    finished <- true  // end of generic args
+                                                elif name[pos] = ',' then
+                                                    pos <- pos + 1  // skip ',' to start of the next arg
+                                                else
+                                                    status <- Some (Error "Invalid generic arguments separator")
+                                        if status.IsNone && ( pos >= name.Length || name[pos] <> ']') then
                                             status <- Some (Error "Error parsing generic params spec")
                                         else
                                             spec.SetGenericArgs(args)
                                 else  
                                     // array spec
-                                    ()
+                                    let mutable dimensions = 1
+                                    let mutable isBound = false
+                                    while pos < name.Length && name[pos] <> ']' && status.IsNone do
+                                        if name[pos] = '*' then
+                                            if isBound then
+                                                status <- Some (Error "Array spec cannot have 2 bound dimensions")
+                                            else
+                                                isBound <- true
+                                        elif name[pos] <> ',' then
+                                            status <- Some (Error $"Invalid character in array spec: {name[pos]}")
+                                        else
+                                            dimensions <- dimensions + 1
+
+                                        if status.IsNone then
+                                            pos <- pos + 1
+                                            pos <- ClrTypeSpec.SkipSpace(name, pos)
+                                    if status.IsNone then
+                                        if name[pos] <> ']' then
+                                            status <- Some (Error "Unmatched '[' while parsing array spec")
+                                        elif dimensions > 1 && isBound then
+                                            status <- Some (Error "Invalid array spec, multi-dimensional array cannot be bound")
+                                        else
+                                            spec.AddArray(ClrArraySpec(dimensions, isBound))
                     | ']' ->
                         if isRecursive then 
                             pos <- pos + 1
