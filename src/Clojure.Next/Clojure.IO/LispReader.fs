@@ -1056,7 +1056,30 @@ type LispReader() =
 
         let o = LispReader.read(r, true,null, true, opts, LispReader.ensurePending(pendingForms))
         match o with
-        | :? Symbol as s -> RTType.ClassForName(s.Name)
+        | :? Symbol as s -> RTType.ClassForName(o.ToString())
+        | :? IPersistentList ->
+            let fs = RTSeq.first(o) :?> Symbol
+            if TheVarSym.Equals(fs) then
+                let vs = RTSeq.second(o) :?> Symbol
+                RTVar.var(vs.Namespace, vs.Name)
+            elif fs.Name.EndsWith(".") then
+                let args = RTSeq.toArray(RTSeq.next(o))
+                let s = fs.ToString()
+                Reflector.InvokeConstructor(RTType.ClassForNameE(s.Substring(0,s.Length-1)), args)
+            elif RTVar.NamesStaticMember(fs) then
+                  let args = RTSeq.toArray(RTSeq.next(o))
+                  Reflector.InvokeStaticMethod(fs.Namespace, fs.Name, args)
+            else
+                let v = RTVar.MaybeResolveIn(getCurrentNamespace())
+                match v with
+                | :? Var as v ->
+                    (v :> IFn).applyTo(RT0.next(o))
+                | _ -> raise <| new InvalidOperationException($"Can't resolve {fs}")
+        | _ -> raise <| new InvalidOperationException("Unsupported #= form")
+
+
+
+
 
     static member private CtorReader(r: PushbackTextReader, tilde: char, opts: obj, pendingForms: obj) : obj =
         raise <| new NotImplementedException()
