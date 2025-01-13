@@ -106,7 +106,7 @@ let PersistentTreeMapBigTests =
     testList
         "Basic PersistentTreeMap create tests"
         [         
-          ftestCase "Do some big tests"
+          testCase "Do some big tests"
           <| fun _ ->  
                 DoBigTest(100)
                 DoBigTest(1000)

@@ -1056,7 +1056,7 @@ type LispReader() =
 
         let o = LispReader.read(r, true,null, true, opts, LispReader.ensurePending(pendingForms))
         match o with
-        | :? Symbol as s -> RTType.classForName
+        | :? Symbol as s -> RTType.ClassForName(s.Name)
 
     static member private CtorReader(r: PushbackTextReader, tilde: char, opts: obj, pendingForms: obj) : obj =
         raise <| new NotImplementedException()

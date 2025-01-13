@@ -96,8 +96,7 @@ type RTType private () =
     static member private HasTriggerCharacter(p: string) = p.IndexOfAny(RTType._triggerTypeChars) >= 0
 
 
-[<Sealed>]
-type internal ClrArraySpec(_dimensions: int, _isBound: bool) =
+and [<Sealed>] ClrArraySpec(_dimensions: int, _isBound: bool) =
 
     member internal this.Resolve(t: Type) = 
         if _isBound then
@@ -132,6 +131,41 @@ and [<Sealed>] ClrTypeSpec() =
     let mutable _pointerLevel = 0
     let mutable _isByRef = false
 
+    member _.Name = _name
+    member _.AssemblyName = _assemblyName
+    member _.Nested = _nested
+    member _.GenericParams = _genericParams
+    member _.ArraySpec = _arraySpec
+    member _.PointerLevel = _pointerLevel
+    member _.IsByRef = _isByRef
+
+    member _.HasGenericParams = not <| isNull _genericParams   
+    member _.IsArray = not <| isNull _arraySpec
+    member _.IsNested = not <| isNull _nested
+
+    member private _.AddName( typeName : string ) =
+        if isNull _name then    
+            _name <- typeName
+        else
+            if isNull _nested then  _nested <- new List<string>()
+            _nested.Add(typeName)
+
+    member private _.SetAssemblyName( assyName : string ) =
+        _assemblyName <- assyName
+        
+    member private _.AddArray(arraySpec : ClrArraySpec) =
+        if isNull _arraySpec then _arraySpec <- new List<ClrArraySpec>()
+        _arraySpec.Add(arraySpec)
+
+    member private _.IncrementPointerLevel() =
+        _pointerLevel <- _pointerLevel + 1
+
+    member private _.SetIsByRef() =
+        _isByRef <- true
+
+    member private _.SetGenericArgs( args : List<ClrTypeSpec> ) =
+        _genericParams <- args
+
     // entry point
     static member GetTypeFromName(name: string) : Type =
 
@@ -152,7 +186,7 @@ and [<Sealed>] ClrTypeSpec() =
 
 
 
-    static member private Parse(name: string) : Result<ClrTypeSpec,string> =
+    static member internal Parse(name: string) : Result<ClrTypeSpec,string> =
         let mutable pos = 0
         let spec = ClrTypeSpec.Parse(name, &pos, false, false)
         match spec with
@@ -160,14 +194,15 @@ and [<Sealed>] ClrTypeSpec() =
         | _ when pos < name.Length -> Error("Could not parse the whole type name")
         | _ -> spec
 
-    static member private Parse(name: string, pos: byref<int>, isRecursive: bool, allowAssyQualName: bool) : Result<ClrTypeSpec,string> =
+    static member internal Parse(name: string, pos: byref<int>, isRecursive: bool, allowAssyQualName: bool) : Result<ClrTypeSpec,string> =
         
         let mutable nameStart = 0
         let mutable hasModifiers = false
         let mutable status : Result<ClrTypeSpec,string> option = None
         let spec = ClrTypeSpec()
 
-        pos <-  ClrTypeSpec.SkipSpace(name, pos)     
+        pos <-  ClrTypeSpec.SkipSpace(name, pos)  
+        nameStart <- pos
 
         while ( pos < name.Length && status.IsNone && not hasModifiers) do
             match name[pos] with
@@ -293,34 +328,8 @@ and [<Sealed>] ClrTypeSpec() =
 
         loop pos
         
-    member private _.AddName( typeName : string ) =
-        if isNull _name then    
-            _name <- typeName
-        else
-            if isNull _nested then  _nested <- new List<string>()
-            _nested.Add(typeName)
 
-    member private _.SetAssemblyName( assyName : string ) =
-        _assemblyName <- assyName
-        
-    member private _.AddArray(arraySpec : ClrArraySpec) =
-        if isNull _arraySpec then _arraySpec <- new List<ClrArraySpec>()
-        _arraySpec.Add(arraySpec)
-
-    member private _.IsArray = not <| isNull _arraySpec
-
-    member private _.IncrementPointerLevel() =
-        _pointerLevel <- _pointerLevel + 1
-
-    member private _.SetIsByRef() =
-        _isByRef <- true
-
-    member private _.IsByRef = _isByRef
-
-    member private _.SetGenericArgs( args : List<ClrTypeSpec> ) =
-        _genericParams <- args
-
-    member private _.Resolve(assemblyResolver : Func<AssemblyName, Assembly>, typeResolver : Func<Assembly, string, Type>) : Type =
+    member internal _.Resolve(assemblyResolver : Func<AssemblyName, Assembly>, typeResolver : Func<Assembly, string, Type>) : Type =
         let assyRequired = not <| isNull _assemblyName
 
         let assy = 
