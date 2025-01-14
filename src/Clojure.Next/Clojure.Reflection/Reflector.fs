@@ -1,5 +1,7 @@
 ﻿namespace Clojure.Reflection
 
+open Clojure.Collections
+
 open System
 open System.Collections.Generic
 open System.Reflection
@@ -34,7 +36,7 @@ type Reflector private () =
                         found <- c
 
             match found with
-            | null -> raise <| new InvalidOperationException($"Cannot find constructor for type: {RTType.NameForType(t)} with the correct argument types")
+            | null -> raise <| new InvalidOperationException($"Cannot find constructor for type: {Util.nameForType(t)} with the correct argument types")
             | _ -> found.Invoke(Reflector.BoxArgs(found.GetParameters(), args))
             
 
@@ -49,6 +51,28 @@ type Reflector private () =
         else
             method.Invoke(null, Reflector.BoxArgs(method.GetParameters(), args))
 
+
+    // TODO: How can this even be correct
+    static member Subsumes(c1 : ParameterInfo array, c2 : ParameterInfo array) =
+        // presumes c1 and c2 have the same length
+
+        let rec loop (i:int) (better:bool) =
+            if i >= c1.Length then
+                better
+            else
+                let t1 = c1.[i].ParameterType
+                let t2 = c2.[i].ParameterType
+                if t1 <> t2 then
+                    if not t1.IsPrimitive && t2.IsPrimitive || t2.IsAssignableFrom(t1) then
+                        loop (i + 1) true
+                    else
+                        false
+                else
+                    loop (i + 1) better
+
+        loop 0 false
+
+            
 
     static member BoxArgs(pinfos: ParameterInfo array, args: obj array) =
         if pinfos.Length = 0 then 

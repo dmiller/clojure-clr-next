@@ -38,6 +38,46 @@ type RTReader() =
         else
             PersistentHashMap.createWithCheck(init)
 
+    // the following used to be in clojure.lang.Compiler, but are really used only here(?)
+
+    // THis could almost be in RTVar,given that it is namespace/var-related, but it also needs things from RTType.
+    // So maybe this is the best place
+
+    static member val NsSym = Symbol.intern("ns")
+    static member val InNsSym = Symbol.intern("in-ns")
+
+    static member MaybeResolveIn(n: Namespace, sym: Symbol) : obj =
+        // note: ns-qualified vars must already exist
+        if not <| isNull sym.Namespace then
+            let ns = RTReader.NamespaceFor(sym)
+            if isNull ns then
+                RTType.MaybeArrayType(sym)
+            else
+                ns.findInternedVar(Symbol.intern(sym.Name))
+        elif sym.Name.IndexOf('.') > 0 && not <| sym.Name.EndsWith(".") ||
+             sym.Name.Length > 0 && sym.Name[sym.Name.Length-1] = ']' then   // TODO: What is this?  I don't remember what this is for.
+             RTType.ClassForName(sym.Name)
+        elif sym.Equals(RTReader.NsSym) then
+            RTVar.NsVar
+        elif sym.Equals(RTReader.InNsSym) then
+            RTVar.InNSVar
+        else
+            n.getMapping(sym)
+
+    static member NamespaceFor(sym: Symbol) : Namespace = RTReader.NamespaceFor(RTVar.getCurrentNamespace(), sym)
+
+    static member NamespaceFor(inns: Namespace, sym: Symbol) : Namespace =
+        //note, presumes non-nil sym.ns
+        // first check against currentNS' aliases...
+        let nsSym = Symbol.intern(sym.Namespace)
+        match inns.lookupAlias(nsSym) with
+        | null -> Namespace.find(nsSym)
+        | _ as ns -> ns
+
+    static member NamesStaticMember(sym:Symbol) =
+        not <| isNull sym.Namespace && isNull <| RTReader.NamespaceFor(sym)
+
+
 type ReaderFunction = PushbackTextReader * char * obj * obj -> obj
 
 type ReaderException(msg: string, line: int, column: int, inner: exn) =
@@ -67,7 +107,7 @@ type LispReader() =
     static let DerefSym = Symbol.intern("clojure.core", "deref")
     static let ApplySym = Symbol.intern("clojure.core", "apply")
     static let ConcatSym = Symbol.intern("clojure.core", "concat")
-    static let hashMapSym = Symbol.intern("clojure.core", "hash-map")
+    static let HashMapSym = Symbol.intern("clojure.core", "hash-map")
     static let HashSetSym = Symbol.intern("clojure.core", "hash-set")
     static let VectorSym = Symbol.intern("clojure.core", "vector")
     static let ListSym = Symbol.intern("clojure.core", "list")
@@ -195,8 +235,6 @@ type LispReader() =
         match v with 
         | :? ReaderResolver as r -> Some r
         | _ -> None
-
-    static member getCurrentNamespace() = (RTVar.CurrentNSVar :> IDeref).deref() :?> Namespace
 
     // Entry points for reading
 
@@ -583,9 +621,9 @@ type LispReader() =
                             | _ ->
                                 let kns = 
                                     if not <| isNull ks.Namespace  then
-                                        LispReader.getCurrentNamespace().lookupAlias(Symbol.intern(ks.Namespace))
+                                        RTVar.getCurrentNamespace().lookupAlias(Symbol.intern(ks.Namespace))
                                     else
-                                        LispReader.getCurrentNamespace()
+                                        RTVar.getCurrentNamespace()
                                 if not <| isNull kns then
                                     Keyword.intern(kns.Name.Name, ks.Name)
                                 else
@@ -1066,14 +1104,14 @@ type LispReader() =
                 let args = RTSeq.toArray(RTSeq.next(o))
                 let s = fs.ToString()
                 Reflector.InvokeConstructor(RTType.ClassForNameE(s.Substring(0,s.Length-1)), args)
-            elif RTVar.NamesStaticMember(fs) then
+            elif RTReader.NamesStaticMember(fs) then
                   let args = RTSeq.toArray(RTSeq.next(o))
                   Reflector.InvokeStaticMethod(fs.Namespace, fs.Name, args)
             else
-                let v = RTVar.MaybeResolveIn(getCurrentNamespace())
+                let v = RTReader.MaybeResolveIn(RTVar.getCurrentNamespace(),fs)
                 match v with
                 | :? Var as v ->
-                    (v :> IFn).applyTo(RT0.next(o))
+                    (v :> IFn).applyTo(RTSeq.next(o))
                 | _ -> raise <| new InvalidOperationException($"Can't resolve {fs}")
         | _ -> raise <| new InvalidOperationException("Unsupported #= form")
 

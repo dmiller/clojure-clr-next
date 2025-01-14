@@ -3,6 +3,8 @@
 open System
 open System.Collections.Generic
 open System.Reflection
+open Clojure.Collections
+open Clojure.Lib
 
 exception TypeNotFoundException of string
 
@@ -50,6 +52,77 @@ type RTType private () =
             raise <| TypeNotFoundException($"Unable to resolve class {p}")
         else
             t
+
+    static member MaybeArrayType(sym: Symbol) : Type =
+        if isNull sym.Namespace || not <| RTType.IsPosDigit(sym.Name) then
+            null
+        else
+            let dim = sym.Name[0] - '0' |> int
+            let componentTypeName = Symbol.intern(null,sym.Namespace)
+            let mutable (componentType: Type) =
+                match RTType.PrimType(componentTypeName) with
+                | null -> RTType.MaybeType(componentTypeName, false);
+                | _ as t -> t
+
+            match componentType with 
+            | null -> raise <| TypeNotFoundException($"Unable to resolve component typename: {componentTypeName}")
+            | _ ->
+                for i = 0 to dim-1 do
+                    componentType <- componentType.MakeArrayType()
+                componentType
+
+    static member IsPosDigit(s: string) =
+        if s.Length <> 1 then false
+        else
+            let c = s[0]
+            c >= '1' && c <= '9'
+
+    static member PrimType(sym: Symbol) = 
+        if isNull sym then null
+        else
+            match sym.Name with
+            | "int" | "Int32" | "System.Int32" -> typeof<int>
+            | "long" | "Int64" | "System.Int64" -> typeof<int64>
+            | "float" | "Single" | "System.Single" -> typeof<float>
+            | "double" | "Double" | "System.Double" -> typeof<float>
+            | "short" | "Int16" | "System.Int16" -> typeof<int16>
+            | "byte" | "Byte" | "System.Byte" -> typeof<byte>
+            | "sbyte" | "SByte" | "System.SByte" -> typeof<sbyte>
+            | "char" | "Char" | "System.Char" -> typeof<char>
+            | "bool" | "boolean" | "Boolean" | "System.Boolean" -> typeof<bool>
+            | "uint" | "UInt32" | "System.UInt32" -> typeof<uint32>
+            | "ulong" | "UInt64" | "System.UInt64" -> typeof<uint64>
+            | "ushort" | "UInt16" | "System.UInt16" -> typeof<uint16>
+            | "decimal" | "Decimal" | "System.Decimal" -> typeof<decimal>
+            | "void" | "Void" | "System.Void" -> typeof<System.Void>
+            | _ -> null
+
+    static member MaybeType(form: obj, stringOk: bool) =
+        match form with
+        | :? Type as t -> t
+        | :? Symbol as sym ->
+            // TODO: We'll need another version of this for the compiler that checks the CompileStubSymVar/CompileStubClassVar and the LocalEnvVar.
+            // This version will work for the LispReader, as the compiler will not be initiating reads.
+            if isNull sym.Namespace then
+                if sym.Name.IndexOf('.') >= 0 || sym.Name[sym.Name.Length-1] = ']' then  // TODO: Make sure this is still correct -- i think it is array detection
+                    RTType.ClassForName(sym.Name)
+                else
+                    let o = RTVar.getCurrentNamespace().getMapping(sym)
+                    if o :? Type then o :?> Type
+                    else
+                        try
+                            RTType.ClassForName(sym.Name)
+                        with 
+                        | _ -> null
+            else
+                null
+
+        | :? string as s when stringOk -> RTType.ClassForNameE(s)
+        | _ -> null
+        
+            
+
+
 
     // TODO: Will we need this in the new compiler?  I hope we can get rid of it.
     // This code really belongs over in the compiler, but we need RTType for LispReader, so it's here.

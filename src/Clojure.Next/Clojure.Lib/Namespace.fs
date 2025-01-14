@@ -849,6 +849,10 @@ and [<Sealed;AbstractClass>] RTVar() =
     static member val ReaderResolverVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*reader-resolver*"), null).setDynamic()
     static member val ReadEvalVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*read-eval*"), RTVar._readEval).setDynamic()
 
+
+    static member getCurrentNamespace() = (RTVar.CurrentNSVar :> IDeref).deref() :?> Namespace
+
+
     static member readTrueFalseUnknown(s: string) : obj  = 
         match s with
         | "true" -> true

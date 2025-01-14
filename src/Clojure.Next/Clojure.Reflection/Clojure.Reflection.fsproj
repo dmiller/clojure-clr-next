@@ -11,4 +11,9 @@
     <Compile Include="Reflector.fs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+    <ProjectReference Include="..\Clojure.Lib\Clojure.Lib.fsproj" />
+  </ItemGroup>
+
 </Project>
