@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="TaggedLiteral.fs" />
     <Compile Include="PushbackTextReader.fs" />
     <Compile Include="LineNumberingTextReader.fs" />
     <Compile Include="LispReader.fs" />

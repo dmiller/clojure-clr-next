@@ -73,6 +73,8 @@ type Namespace(name : Symbol) =
     member _.Name = name
     member _.Aliases = aliases.Get()
     member _.Mappings = mappings.Get()    
+
+    static member ClojureNamespace = clojureNamespace
     
     override _.ToString() = name.ToString()
 

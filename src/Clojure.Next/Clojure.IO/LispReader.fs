@@ -144,6 +144,11 @@ type LispReader() =
     static let PlatformKey = Keyword.intern(null, "cljr")
     static let PlatformFeatureSet = PersistentHashSet.create(PlatformKey)
 
+    // Reader conditional options - use with :read-cond
+
+    static let CondAllowKeyword = Keyword.intern(null, "allow")
+    static let CondPreserveKeyword = Keyword.intern(null, "preserve")
+
 
     // EOF special value to throw on eof
     static let EofThrowKeyword = Keyword.intern(null, "eofthrow")
@@ -163,6 +168,10 @@ type LispReader() =
 
     /// Dynamically bound Var set to true in a read-cond context
     static let ReadCondEnvVar = Var.create(false).setDynamic()
+
+    static let DataReadersVar = Var.intern(Namespace.ClojureNamespace,Symbol.intern("*data-readers*"), RTMap.map()).setDynamic();
+    static let DefaultDataReaderFnVar = Var.intern(Namespace.ClojureNamespace, Symbol.intern("*default-data-reader-fn*"), RTMap.map());
+    static let DefaultDataReadersVar  = Var.intern(Namespace.ClojureNamespace, Symbol.intern("default-data-readers"), RTMap.map());
 
     // macro characters and #-dispatch
     static let macros = Array.zeroCreate<ReaderFunction option>(256)
@@ -1116,11 +1125,80 @@ type LispReader() =
         | _ -> raise <| new InvalidOperationException("Unsupported #= form")
 
 
-
-
-
     static member private CtorReader(r: PushbackTextReader, tilde: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        let realizedPendingForms = LispReader.ensurePending(pendingForms)
+        let name = LispReader.read(r, true, null, false, opts, realizedPendingForms)
+        match name with
+        | :? Symbol as sym ->
+            let form = LispReader.read(r, true, null, true, opts, realizedPendingForms)
+            if LispReader.IsPreservedReadCond(opts) || RTVar.suppressRead() then
+                TaggedLiteral.create(sym, form)
+            elif sym.Name.Contains"." then
+                LispReader.ReadRecord(form,sym,opts,pendingForms)
+            else
+                LispReader.ReadTagged(form,sym,opts,pendingForms)
+
+        | _ -> 
+            raise <| new ArgumentException("Reader tag must be a symbol")
+
+
+    static member IsPreservedReadCond(opts: obj) =
+        if not <| RT0.booleanCast((ReadCondEnvVar :> IDeref).deref()) then
+            false
+        else
+            match opts with
+            | :? IPersistentMap as m -> 
+                let readCond = m.valAt(OptReadCondKeyword)
+                CondPreserveKeyword.Equals(readCond)
+            | _ -> false
+
+    static member ReadTagged(o: obj, tag: Symbol, opts: obj, pendingForms: obj) =
+        let dataReaders = (DataReadersVar :>IDeref).deref() :?> ILookup
+        let dataReader = RT0.get(dataReaders, tag)
+        match dataReader with
+        | :? IFn as f -> f.invoke(o)
+        | _ -> 
+            let defaultDataReaders = (DefaultDataReadersVar :> IDeref).deref() :?> ILookup
+            let defaultDataReaderForTag = RT0.get(defaultDataReaders, tag)
+            match defaultDataReaderForTag with
+            | :? IFn as f  -> f.invoke(o)
+            | _ -> 
+                match (DefaultDataReaderFnVar :> IDeref).deref() with
+                | :? IFn as f -> f.invoke(tag, o)
+                | _ -> raise <| new InvalidOperationException($"No reader function for tag: {tag}")
+
+    static member ReadRecord(form: obj, recordName: Symbol, opts: obj, pendingForms: obj) = 
+        let readeval = RT0.booleanCast((RTVar.ReadEvalVar :> IDeref).deref())
+        if not readeval then
+            raise <| new InvalidOperationException("Record construction syntax can only be used when *read-eval* == true")
+
+        let recordType = RTType.ClassForName(recordName.ToString())
+        let allCtors = recordType.GetConstructors()
+
+        match form with
+        | :? IPersistentVector as recordEntries ->
+             // short form
+             if allCtors|> Array.exists(fun c -> c.GetParameters().Length = recordEntries.count()) then
+                Reflector.InvokeConstructor(recordType, RTSeq.toArray(recordEntries))
+             else
+                raise <| new ArgumentException($"Unexpected number of constructor arguments to {recordType}: got {recordEntries.count()}")
+        | :? IPersistentMap as vals ->
+                let rec loop (s: ISeq) =
+                    match s with 
+                    | null -> None
+                    | _ when not <| (s.first() :> Keyword) -> Some (s.first())
+                    | _ -> loop (s.next())
+                let hasBadArg = loop (RTMap.keys(vals))
+                match hasBadArg with
+                | Some k -> raise <| new ArgumentException($"Unreadable defrecord form: key must be of type clojure.lang.Keyword, got {k.ToString()}")
+                | None ->
+                    Reflector.InvokeStaticMethod(recordType, "create", [| vals |])
+
+        | _ ->
+            raise <| new ArgumentException($"Unreadable constructor form starting with \"#{recordName}\"")
+
+
+
 
     static member private unreadableReader(r: PushbackTextReader, tilde: char, opts: obj, pendingForms: obj) : obj =
         raise <| new NotImplementedException()

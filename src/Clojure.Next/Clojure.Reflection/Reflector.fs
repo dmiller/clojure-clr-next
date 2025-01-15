@@ -5,6 +5,8 @@ open Clojure.Collections
 open System
 open System.Collections.Generic
 open System.Reflection
+open System.Text
+open System.Linq
 
 [<AbstractClass; Sealed>]
 type Reflector private () =
@@ -45,11 +47,34 @@ type Reflector private () =
         Reflector.InvokeStaticMethod(t, methodName, args)
 
     static member InvokeStaticMethod(t: Type, methodName: string, args: obj array) =
-        let method = t.GetMethod(methodName, BindingFlags.Public ||| BindingFlags.Static)
-        if isNull method then
-            raise <| new ArgumentException($"No method {methodName} in type {t.FullName}")
+        if methodName.Equals("new") then
+            Reflector.InvokeConstructor(t, args)
         else
-            method.Invoke(null, Reflector.BoxArgs(method.GetParameters(), args))
+            let methods = Reflector.GetMethods(t, methodName, GenericTypeArgList.Empty, args.Length, true)
+            Reflector.InvokeMatchingMethod(methodName, methods, t, null, args)
+
+    static member GetMethods(targetType: Type, methodName: string, typeArgs: GenericTypeArgList, arity: int, getStatics: bool) =
+        let flags = BindingFlags.Public ||| BindingFlags.FlattenHierarchy ||| BindingFlags.InvokeMethod  ||| (if getStatics then BindingFlags.Static else BindingFlags.Instance)
+
+        if targetType.IsInterface && not getStatics then
+            Reflector.GetInterfaceMethods(targetType, methodName, typeArgs, arity)
+        else
+            (targetType.GetMethods(flags).Where(fun m -> m.Name = methodName && m.GetParameters().Length = arity)
+            |> Seq.choose (fun m -> 
+                let genArgs = m.GetGenericArguments()
+                if typeArgs.IsEmpty && genArgs.Length = 0 then
+                    Some m
+                elif not typeArgs.IsEmpty && typeArgs.Count = genArgs.Length then
+                    Some  <| m.MakeGenericMethod(typeArgs.ToArray())
+                else
+                    None)).ToList()
+
+
+    static member GetInterfaceMethods(targetType: Type, methodName: string, typeArgs: GenericTypeArgList, arity: int) : List<MethodInfo> =
+        let flags = BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.InvokeMethod
+        let interfaces = List<Type>([| targetType |])
+        interfaces.AddRange(targetType.GetInterfaces())
+        for ifx in interfaces
 
 
     // TODO: How can this even be correct
@@ -138,4 +163,44 @@ type Reflector private () =
             false
         
 
+and [<Sealed>]  internal GenericTypeArgList private (_typeArgs : List<Type>) = 
+    
+    // An empty instance
+    // In the semantics of (type-args ...), (type-args) is equivalent to not having any type args at all -- it is ignored.
+    static member val Empty = GenericTypeArgList(List<Type>())
 
+    // Some places need a list of the types, some places need an array.
+
+    member _.ToArray() = _typeArgs.ToArray()
+    member _.ToList() = _typeArgs.AsReadOnly()
+
+    member _.IsEmpty = not <| _typeArgs.Any()
+    member _.Count = _typeArgs.Count
+
+    static member Create(targs: ISeq) =
+        let types = new List<Type>()
+
+        let rec loop (s: ISeq) =
+            match s with
+            | null -> ()
+            | _ ->
+                let arg = s.first()
+                if not <| arg :? Symbol then
+                    raise <| new ArgumentException("Malformed generic method designator: type arg must be a Symbol")
+                else
+                    let t = RTType.MaybeType(arg, false)
+                    if isNull t then
+                        raise <| new ArgumentException($"Malformed generic method designator: invalid type arg")
+                    else
+                        types.Add(t)
+                        loop (s.next())
+
+        loop targs
+        GenericTypeArgList(types)
+
+    member _.GenerateGenericTypeArgsString() =
+        let sb = StringBuilder()
+        sb.Append("<") |> ignore
+        _typeArgs.ForEach (fun t -> sb.Append(t.FullName).Append(",") |> ignore)
+        sb.Append(">") |> ignore
+        sb.ToString()
