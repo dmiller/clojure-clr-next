@@ -513,15 +513,17 @@ type IRef =
 
 // Represents an object with a value that can be set.
 // The only class that has this interface at present if Var.
-// Hence the method 'doReset' that seets the 'root' value.
+// Hence the method 'doReset' that sets the 'root' value.
 
 [<AllowNullLiteral>]
 type Settable =
     abstract doSet: value: obj -> obj
     abstract doReset: value: obj -> obj
 
-
-
+[<AllowNullLiteral>]
+type IRecord = 
+    interface
+    end
 
 (*
 

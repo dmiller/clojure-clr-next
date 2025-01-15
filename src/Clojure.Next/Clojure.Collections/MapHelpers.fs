@@ -16,7 +16,7 @@ type KeySeq private (meta: IPersistentMap, seq: ISeq, enumerable: IEnumerable) =
         | null -> null
         | _ -> KeySeq(s, null)
 
-    static member create(map: IPersistentMap) =
+    static member createFromMap(map: IPersistentMap) =
         if isNull map then
             null
         else

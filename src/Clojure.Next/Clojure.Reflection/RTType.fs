@@ -2,6 +2,7 @@
 
 open System
 open System.Collections.Generic
+open System.Linq
 open System.Reflection
 open Clojure.Collections
 open Clojure.Lib
@@ -96,6 +97,28 @@ type RTType private () =
             | "decimal" | "Decimal" | "System.Decimal" -> typeof<decimal>
             | "void" | "Void" | "System.Void" -> typeof<System.Void>
             | _ -> null
+
+    static member val private PrimTypeNamesMap = 
+         System.Linq.Enumerable.ToDictionary(
+             [ (typeof<int>, "int"); 
+              (typeof<int64>, "long"); 
+              (typeof<float>, "float"); 
+              (typeof<int16>, "short"); 
+              (typeof<byte>, "byte"); 
+              (typeof<sbyte>, "sbyte"); 
+              (typeof<char>, "char"); 
+              (typeof<bool>, "bool"); 
+              (typeof<uint32>, "uint"); 
+              (typeof<uint64>, "ulong"); 
+              (typeof<uint16>, "ushort"); 
+              (typeof<decimal>, "decimal"); 
+              (typeof<char>, "char") ],
+              fst,
+              snd)
+
+    static member TryPrimTypeToName(t: Type) = 
+        let ok, name = RTType.PrimTypeNamesMap.TryGetValue(t)
+        if ok then Some name else None
 
     static member MaybeType(form: obj, stringOk: bool) =
         match form with

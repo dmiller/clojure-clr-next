@@ -21,6 +21,11 @@ type RTMap() =
         else
             PersistentHashMap.create init
 
+    static member keys( coll: obj) =
+        match coll with
+        | :? IPersistentMap as ipm -> KeySeq.createFromMap(ipm)
+        | _ -> KeySeq.create(RT0.seq(coll))
+
     static member set( [<ParamArray>] init: obj array) : IPersistentSet =
         PersistentHashSet.createWithCheck init
 
@@ -52,3 +57,4 @@ type RTMap() =
         match coll with
         | null -> coll
         | _ -> (coll :?> IPersistentMap).without(key)
+

@@ -53,28 +53,89 @@ type Reflector private () =
             let methods = Reflector.GetMethods(t, methodName, GenericTypeArgList.Empty, args.Length, true)
             Reflector.InvokeMatchingMethod(methodName, methods, t, null, args)
 
-    static member GetMethods(targetType: Type, methodName: string, typeArgs: GenericTypeArgList, arity: int, getStatics: bool) =
+    static member GetMethods(targetType: Type, methodName: string, typeArgs: GenericTypeArgList, arity: int, getStatics: bool)  : IList<MethodBase> =
         let flags = BindingFlags.Public ||| BindingFlags.FlattenHierarchy ||| BindingFlags.InvokeMethod  ||| (if getStatics then BindingFlags.Static else BindingFlags.Instance)
 
         if targetType.IsInterface && not getStatics then
-            Reflector.GetInterfaceMethods(targetType, methodName, typeArgs, arity)
+            Reflector.GetInterfaceMethods(targetType, methodName, typeArgs, arity).Cast<MethodBase>().ToList()
+            
         else
             (targetType.GetMethods(flags).Where(fun m -> m.Name = methodName && m.GetParameters().Length = arity)
+       
             |> Seq.choose (fun m -> 
+                                let genArgs = m.GetGenericArguments()
+                                if typeArgs.IsEmpty && genArgs.Length = 0 then
+                                    Some m
+                                elif not typeArgs.IsEmpty && typeArgs.Count = genArgs.Length then
+                                    Some  <| m.MakeGenericMethod(typeArgs.ToArray())
+                                else
+                                    None)
+                                    
+             |> Seq.cast<MethodBase>).ToList()
+
+    // We are returning list of MethodBase rather than MethodInfo?  Above and below.
+
+    static member GetInterfaceMethods(targetType: Type, methodName: string, typeArgs: GenericTypeArgList, arity: int) : List<MethodBase> =
+        let flags = BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.InvokeMethod
+        let interfaces = List<Type>([| targetType |])
+        interfaces.AddRange(targetType.GetInterfaces())
+        (interfaces
+        |> Seq.collect (fun i -> i.GetMethods(flags).Where(fun m -> m.Name = methodName && m.GetParameters().Length = arity))
+        |> Seq.choose (fun m -> 
                 let genArgs = m.GetGenericArguments()
                 if typeArgs.IsEmpty && genArgs.Length = 0 then
                     Some m
                 elif not typeArgs.IsEmpty && typeArgs.Count = genArgs.Length then
                     Some  <| m.MakeGenericMethod(typeArgs.ToArray())
                 else
-                    None)).ToList()
+                    None)
+         |> Seq.cast<MethodBase>).ToList()
 
 
-    static member GetInterfaceMethods(targetType: Type, methodName: string, typeArgs: GenericTypeArgList, arity: int) : List<MethodInfo> =
-        let flags = BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.InvokeMethod
-        let interfaces = List<Type>([| targetType |])
-        interfaces.AddRange(targetType.GetInterfaces())
-        for ifx in interfaces
+    static member InvokeMatchingMethod(methodName: string, infos: IList<MethodBase>, t: Type, target: obj, args: obj array) =
+        let targetType = if isNull t then target.GetType() else t
+
+        let info : MethodBase =
+            if infos.Count = 0 then
+                null
+            elif infos.Count = 1 then
+                infos[0] 
+            else
+                let mutable found: MethodBase = null
+                for i = 0 to infos.Count - 1 do
+                    let m = infos.[i]
+                    let pis = m.GetParameters()
+                    if Reflector.IsCongruent(pis, args) && ( found = null  || Reflector.Subsumes(pis, found.GetParameters()) ) then
+                        found <- m
+                found
+
+        if isNull info then
+            raise <| new ArgumentException( $"""Cannot find {if isNull t then "instance" else "static"} method named: {methodName} for type: {targetType.Name} with {args.Length} arguments""")
+    
+        Reflector.InvokeMethod(info :?> MethodInfo, target, args)
+
+    static member InvokeMethod(info: MethodInfo, target: obj, args: obj array) =
+        let boxedArgs = Reflector.BoxArgs(info.GetParameters(), args)
+
+        if info.ReturnType = typeof<Void> then
+            info.Invoke(target, boxedArgs) |> ignore
+            null
+        else
+            Reflector.prepRet(info.ReturnType, info.Invoke(target, boxedArgs))
+
+    static member prepRet(t:Type, x: obj) = x
+    // at some point, this used to be more complicated
+            
+            //if (!t.IsPrimitive)
+            //    return x;
+
+            //if (x is Boolean)
+            //    //return ((Boolean)x) ? RT.T : RT.F;
+            //    return ((Boolean)x) ? true : false;
+            //else if (x is Int32)
+            //    return (long)(int)x;
+            ////else if (x is Single)
+            ////    return (double)(float)x;
 
 
     // TODO: How can this even be correct
@@ -163,7 +224,7 @@ type Reflector private () =
             false
         
 
-and [<Sealed>]  internal GenericTypeArgList private (_typeArgs : List<Type>) = 
+and [<Sealed>] GenericTypeArgList private (_typeArgs : List<Type>) = 
     
     // An empty instance
     // In the semantics of (type-args ...), (type-args) is equivalent to not having any type args at all -- it is ignored.

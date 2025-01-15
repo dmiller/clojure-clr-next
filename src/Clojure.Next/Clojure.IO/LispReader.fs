@@ -5,6 +5,7 @@ open Clojure.Lib
 open System.Collections.Generic
 open System
 open System.IO
+open System.Linq
 open System.Text
 open System.Text.RegularExpressions
 open Clojure.Numerics
@@ -74,6 +75,49 @@ type RTReader() =
         | null -> Namespace.find(nsSym)
         | _ as ns -> ns
 
+    // THere is some duplicate code here.  Can we consolidate?
+    // THis is also used to be in Compiler, but is only used in LispReader.
+    static member ResolveSymbol(sym: Symbol) = 
+        // already qualifed or classname?
+        if sym.Name.IndexOf('.') > 0 then
+            sym
+        elif not <| isNull sym.Namespace then
+            let ns = RTReader.NamespaceFor(sym)
+
+            // This test is nasty.  The second half says ns.Name.Name and sym.Namespace match. Whether null or not.
+            if isNull ns || (if isNull ns.Name.Name then isNull sym.Namespace else ns.Name.Name.Equals(sym.Namespace)) then
+                match RTType.MaybeArrayType(sym) with
+                | null -> sym
+                | _ as at -> RTReader.ArrayTypeToSymbol(at)
+            else
+                // we know ns is not null at this point
+                Symbol.intern(ns.Name.Name, sym.Name)
+        else
+            let currentNS = RTVar.getCurrentNamespace()
+            match currentNS.getMapping(sym) with
+            | null -> Symbol.intern(currentNS.Name.Name, sym.Name)
+            | :? Type as ot -> Symbol.intern(null, Util.nameForType(ot))
+            | :? Var as v -> Symbol.intern(v.Namespace.Name.Name, v.Symbol.Name)
+            | _ -> null
+
+    static member ArrayTypeToSymbol(t: Type) = 
+
+        let rec loop (t: Type) (dim: int) =
+            if t.IsArray && dim <= 9 then
+                loop (t.GetElementType()) (dim + 1)
+            else 
+                t, dim
+
+        let componentType, dim = loop t 0
+
+        if dim <= 9 && dim >= 1 then
+           let nameOpt = RTType.TryPrimTypeToName(componentType)
+           match nameOpt with
+           | Some name -> Symbol.intern(name + dim.ToString())
+           | None -> Symbol.intern(componentType.FullName,dim.ToString())
+        else
+            Symbol.intern(null,t.FullName)
+
     static member NamesStaticMember(sym:Symbol) =
         not <| isNull sym.Namespace && isNull <| RTReader.NamespaceFor(sym)
 
@@ -113,8 +157,64 @@ type LispReader() =
     static let ListSym = Symbol.intern("clojure.core", "list")
     static let WithMetaSym = Symbol.intern("clojure.core", "with-meta")
     static let SeqSym = Symbol.intern("clojure.core", "seq")
+
+
+
+    // Compiler special forms
+    // Obviously this should be over in the Clojure.Compiler, but it is used here.
+    // I had hoped to have a version of LispReader that could be delivered separately, but perhaps that is just the EdnReader and LispReader should reside with the compiler?
+
+    static let DefSym = Symbol.intern("def");
+    static let LoopSym = Symbol.intern("loop*");
+    static let RecurSym = Symbol.intern("recur");
+    static let IfSym = Symbol.intern("if");
+    static let CaseSym = Symbol.intern("case*");
+    static let LetSym = Symbol.intern("let*");
+    static let LetfnSym = Symbol.intern("letfn*");
+    static let DoSym = Symbol.intern("do");
     static let FnSym = Symbol.intern("fn*")
+    static let QuoteSym = Symbol.intern("quote")
+    static let TheVarSym = Symbol.intern("var")
+    static let ImportSym = Symbol.intern("clojure.core","import*");
+    static let DotSym = Symbol.intern(".");
+    static let AssignSym = Symbol.intern("set!");
+    static let DeftypeSym = Symbol.intern("deftype*");
+    static let ReifySym = Symbol.intern("reify*");
+    static let TrySym = Symbol.intern("try");
+    static let ThrowSym = Symbol.intern("throw");
+    static let MonitorEnterSym = Symbol.intern("monitor-enter");
+    static let MonitorExitSym = Symbol.intern("monitor-exit");
+    static let CatchSym = Symbol.intern("catch");
+    static let FinallySym = Symbol.intern("finally");
+    static let NewSym = Symbol.intern("new");
     static let AmpersandSym = Symbol.intern("&")
+
+    static let CompilerSpecialSymbols = 
+        PersistentHashSet.create(
+            DefSym, 
+            LoopSym, 
+            RecurSym, 
+            IfSym, 
+            CaseSym, 
+            LetSym, 
+            LetfnSym, 
+            DoSym, 
+            FnSym, 
+            QuoteSym, 
+            TheVarSym, 
+            ImportSym, 
+            DotSym, 
+            AssignSym, 
+            DeftypeSym, 
+            ReifySym, 
+            TrySym, 
+            ThrowSym, 
+            MonitorEnterSym, 
+            MonitorExitSym, 
+            CatchSym, 
+            FinallySym, 
+            NewSym, 
+            AmpersandSym)
 
     // Keyword definitions
 
@@ -176,6 +276,10 @@ type LispReader() =
     // macro characters and #-dispatch
     static let macros = Array.zeroCreate<ReaderFunction option>(256)
     static let dispatchMacros = Array.zeroCreate<ReaderFunction option>(256)
+
+    // A couple of constants
+    static let MaxLongAsBigInteger = BigInteger(Int64.MaxValue)
+    static let MinLongAsBigInteger = BigInteger(Int64.MinValue)
 
 
     static do 
@@ -244,6 +348,12 @@ type LispReader() =
         match v with 
         | :? ReaderResolver as r -> Some r
         | _ -> None
+
+    static member getGensymEnv() : IPersistentMap option =
+        let m = (GensymEnvVar:>IDeref).deref()
+        match m with 
+        | :? IPersistentMap as pm -> Some pm
+        | _ -> None 
 
     // Entry points for reading
 
@@ -714,8 +824,9 @@ type LispReader() =
         // TODO:  Need to enable other radixes
         BigInteger.Parse(s)
 
+    
     static member bigIntegerAsInt64(bi: BigInteger) =
-        if bi < Int64.MinValue || bi > Int64.MaxValue then
+        if bi < MinLongAsBigInteger || bi > MaxLongAsBigInteger then
             None
         else
             Some (int64 bi)
@@ -926,8 +1037,105 @@ type LispReader() =
     // ::{:c 1}   => {:a.b/c 1}  (where *ns* = a.b)
     // ::a{:c 1}  => {:a.b/c 1}  (where a is aliased to a.b)
     static member private namespaceMapReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        
+        let autoChar = r.Read()
+        let auto = 
+            if autoChar = int ':' then true 
+            else r.Unread(autoChar); false
 
+        let mutable osym : obj = null
+        let mutable nextChar = r.Read()
+
+        if LispReader.isWhitespace(nextChar) then
+            // the #:: { } case or an error
+            if auto then
+                while LispReader.isWhitespace(nextChar) do
+                    nextChar <- r.Read()
+                if nextChar <> int '{' then
+                    LispReader.unread(r, nextChar)
+                    raise <| new ArgumentException("Namespaced map must specify a namespace")
+            else
+                LispReader.unread(r, nextChar)
+                raise <| new ArgumentException("Namespaced map must specify a namespace")
+        elif nextChar <> int '{' then
+            // #:foo { } or #::foo { }
+            LispReader.unread(r, nextChar)
+            osym <- LispReader.read(r, true, null, false, opts, pendingForms)
+            nextChar <- r.Read()
+            while LispReader.isWhitespace(nextChar) do
+                nextChar <- r.Read()
+
+        if nextChar <> int '{' then
+            raise <| new ArgumentException("Namespaced map must specify a map")
+
+        // Resolve autoresolved ns
+        let mutable ns = String.Empty
+        let ssym = 
+            match osym with
+            | :? Symbol as s -> s
+            | _ -> null
+
+        if auto then
+            let resolver  = LispReader.getReaderResolver()
+            if isNull osym then 
+                ns <- 
+                    match resolver with
+                    | Some r -> r.currentNS().Name
+                    | _ -> RTVar.getCurrentNamespace().Name.Name
+            elif isNull ssym || not <| isNull ssym.Namespace then
+                raise <| new ArgumentException($"Namespaced map must specify a valid namespace: {osym}")
+            else
+                let resolvedNS = 
+                    match resolver with
+                    | Some r -> r.resolveAlias(ssym)
+                    | _ ->
+                        let rns = RTVar.getCurrentNamespace().lookupAlias(ssym)
+                        match rns with 
+                        | null -> null
+                        | _ -> rns.Name
+                match resolvedNS with
+                | null -> raise <| new ArgumentException($"Unknown auto-resolved namespace alias: {osym}")
+                | _ -> ns <- resolvedNS.Name
+
+        elif isNull ssym || not <| isNull ssym.Namespace then
+            raise <| new ArgumentException($"Namespaced map must specify a valid namespace: {osym}")
+        else 
+            ns <- ssym.Namespace
+
+        // Read map
+        let kvs = LispReader.readDelimitedList('}', r, true, opts, LispReader.ensurePending(pendingForms)).ToList()
+        if (kvs.Count &&& 1) = 1 then
+            raise <| new ArgumentException("Namespaced map literal must contain an even number of forms")
+
+        // Construct output map
+        let a = Array.zeroCreate<obj>(kvs.Count)
+        use mutable e = kvs.GetEnumerator()
+        let mutable i = 0
+        while e.MoveNext() do
+            let mutable k = e.Current
+            e.MoveNext() |> ignore;
+            let v =  e.Current
+            
+            match k with 
+            | :? Keyword as kw ->
+                k <- if isNull kw.Namespace then 
+                        Keyword.intern(ns,kw.Name)
+                     else 
+                        Keyword.intern(null, kw.Name)
+            | _ ->
+                k <- match k with 
+                     | :? Symbol as s -> 
+                        if isNull s.Namespace then
+                            Symbol.intern(ns, s.Name) :> obj
+                        else 
+                            Symbol.intern(null, s.Name) :> obj
+                     | _ -> k
+
+            a[i] <- k
+            a[i + 1] <- v
+            i <- i + 2
+            
+        RTMap.map(a)
 
     static member val symbolicValuesMap = Map(
          [  (Symbol.intern("Inf"), Double.PositiveInfinity); 
@@ -951,10 +1159,204 @@ type LispReader() =
 
 
     static member private syntaxQuoteReader(r: PushbackTextReader, backquote: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        try
+            Var.pushThreadBindings(RTMap.map(GensymEnvVar, PersistentHashMap.Empty))
+            let form = LispReader.readAux(r, opts, LispReader.ensurePending(pendingForms))
+            LispReader.SyntaxQuote(form)
+        finally
+            Var.popThreadBindings() |> ignore
+
+
+    static member private SyntaxQuote(form: obj) =
+        let ret, checkMeta = LispReader.AnalyzeSyntaxQuote(form)
+
+        if checkMeta then
+            match form with
+            | :? IObj as iobj when not <| isNull (iobj.meta()) ->
+                let newMeta = iobj.meta().without(LineKeyword).without(ColumnKeyword).without(SourceSpanKeyword)
+                if newMeta.count() = 0 then
+                    ret
+                else
+                    RTSeq.list(WithMetaSym, ret, LispReader.SyntaxQuote(iobj.meta()))
+            | _ -> ret                
+        else
+            ret
+
+    static member private IsSpecial(sym: obj) = CompilerSpecialSymbols.Contains(sym)
+
+    static member private AnalyzeSyntaxQuote(form: obj) : obj * bool =
+        match form with
+        | _ when  LispReader.IsSpecial(form) -> 
+            RTSeq.list(QuoteSym, form), true
+        | :? Symbol as sym ->
+            let analyzedSym = LispReader.AnalyzeSymbolForSyntaxQuote(sym)
+            RTSeq.list(QuoteSym,analyzedSym), true
+        | _ when LispReader.IsUnquote(form) ->
+            RTSeq.second(form), false
+        | _ when LispReader.IsUnquoteSplicing(form) ->
+            raise <| new ArgumentException("splice not in list")
+        | :? IPersistentCollection ->
+            match form with
+            | :? IRecord -> form, true
+            | :? IPersistentMap ->
+                let keyvals : IPersistentVector = LispReader.FlattenMap(form)
+                RTSeq.list(ApplySym, HashMapSym, RTSeq.list(SeqSym, RTSeq.cons(ConcatSym, LispReader.SyntaxQuoteExpandList(keyvals.seq())))), true
+            | :? IPersistentVector as v ->  
+                RTSeq.list(ApplySym, VectorSym, RTSeq.list(SeqSym, RTSeq.cons(ConcatSym, LispReader.SyntaxQuoteExpandList(v.seq())))), true
+            | :? IPersistentSet as s ->
+                 RTSeq.list(ApplySym, HashSetSym, RTSeq.list(SeqSym, RTSeq.cons(ConcatSym, LispReader.SyntaxQuoteExpandList(s.seq())))), true
+            | :? ISeq | :? IPersistentList ->
+                    match RT0.seq(form) with
+                    | null -> RTSeq.cons(ListSym, null), true
+                    | _ as seq-> RTSeq.list(SeqSym, RTSeq.cons(ConcatSym, LispReader.SyntaxQuoteExpandList(seq))), true
+            | _ -> raise <| new ArgumentException("Unknown collection type")
+        | :? Keyword | :? Char | :? String -> form, true
+        | _ when Numbers.IsNumeric(form) -> form, true
+        | _ -> RTSeq.list(QuoteSym, form), true
+
+
+    static member private AnalyzeSymbolForSyntaxQuote(sym: Symbol) =
+        let resolver = LispReader.getReaderResolver()
+        if isNull sym.Namespace && sym.Name.EndsWith("#") then
+            // gensym
+            let gmap = LispReader.getGensymEnv()
+            match gmap with
+            | Some m ->
+                let mappedGensym = m.valAt(sym) :?> Symbol
+                if isNull mappedGensym then
+                    let newGensym = Symbol.intern(null, sym.Name.Substring(0, sym.Name.Length - 1) + "__" + RT0.nextID().ToString() + "__auto__")
+                    GensymEnvVar.set(m.assoc(sym, newGensym)) 
+                else
+                    mappedGensym
+            | _ -> raise <| new InvalidDataException("Gensym literal not in syntax-quote")
+        elif isNull sym.Namespace && sym.Name.EndsWith(".") then
+            // constructor
+            let csym = Symbol.intern(null, sym.Name.Substring(0,sym.Name.Length-1))
+            let rsym = 
+                match resolver with 
+                | Some r -> 
+                    let resolvedClass = r.resolveClass(csym)
+                    if isNull resolvedClass then
+                        csym
+                    else
+                        resolvedClass
+                | None -> RTReader.ResolveSymbol(csym)
+            Symbol.intern(null, rsym.Name + ".")
+        elif isNull sym.Namespace && sym.Name.StartsWith(".") then
+            // method
+            sym
+
+        else 
+            match resolver with
+            | Some r -> 
+                let resolvedNS =
+                    match sym.Namespace with
+                    | null -> null
+                    | _ ->
+                        let alias = Symbol.intern(null, sym.Namespace)
+                        match r.resolveClass(alias) with
+                        | null -> r.resolveAlias(alias)
+                        | _ as ns -> ns
+                if not <| isNull resolvedNS then
+                    //Classname/foo => package.qualified.Classname/foo
+                    Symbol.intern(resolvedNS.Name, sym.Name)
+                 elif isNull sym.Namespace then
+                    let resolvedSym = 
+                        match r.resolveClass(sym) with
+                        | null -> r.resolveVar(sym)
+                        | _ as rsym -> rsym
+                    match resolvedSym with
+                    | null -> Symbol.intern(r.currentNS().Name, sym.Name)
+                    | _ -> resolvedSym
+                else 
+                   sym
+            | _ -> 
+                // No resolver.  Use the current namespace instead for what makes sense (i.e., mapping)
+                let maybeClass =
+                    if not <| isNull sym.Namespace then
+                        RTVar.getCurrentNamespace().getMapping(Symbol.intern(null, sym.Namespace))
+                    else
+                        null
+                match maybeClass with
+                | :? Type as t ->
+                    // Classname/foo -> package.qualified.Classname/foo
+                    Symbol.intern(t.Name, sym.Name)
+                | _ -> RTReader.ResolveSymbol(sym)
+
+    static member private SyntaxQuoteExpandList(seq: ISeq) =
+        let rec loop (s: ISeq) (ret: IPersistentVector) =
+            match s with
+            | null -> ret.seq()
+            | _ ->
+                let item = s.first()
+                let nextRet = 
+                    if LispReader.IsUnquote(item) then
+                        ret.cons(RTSeq.list(ListSym, RTSeq.second(item)))
+                    elif LispReader.IsUnquoteSplicing(item) then
+                        ret.cons(RTSeq.second(item))
+                    else
+                        ret.cons(RTSeq.list(ListSym, LispReader.SyntaxQuote(item)))
+                loop (s.next()) nextRet
+        loop seq, PersistentVector.Empty
+
+(*
+
+
+
+   
+                    else
+                    {
+                        object maybeClass = null;
+                        if (sym.Namespace != null)
+                            maybeClass = Compiler.CurrentNamespace.GetMapping(
+                                Symbol.intern(null, sym.Namespace));
+                        Type t = maybeClass as Type;
+
+                        if (t != null)
+                        {
+                            // Classname/foo -> package.qualified.Classname/foo
+                            sym = Symbol.intern(t.Name, sym.Name);
+                        }
+                        else
+                            sym = Compiler.resolveSymbol(sym);
+                    }
+                    return RT.list(Compiler.QuoteSym, sym);
+                }
+
+*)
+
+             
+    static member FlattenMap(form: obj) =
+        let rec loop (s: ISeq) (kvs: IPersistentVector) =
+            match s with
+            | null -> kvs
+            | _ ->
+                let e = s.first() :?> IMapEntry
+                let kvs1 = kvs.cons(e.key()).cons(e.value())
+                loop (s.next()) kvs1
+        loop (RT0.seq(form)) PersistentVector.Empty
+            
+        
+    static member IsUnquote(form: obj) = 
+        match form with
+        | :? ISeq as s -> Util.equals(RTSeq.first(s), UnquoteSym)
+        | _ -> false        
+
+
+    static member IsUnquoteSplicing(form: obj) = 
+        match form with
+        | :? ISeq as s -> Util.equals(RTSeq.first(s), UnquoteSplicingSym)
+        | _ -> false       
+
+
+
+                
+
+
+
 
     static member private unquoteReader(r: PushbackTextReader, comma: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        asdf
 
     static member private dispatchReader(r: PushbackTextReader, hash: char, opts: obj, pendingForms: obj) : obj =
         let ch = r.Read()
@@ -1186,13 +1588,13 @@ type LispReader() =
                 let rec loop (s: ISeq) =
                     match s with 
                     | null -> None
-                    | _ when not <| (s.first() :> Keyword) -> Some (s.first())
+                    | _ when not <| (s.first() :? Keyword) -> Some (s.first())
                     | _ -> loop (s.next())
                 let hasBadArg = loop (RTMap.keys(vals))
                 match hasBadArg with
                 | Some k -> raise <| new ArgumentException($"Unreadable defrecord form: key must be of type clojure.lang.Keyword, got {k.ToString()}")
                 | None ->
-                    Reflector.InvokeStaticMethod(recordType, "create", [| vals |])
+                    Reflector.InvokeStaticMethod(recordType, "create", [| vals :> obj |])
 
         | _ ->
             raise <| new ArgumentException($"Unreadable constructor form starting with \"#{recordName}\"")
@@ -1201,10 +1603,10 @@ type LispReader() =
 
 
     static member private unreadableReader(r: PushbackTextReader, tilde: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        raise <| new ArgumentException("Unreadable form")
 
     static member private conditionalReader(r: PushbackTextReader, hash: char, opts: obj, pendingForms: obj) : obj =
-        raise <| new NotImplementedException()
+        asdf
 
 
 

@@ -374,7 +374,7 @@ and [<Sealed;AllowNullLiteral>] TBox(thread: Thread, v: obj) =
 
     member _.Thread with get() = thread
     
-and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) = 
+and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) = 
     inherit ARef(PersistentHashMap.Empty)
 
     // revision counter
@@ -395,6 +395,8 @@ and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) =
     [<DefaultValue;ThreadStatic>]
     static val mutable private currentFrame : Frame
 
+    member _.Symbol = _sym
+
     static member private CurrentFrame 
         with get() = 
             if isNull Var.currentFrame then Var.currentFrame <- Frame.Top
@@ -408,8 +410,8 @@ and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) =
 
     override _.ToString() =
         match _ns with
-        | null -> $"""#<Var: {if isNull sym then "--unnamed--" else sym.ToString()}>"""
-        | _ -> $"#'{_ns}/{sym}"
+        | null -> $"""#<Var: {if isNull _sym then "--unnamed--" else _sym.ToString()}>"""
+        | _ -> $"#'{_ns}/{_sym}"
     // To avoid initialization checks that would be caused by the circular dependency between the Var and the Unbound value in its root,
     // I made the constructor private and created a factory method to create a Var.
     // Called createInternal to avoid name collision with the 'create' method in the public interface.
@@ -425,7 +427,7 @@ and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) =
         v
 
     member _.Namespace = _ns
-    member _.Name = sym
+    member _.Name = _sym
 
 
     ////////////////////////////////
@@ -578,7 +580,7 @@ and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) =
     // Set the metadata attached to this var.
     // The metadata must contain entries for the namespace and name.
     member this.setMeta(m: IPersistentMap) =
-        (this :> IReference).resetMeta(m.assoc(Var.nameKey,sym).assoc(Var.nsKey,_ns)) |> ignore
+        (this :> IReference).resetMeta(m.assoc(Var.nameKey,_sym).assoc(Var.nsKey,_ns)) |> ignore
 
     // Add a macro=true flag to the metadata.
     member this.setMacro() = (this :> IReference).alterMeta(Var.assocFn,RTSeq.list(Var.macroKey,true)) |> ignore
@@ -632,10 +634,10 @@ and [<Sealed;AllowNullLiteral>] Var private (_ns: Namespace, sym: Symbol) =
         this.validate(v)
         let tbox = this.getThreadBinding()
         match tbox with
-        | null -> raise <| new InvalidOperationException($"Can't change/establish root binding of: {sym} with set")
+        | null -> raise <| new InvalidOperationException($"Can't change/establish root binding of: {_sym} with set")
         | _ -> 
             if not <| Object.ReferenceEquals(Thread.CurrentThread,tbox.Thread) then
-                raise <| new InvalidOperationException($"Can't set!: {sym} from non-binding thread")
+                raise <| new InvalidOperationException($"Can't set!: {_sym} from non-binding thread")
             tbox.Value <- v
             v
 
@@ -850,10 +852,13 @@ and [<Sealed;AbstractClass>] RTVar() =
 
     static member val ReaderResolverVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*reader-resolver*"), null).setDynamic()
     static member val ReadEvalVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*read-eval*"), RTVar._readEval).setDynamic()
+    static member val SuppressReadVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*suppress-read*"), null).setDynamic()
 
 
     static member getCurrentNamespace() = (RTVar.CurrentNSVar :> IDeref).deref() :?> Namespace
 
+    // In here because both LispReader and EdnReader need it
+    static member suppressRead() = RT0.booleanCast((RTVar.SuppressReadVar :> IDeref).deref())
 
     static member readTrueFalseUnknown(s: string) : obj  = 
         match s with
