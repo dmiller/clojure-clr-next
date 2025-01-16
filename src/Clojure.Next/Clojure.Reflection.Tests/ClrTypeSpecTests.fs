@@ -290,7 +290,7 @@ let ArrayTests =
                 Expect.equal spec.ArraySpec.Count 1 "Should have one array spec"
                 testArraySpec(spec.ArraySpec[0], 1, true)
 
-          ftestCase "Single array, several dimension, bound"
+          testCase "Single array, several dimension, bound"
           <| fun _ ->
                 let result = ClrTypeSpec.Parse "MyType[*]"
 
@@ -311,7 +311,7 @@ let ArrayTests =
                 Expect.equal msg "Array spec cannot have 2 bound dimensions" "Has correct error message" 
 
 
-          ftestCase "multi-dimensional array cannot be bound"  
+          testCase "multi-dimensional array cannot be bound"  
           <| fun _ ->
                 let result = ClrTypeSpec.Parse "MyType[*,]"
 

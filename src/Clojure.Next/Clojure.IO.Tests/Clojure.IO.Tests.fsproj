@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="LispReaderTests.fs" />
     <Compile Include="LineNumberingReaderTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

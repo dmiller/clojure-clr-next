@@ -850,6 +850,16 @@ and [<Sealed;AbstractClass>] RTVar() =
 
     // Pre-defined Vars (miscellaneous)
 
+    // Need to have this located before the initialization of ReadEvalVar
+    static member val _readEval =
+        let mutable v = Environment.GetEnvironmentVariable("CLOJURE_READ_EVAL")
+        if isNull v then
+            v <- Environment.GetEnvironmentVariable("clojure.read.eval")
+        if isNull v then
+            v <- "true"
+        RTVar.readTrueFalseUnknown(v)
+
+
     static member val ReaderResolverVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*reader-resolver*"), null).setDynamic()
     static member val ReadEvalVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*read-eval*"), RTVar._readEval).setDynamic()
     static member val SuppressReadVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*suppress-read*"), null).setDynamic()
@@ -866,13 +876,6 @@ and [<Sealed;AbstractClass>] RTVar() =
         | "false" -> false
         | _ -> Keyword.intern(null, "unknown")
 
-    static member val _readEval =
-        let mutable v = Environment.GetEnvironmentVariable("CLOJURE_READ_EVAL")
-        if isNull v then
-            v <- Environment.GetEnvironmentVariable("clojure.read.eval")
-        if isNull v then
-            v <- "true"
-        RTVar.readTrueFalseUnknown(v)
 
     // original comment: duck typing stderr plays nice with e.g. swank 
     static member errPrintWriter() : TextWriter =

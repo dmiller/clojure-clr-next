@@ -160,3 +160,4 @@ module internal ArithmeticHelpers =
             uintlogTable
             |> List.findIndex (fun x -> v <= x)
             |> uint
+
