@@ -974,12 +974,6 @@ type LispReader() =
         | None -> raise <| new FormatException($"Invalid number: {s}")
         | Some n -> n
 
-    // In our old clojure.lang.BigNumber, we had an
-    static member parseBigIntegerInRadix(s: string, radix: int) =
-        // TODO:  Need to enable other radixes
-        BigInteger.Parse(s)
-
-
     static member bigIntegerAsInt64(bi: BigInteger) =
         if bi < MinLongAsBigInteger || bi > MaxLongAsBigInteger then
             None
@@ -1009,7 +1003,7 @@ type LispReader() =
             match n with
             | null, _ -> None
             | n, radix ->
-                let bn = LispReader.parseBigIntegerInRadix (n, radix)
+                let bn = BigIntegerExtensions.Parse(n, radix)
                 let bn = if isNeg then -bn else bn
 
                 Some
