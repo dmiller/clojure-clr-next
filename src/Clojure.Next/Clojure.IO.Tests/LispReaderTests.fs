@@ -6,6 +6,8 @@ open Clojure.Numerics
 open System.Numerics
 open Clojure.BigArith
 open System
+open System.IO
+open Clojure.Collections
 
 
 let TestDecimalMatch(inStr: string, bdStr: string) =
@@ -15,6 +17,32 @@ let TestDecimalMatch(inStr: string, bdStr: string) =
     Expect.equal (d1.GetType()) typeof<BigDecimal>  "Should have type BigDecimal"
     Expect.equal d1 (BigDecimal.Parse(bdStr))  $"Should be {bdStr}"
 
+let CreatePushbackReaderFromString(s: string) =
+    let sr = new System.IO.StringReader(s)
+    new PushbackTextReader(sr)
+
+let ReadFromString(s: string) =
+    let r = CreatePushbackReaderFromString(s)
+    LispReader.read(r,true,null,false)
+
+let CreateLNPBRFromString(s: string) =
+    let sr = new System.IO.StringReader(s)
+    new LineNumberingTextReader(sr)
+
+let ReadFromStringNumbering(s: string) =
+    let r = CreateLNPBRFromString(s)
+    LispReader.read(r,true,null,false)
+
+let ExpectNumberMatch (value: obj) (expected: obj) (t: Type) =
+    Expect.equal (value.GetType()) t  "Should have correct type"
+    Expect.equal value expected  "Should have correct value"
+
+let ExpectSymbolMatch (value: obj) (nameSpace:string) (name: string) =
+    Expect.equal (value.GetType()) typeof<Symbol>  "Should have type Symbol"
+    let s = value :?> Symbol
+    Expect.equal s.Namespace nameSpace  "Should have correct namespace"
+    Expect.equal s.Name name  "Should have correct name"
+
 
 [<Tests>]
 let MatchNumberTests =
@@ -22,7 +50,7 @@ let MatchNumberTests =
         "LispReader.MatchNumber"
         [ 
         
-          testCase "Reads zero, with optional sign"
+          testCase "matchNumber matches zero, with optional sign"
           <| fun _ ->
             let o1 = LispReader.matchNumber "0"
             let o2 = LispReader.matchNumber "+0"
@@ -43,7 +71,7 @@ let MatchNumberTests =
             Expect.equal (i3.GetType()) typeof<int64>  "Should have type int64"
             Expect.equal i3 0L  "Should be zero"
 
-          testCase "Reads basic decimal integers, with optional sign"
+          testCase "matchNumber matches basic decimal integers"
           <| fun _ ->
             let o1 = LispReader.matchNumber "123"
             let o2 = LispReader.matchNumber "+123"
@@ -72,7 +100,7 @@ let MatchNumberTests =
             Expect.equal (i4.GetType()) typeof<BigInt>  "Should have type int64"
             Expect.equal i4 (BigInt.fromBigInteger(BigInteger.Parse("12345678901234567890")))  "Should be 123"
 
-          ftestCase "Reads basic hexidecimal integers, with optional sign"
+          testCase "matchNumber matches basic hexidecimal integers"
           <| fun _ ->
             let o1 = LispReader.matchNumber "0X12A"
             let o2 = LispReader.matchNumber "+0xFFF"
@@ -93,7 +121,7 @@ let MatchNumberTests =
             Expect.equal (i3.GetType()) typeof<BigInt>  "Should have type BigInt"
             Expect.equal i3 (BigInt.fromBigInteger(BigIntegerExtensions.Parse("-FFFFFFFFFFFFFFFFFFFFFFFF", 16)))  "Should be zero"
 
-          ftestCase "Reads basic octal integers, with optional sign"
+          testCase "Reads basic octal integers, with optional sign"
           <| fun _ ->
             let o1 = LispReader.matchNumber "0123"
             let o2 = LispReader.matchNumber "+0123"
@@ -119,7 +147,7 @@ let MatchNumberTests =
             Expect.equal (i4.GetType()) typeof<BigInt>  "Should have type BigInt"
             Expect.equal i4 (BigInt.fromBigInteger(BigIntegerExtensions.Parse("01234567012345670123456777", 8)))  "Should be something big"
 
-          ftestCase "Reads integers in specified radix, with optional sign"
+          ftestCase "matchNumber reads integers in specified radix, with optional sign"
           <| fun _ ->
             let o1 = LispReader.matchNumber "2R1100"
             let o2 = LispReader.matchNumber "4R123"
@@ -146,7 +174,7 @@ let MatchNumberTests =
             Expect.equal i4 (BigInt.fromBigInteger(BigIntegerExtensions.Parse("1234QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQAQ", 30)))  "Should be something big"
 
 
-          ftestCase "Reads floating point"
+          testCase "matchNumber matches floating point"
           <| fun _ ->
             let o1 = LispReader.matchNumber "123.7"
             let o2 = LispReader.matchNumber "-123.7E4"
@@ -188,7 +216,7 @@ let MatchNumberTests =
             Expect.equal i7 1000.0  "Should be 1000.0"
 
 
-          ftestCase "Reads BigDecimals"
+          testCase "matchNumber matches BigDecimals"
           <| fun _ ->
             TestDecimalMatch("123.7M","123.7")
             TestDecimalMatch("-123.7E4M","-123.7E+4")
@@ -197,7 +225,7 @@ let MatchNumberTests =
             TestDecimalMatch("123456789.987654321E-6M", "123.456789987654321")
 
 
-          ftestCase "Reads Ratios"
+          testCase "matchNumber matches ratios"
           <| fun _ ->
             let o1 = LispReader.matchNumber "12/1"
             let o2 = LispReader.matchNumber "12/4"
@@ -223,7 +251,7 @@ let MatchNumberTests =
             Expect.equal (i4.GetType()) typeof<int64>  "Should have type int64"
             Expect.equal i4 100000L  "Should be 100000"
 
-          ftestCase "matchNumber matches whole string"
+          testCase "matchNumber matches whole string"
           <| fun _ ->
             let o1 = LispReader.matchNumber " 123"
             let o2 = LispReader.matchNumber "123 "
@@ -239,7 +267,7 @@ let MatchNumberTests =
             Expect.isTrue o5.IsNone  "Should not have parsed successfully"
             Expect.isTrue o6.IsNone  "Should not have parsed successfully"
           
-          ftestCase "matchNumber fails to match weird things"
+          testCase "matchNumber fails to match weird things"
           <| fun _ ->
             let o1 = LispReader.matchNumber "123a"
             let o2 = LispReader.matchNumber "0x123Z"
@@ -253,7 +281,144 @@ let MatchNumberTests =
 
             Expect.throwsT<FormatException> (fun () -> LispReader.matchNumber "10RAA" |> ignore)  "bad chars for given radix"
 
+        ]
 
+[<Tests>]
+let EOFTests =
+    testList
+        "Testing EOF"
+        [ 
+        
+          testCase "E0F value returned on EOF"
+          <| fun _ ->
+            let o = LispReader.read(CreatePushbackReaderFromString("    "), false, 7, false)
+            Expect.equal o 7  "Should be EOF value (7)"
+
+          testCase "E0F thrown on EOF"
+          <| fun _ ->
+            Expect.throwsT<EndOfStreamException> (fun _ -> LispReader.read(CreatePushbackReaderFromString("    "), true, 7, false) |> ignore) "should throw EOF exception"
 
         ]
 
+[<Tests>]
+let NumberReadTests =
+    testList
+        "Testing read on numbers"
+        [ 
+        
+          testCase "read reads integers"
+          <| fun _ ->
+            let o1 = ReadFromString "123"
+            let o2 = ReadFromString "+123"
+            let o3 = ReadFromString "-123"
+            let o4 = ReadFromString "12345678901234567890123456789"
+
+            ExpectNumberMatch o1 123L typeof<int64>
+            ExpectNumberMatch o2 123L typeof<int64>
+            ExpectNumberMatch o3 -123L typeof<int64>
+            ExpectNumberMatch o4 (BigInt.fromBigInteger(BigInteger.Parse("12345678901234567890123456789"))) typeof<BigInt>
+
+          testCase "read reads floats"
+          <| fun _ ->
+            let o1 = ReadFromString "123.4"
+            let o2 = ReadFromString "+123.4E4"
+            let o3 = ReadFromString "-123.4E-2"
+
+            ExpectNumberMatch o1 123.4 typeof<float>
+            ExpectNumberMatch o2 123.4E4 typeof<float>
+            ExpectNumberMatch o3 -123.4E-2 typeof<float>
+
+
+          testCase "read reads ratios"
+          <| fun _ ->
+            let o1 = ReadFromString "123/456"
+            let o2 = ReadFromString "-123/456"
+            let o3 = ReadFromString "+123/456"
+
+            ExpectNumberMatch o1 (Ratio(BigInteger(41),BigInteger(152))) typeof<Ratio>
+            ExpectNumberMatch o2 (Ratio(BigInteger(-41),BigInteger(152))) typeof<Ratio>
+            ExpectNumberMatch o3 (Ratio(BigInteger(41),BigInteger(152))) typeof<Ratio>
+
+          testCase "read reads BigDecimals"
+          <| fun _ ->
+            let o1 = ReadFromString "123.7M"
+            let o2 = ReadFromString "-123.7E4M"
+            let o3 = ReadFromString "+123.7E4M"
+            let o4 = ReadFromString "0.0001234500M"
+            let o5 = ReadFromString "123456789.987654321E-6M"
+
+            ExpectNumberMatch o1 (BigDecimal.Parse("123.7")) typeof<BigDecimal>
+            ExpectNumberMatch o2 (BigDecimal.Parse("-123.7E+4")) typeof<BigDecimal>
+            ExpectNumberMatch o3 (BigDecimal.Parse("123.7E4")) typeof<BigDecimal>
+            ExpectNumberMatch o4 (BigDecimal.Parse("0.0001234500")) typeof<BigDecimal>
+            ExpectNumberMatch o5 (BigDecimal.Parse("123.456789987654321")) typeof<BigDecimal>
+
+        ]
+
+
+[<Tests>]
+let SpecialTokenTests =
+    testList
+        "Testing read on special tokens"
+        [ 
+        
+          ftestCase "slash alone is slash"
+          <| fun _ ->
+            let o = ReadFromString "/"
+            ExpectSymbolMatch o null "/"
+
+          ftestCase "clojure.core slash is special"
+          <| fun _ ->
+            let o = ReadFromString "clojure.core//"
+            ExpectSymbolMatch o "clojure.core" "/"
+            
+          ftestCase "true/false are boolean"
+          <| fun _ ->
+            let t = ReadFromString "true"
+            let f = ReadFromString "false"
+            Expect.equal (t.GetType()) typeof<bool>  "Should have type bool"
+            Expect.equal (f.GetType()) typeof<bool>  "Should have type bool"
+            Expect.equal t true  "Should be true"
+            Expect.equal f false  "Should be false"
+
+          ftestCase "nil should be null"
+          <| fun _ ->
+            let n = ReadFromString "nil"
+            Expect.isNull n  "Should be null"
+
+        ]
+
+[<Tests>]
+let SymbolTests =
+    testList
+        "Testing read on symbols"
+        [ 
+        
+          ftestCase "symbols of various flavors"
+          <| fun _ ->
+            ExpectSymbolMatch (ReadFromString "abc") null "abc"                  // basic (no namesspace)
+            ExpectSymbolMatch (ReadFromString "abc/def") "abc" "def"             // with namespace
+            ExpectSymbolMatch (ReadFromString "abc/def/ghi") "abc/def" "ghi"     // multiple slashes allowed
+            ExpectSymbolMatch (ReadFromString "a:b:c/d:e:f") "a:b:c" "d:e:f"     // multiple colons allows (if not doubles, not beginning or ending)
+
+          ftestCase "bad symbols of various flavors"
+          <| fun _ ->
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "abc:/def" |> ignore) "Namespace should not end with trailing colon"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "abc/def:" |> ignore) "Name should not end with trailing colon"        
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "def:" |> ignore)     "Name should not end with trailing colon"        
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "ab::de" |> ignore)   "Double colon is bad"     
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "abc/ab::de" |> ignore)   "Double colon is bad"  
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "ab::de/efg" |> ignore)   "Double colon is bad"  
+
+          ftestCase "pipe escaping is fun!"
+          <| fun _ ->
+            ExpectSymbolMatch (ReadFromString "|ab(1 2)[1 2]{1 2}#{1 2}cd|") null "ab(1 2)[1 2]{1 2}#{1 2}cd"     // piping turns off special characters
+            ExpectSymbolMatch (ReadFromString "ab|(1 2)[1 2]{1 2}#{1 2}|cd") null "ab(1 2)[1 2]{1 2}#{1 2}cd"     // piping turns off special characters, even with pipes inside
+            ExpectSymbolMatch (ReadFromString "ab|(1 2)[1 2]|cd|{1 2}#{1 2}|ef") null "ab(1 2)[1 2]cd{1 2}#{1 2}ef"     // piping turns off special characters, even with multiple pipes inside
+            ExpectSymbolMatch (ReadFromString "ab|cd||ef|gh||||") null "abcd|efgh|"     // pipe escapes self
+            ExpectSymbolMatch (ReadFromString "ab|cd/ef|gh") null "abcd/efgh"     // piping eats slash
+            ExpectSymbolMatch (ReadFromString "ab/cd|ef/gh|ij") "ab" "cdef/ghij"     // piping eats slash
+
+            Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString "ab|cd|ef|gh" |> ignore) "Should throw EOF exception with unmatched pipe"
+
+        ]

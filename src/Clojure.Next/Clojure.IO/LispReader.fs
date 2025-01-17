@@ -502,7 +502,7 @@ type LispReader() =
 
             if ch = -1 then
                 if eofIsError then
-                    raise <| new Exception("EOF while reading")
+                    raise <| new EndOfStreamException("EOF while reading")
                 else
                     Some eofValue
             elif returnOn.IsSome && ch = (int (returnOn.Value)) then
