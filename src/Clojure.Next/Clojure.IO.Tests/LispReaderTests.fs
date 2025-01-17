@@ -8,6 +8,7 @@ open Clojure.BigArith
 open System
 open System.IO
 open Clojure.Collections
+open Clojure.Lib
 
 
 let TestDecimalMatch(inStr: string, bdStr: string) =
@@ -43,6 +44,16 @@ let ExpectSymbolMatch (value: obj) (nameSpace:string) (name: string) =
     Expect.equal s.Namespace nameSpace  "Should have correct namespace"
     Expect.equal s.Name name  "Should have correct name"
 
+let ExpectKeywordMatch (value: obj) (nameSpace:string) (name: string) =
+    Expect.equal (value.GetType()) typeof<Keyword>  "Should have type Keyword"
+    let s = value :?> Keyword
+    Expect.equal s.Namespace nameSpace  "Should have correct namespace"
+    Expect.equal s.Name name  "Should have correct name"
+
+let ExpectStringMatch (actual: obj)  (expected: string) =
+    Expect.equal (actual.GetType()) typeof<String>  "Should have type Keyword"
+    let s = actual :?> String
+    Expect.equal s expected  "Should have correct value"
 
 [<Tests>]
 let MatchNumberTests =
@@ -147,7 +158,7 @@ let MatchNumberTests =
             Expect.equal (i4.GetType()) typeof<BigInt>  "Should have type BigInt"
             Expect.equal i4 (BigInt.fromBigInteger(BigIntegerExtensions.Parse("01234567012345670123456777", 8)))  "Should be something big"
 
-          ftestCase "matchNumber reads integers in specified radix, with optional sign"
+          testCase "matchNumber reads integers in specified radix, with optional sign"
           <| fun _ ->
             let o1 = LispReader.matchNumber "2R1100"
             let o2 = LispReader.matchNumber "4R123"
@@ -362,17 +373,17 @@ let SpecialTokenTests =
         "Testing read on special tokens"
         [ 
         
-          ftestCase "slash alone is slash"
+          testCase "slash alone is slash"
           <| fun _ ->
             let o = ReadFromString "/"
             ExpectSymbolMatch o null "/"
 
-          ftestCase "clojure.core slash is special"
+          testCase "clojure.core slash is special"
           <| fun _ ->
             let o = ReadFromString "clojure.core//"
             ExpectSymbolMatch o "clojure.core" "/"
             
-          ftestCase "true/false are boolean"
+          testCase "true/false are boolean"
           <| fun _ ->
             let t = ReadFromString "true"
             let f = ReadFromString "false"
@@ -381,7 +392,7 @@ let SpecialTokenTests =
             Expect.equal t true  "Should be true"
             Expect.equal f false  "Should be false"
 
-          ftestCase "nil should be null"
+          testCase "nil should be null"
           <| fun _ ->
             let n = ReadFromString "nil"
             Expect.isNull n  "Should be null"
@@ -394,14 +405,14 @@ let SymbolTests =
         "Testing read on symbols"
         [ 
         
-          ftestCase "symbols of various flavors"
+          testCase "symbols of various flavors"
           <| fun _ ->
             ExpectSymbolMatch (ReadFromString "abc") null "abc"                  // basic (no namesspace)
             ExpectSymbolMatch (ReadFromString "abc/def") "abc" "def"             // with namespace
             ExpectSymbolMatch (ReadFromString "abc/def/ghi") "abc/def" "ghi"     // multiple slashes allowed
             ExpectSymbolMatch (ReadFromString "a:b:c/d:e:f") "a:b:c" "d:e:f"     // multiple colons allows (if not doubles, not beginning or ending)
 
-          ftestCase "bad symbols of various flavors"
+          testCase "bad symbols of various flavors"
           <| fun _ ->
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "abc:/def" |> ignore) "Namespace should not end with trailing colon"
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "abc/def:" |> ignore) "Name should not end with trailing colon"        
@@ -410,7 +421,7 @@ let SymbolTests =
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "abc/ab::de" |> ignore)   "Double colon is bad"  
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "ab::de/efg" |> ignore)   "Double colon is bad"  
 
-          ftestCase "pipe escaping is fun!"
+          testCase "pipe escaping is fun!"
           <| fun _ ->
             ExpectSymbolMatch (ReadFromString "|ab(1 2)[1 2]{1 2}#{1 2}cd|") null "ab(1 2)[1 2]{1 2}#{1 2}cd"     // piping turns off special characters
             ExpectSymbolMatch (ReadFromString "ab|(1 2)[1 2]{1 2}#{1 2}|cd") null "ab(1 2)[1 2]{1 2}#{1 2}cd"     // piping turns off special characters, even with pipes inside
@@ -422,3 +433,120 @@ let SymbolTests =
             Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString "ab|cd|ef|gh" |> ignore) "Should throw EOF exception with unmatched pipe"
 
         ]
+
+[<Tests>]
+let KeywordTests =
+    testList
+        "Testing read on keywords"
+        [ 
+        
+          testCase "keywords of various flavors"
+          <| fun _ ->
+            ExpectKeywordMatch (ReadFromString ":abc") null "abc"                  // basic (no namesspace)
+            ExpectKeywordMatch (ReadFromString ":abc/def") "abc" "def"             // with namespace
+            // TODO: (original) Add more tests dealing with  :: resolution
+            ExpectKeywordMatch (ReadFromString "::abc") (((RTVar.CurrentNSVar :> IDeref).deref() :?> Namespace).Name.Name) "abc"       // double colon defaults to current namespace
+            ExpectKeywordMatch (ReadFromString "::ab.cd") (((RTVar.CurrentNSVar :> IDeref).deref() :?> Namespace).Name.Name) "ab.cd"       // double colon defaults to current namespace (some confusion in C# tests in old code)
+            ExpectKeywordMatch (ReadFromString ":1") null "1"                      // colon-digit is keyword
+
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString ":abc:/def" |> ignore) "Namespace should not end with trailing colon"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString ":abc/def:" |> ignore) "Name should not end with trailing colon"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString ":def:" |> ignore)     "Name should not end with trailing colon"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString ":bar/" |> ignore)     "missing name is bad"
+      
+
+        ]
+
+
+[<Tests>]
+let StringTests =
+    testList
+        "Testing read on string"
+        [ 
+        
+          testCase "string of various flavors"
+          <| fun _ ->
+            ExpectStringMatch (ReadFromString "\"abc\"") "abc"                  // basic 
+            ExpectStringMatch (ReadFromString "\"\"") String.Empty             // empty string
+
+            let chars1 = [|
+                '"'; 'a'; 
+                '\\'; 't'; 'b';
+                '\\'; 'r'; 'c';
+                '\\'; 'n'; 'd';
+                '\\'; '\\'; 'e';
+                '\\'; '"'; 'f';
+                '\\'; 'b'; 'g';
+                '\\'; 'f'; 'h'; '"' |]
+            ExpectStringMatch (ReadFromString (String(chars1))) "a\tb\rc\nd\\e\"f\bg\fh"     // escaped characters
+
+
+
+            Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString "\"abc" |> ignore) "Should throw EOF exception with unmatched quote"
+
+            let chars2 = [|
+                '"'; 'a'; 
+                '\\'; 't'; 'b';
+                '\\'; 'r'; 'c';
+                '\\'; 'n'; 'd';
+                '\\'  |]
+
+            Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString (String(chars2)) |> ignore) "Should throw EOF exception with nothing after escape \\"
+
+          testCase "strings with Unicode characters"
+          <| fun _ ->
+
+            let chars1 = [|
+                '"'; 'a'; 
+                '\\'; 'u'; '1'; '2'; 'C'; '4';
+                'b'; '"' |]
+
+            ExpectStringMatch (ReadFromString (String(chars1))) "a\u12C4b"     // unicode characters
+
+            let chars2 = [|
+                '"'; 'a'; 
+                '\\'; 'u'; '1'; '2'; 'X'; '4';
+                'b'; 'c'; '"' |]
+
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString (String(chars2)) |> ignore) "Should throw EOF exception bad unicode character"
+
+            let chars3 = [|
+                '"'; 'a'; 
+                '\\'; 'u'; '1'; '2'; 'A' |]
+
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString (String(chars2)) |> ignore) "Should throw if EOF while reading Unicode character"
+
+          ftestCase "strings with octal characters"
+          <| fun _ ->
+
+            let chars1 = [|
+                '"'; 'a'; 
+                '\\'; '1'; '2'; '4';
+                'b'; '"' |]
+
+            ExpectStringMatch (ReadFromString (String(chars1))) "aTb"     // octal characters (did hex/octal conversion)
+
+            let chars2 = [|
+                '"'; 'a'; 
+                '\\'; '1'; '8'; '4';
+                'b'; '"' |]
+
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString (String(chars2)) |> ignore) "Should throw if bad octal character"
+
+            let chars3= [|
+                '"'; 'a'; 
+                '\\'; '1'; '8' |]
+
+
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString (String(chars3)) |> ignore) "Should throw if EOF while reading octal character"
+
+            let chars4 = [|
+                '"'; 'a'; 
+                '\\'; '4'; '7'; '7';
+                'b'; '"' |]
+
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString (String(chars4)) |> ignore) "Should throw if octal value out of range"
+
+
+        ]
+

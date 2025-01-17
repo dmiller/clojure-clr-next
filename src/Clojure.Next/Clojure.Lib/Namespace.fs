@@ -830,7 +830,7 @@ and [<Sealed;AbstractClass>] RTVar() =
 
     static member val CurrentNSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), RTVar.ClojureNamespace).setDynamic()
     static member val InNSVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("in-ns"), false)
-    static member val NsVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), false)
+    static member val NsVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("ns"), false)
 
     // Pre-defined Vars (I/O-related)
 

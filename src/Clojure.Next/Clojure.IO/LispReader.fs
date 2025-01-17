@@ -1095,7 +1095,7 @@ type LispReader() =
 
                         if uc > 255 then // = octal 377
                             raise
-                            <| new InvalidOperationException($"Octal escape sequence must be in range [0, 377]: {uc}")
+                            <| new ArgumentException($"Octal escape sequence must be in range [0, 377]: {uc}")
 
                         char uc
                     else
@@ -1142,7 +1142,7 @@ type LispReader() =
 
                             if uc > 255 then // octal 377
                                 raise
-                                <| new InvalidOperationException("Octal escape sequence must be in range [0, 377]")
+                                <| new ArgumentException("Octal escape sequence must be in range [0, 377]")
 
                             sb.Append(char uc) |> ignore
                         else
