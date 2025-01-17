@@ -47,6 +47,16 @@ type RTReader() =
     static member val NsSym = Symbol.intern ("ns")
     static member val InNsSym = Symbol.intern ("in-ns")
 
+        // These are used externally 
+    static member val LineKeyword = Keyword.intern (null, "line")
+    static member val ColumnKeyword = Keyword.intern (null, "column")
+    static member val FileKeyword = Keyword.intern (null, "file")
+    static member val SourceSpanKeyword = Keyword.intern (null, "source-span")
+    static member val StartLineKeyword = Keyword.intern (null, "start-line")
+    static member val StartColumnKeyword = Keyword.intern (null, "start-column")
+    static member val EndLineKeyword = Keyword.intern (null, "end-line")
+    static member val EndColumnKeyword = Keyword.intern (null, "end-column")
+
     static member MaybeResolveIn(n: Namespace, sym: Symbol) : obj =
         // note: ns-qualified vars must already exist
         if not <| isNull sym.Namespace then
@@ -238,14 +248,7 @@ type LispReader() =
 
     static let UnknownKeyword = Keyword.intern (null, "unknown")
 
-    static let LineKeyword = Keyword.intern (null, "line")
-    static let ColumnKeyword = Keyword.intern (null, "column")
-    static let FileKeyword = Keyword.intern (null, "file")
-    static let SourceSpanKeyword = Keyword.intern (null, "source-span")
-    static let StartLineKeyword = Keyword.intern (null, "start-line")
-    static let StartColumnKeyword = Keyword.intern (null, "start-column")
-    static let EndLineKeyword = Keyword.intern (null, "end-line")
-    static let EndColumnKeyword = Keyword.intern (null, "end-column")
+
     static let TagKeyword = Keyword.intern (null, "tag")
     static let ParamTagsKeyword = Keyword.intern (null, "param-tags")
 
@@ -345,7 +348,6 @@ type LispReader() =
         dispatchMacros[int '_'] <- Some LispReader.discardReader
         dispatchMacros[int '?'] <- Some LispReader.conditionalReader
         dispatchMacros[int ':'] <- Some LispReader.namespaceMapReader
-
 
     static member isMacro(ch: int) = ch < macros.Length && macros[ch].IsSome
 
@@ -509,7 +511,7 @@ type LispReader() =
                 Some returnOnValue
             elif
                 Char.IsDigit(char ch)
-                || (ch = (int '+') || ch = (int '-') && Char.IsDigit(char <| peekChar ()))
+                || (  (ch = (int '+') || ch = (int '-')) && Char.IsDigit(char <| peekChar ()))
             then
                 Some <| LispReader.readNumber (r, (char ch))
             else
@@ -571,7 +573,7 @@ type LispReader() =
                 -1
         elif ('a' <= ch && ch <= 'z') then
             if c - (int 'z') < radix - 10 then
-                c - (int 'z') + 10
+                c - (int 'a') + 10
             else
                 -1
         else
@@ -770,20 +772,20 @@ type LispReader() =
                     sbMask.Append('a') |> ignore
                     loop ()
             else // not raw mode
-            if
-                ch = -1 || LispReader.isWhitespace (ch) || LispReader.isTerminatingMacro (ch)
-            then
-                LispReader.unread (r, ch)
-                false
-            elif ch = int '|' && allowSymEscape then
-                rawMode <- true
-                sbRaw.Append('|') |> ignore
-                loop ()
-            else
-                sbRaw.Append(char ch) |> ignore
-                sbToken.Append(char ch) |> ignore
-                sbMask.Append(char ch) |> ignore
-                loop ()
+                if
+                    ch = -1 || LispReader.isWhitespace (ch) || LispReader.isTerminatingMacro (ch)
+                then
+                    LispReader.unread (r, ch)
+                    false
+                elif ch = int '|' && allowSymEscape then
+                    rawMode <- true
+                    sbRaw.Append('|') |> ignore
+                    loop ()
+                else
+                    sbRaw.Append(char ch) |> ignore
+                    sbToken.Append(char ch) |> ignore
+                    sbMask.Append(char ch) |> ignore
+                    loop ()
 
         let eofSeen = loop ()
         (sbRaw.ToString(), sbToken.ToString(), sbMask.ToString(), eofSeen)
@@ -1194,24 +1196,24 @@ type LispReader() =
 
             if startLine <> -1 then
                 let mutable meta = RT0.meta (s) :> Associative
-                meta <- RTMap.assoc (meta, LineKeyword, RT0.getWithDefault (meta, LineKeyword, startLine))
-                meta <- RTMap.assoc (meta, ColumnKeyword, RT0.getWithDefault (meta, ColumnKeyword, startCol))
+                meta <- RTMap.assoc (meta, RTReader.LineKeyword, RT0.getWithDefault (meta, RTReader.LineKeyword, startLine))
+                meta <- RTMap.assoc (meta, RTReader.ColumnKeyword, RT0.getWithDefault (meta, RTReader.ColumnKeyword, startCol))
 
                 meta <-
                     RTMap.assoc (
                         meta,
-                        SourceSpanKeyword,
+                        RTReader.SourceSpanKeyword,
                         RT0.getWithDefault (
                             meta,
-                            SourceSpanKeyword,
+                            RTReader.SourceSpanKeyword,
                             RTMap.map (
-                                StartLineKeyword,
+                                RTReader.StartLineKeyword,
                                 startLine,
-                                StartColumnKeyword,
+                                RTReader.StartColumnKeyword,
                                 startCol,
-                                EndLineKeyword,
+                                RTReader.EndLineKeyword,
                                 lntr.LineNumber,
-                                EndColumnKeyword,
+                                RTReader.EndColumnKeyword,
                                 lntr.ColumnNumber
                             )
                         )
@@ -1439,9 +1441,9 @@ type LispReader() =
                 let newMeta =
                     iobj
                         .meta()
-                        .without(LineKeyword)
-                        .without(ColumnKeyword)
-                        .without (SourceSpanKeyword)
+                        .without(RTReader.LineKeyword)
+                        .without(RTReader.ColumnKeyword)
+                        .without (RTReader.SourceSpanKeyword)
 
                 if newMeta.count () = 0 then
                     ret
@@ -1721,25 +1723,25 @@ type LispReader() =
         match o with
         | :? IMeta as im ->
             let metaAsMap =
-                metaAsMap.assoc (LineKeyword, RT0.getWithDefault (metaAsMap, LineKeyword, startLine))
+                metaAsMap.assoc (RTReader.LineKeyword, RT0.getWithDefault (metaAsMap, RTReader.LineKeyword, startLine))
 
             let metaAsMap =
-                metaAsMap.assoc (ColumnKeyword, RT0.getWithDefault (metaAsMap, ColumnKeyword, startCol))
+                metaAsMap.assoc (RTReader.ColumnKeyword, RT0.getWithDefault (metaAsMap, RTReader.ColumnKeyword, startCol))
 
             let metaAsMap =
                 metaAsMap.assoc (
-                    SourceSpanKeyword,
+                    RTReader.SourceSpanKeyword,
                     RT0.getWithDefault (
                         metaAsMap,
-                        SourceSpanKeyword,
+                        RTReader.SourceSpanKeyword,
                         RTMap.map (
-                            StartLineKeyword,
+                            RTReader.StartLineKeyword,
                             startLine,
-                            StartColumnKeyword,
+                            RTReader.StartColumnKeyword,
                             startCol,
-                            EndLineKeyword,
+                            RTReader.EndLineKeyword,
                             lntr.LineNumber,
-                            EndColumnKeyword,
+                            RTReader.EndColumnKeyword,
                             lntr.ColumnNumber
                         )
                     )

@@ -33,7 +33,7 @@ type LineNumberingTextReader(baseReader : TextReader, capacity: int) =
 
     override this.Read() : int = 
 
-        let mutable ch = baseReader.Read()
+        let mutable ch = base.Read()
 
         prevLineStart <- atLineStart
        
@@ -45,7 +45,7 @@ type LineNumberingTextReader(baseReader : TextReader, capacity: int) =
             columnNumber <- columnNumber + 1
             if ch = ('\r' |> int) then 
                 if this.Peek() = ('\n' |> int) then
-                    ch <- baseReader.Read() 
+                    ch <- base.Read() 
                     index <- index + 1
                 else 
                     this.NoteLineAdvance()

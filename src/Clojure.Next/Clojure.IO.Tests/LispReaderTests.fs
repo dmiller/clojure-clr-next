@@ -55,6 +55,11 @@ let ExpectStringMatch (actual: obj)  (expected: string) =
     let s = actual :?> String
     Expect.equal s expected  "Should have correct value"
 
+let ExpectCharMatch (actual: obj)  (expected: char) =
+    Expect.equal (actual.GetType()) typeof<Char>  "Should have type Keyword"
+    let c = actual :?> Char
+    Expect.equal c expected  "Should have correct value"
+
 [<Tests>]
 let MatchNumberTests =
     testList
@@ -516,7 +521,7 @@ let StringTests =
 
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString (String(chars2)) |> ignore) "Should throw if EOF while reading Unicode character"
 
-          ftestCase "strings with octal characters"
+          testCase "strings with octal characters"
           <| fun _ ->
 
             let chars1 = [|
@@ -550,3 +555,151 @@ let StringTests =
 
         ]
 
+
+[<Tests>]
+let CharacterTests =
+    testList
+        "Testing read on characters"
+        [ 
+        
+          testCase "basic and named characters"
+          <| fun _ ->
+            ExpectCharMatch (ReadFromString "\\a") 'a'                  // basic
+            ExpectCharMatch (ReadFromString "\\a b") 'a'                // backslash yeils next character stopping at terminator
+
+            ExpectCharMatch (ReadFromString "\\newline") '\n'           // named characters
+            ExpectCharMatch (ReadFromString "\\return") '\r'            // named characters
+            ExpectCharMatch (ReadFromString "\\space") ' '              // named characters
+            ExpectCharMatch (ReadFromString "\\tab") '\t'               // named characters
+            ExpectCharMatch (ReadFromString "\\formfeed") '\f'          // named characters
+            ExpectCharMatch (ReadFromString "\\backspace") '\b'         // named characters
+
+
+          testCase "unicode characters"
+          <| fun _ ->
+            ExpectCharMatch (ReadFromString "\\u0040") '\u0040'          // unicode characters
+            ExpectCharMatch (ReadFromString "\\u12c4") '\u12c4'          // unicode characters
+
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "\\u12C 4" |> ignore) "Should throw if EOF while reading Unicode character"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "\\uDAAA" |> ignore) "Should throw if Unicode in bad range"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "\\u12X4" |> ignore) "Should throw if bad Unicode digit"
+
+
+          testCase "octal characters"
+          <| fun _ ->
+            ExpectCharMatch (ReadFromString "\\o124") 'T'          // octal characters
+            ExpectCharMatch (ReadFromString "\\o12")  '\n'         // octal characters
+
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "\\o184" |> ignore) "Should throw if bad octal character"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "\\o477" |> ignore) "Should throw if octal value out of range"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString "\\o0012 aa" |> ignore) "Should throw if too many octal digits"
+
+        ]
+
+
+[<Tests>]
+let CommentTests =
+    testList
+        "Testing comments"
+        [ 
+        
+          testCase "comments to end of line"
+          <| fun _ ->
+            ExpectNumberMatch (ReadFromString "  ; ignore me\n 123") 123L typeof<int64>      // semicolon to end of line
+            ExpectNumberMatch (ReadFromString "  #! ignore me\n 123") 123L typeof<int64>      // #! to end of line
+
+        ]
+
+[<Tests>]
+let DiscardTests =
+    testList
+        "Testing discard #_"
+        [ 
+        
+          ftestCase "#_ ignores next form"
+          <| fun _ ->
+            ExpectNumberMatch (ReadFromString "#_ (1 2 3) 4") 4L typeof<int64>      // semicolon to end of line
+
+          ftestCase "#_ ignores next form in list"
+          <| fun _ ->
+            let o1 = ReadFromString("( abc #_ (1 2 3) 12)")
+
+            Expect.equal (o1.GetType()) typeof<PersistentList> "Should read a list"
+            
+            let pl = o1 :?> PersistentList
+
+            Expect.equal ((pl :> IPersistentCollection).count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(pl)) null "abc"
+            ExpectNumberMatch (RTSeq.second(pl)) 12L typeof<int64>
+        ]
+
+
+
+[<Tests>]
+let ListTests =
+    testList
+        "Testing lists"
+        [ 
+        
+          testCase "Basic list"
+          <| fun _ ->
+            let o1 = ReadFromString("(abc 12)")
+
+            Expect.equal (o1.GetType()) typeof<PersistentList> "Should read a list"
+            
+            let pl = o1 :?> PersistentList
+
+            Expect.equal ((pl :> IPersistentCollection).count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(pl)) null "abc"
+            ExpectNumberMatch (RTSeq.second(pl)) 12L typeof<int64>
+
+        
+          testCase "Empty list"
+          <| fun _ ->
+            let o1 = ReadFromString("(  )")
+
+            Expect.equal (o1.GetType()) typeof<Clojure.Collections.EmptyList> "Should read a list"
+            
+            let pl = o1 :?> IPersistentList
+
+            Expect.equal ((pl :> IPersistentCollection).count()) 0 "Should have no elements"
+
+          testCase "Nested list"
+          <| fun _ ->
+            let o1 = ReadFromString("(a (b c) d)")
+
+            Expect.equal (o1.GetType()) typeof<PersistentList> "Should read a list"
+            
+            let pl = o1 :?> IPersistentList
+      
+            Expect.equal ((pl :> IPersistentCollection).count()) 3 "Should have three elements"
+
+            ExpectSymbolMatch (RTSeq.first(pl)) null "a"
+
+            let pl2 = RTSeq.second(pl) :?> IPersistentList
+            Expect.equal ((pl2 :> IPersistentCollection).count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(pl2)) null "b"
+            ExpectSymbolMatch (RTSeq.second(pl2)) null "c"
+
+            ExpectSymbolMatch (RTSeq.third(pl)) null "d"
+
+          testCase "Missing list terminator fails"
+            <| fun _ ->
+                Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString("(a b c") |> ignore) "Should throw EOF exception with unmatched paren"
+
+          ftestCase "Gets line number for list"
+          <| fun _ ->
+            let o1 = ReadFromStringNumbering("\n\n (a b \n1 2)")
+
+            Expect.isTrue ((typeof<IObj>).IsAssignableFrom(o1.GetType())) "Should read a list"
+            let io = o1 :?> IObj
+            let meta = RT0.meta(io)
+            Expect.equal (meta.valAt(RTReader.LineKeyword)) 3 "Should have line number 3"
+            let sourceSpanMap = meta.valAt(RTReader.SourceSpanKeyword) :?> IPersistentMap
+            Expect.equal (sourceSpanMap.valAt(RTReader.StartLineKeyword)) 3 "Should have line number 3"
+            Expect.equal (sourceSpanMap.valAt(RTReader.StartColumnKeyword)) 3 "Should have column number 3"
+            Expect.equal (sourceSpanMap.valAt(RTReader.EndLineKeyword)) 4 "Should have line number 4"
+            Expect.equal (sourceSpanMap.valAt(RTReader.EndColumnKeyword)) 5 "Should have column number 5"
+
+
+        ]
