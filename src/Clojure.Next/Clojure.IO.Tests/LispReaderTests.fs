@@ -616,11 +616,11 @@ let DiscardTests =
         "Testing discard #_"
         [ 
         
-          ftestCase "#_ ignores next form"
+          testCase "#_ ignores next form"
           <| fun _ ->
             ExpectNumberMatch (ReadFromString "#_ (1 2 3) 4") 4L typeof<int64>      // semicolon to end of line
 
-          ftestCase "#_ ignores next form in list"
+          testCase "#_ ignores next form in list"
           <| fun _ ->
             let o1 = ReadFromString("( abc #_ (1 2 3) 12)")
 
@@ -687,7 +687,7 @@ let ListTests =
             <| fun _ ->
                 Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString("(a b c") |> ignore) "Should throw EOF exception with unmatched paren"
 
-          ftestCase "Gets line number for list"
+          testCase "Gets line number for list"
           <| fun _ ->
             let o1 = ReadFromStringNumbering("\n\n (a b \n1 2)")
 
@@ -700,6 +700,180 @@ let ListTests =
             Expect.equal (sourceSpanMap.valAt(RTReader.StartColumnKeyword)) 3 "Should have column number 3"
             Expect.equal (sourceSpanMap.valAt(RTReader.EndLineKeyword)) 4 "Should have line number 4"
             Expect.equal (sourceSpanMap.valAt(RTReader.EndColumnKeyword)) 5 "Should have column number 5"
+
+        ]
+        
+
+[<Tests>]
+let VectorTests =
+    testList
+        "Testing vectors"
+        [ 
+        
+          testCase "Basic vector"
+          <| fun _ ->
+            let o1 = ReadFromString("[abc 12]")
+
+            Expect.equal (o1.GetType()) typeof<PersistentVector> "Should read a vector"
+            
+            let pv = o1 :?> IPersistentVector
+
+            Expect.equal ((pv :> IPersistentCollection).count()) 2 "Should have two elements"
+            ExpectSymbolMatch (pv.nth(0)) null "abc"
+            ExpectNumberMatch (pv.nth(1)) 12L typeof<int64>
+
+        
+          testCase "Empty vector"
+          <| fun _ ->
+            let o1 = ReadFromString("[  ]")
+
+            Expect.equal (o1.GetType()) typeof<PersistentVector> "Should read a vector"
+            
+            let pv = o1 :?> IPersistentVector
+
+            Expect.equal ((pv :> IPersistentCollection).count()) 0 "Should have no elements"
+
+          testCase "Nested list in vector"
+          <| fun _ ->
+            let o1 = ReadFromString("[a (b c) d]")
+
+            Expect.equal (o1.GetType()) typeof<PersistentVector> "Should read a vector"
+            
+            let pv = o1 :?> IPersistentVector
+      
+            Expect.equal ((pv :> IPersistentCollection).count()) 3 "Should have three elements"
+
+            ExpectSymbolMatch (pv.nth(0)) null "a"
+
+            let pv2 = pv.nth(1) :?> IPersistentList
+            Expect.equal ((pv2 :> IPersistentCollection).count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(pv2)) null "b"
+            ExpectSymbolMatch (RTSeq.second(pv2)) null "c"
+
+            ExpectSymbolMatch (pv.nth(2)) null "d"
+
+
+          testCase "Nested vector in vector"
+          <| fun _ ->
+            let o1 = ReadFromString("[a [b c] d]")
+
+            Expect.equal (o1.GetType()) typeof<PersistentVector> "Should read a vector"
+            
+            let pv = o1 :?> IPersistentVector
+      
+            Expect.equal ((pv :> IPersistentCollection).count()) 3 "Should have three elements"
+
+            ExpectSymbolMatch (pv.nth(0)) null "a"
+
+            let pv2 = pv.nth(1) :?> IPersistentVector
+            Expect.equal ((pv2 :> IPersistentCollection).count()) 2 "Should have two elements"
+            ExpectSymbolMatch (pv2.nth(0)) null "b"
+            ExpectSymbolMatch (pv2.nth(1)) null "c"
+
+            ExpectSymbolMatch (pv.nth(2)) null "d"
+
+
+          testCase "Missing vector terminator fails"
+            <| fun _ ->
+                Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString("[a b c") |> ignore) "Should throw EOF exception with unmatched bracket"
+
+        ]
+
+      
+
+[<Tests>]
+let MapTests =
+    testList
+        "Testing maps"
+        [ 
+        
+          testCase "Basic map"
+          <| fun _ ->
+            let o1 = ReadFromString("{:a abc 14 12}")
+
+            Expect.equal (o1.GetType()) typeof<PersistentArrayMap> "Should read a map"
+            
+            let pv = o1 :?> IPersistentMap
+
+            Expect.equal ((pv :> IPersistentCollection).count()) 2 "Should have two elements"
+            ExpectSymbolMatch (pv.valAt(Keyword.intern(null,"a"))) null "abc"
+            ExpectNumberMatch (pv.valAt(14L)) 12L typeof<int64>
+
+        
+          testCase "Empty map"
+          <| fun _ ->
+            let o1 = ReadFromString("{  }")
+
+            Expect.equal (o1.GetType()) typeof<PersistentArrayMap> "Should read a map"
+            
+            let pv = o1 :?> IPersistentMap
+
+            Expect.equal ((pv :> IPersistentCollection).count()) 0 "Should have no elements"
+
+ 
+          testCase "Odd number of elements terminator fails"
+            <| fun _ ->
+                Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("{a b c}") |> ignore) "Should throw EOF exception with unmatched brace"
+
+
+          testCase "Missing map terminator fails"
+            <| fun _ ->
+                Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString("{a b c d") |> ignore) "Should throw EOF exception with unmatched brace"
+
+        ]
+
+
+[<Tests>]
+let SetTests =
+    testList
+        "Testing sets"
+        [ 
+        
+          ftestCase "Basic set"
+          <| fun _ ->
+            let o1 = ReadFromString("#{abc 12}")
+
+            Expect.equal (o1.GetType()) typeof<PersistentHashSet> "Should read a set"
+            
+            let pv = o1 :?> IPersistentSet
+
+            Expect.equal ((pv :> IPersistentCollection).count()) 2 "Should have two elements"
+            Expect.isTrue (pv.contains(Symbol.intern(null,"abc"))) "Should have abc"
+            Expect.isTrue (pv.contains(12L)) "Should have 12"
+            Expect.isFalse (pv.contains(13L)) "Should not have 13"
+
+        
+          ftestCase "Empty set"
+          <| fun _ ->
+            let o1 = ReadFromString("#{  }")
+
+            Expect.equal (o1.GetType()) typeof<PersistentHashSet> "Should read a set"
+            
+            let pv = o1 :?> IPersistentSet
+
+            Expect.equal ((pv :> IPersistentCollection).count()) 0 "Should have no elements"
+
+          ftestCase "Missing set terminator fails"
+            <| fun _ ->
+                Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString("#{a b c d") |> ignore) "Should throw EOF exception with unmatched brace"
+
+        ]
+
+
+
+[<Tests>]
+let UnmatchedDelimiterTests =
+    testList
+        "Testing unmatched delimiters"
+        [ 
+        
+          ftestCase "Unmatched delimiters"
+          <| fun _ ->
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString(")") |> ignore) "Should throw unmatched delimiter exception, naked )"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("]") |> ignore) "Should throw unmatched delimiter exception, naked ]"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("}") |> ignore) "Should throw unmatched delimiter exception, naked }"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("( a b c }") |> ignore) "Mismatched ending delimiter"
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("( a [b c) ") |> ignore) "Mismatched ending delimiter, nested"
 
 
         ]

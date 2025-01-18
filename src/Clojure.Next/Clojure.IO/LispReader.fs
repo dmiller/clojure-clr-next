@@ -1231,7 +1231,7 @@ type LispReader() =
 
     static member private mapReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
         let a =
-            LispReader.readDelimitedList ('}', r, true, opts, LispReader.ensurePending (pendingForms))
+            LispReader.readDelimitedList('}', r, true, opts, LispReader.ensurePending (pendingForms))
             |> Seq.toArray
 
         if (a.Length &&& 1) = 1 then
@@ -1241,9 +1241,13 @@ type LispReader() =
         RTMap.map (a)
 
     static member private setReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
-        PersistentHashSet.createWithCheck (
-            LispReader.readDelimitedList ('}', r, true, opts, LispReader.ensurePending (pendingForms))
-        )
+        let a = 
+            LispReader.readDelimitedList('}', r, true, opts, LispReader.ensurePending (pendingForms))
+            |> Seq.toArray
+
+        PersistentHashSet.createWithCheck (a)
+         
+        
 
     static member private unmatchedDelimiterReader
         (
