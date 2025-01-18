@@ -1527,7 +1527,8 @@ type LispReader() =
                             + "__auto__"
                         )
 
-                    GensymEnvVar.set (m.assoc (sym, newGensym))
+                    GensymEnvVar.set (m.assoc (sym, newGensym)) |> ignore
+                    newGensym
                 else
                     mappedGensym
             | _ -> raise <| new InvalidDataException("Gensym literal not in syntax-quote")
@@ -1605,7 +1606,7 @@ type LispReader() =
 
                 loop (s.next ()) nextRet
 
-        loop seq, PersistentVector.Empty
+        loop seq PersistentVector.Empty
 
     (*
 

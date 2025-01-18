@@ -60,6 +60,15 @@ let ExpectCharMatch (actual: obj)  (expected: char) =
     let c = actual :?> Char
     Expect.equal c expected  "Should have correct value"
 
+let ExpectIsInstanceOf (o: obj) (t: Type) =
+    Expect.isTrue (t.IsAssignableFrom(o.GetType()))  $"Should be assignable to type {t.Name}"
+
+let ExpectGensymMatch (value: obj) (nameSpace:string) (prefix: string) =
+    Expect.equal (value.GetType()) typeof<Symbol>  "Should have type Symbol"
+    let s = value :?> Symbol
+    Expect.equal s.Namespace nameSpace  "Should have correct namespace"
+    Expect.isTrue (s.Name.StartsWith(prefix)) "Should have correct prefix"
+
 [<Tests>]
 let MatchNumberTests =
     testList
@@ -829,7 +838,7 @@ let SetTests =
         "Testing sets"
         [ 
         
-          ftestCase "Basic set"
+          testCase "Basic set"
           <| fun _ ->
             let o1 = ReadFromString("#{abc 12}")
 
@@ -843,7 +852,7 @@ let SetTests =
             Expect.isFalse (pv.contains(13L)) "Should not have 13"
 
         
-          ftestCase "Empty set"
+          testCase "Empty set"
           <| fun _ ->
             let o1 = ReadFromString("#{  }")
 
@@ -853,7 +862,7 @@ let SetTests =
 
             Expect.equal ((pv :> IPersistentCollection).count()) 0 "Should have no elements"
 
-          ftestCase "Missing set terminator fails"
+          testCase "Missing set terminator fails"
             <| fun _ ->
                 Expect.throwsT<EndOfStreamException> (fun _ -> ReadFromString("#{a b c d") |> ignore) "Should throw EOF exception with unmatched brace"
 
@@ -867,13 +876,343 @@ let UnmatchedDelimiterTests =
         "Testing unmatched delimiters"
         [ 
         
-          ftestCase "Unmatched delimiters"
+          testCase "Unmatched delimiters"
           <| fun _ ->
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString(")") |> ignore) "Should throw unmatched delimiter exception, naked )"
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("]") |> ignore) "Should throw unmatched delimiter exception, naked ]"
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("}") |> ignore) "Should throw unmatched delimiter exception, naked }"
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("( a b c }") |> ignore) "Mismatched ending delimiter"
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("( a [b c) ") |> ignore) "Mismatched ending delimiter, nested"
+        ]
 
+
+
+[<Tests>]
+let WrappingFormsTests =
+    testList
+        "Testing wrapping forms"
+        [ 
+        
+          testCase "Quote wraps #1"
+          <| fun _ ->
+            let o1 = ReadFromString("'a")
+        
+            ExpectIsInstanceOf o1 typeof<ISeq>
+
+            let seq = o1 :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) null "quote"
+            ExpectSymbolMatch (RTSeq.second(seq)) null "a"
+
+          testCase "Quote wraps #2"
+          <| fun _ ->
+            let o1 = ReadFromString("'(a b c)")
+        
+            ExpectIsInstanceOf o1 typeof<ISeq>
+
+            let seq = o1 :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) null "quote"
+
+            let item2 = RTSeq.second(seq)
+            ExpectIsInstanceOf item2 typeof<IPersistentList>
+
+            let pl2 = item2 :?> IPersistentList
+            Expect.equal ((pl2 :> IPersistentCollection).count()) 3 "Should have three elements"
+            ExpectSymbolMatch (RTSeq.first(pl2)) null "a"
+            ExpectSymbolMatch (RTSeq.second(pl2)) null "b"
+            ExpectSymbolMatch (RTSeq.third(pl2)) null "c"
+
+        
+          testCase "Deref wraps #1"
+          <| fun _ ->
+            let o1 = ReadFromString("@a")
+        
+            ExpectIsInstanceOf o1 typeof<ISeq>
+
+            let seq = o1 :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) "clojure.core" "deref"
+            ExpectSymbolMatch (RTSeq.second(seq)) null "a"
+
+          testCase "Deref wraps #2"
+          <| fun _ ->
+            let o1 = ReadFromString("@(a b c)")
+        
+            ExpectIsInstanceOf o1 typeof<ISeq>
+
+            let seq = o1 :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) "clojure.core" "deref"
+
+            let item2 = RTSeq.second(seq)
+            ExpectIsInstanceOf item2 typeof<IPersistentList>
+
+            let pl2 = item2 :?> IPersistentList
+            Expect.equal ((pl2 :> IPersistentCollection).count()) 3 "Should have three elements"
+            ExpectSymbolMatch (RTSeq.first(pl2)) null "a"
+            ExpectSymbolMatch (RTSeq.second(pl2)) null "b"
+            ExpectSymbolMatch (RTSeq.third(pl2)) null "c"
+
+        ]
+
+
+[<Tests>]
+let SyntaxQuoteTests =
+    testList
+        "Testing syntax-quote forms"
+        [ 
+        
+          testCase "SQ on self-evaluating returns the thing"
+          <| fun _ ->
+
+            let o = ReadFromString("`:abc")
+            ExpectKeywordMatch o null "abc"
+
+            let o = ReadFromString("`123")
+            ExpectNumberMatch o 123L typeof<int64>
+
+            let o = ReadFromString("`\\a")
+            ExpectCharMatch o 'a'
+
+            let o = ReadFromString("`\"abc\"")
+            ExpectStringMatch o "abc"
+
+          testCase "SQ on special form quotes"
+          <| fun _ ->
+
+            let o = ReadFromString("`def")
+
+            ExpectIsInstanceOf o typeof<ISeq>
+
+            let seq = o :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) null "quote"
+            ExpectSymbolMatch (RTSeq.second(seq)) null "def"
+
+            let o = ReadFromString("`fn*")
+            ExpectIsInstanceOf o typeof<ISeq>
+
+            let seq = o :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) null "quote"
+            ExpectSymbolMatch (RTSeq.second(seq)) null "fn*"
+
+
+          testCase "SQ on regular symbol resolves"
+          <| fun _ ->
+
+            let o = ReadFromString("`abc")
+
+            ExpectIsInstanceOf o typeof<ISeq>
+
+            let seq = o :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) null "quote"
+            ExpectSymbolMatch (RTSeq.second(seq)) (((RTVar.CurrentNSVar :> IDeref).deref() :?> Namespace).Name.Name) "abc"   
+
+
+          testCase "SQ on gensym generates"
+          <| fun _ ->
+
+            let o = ReadFromString("`abc#")
+
+            ExpectIsInstanceOf o typeof<ISeq>
+
+            let seq = o :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) null "quote"
+            ExpectGensymMatch (RTSeq.second(seq)) null "abc_"
+
+            
+          ftestCase "SQ on gensym sees same twice"
+          <| fun _ ->
+
+            let o = ReadFromString("`(abc# abc#)")
+
+            ExpectIsInstanceOf o typeof<ISeq>
+            // Return should be 
+            //    (clojure/seq (clojure/concat (clojure/list (quote abc__N)) 
+            //                                 (clojure/list (quote abc__N)))))
+
+            let seq = o :?> ISeq
+            Expect.equal (seq.count()) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(seq)) "clojure.core" "seq"
+
+            let item2 = RTSeq.second(seq) 
+            ExpectIsInstanceOf item2 typeof<ISeq>
+            Expect.equal (RT0.count(item2)) 3 "Should have three elements"
+            ExpectSymbolMatch (RTSeq.first(item2)) "clojure.core" "concat"
+
+            let item22 = RTSeq.second(item2)
+            ExpectIsInstanceOf item22 typeof<ISeq>
+            Expect.equal (RT0.count(item22)) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(item22)) "clojure.core" "list"
+
+            let item222 = RTSeq.second(item22)
+            ExpectIsInstanceOf item222 typeof<ISeq>
+            Expect.equal (RT0.count(item222)) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(item222)) null "quote"
+            ExpectGensymMatch (RTSeq.second(item222)) null "abc_"
+
+            let item23 = RTSeq.second(item2)
+            ExpectIsInstanceOf item23 typeof<ISeq>
+            Expect.equal (RT0.count(item23)) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(item23)) "clojure.core" "list"
+
+            let item232 = RTSeq.second(item22)
+            ExpectIsInstanceOf item232 typeof<ISeq>
+            Expect.equal (RT0.count(item232)) 2 "Should have two elements"
+            ExpectSymbolMatch (RTSeq.first(item222)) null "quote"
+            ExpectGensymMatch (RTSeq.second(item232)) null "abc_"
+
+            Expect.equal (RTSeq.second(item222)) (RTSeq.second(item232)) "Should be same gensym"
+
+          ftestCase "SQ on map makes map"
+          <| fun _ ->
+
+            let o = ReadFromString("`{:a 1 :b 2}")
+            //  (clojure/apply 
+            //      clojure/hash-map 
+            //         (clojure/seq 
+            //             (clojure/concat (clojure/list :a) 
+            //                             (clojure/list 1) 
+            //                             (clojure/list :b) 
+            //                             (clojure/list 2))))
+
+            let expected = ReadFromString(
+                "(clojure.core/apply 
+                    clojure.core/hash-map 
+                        (clojure.core/seq 
+                            (clojure.core/concat (clojure.core/list :a) 
+                                                 (clojure.core/list 1) 
+                                                 (clojure.core/list :b) 
+                                                 (clojure.core/list 2))))")
+
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
+
+
+          ftestCase "SQ on vector makes vector"
+          <| fun _ ->
+
+            let o = ReadFromString("`[:b 2]")
+            //  (clojure.core/apply 
+            //      clojure.core/vector 
+            //         (clojure.core/seq
+            //             (clojure.core/concat (clojure.core/list :b) 
+            //                                  (clojure.core/list 2))))
+              
+            let expected = ReadFromString(
+                "(clojure.core/apply 
+                     clojure.core/vector 
+                        (clojure.core/seq 
+                           (clojure.core/concat (clojure.core/list :b) 
+                                                (clojure.core/list 2))))")
+ 
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
+
+          ftestCase "SQ on set makes set"
+          <| fun _ ->
+
+            let o = ReadFromString("`#{:b 2}")
+            //  (clojure.core/apply 
+            //      clojure.core/hash-set 
+            //         (clojure.core/seq
+            //             (clojure.core/concat (clojure.core/list :b) 
+            //                                  (clojure.core/list 2))))
+              
+            let expected = ReadFromString(
+                "(clojure.core/apply 
+                     clojure.core/hash-set 
+                        (clojure.core/seq 
+                           (clojure.core/concat (clojure.core/list 2) 
+                                                (clojure.core/list :b))))")
+           // The order the elements of the set are enumerated in are an implementation detail.
+           // I just happen to know that for these two elements, they will occur in the order indicated here.
+ 
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
+
+          ftestCase "SQ on list makes list"
+          <| fun _ ->
+
+            let o = ReadFromString("`(:b 2)")
+            //   (clojure/seq (clojure/concat (clojure/list :b) 
+            //                                (clojure/list 2))))
+              
+            let expected = ReadFromString(
+                "(clojure.core/seq 
+                           (clojure.core/concat (clojure.core/list :b) 
+                                                (clojure.core/list 2)))")
+           // The order the elements of the set are enumerated in are an implementation detail.
+           // I just happen to know that for these two elements, they will occur in the order indicated here.
+ 
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
+
+
+          ftestCase "Unquote standalone returns unquote list"
+          <| fun _ ->
+
+            let o = ReadFromString("~x")
+              
+            let expected = ReadFromString("(clojure.core/unquote x)")
+ 
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
+
+          ftestCase "Unquote-splice standalone returns unquote-splie list"
+          <| fun _ ->
+
+            let o = ReadFromString("~@x")
+              
+            let expected = ReadFromString("(clojure.core/unquote-splicing x)")
+ 
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
+
+
+          ftestCase "SQ on unquote dequotes"
+          <| fun _ ->
+
+            let o = ReadFromString("`(a ~b)")
+
+            let nsName = ((RTVar.CurrentNSVar :> IDeref).deref() :?> Namespace).Name.Name
+              
+            let expected = ReadFromString($"(clojure.core/seq (clojure.core/concat (clojure.core/list (quote {nsName}/a)) (clojure.core/list b)))")
+ 
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
+
+
+          ftestCase "SQ on unquote-splice not in list fails"
+          <| fun _ ->
+            Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("`~@x") |> ignore) "Should throw if unquote-splice not in list"
+
+          
+          ftestCase "SQ on unquote-splice splices"
+          <| fun _ ->
+
+            let o = ReadFromString("`(a ~@b)")
+
+            let nsName = ((RTVar.CurrentNSVar :> IDeref).deref() :?> Namespace).Name.Name
+              
+            let expected = ReadFromString($"(clojure.core/seq (clojure.core/concat (clojure.core/list (quote {nsName}/a)) b))")
+ 
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
+
+          
+          ftestCase "SQ on () returns empty list"
+          <| fun _ ->
+
+            let o = ReadFromString("`()")
+              
+            let expected = ReadFromString($"(clojure.core/list)")
+ 
+            ExpectIsInstanceOf o typeof<ISeq>
+            Expect.equal o expected "Should be the same"
 
         ]
