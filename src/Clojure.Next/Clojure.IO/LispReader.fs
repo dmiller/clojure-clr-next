@@ -1799,7 +1799,8 @@ type LispReader() =
 
                 loop ()
 
-        loop ()
+        let pattern = loop ()
+        Regex(pattern)
 
 
     static member private fnReader(r: PushbackTextReader, lparen: char, opts: obj, pendingForms: obj) : obj =

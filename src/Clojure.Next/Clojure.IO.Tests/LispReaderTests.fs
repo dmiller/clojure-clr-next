@@ -9,6 +9,8 @@ open System
 open System.IO
 open Clojure.Collections
 open Clojure.Lib
+open System.Text.RegularExpressions
+open System.Collections.Generic
 
 
 let TestDecimalMatch(inStr: string, bdStr: string) =
@@ -69,6 +71,81 @@ let ExpectGensymMatch (value: obj) (nameSpace:string) (prefix: string) =
     Expect.equal s.Namespace nameSpace  "Should have correct namespace"
     Expect.isTrue (s.Name.StartsWith(prefix)) "Should have correct prefix"
 
+let ExpectFunctionMatch (actual: obj) (expected: ISeq) =
+    
+    // THis will only handle a form like:  (fn* [x y & z] (+ x y z))
+    // Where the body is a single form which is a list.
+    // We have to compare the actual args  against what we put in.
+    //  Thus:
+    //     Actual:   (fn# [P1__38  P2__39] (+ P1__38 P2__39))
+    //     Expected: (fn# [P1__ P2))] (+ P1__ P2__))
+
+    ExpectIsInstanceOf actual typeof<ISeq>
+
+    let fn = actual :?> ISeq
+
+    let actualName = RTSeq.first(fn)
+    let expectedName = RTSeq.first(expected)
+    
+    Expect.equal actualName expectedName  "Function names should match"
+
+    let actualArgs = RTSeq.second(fn)
+    let expectedArgs = RTSeq.second(expected)
+
+    ExpectIsInstanceOf actualArgs typeof<Seqable>
+    ExpectIsInstanceOf expectedArgs typeof<Seqable>
+
+    let actualArgList = (actualArgs :?> Seqable).seq()
+    let expectedArgList = (expectedArgs :?> Seqable).seq()
+    
+    // Check args & build symbol map for args
+
+    Expect.isTrue  ((isNull actualArgList && isNull expectedArgList) || (actualArgList.count() = expectedArgList.count()))  "Arg counts should match"
+    let d = Dictionary<Symbol, Symbol>()
+
+    let rec checkArgs (actual: ISeq) (expected: ISeq) =
+        match actual with
+        | null -> ()
+        | _ ->
+            let actualSym = RTSeq.first(actual) :?> Symbol
+            let expectedSym = RTSeq.first(expected) :?> Symbol
+            Expect.isTrue (actualSym.Name.StartsWith("p__"))  "Arg names should be of form p__N#"
+            Expect.isTrue (actualSym.Name.EndsWith("#"))  "Arg names should be of form p__N#"
+            d.Add(actualSym, expectedSym)
+            checkArgs (actual.next()) (expected.next())
+
+    if not <| isNull actualArgList then
+        checkArgs actualArgList expectedArgList
+
+    let actualBody = RTSeq.third(fn)
+    let expectedBody = RTSeq.third(expected)
+
+    ExpectIsInstanceOf actualBody typeof<ISeq>
+    ExpectIsInstanceOf expectedBody typeof<ISeq>
+
+    let actualBodyList = actualBody :?> ISeq
+    let expectedBodyList = expectedBody :?> ISeq
+
+    // Check body, with arg substitutaions
+
+    let rec checkBody (actual: ISeq) (expected: ISeq) =
+        match actual with
+        | null -> ()
+        | _ ->
+            let actualForm = RTSeq.first(actual)
+            let expectedForm = RTSeq.first(expected)
+            match actualForm, expectedForm  with
+            | (:? Symbol as actualFormSym), (:? Symbol as expectedFormSym) ->
+                if d.ContainsKey(actualFormSym) then
+                    Expect.equal (d.[actualFormSym]) expectedFormSym  "Arg names should match"
+                else
+                    Expect.equal actualForm expectedForm  "Forms should match"
+            | _ -> Expect.equal     actualForm expectedForm  "Forms should match"
+
+
+            checkBody (actual.next()) (expected.next())
+    checkBody actualBodyList expectedBodyList
+    
 [<Tests>]
 let MatchNumberTests =
     testList
@@ -1312,7 +1389,7 @@ let MetaTests =
             Expect.equal o expectedTarget "Should have the expected target"
 
 
-          ftestCase "Meta adds file location information to  target metadata if available"
+          testCase "Meta adds file location information to  target metadata if available"
           <| fun _ ->          
             let o = ReadFromStringNumbering("\n\n^c (a b)")
 
@@ -1325,3 +1402,107 @@ let MetaTests =
             Expect.isTrue  (meta.equiv(expectedMeta)) "Should have the expected metadata"   // Note: use of equal here fails because of int vs long in line/column numbers.
             Expect.equal o expectedTarget "Should have the expected target"
         ]
+
+[<Tests>]
+let VarReaderTests =
+    testList
+        "Testing the Var reader"
+        [ 
+        
+          testCase "var wraps Var"
+          <| fun _ ->
+            let o = ReadFromString("#'abc")
+
+            let expected = ReadFromString("(var abc)")
+            Expect.equal o expected "Should be the same"
+
+        ]
+
+
+[<Tests>]
+let RegexReaderTests =
+    testList
+        "# \" generates regex"
+        [ 
+        
+          testCase "var wraps Var"
+          <| fun _ ->
+            let o = ReadFromString("#\"abc\"")
+
+            ExpectIsInstanceOf o typeof<Regex>
+            let re = o :?> Regex
+            Expect.equal (re.ToString()) "abc" "Should be the same"
+
+
+          testCase "var throws EOF on missing close double-quote"
+          <| fun _ ->
+            Expect.throwsT<EndOfStreamException>(fun _ -> ReadFromString("#\abc") |> ignore) "Should throw EOF"
+
+          testCase "var handles escape on double-quote"
+          <| fun _ ->
+
+            let chars = [|  '#'; '"'; 'a'; '\\'; '"'; 'b'; 'c'; '"' |]
+            let o = ReadFromString(String(chars))
+
+            ExpectIsInstanceOf o typeof<Regex>
+            let re = o :?> Regex
+            Expect.equal (re.ToString()) "a\\\"bc" "Should be the same"
+
+
+        ]
+
+
+[<Tests>]
+let FnReaderTests =
+    testList
+        "function and arg readers"
+        [ 
+        
+          ftestCase "#(...) with no args generates a no-arg function"
+          <| fun _ ->
+            let o = ReadFromString("#(+ 1 2)")
+
+            let expected = ReadFromString("(fn* [] (+ 1 2))")
+
+            Expect.equal o expected "should generate no-arg function"
+            ExpectFunctionMatch o ((expected :?> Seqable).seq())
+
+          ftestCase "#(...) with args generates function with enough args"
+          <| fun _ ->
+            let o = ReadFromString("#(+ %2 2)")
+
+            let expected = ReadFromString("(fn* [x y] (+ y 2))")
+            
+            ExpectFunctionMatch o ((expected :?> Seqable).seq())
+
+
+          ftestCase "#(...) with anon arg generates function with one arg"
+          <| fun _ ->
+            let o = ReadFromString("#(+ % 2)")
+
+            let expected = ReadFromString("(fn* [x] (+ x 2))")
+            
+            ExpectFunctionMatch o ((expected :?> Seqable).seq())
+
+          ftestCase "#(...) with anon arg and non-anon arg generates function with enough args"
+          <| fun _ ->
+            let o = ReadFromString("#(+ % %3)")
+
+            let expected = ReadFromString("(fn* [x y z] (+ x z))")
+            
+            ExpectFunctionMatch o ((expected :?> Seqable).seq())
+
+          ftestCase "Arg reader outside #(...) returns symbol as is"
+          <| fun _ ->
+            let o = ReadFromString("%2")
+
+            ExpectIsInstanceOf o typeof<Symbol>
+            Expect.equal (o :?> Symbol).Name "%2" "Should be the same"
+
+          ftestCase "Arg reader followed by non-digit fails"
+          <| fun _ ->
+            Expect.throwsT<ArgumentException>(fun _ -> ReadFromString("#(+ %a 2)") |> ignore) "Should throw"
+
+        ]
+
+        // TODO: eval reader tests.  Need to figure out how to get the eval reader to work in a test context.
