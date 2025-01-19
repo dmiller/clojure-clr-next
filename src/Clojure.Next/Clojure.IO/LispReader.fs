@@ -1712,7 +1712,7 @@ type LispReader() =
 
         let pendingForms = LispReader.ensurePending (pendingForms)
 
-        let metaAsMap =
+        let mutable metaAsMap =
             match LispReader.readAux (r, opts, pendingForms) with
             | :? Symbol as s -> RTMap.map (TagKeyword, s)
             | :? String as s -> RTMap.map (TagKeyword, s)
@@ -1727,30 +1727,32 @@ type LispReader() =
 
         match o with
         | :? IMeta as im ->
-            let metaAsMap =
-                metaAsMap.assoc (RTReader.LineKeyword, RT0.getWithDefault (metaAsMap, RTReader.LineKeyword, startLine))
 
-            let metaAsMap =
-                metaAsMap.assoc (RTReader.ColumnKeyword, RT0.getWithDefault (metaAsMap, RTReader.ColumnKeyword, startCol))
+            if startLine <> -1 && o :? ISeq then
+                 metaAsMap <-
+                    metaAsMap.assoc (RTReader.LineKeyword, RT0.getWithDefault (metaAsMap, RTReader.LineKeyword, startLine))
 
-            let metaAsMap =
-                metaAsMap.assoc (
-                    RTReader.SourceSpanKeyword,
-                    RT0.getWithDefault (
-                        metaAsMap,
+                 metaAsMap <-
+                    metaAsMap.assoc (RTReader.ColumnKeyword, RT0.getWithDefault (metaAsMap, RTReader.ColumnKeyword, startCol))
+
+                 metaAsMap <-
+                    metaAsMap.assoc (
                         RTReader.SourceSpanKeyword,
-                        RTMap.map (
-                            RTReader.StartLineKeyword,
-                            startLine,
-                            RTReader.StartColumnKeyword,
-                            startCol,
-                            RTReader.EndLineKeyword,
-                            lntr.LineNumber,
-                            RTReader.EndColumnKeyword,
-                            lntr.ColumnNumber
+                        RT0.getWithDefault (
+                            metaAsMap,
+                            RTReader.SourceSpanKeyword,
+                            RTMap.map (
+                                RTReader.StartLineKeyword,
+                                startLine,
+                                RTReader.StartColumnKeyword,
+                                startCol,
+                                RTReader.EndLineKeyword,
+                                lntr.LineNumber,
+                                RTReader.EndColumnKeyword,
+                                lntr.ColumnNumber
+                            )
                         )
                     )
-                )
 
             match o with
             | :? IReference as ir ->
@@ -1758,7 +1760,7 @@ type LispReader() =
                 o
             | _ ->
 
-                let rec loop (s: ISeq) (ometa: Associative) b =
+                let rec loop (s: ISeq) (ometa: Associative)=
                     match s with
                     | null -> (o :?> IObj).withMeta (ometa :?> IPersistentMap) :> obj
                     | _ ->
@@ -1766,6 +1768,7 @@ type LispReader() =
                         loop (s.next ()) (RTMap.assoc (ometa, kv.key (), kv.value ()))
 
                 loop (RT0.seq (metaAsMap)) (RT0.meta (o))
+
         | _ -> raise <| new ArgumentException("Metadata can only be applied to IMetas")
 
 

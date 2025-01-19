@@ -1025,7 +1025,7 @@ let SyntaxQuoteTests =
             ExpectGensymMatch (RTSeq.second(seq)) null "abc_"
 
             
-          ftestCase "SQ on gensym sees same twice"
+          testCase "SQ on gensym sees same twice"
           <| fun _ ->
 
             let o = ReadFromString("`(abc# abc#)")
@@ -1068,7 +1068,7 @@ let SyntaxQuoteTests =
 
             Expect.equal (RTSeq.second(item222)) (RTSeq.second(item232)) "Should be same gensym"
 
-          ftestCase "SQ on map makes map"
+          testCase "SQ on map makes map"
           <| fun _ ->
 
             let o = ReadFromString("`{:a 1 :b 2}")
@@ -1093,7 +1093,7 @@ let SyntaxQuoteTests =
             Expect.equal o expected "Should be the same"
 
 
-          ftestCase "SQ on vector makes vector"
+          testCase "SQ on vector makes vector"
           <| fun _ ->
 
             let o = ReadFromString("`[:b 2]")
@@ -1113,7 +1113,7 @@ let SyntaxQuoteTests =
             ExpectIsInstanceOf o typeof<ISeq>
             Expect.equal o expected "Should be the same"
 
-          ftestCase "SQ on set makes set"
+          testCase "SQ on set makes set"
           <| fun _ ->
 
             let o = ReadFromString("`#{:b 2}")
@@ -1135,7 +1135,7 @@ let SyntaxQuoteTests =
             ExpectIsInstanceOf o typeof<ISeq>
             Expect.equal o expected "Should be the same"
 
-          ftestCase "SQ on list makes list"
+          testCase "SQ on list makes list"
           <| fun _ ->
 
             let o = ReadFromString("`(:b 2)")
@@ -1153,7 +1153,7 @@ let SyntaxQuoteTests =
             Expect.equal o expected "Should be the same"
 
 
-          ftestCase "Unquote standalone returns unquote list"
+          testCase "Unquote standalone returns unquote list"
           <| fun _ ->
 
             let o = ReadFromString("~x")
@@ -1163,7 +1163,7 @@ let SyntaxQuoteTests =
             ExpectIsInstanceOf o typeof<ISeq>
             Expect.equal o expected "Should be the same"
 
-          ftestCase "Unquote-splice standalone returns unquote-splie list"
+          testCase "Unquote-splice standalone returns unquote-splie list"
           <| fun _ ->
 
             let o = ReadFromString("~@x")
@@ -1174,7 +1174,7 @@ let SyntaxQuoteTests =
             Expect.equal o expected "Should be the same"
 
 
-          ftestCase "SQ on unquote dequotes"
+          testCase "SQ on unquote dequotes"
           <| fun _ ->
 
             let o = ReadFromString("`(a ~b)")
@@ -1187,12 +1187,12 @@ let SyntaxQuoteTests =
             Expect.equal o expected "Should be the same"
 
 
-          ftestCase "SQ on unquote-splice not in list fails"
+          testCase "SQ on unquote-splice not in list fails"
           <| fun _ ->
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("`~@x") |> ignore) "Should throw if unquote-splice not in list"
 
           
-          ftestCase "SQ on unquote-splice splices"
+          testCase "SQ on unquote-splice splices"
           <| fun _ ->
 
             let o = ReadFromString("`(a ~@b)")
@@ -1205,7 +1205,7 @@ let SyntaxQuoteTests =
             Expect.equal o expected "Should be the same"
 
           
-          ftestCase "SQ on () returns empty list"
+          testCase "SQ on () returns empty list"
           <| fun _ ->
 
             let o = ReadFromString("`()")
@@ -1215,4 +1215,113 @@ let SyntaxQuoteTests =
             ExpectIsInstanceOf o typeof<ISeq>
             Expect.equal o expected "Should be the same"
 
+        ]
+
+
+[<Tests>]
+let DispatchTests =
+    testList
+        "Testing dispatch"
+        [ 
+        
+          testCase "#-dispatch on invalid char fails"
+          <| fun _ ->
+
+            Expect.throwsT<ArgumentException> (fun _ ->  ReadFromString("#1(1 2)") |> ignore) "Should fail on bad dispatch char"
+
+        ]
+
+[<Tests>]
+let MetaTests =
+    testList
+        "Testing metadata"
+        [ 
+        
+          testCase "Meta on improper metatdata fails"
+          <| fun _ ->
+            Expect.throwsT<ArgumentException> (fun _ ->  ReadFromString("^1(1 2)") |> ignore) "Should fail on bad metadata"
+
+          testCase "Meta applied to non-IObj fails"
+          <| fun _ ->
+            Expect.throwsT<ArgumentException> (fun _ ->  ReadFromString("^{:a 1} 1") |> ignore) "Should fail on bad target"
+
+          testCase "Meta applies hash meta-data as-is to target"
+          <| fun _ ->          
+            let o = ReadFromString("^{:a 1} (a b)")
+
+            ExpectIsInstanceOf o typeof<IPersistentList>
+
+            let meta = RT0.meta(o)
+            let expectedTarget = ReadFromString("(a b)")
+            let expectedMeta = ReadFromString("{:a 1}") :?> IPersistentMap
+
+            Expect.equal meta expectedMeta "Should have the expected metadata"
+            Expect.equal o expectedTarget "Should have the expected target"
+
+          testCase "Meta applies keyword with value true to target"
+          <| fun _ ->          
+            let o = ReadFromString("^:c (a b)")
+
+            ExpectIsInstanceOf o typeof<IPersistentList>
+
+            let meta = RT0.meta(o)
+            let expectedTarget = ReadFromString("(a b)")
+            let expectedMeta = ReadFromString("{:c true}") :?> IPersistentMap
+
+            Expect.equal meta expectedMeta "Should have the expected metadata"
+            Expect.equal o expectedTarget "Should have the expected target"
+
+          testCase "Meta applies string as :tag metadate with true to target"
+          <| fun _ ->          
+            let o = ReadFromString("^\"help\" (a b)")
+
+            ExpectIsInstanceOf o typeof<IPersistentList>
+
+            let meta = RT0.meta(o)
+            let expectedTarget = ReadFromString("(a b)")
+            let expectedMeta = ReadFromString("{:tag \"help\"}") :?> IPersistentMap
+
+            Expect.equal meta expectedMeta "Should have the expected metadata"
+            Expect.equal o expectedTarget "Should have the expected target"
+
+          testCase "Meta applies Symbol as :tag metadate with true to target"
+          <| fun _ ->          
+            let o = ReadFromString("^x (a b)")
+
+            ExpectIsInstanceOf o typeof<IPersistentList>
+
+            let meta = RT0.meta(o)
+            let expectedTarget = ReadFromString("(a b)")
+            let expectedMeta = ReadFromString("{:tag x}") :?> IPersistentMap
+
+            Expect.equal meta expectedMeta "Should have the expected metadata"
+            Expect.equal o expectedTarget "Should have the expected target"
+
+
+          testCase "Meta applies vector as :param-tags metadate with true to target"
+          <| fun _ ->          
+            let o = ReadFromString("^[t1 t2] (a b)")
+
+            ExpectIsInstanceOf o typeof<IPersistentList>
+
+            let meta = RT0.meta(o)
+            let expectedTarget = ReadFromString("(a b)")
+            let expectedMeta = ReadFromString("{:param-tags [t1 t2]}") :?> IPersistentMap
+
+            Expect.equal meta expectedMeta "Should have the expected metadata"
+            Expect.equal o expectedTarget "Should have the expected target"
+
+
+          ftestCase "Meta adds file location information to  target metadata if available"
+          <| fun _ ->          
+            let o = ReadFromStringNumbering("\n\n^c (a b)")
+
+            ExpectIsInstanceOf o typeof<IPersistentList>
+
+            let meta = RT0.meta(o)
+            let expectedTarget = ReadFromString("(a b)")
+            let expectedMeta = ReadFromString("{:tag c :line 3 :column 2 :source-span {:start-line 3 :start-column 2 :end-line 3 :end-column 9}}") :?> IPersistentMap
+
+            Expect.isTrue  (meta.equiv(expectedMeta)) "Should have the expected metadata"   // Note: use of equal here fails because of int vs long in line/column numbers.
+            Expect.equal o expectedTarget "Should have the expected target"
         ]
