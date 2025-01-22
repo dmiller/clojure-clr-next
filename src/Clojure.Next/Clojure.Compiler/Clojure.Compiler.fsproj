@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+    <ProjectReference Include="..\Clojure.IO\Clojure.IO.fsproj" />
     <ProjectReference Include="..\Clojure.Lib\Clojure.Lib.fsproj" />
   </ItemGroup>
 

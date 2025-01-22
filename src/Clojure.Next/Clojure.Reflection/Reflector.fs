@@ -11,6 +11,57 @@ open System.Linq
 [<AbstractClass; Sealed>]
 type Reflector private () =
 
+    // Field/property lookup
+
+    static member GetFieldInfo(t: Type, name: string, getStatics: bool ) =
+        let flags = 
+            if getStatics then 
+                BindingFlags.Public ||| BindingFlags.Static ||| BindingFlags.FlattenHierarchy
+            else 
+                BindingFlags.Public ||| BindingFlags.Instance
+        t.GetField(name,flags)
+
+    static member GetPropertyInfo(t: Type, name: string, getStatics: bool ) =
+        let flags = 
+            if getStatics then 
+                BindingFlags.Public ||| BindingFlags.Static ||| BindingFlags.FlattenHierarchy
+            else 
+                BindingFlags.Public ||| BindingFlags.Instance
+        
+        let typesToCheck = List<Type>()
+        typesToCheck.Add(t)
+
+        if t.IsInterface && not getStatics then
+            typesToCheck.AddRange(t.GetInterfaces())
+
+        let pinfos = List<PropertyInfo>()
+
+        for t in typesToCheck do
+            let props = t.GetProperties(flags).Where(fun p -> p.Name = name  && p.GetIndexParameters().Length = 0)
+            pinfos.AddRange(props)
+
+        if pinfos.Count = 0 then
+            null
+        elif pinfos.Count = 1 then
+            pinfos.[0]
+        else
+            // Look for the one declared on this type, if it exists
+            // This handles the situation where we have overloads.
+            // TODO: Should we use another one?  Raise an error?
+            pinfos.Find(fun p -> p.DeclaringType = t)  
+
+    static member GetFieldOrPropertyInfo(t: Type, name: string, getStatics: bool) =
+        let f = Reflector.GetFieldInfo(t, name, getStatics)
+        if not <| isNull f then
+            f :> MemberInfo
+        else
+            let p = Reflector.GetPropertyInfo(t, name, getStatics)
+            if not <| isNull p then
+                p :> MemberInfo
+            else
+                null
+
+
     static member InvokeConstructor(t: Type, args : obj array) = 
         // TODO:  (original)  Replace with GetConstructors/GetMatchingMethodAux
 

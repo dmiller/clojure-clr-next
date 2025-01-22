@@ -57,6 +57,8 @@ type RTReader() =
     static member val EndLineKeyword = Keyword.intern (null, "end-line")
     static member val EndColumnKeyword = Keyword.intern (null, "end-column")
 
+    static member val TagKeyword = Keyword.intern (null, "tag")
+
     static member MaybeResolveIn(n: Namespace, sym: Symbol) : obj =
         // note: ns-qualified vars must already exist
         if not <| isNull sym.Namespace then
@@ -249,7 +251,7 @@ type LispReader() =
     static let UnknownKeyword = Keyword.intern (null, "unknown")
 
 
-    static let TagKeyword = Keyword.intern (null, "tag")
+
     static let ParamTagsKeyword = Keyword.intern (null, "param-tags")
 
     // Parser options
@@ -1714,8 +1716,8 @@ type LispReader() =
 
         let mutable metaAsMap =
             match LispReader.readAux (r, opts, pendingForms) with
-            | :? Symbol as s -> RTMap.map (TagKeyword, s)
-            | :? String as s -> RTMap.map (TagKeyword, s)
+            | :? Symbol as s -> RTMap.map (RTReader.TagKeyword, s)
+            | :? String as s -> RTMap.map (RTReader.TagKeyword, s)
             | :? Keyword as k -> RTMap.map (k, true)
             | :? IPersistentVector as v -> RTMap.map (ParamTagsKeyword, v)
             | :? IPersistentMap as m -> m
