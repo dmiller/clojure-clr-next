@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="CompilerException.fs" />
+    <Compile Include="IType.fs" />
+    <Compile Include="Expr.fs" />
+    <Compile Include="Compiler.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Clojure.Collections\Clojure.Collections.fsproj" />
+    <ProjectReference Include="..\Clojure.Lib\Clojure.Lib.fsproj" />
+  </ItemGroup>
+
+</Project>

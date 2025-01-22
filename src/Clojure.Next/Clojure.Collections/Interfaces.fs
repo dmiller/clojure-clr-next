@@ -521,10 +521,7 @@ type Settable =
     abstract doReset: value: obj -> obj
 
 [<AllowNullLiteral>]
-type IRecord = 
-    interface
-    end
+type IRecord = interface end
 
-(*
-
-*)
+[<AllowNullLiteral>]
+type IType = interface end

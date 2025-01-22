@@ -33,6 +33,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Reflection", "Cloju
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Reflection.Tests", "Clojure.Reflection.Tests\Clojure.Reflection.Tests.fsproj", "{102D9583-A496-4289-B691-AA8B5E7FB91D}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Clojure.Compiler", "Clojure.Compiler\Clojure.Compiler.fsproj", "{58311A2C-6B1F-4875-A5B3-F934825D398B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -99,6 +101,10 @@ Global
 		{102D9583-A496-4289-B691-AA8B5E7FB91D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{102D9583-A496-4289-B691-AA8B5E7FB91D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{102D9583-A496-4289-B691-AA8B5E7FB91D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{58311A2C-6B1F-4875-A5B3-F934825D398B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58311A2C-6B1F-4875-A5B3-F934825D398B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58311A2C-6B1F-4875-A5B3-F934825D398B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58311A2C-6B1F-4875-A5B3-F934825D398B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
