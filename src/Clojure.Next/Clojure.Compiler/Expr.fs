@@ -135,13 +135,23 @@ and HostArg = { ParamType: ParameterType; ArgExpr: Expr; LocalBinding: LocalBind
 and ObjMethod() =
     member val UsesThis = false with get, set
 
-and CompilerContext(ctx: ParserContext) =
+and CompilerContext(_ctx: ParserContext, lbs : IPersistentMap, _method : ObjMethod option) =
     
     // Map from Symbol to LocalBinding
-    let mutable _localBindings = PersistentHashMap.Empty    
-    let mutable _method : ObjMethod option = None
+    let mutable _localBindings = lbs
 
+    new(ctx: ParserContext) = new CompilerContext(ctx, PersistentHashMap.Empty, None)
         
+    member this.WithParserContext(ctx: ParserContext) = new CompilerContext(ctx,_localBindings, _method) 
+
+    member _.ParserContext = _ctx
+    member _.LocalBindings = _localBindings
+    member _.Method = _method
+
+    member _.IsExpr = _ctx = ParserContext.Expression
+    member _.IsStmt = _ctx = ParserContext.Statement
+    member _.IsReturn = _ctx = ParserContext.Return
+
     member this.GetLocalBinding(sym: Symbol) = 
         match RT0.get(_localBindings,sym) with
         | :? LocalBinding as lb ->
@@ -156,17 +166,17 @@ and CompilerContext(ctx: ParserContext) =
         | _ -> None
 
     member this.ContainsBindingForSym(sym: Symbol) = 
-        not <| isNull RT0.get(_localBindings,sym) 
+        not <| isNull (RT0.get(_localBindings,sym))
 
 
     member this.ClosesOver(b: LocalBinding, method: ObjMethod) = 
         // TODO: Implement ClosesOver
         ()
+
+    member this.RegisterVar(v: Var) = () // TODO: Implement this
                 
             
- 
 
-    member _.Ctx = ctx
 
 
     

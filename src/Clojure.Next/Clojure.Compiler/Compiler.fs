@@ -7,11 +7,14 @@ open System.Collections.Generic
 open Clojure.IO
 open Clojure.Reflection
 open System.Reflection
+open Clojure.Lib
 
 
 
 [<Sealed;AbstractClass>]
 type Compiler private () =
+
+    static let ConstKeyword = Keyword.intern(null,"const")
 
 
     static let TypeToTagDict = Dictionary<Type, Symbol>()
@@ -76,7 +79,7 @@ type Compiler private () =
 
         with 
         | :? CompilerException -> reraise()
-        |  _ as e -> raise <| CompilerException(e)  // TODO: add source info
+        |  _ as e -> raise <| CompilerException("HELP!", e)  // TODO: add source info
 
 
     // Let's start with something easy
@@ -202,11 +205,11 @@ type Compiler private () =
                 | Some lb -> Some(LocalBindingExpr({Ctx = cctx; Binding = lb; Tag = tag}))
                 | None -> None
 
-            elif isNull (LispReader.NamespaceFor(sym)) && not RTType.IsPosDigit(sym.Name) then
+            elif isNull (RTReader.NamespaceFor(sym)) && not <| RTType.IsPosDigit(sym.Name) then
     
                 // we have a namespace, coudl be Typename/Field
                 let nsSym = Symbol.intern(sym.Namespace)
-                match Compiler.MaybeType(nsSym,false) with
+                match Compiler.MaybeType(cctx,nsSym,false) with
                 | null -> None
                 | _ as t -> 
                     let info = Reflector.GetFieldOrPropertyInfo(t,sym.Name,true)
@@ -220,6 +223,19 @@ type Compiler private () =
         match maybeExpr with 
         | Some e -> e
         | None ->
+            match Compiler.Resolve(sym) with
+            | :? Var as v -> 
+                if not <| isNull (Compiler.IsMacro(cctx, v)) then 
+                    raise <| CompilerException($"Can't take the value of a macro: {sym.Name}")
+                elif RT0.booleanCast(RT0.get((v :> IMeta).meta(),ConstKeyword))then 
+                    Compiler.Analyze(cctx.WithParserContext(Expression), RTSeq.list(LispReader.QuoteSym, v))
+                else VarExpr({Ctx = cctx; Var = v; Tag = tag})
+            | :? Type ->
+                LiteralExpr({Type=OtherType; Value = sym;})
+            | :? Symbol ->
+                UnresolvedVarExpr({Ctx = cctx; Sym = sym})
+            | _ -> raise <| CompilerException($"Unable to resolve symbol: {sym} in this context")
+                
                     
 
             
@@ -244,7 +260,7 @@ type Compiler private () =
     static member CreateStaticFieldOrPropertyExpr(cctx: CompilerContext, tag: Symbol, t: Type, memberName: string, info: MemberInfo) : Expr =
         HostExpr({Ctx = cctx; Tag = tag; Target = None; TargetType = t; MemberName = memberName; TInfo = info; Args = null;  IsTailPosition = false; SourceInfo = None})
 
-    static member MaybeType(form: obj, stringOk: bool) = 
+    static member MaybeType(cctx: CompilerContext, form: obj, stringOk: bool) = 
         match form with
         | :? Type as t -> t
         | :? Symbol as sym -> 
@@ -253,38 +269,96 @@ type Compiler private () =
                 if sym.Name.IndexOf('.') > 0 || sym.Name.Length > 0 && sym.Name[sym.Name.Length - 1] = ']' then
                     RTType.ClassForNameE(sym.Name)
                 else 
-                    match RTVar.getCurrentNamespace().GetMapping(sym) with
+                    match RTVar.getCurrentNamespace().getMapping(sym) with
                     | :? Type as t -> t
                     | _ when cctx.ContainsBindingForSym(sym) -> null
                     | _  ->
                         try 
-                            RTType.ClassForName(sym.Name
+                            RTType.ClassForName(sym.Name)
                         with
                         | _ -> null
-        | _ when stringOk && form :? string -> RTType.ClassForName(form :?> string)
+            else 
+                null
+        | _ when stringOk && (form :? string) -> RTType.ClassForName(form :?> string)
         | _ -> null
 
 
+    static member Resolve(sym: Symbol) : obj  = Compiler.ResolveIn(RTVar.getCurrentNamespace(), sym, false)
 
-
-
-        static member MaybeResolveIn(n: Namespace, sym: Symbol) : obj =
-        // note: ns-qualified vars must already exist
+    static member ResolveIn(ns: Namespace, sym: Symbol, allowPrivate: bool) : obj = 
         if not <| isNull sym.Namespace then
-            let ns = RTReader.NamespaceFor(sym)
-
-            if isNull ns then
-                RTType.MaybeArrayType(sym)
-            else
-                ns.findInternedVar (Symbol.intern (sym.Name))
-        elif
-            sym.Name.IndexOf('.') > 0 && not <| sym.Name.EndsWith(".")
-            || sym.Name.Length > 0 && sym.Name[sym.Name.Length - 1] = ']'
-        then // TODO: What is this?  I don't remember what this is for.
-            RTType.ClassForName(sym.Name)
+            match RTReader.NamespaceFor(sym) with
+            | null -> 
+                match RTType.MaybeArrayType(sym) with
+                | null -> raise <| new InvalidOperationException($"No such namespace: {sym.Namespace}")
+                | _ as t -> t
+            | _ as ns ->
+                match ns.findInternedVar(Symbol.intern(sym.Name)) with
+                | null -> raise <| new InvalidOperationException($"No such var: {sym}")
+                | _ as v when v.Namespace <> RTVar.getCurrentNamespace() && not v.isPublic && not allowPrivate ->
+                    raise <| new InvalidOperationException($"Var: {sym} is not public")
+                | _ as v -> v
+        elif sym.Name.IndexOf('.') > 0 || sym.Name.Length > 0 && sym.Name[sym.Name.Length - 1] = ']' then
+            RTType.ClassForNameE(sym.Name)
         elif sym.Equals(RTReader.NsSym) then
             RTVar.NsVar
         elif sym.Equals(RTReader.InNsSym) then
             RTVar.InNSVar
+        //elif CompileStubSymVar / CompileStubClassVar  // TODO: Decide on stubs
         else
-            n.getMapping (sym)
+            match ns.getMapping(sym) with
+            | null -> 
+                if RT0.booleanCast((RTVar.AllowUnresolvedVarsVar :> IDeref).deref()) then 
+                    sym
+                else 
+                    raise <| new InvalidOperationException($"Unable to resolve symbol: {sym} int this context")
+            | _ as o -> o
+
+    static member IsMacro(cctx: CompilerContext, op: obj) : Var = 
+        let checkVar(v: Var) = 
+            if not <| isNull v && v.isMacro then
+                if v.Namespace = RTVar.getCurrentNamespace() && not v.isPublic then
+                    raise <| new InvalidOperationException($"Var: {v} is not public")
+        match op with
+        | :? Var as v -> checkVar(v); v
+        | :? Symbol as s -> 
+            if cctx.ContainsBindingForSym(s) then
+                null
+            else
+                match Compiler.LookupVar(cctx, s, false, false) with
+                | null -> null
+                | _ as v -> checkVar(v); v
+        | _ -> null
+
+    static member LookupVar(cctx:CompilerContext, sym: Symbol, internNew: bool) = Compiler.LookupVar(cctx, sym, internNew, true)
+
+    static member LookupVar(cctx: CompilerContext, sym: Symbol, internNew: bool, registerMacro: bool) : Var = 
+        let var = 
+            // Note: ns-qualified vars in other namespaces must exist already
+            match sym with
+            | _ when not <| isNull sym.Namespace ->
+                match RTReader.NamespaceFor(sym) with
+                | null -> null
+                | _ as ns ->
+                    let name = Symbol.intern(sym.Name)
+                    if internNew && Object.ReferenceEquals(ns, RTVar.getCurrentNamespace()) then
+                        RTVar.getCurrentNamespace().intern(name)
+                    else
+                        ns.findInternedVar(name)
+            | _ when sym.Equals(RTReader.NsSym) -> RTVar.NsVar
+            | _ when sym.Equals(RTReader.InNsSym) -> RTVar.InNSVar
+            | _ -> 
+                match RTVar.getCurrentNamespace().getMapping(sym) with
+                | null -> 
+                    // introduce a new var in the current ns
+                    if internNew then
+                        RTVar.getCurrentNamespace().intern(Symbol.intern(sym.Name))
+                    else null
+                | :? Var as v -> v
+                | _ as o -> raise <| new InvalidOperationException($"Expecting var, but {sym} is mapped to {o}")
+
+        if not <| isNull var && (not var.isPublic || registerMacro) then
+                cctx.RegisterVar(var)   // TODO: SHould this be done later by walking the tree?
+ 
+        var
+        

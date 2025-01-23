@@ -850,6 +850,8 @@ and [<Sealed;AbstractClass>] RTVar() =
 
     // Pre-defined Vars (miscellaneous)
 
+    static member val AllowUnresolvedVarsVar = Var.intern(RTVar.ClojureNamespace, Symbol.intern("*allow-unresolved-vars*"), false).setDynamic()
+
     // Need to have this located before the initialization of ReadEvalVar
     static member val _readEval =
         let mutable v = Environment.GetEnvironmentVariable("CLOJURE_READ_EVAL")

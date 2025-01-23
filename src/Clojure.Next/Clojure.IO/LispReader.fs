@@ -23,29 +23,13 @@ type ReaderResolver =
 [<AbstractClass; Sealed>]
 type RTReader() =
 
-    static member mapUniqueKeys([<ParamArray>] init: obj[]) : IPersistentMap =
-        if isNull init then
-            PersistentArrayMap.Empty
-        elif init.Length <= PersistentArrayMap.hashtableThreshold then
-            new PersistentArrayMap(init)
-        else
-            PersistentHashMap.create (init)
-
-    static member map([<ParamArray>] init: obj[]) : IPersistentMap =
-        if isNull init || init.Length = 0 then
-            PersistentArrayMap.Empty
-        elif init.Length <= PersistentArrayMap.hashtableThreshold then
-            PersistentArrayMap.createWithCheck (init)
-        else
-            PersistentHashMap.createWithCheck (init)
-
-    // the following used to be in clojure.lang.Compiler, but are really used only here(?)
 
     // THis could almost be in RTVar,given that it is namespace/var-related, but it also needs things from RTType.
     // So maybe this is the best place
-
+    
     static member val NsSym = Symbol.intern ("ns")
     static member val InNsSym = Symbol.intern ("in-ns")
+
 
         // These are used externally 
     static member val LineKeyword = Keyword.intern (null, "line")
@@ -149,31 +133,13 @@ type RTReader() =
 
 type ReaderFunction = PushbackTextReader * char * obj * obj -> obj
 
-type ReaderException(msg: string, line: int, column: int, inner: exn) =
-    inherit Exception(msg, inner)
-
-    static member val ErrNS = "clojure.error"
-    static member val ErrLine = Keyword.intern (ReaderException.ErrNS, "line")
-    static member val ErrColumn = Keyword.intern (ReaderException.ErrNS, "column")
-
-    member val data: IPersistentMap =
-        if line > 0 then
-            RTReader.map (ReaderException.ErrLine, line, ReaderException.ErrColumn, column)
-        else
-            null
-
-    new() = ReaderException(null, -1, -1, null)
-    new(msg: string) = ReaderException(msg, -1, -1, null)
-    new(msg: string, inner: exn) = ReaderException(msg, -1, -1, inner)
-
-
 
 [<AbstractClass; Sealed>]
 type LispReader() =
 
     // Symbol definitions
 
-    static let QuoteSym = Symbol.intern ("quote")
+
     static let TheVarSym = Symbol.intern ("var")
     static let UnquoteSym = Symbol.intern ("clojure.core", "unquote")
     static let UnquoteSplicingSym = Symbol.intern ("clojure.core", "unquote-splicing")
@@ -202,7 +168,6 @@ type LispReader() =
     static let LetfnSym = Symbol.intern ("letfn*")
     static let DoSym = Symbol.intern ("do")
     static let FnSym = Symbol.intern ("fn*")
-    static let QuoteSym = Symbol.intern ("quote")
     static let TheVarSym = Symbol.intern ("var")
     static let ImportSym = Symbol.intern ("clojure.core", "import*")
     static let DotSym = Symbol.intern (".")
@@ -229,7 +194,7 @@ type LispReader() =
             LetfnSym,
             DoSym,
             FnSym,
-            QuoteSym,
+            LispReader.QuoteSym,
             TheVarSym,
             ImportSym,
             DotSym,
@@ -323,7 +288,7 @@ type LispReader() =
     static do
         macros[int '"'] <- Some LispReader.stringReader
         macros[int ';'] <- Some LispReader.commentReader
-        macros[int '\''] <- Some <| LispReader.wrappingReader (QuoteSym)
+        macros[int '\''] <- Some <| LispReader.wrappingReader (LispReader.QuoteSym)
         macros[int '@'] <- Some <| LispReader.wrappingReader (DerefSym)
         macros[int '^'] <- Some LispReader.metaReader
         macros[int '`'] <- Some LispReader.syntaxQuoteReader
@@ -350,6 +315,8 @@ type LispReader() =
         dispatchMacros[int '_'] <- Some LispReader.discardReader
         dispatchMacros[int '?'] <- Some LispReader.conditionalReader
         dispatchMacros[int ':'] <- Some LispReader.namespaceMapReader
+
+    static member val QuoteSym = Symbol.intern ("quote")  // TODO: We have a mess -- these things are defined in too many places
 
     static member isMacro(ch: int) = ch < macros.Length && macros[ch].IsSome
 
@@ -380,7 +347,7 @@ type LispReader() =
 
     static member installPlatformFeature(opts: obj) : obj =
         match opts with
-        | null -> RTReader.mapUniqueKeys (OptFeaturesKeyword, PlatformFeatureSet)
+        | null -> RTMap.mapUniqueKeys (OptFeaturesKeyword, PlatformFeatureSet)
         | :? IPersistentMap as mopts ->
             match mopts.valAt (OptFeaturesKeyword) with
             | null -> mopts.assoc (OptFeaturesKeyword, PlatformFeatureSet)
@@ -1463,10 +1430,10 @@ type LispReader() =
 
     static member private AnalyzeSyntaxQuote(form: obj) : obj * bool =
         match form with
-        | _ when LispReader.IsSpecial(form) -> RTSeq.list (QuoteSym, form), true
+        | _ when LispReader.IsSpecial(form) -> RTSeq.list (LispReader.QuoteSym, form), true
         | :? Symbol as sym ->
             let analyzedSym = LispReader.AnalyzeSymbolForSyntaxQuote(sym)
-            RTSeq.list (QuoteSym, analyzedSym), true
+            RTSeq.list (LispReader.QuoteSym, analyzedSym), true
         | _ when LispReader.IsUnquote(form) -> RTSeq.second (form), false
         | _ when LispReader.IsUnquoteSplicing(form) -> raise <| new ArgumentException("splice not in list")
         | :? IPersistentCollection ->
@@ -1505,7 +1472,7 @@ type LispReader() =
         | :? Char
         | :? String -> form, true
         | _ when Numbers.IsNumeric(form) -> form, true
-        | _ -> RTSeq.list (QuoteSym, form), true
+        | _ -> RTSeq.list (LispReader.QuoteSym, form), true
 
 
     static member private AnalyzeSymbolForSyntaxQuote(sym: Symbol) =
