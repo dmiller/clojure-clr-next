@@ -170,7 +170,6 @@ type LispReader() =
     static let FnSym = Symbol.intern ("fn*")
     static let TheVarSym = Symbol.intern ("var")
     static let ImportSym = Symbol.intern ("clojure.core", "import*")
-    static let DotSym = Symbol.intern (".")
     static let AssignSym = Symbol.intern ("set!")
     static let DeftypeSym = Symbol.intern ("deftype*")
     static let ReifySym = Symbol.intern ("reify*")
@@ -180,7 +179,7 @@ type LispReader() =
     static let MonitorExitSym = Symbol.intern ("monitor-exit")
     static let CatchSym = Symbol.intern ("catch")
     static let FinallySym = Symbol.intern ("finally")
-    static let NewSym = Symbol.intern ("new")
+
     static let AmpersandSym = Symbol.intern ("&")
 
     static let CompilerSpecialSymbols =
@@ -197,7 +196,7 @@ type LispReader() =
             LispReader.QuoteSym,
             TheVarSym,
             ImportSym,
-            DotSym,
+            LispReader.DotSym,
             AssignSym,
             DeftypeSym,
             ReifySym,
@@ -207,7 +206,7 @@ type LispReader() =
             MonitorExitSym,
             CatchSym,
             FinallySym,
-            NewSym,
+            LispReader.NewSym,
             AmpersandSym
         )
 
@@ -317,6 +316,8 @@ type LispReader() =
         dispatchMacros[int ':'] <- Some LispReader.namespaceMapReader
 
     static member val QuoteSym = Symbol.intern ("quote")  // TODO: We have a mess -- these things are defined in too many places
+    static member val NewSym = Symbol.intern ("new")
+    static member val DotSym = Symbol.intern (".")
 
     static member isMacro(ch: int) = ch < macros.Length && macros[ch].IsSome
 
@@ -1426,7 +1427,7 @@ type LispReader() =
         else
             ret
 
-    static member private IsSpecial(sym: obj) = CompilerSpecialSymbols.Contains(sym)
+    static member IsSpecial(sym: obj) = CompilerSpecialSymbols.Contains(sym)
 
     static member private AnalyzeSyntaxQuote(form: obj) : obj * bool =
         match form with

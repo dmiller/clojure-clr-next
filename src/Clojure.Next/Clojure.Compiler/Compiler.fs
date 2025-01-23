@@ -8,6 +8,8 @@ open Clojure.IO
 open Clojure.Reflection
 open System.Reflection
 open Clojure.Lib
+open System.Text.RegularExpressions
+open System.Text
 
 
 
@@ -15,6 +17,8 @@ open Clojure.Lib
 type Compiler private () =
 
     static let ConstKeyword = Keyword.intern(null,"const")
+    static let IdentitySym = Symbol.intern("clojure.core", "identity")
+    static let ClassSym = Symbol.intern("System", "Type")
 
 
     static let TypeToTagDict = Dictionary<Type, Symbol>()
@@ -362,3 +366,130 @@ type Compiler private () =
  
         var
         
+
+    // Macroexpansion
+
+    // TODO: Macrochecking via Spec
+    static member CheckSpecs(v: Var, form: ISeq) = ()
+
+    static member Macroexpand1(form: obj) = Compiler.Macroexpand1(CompilerContext(Expression), form)
+    static member Macroexpand(form : obj) = Compiler.Macroexpand(CompilerContext(Expression), form)
+
+    static member Macroexpand1(cctx: CompilerContext, form: obj) =
+        match form with 
+        | :? ISeq as s -> Compiler.MacroexpandSeq1(cctx, s)
+        | _ -> form
+
+    static member Macroexpand(cctx: CompilerContext, form : obj) = 
+        let exf = Compiler.Macroexpand1(cctx, form)
+        if Object.ReferenceEquals(exf, form) then form 
+        else Compiler.Macroexpand(cctx, exf)
+
+    static member private MacroexpandSeq1(cctx: CompilerContext, form: ISeq) = 
+        let op = form.first()
+        if (LispReader.IsSpecial(form)) then
+            form
+        else
+            match Compiler.IsMacro(cctx, op) with
+            | null -> Compiler.MacroExpandNonSpecial(cctx, op, form)
+            | _ as v -> Compiler.MacroExpandSpecial(cctx, v, form)
+
+    static member private MacroExpandSpecial(cctx: CompilerContext, v: Var, form: ISeq) = 
+        Compiler.CheckSpecs(v,form)
+        try
+            // Here is macro magic -- supply the &form and &env args in front
+            let args = RTSeq.cons(form, RTSeq.cons(cctx.LocalBindings, form.next()))
+            (v :> IFn).applyTo(args)
+        with
+        | :? ArityException as e ->
+            // hide the 2 extra params for a macro
+            // This simple test is used in the JVM:   if (e.Name.Equals(munge(v.ns.Name.Name) + "$" + munge(v.sym.Name)))
+            // Does not work for us because have to append a __1234 to the type name for functions in order to avoid name collisiions in the eval assembly.
+            // So we have to see if the name is of the form   namespace$name__xxxx  where the __xxxx can be repeated.
+            let reducedName = Compiler.RemoveFnSuffix(e.name)
+            if reducedName.Equals($"{Munger.Munge(v.Namespace.Name.Name)}${Munger.Munge(v.Symbol.Name)}")  then
+                raise <| new ArityException(e.actual-2, e.name)
+            else
+                reraise()
+        | :? CompilerException -> 
+            reraise()
+        | _ as e ->
+            if e :? ArgumentException || e :? InvalidOperationException || (e :> obj) :? IExceptionInfo then
+                // TODO: Put in source Info
+                raise <| CompilerException("Macro failed", e)
+                (* 
+                                        throw new CompilerException((String)SourcePathVar.deref(), LineVarDeref(), ColumnVarDeref(),
+                            op is Symbol symbol ? symbol : null,
+                            CompilerException.PhaseMacroSyntaxCheckKeyword,
+                            e);
+                *)
+            else
+                // TODO: put in source info
+                raise <| CompilerException("Macro failed", e)
+                (*
+                          throw new CompilerException((String)SourcePathVar.deref(), LineVarDeref(), ColumnVarDeref(),
+                            op is Symbol symbol ? symbol : null,
+                            (e.GetType().Equals(typeof(Exception)) ? CompilerException.PhaseMacroSyntaxCheckKeyword : CompilerException.PhaseMacroExpandKeyword),
+                            e);
+                      
+                *)
+
+    static member private MacroExpandNonSpecial(cctx: CompilerContext, op: obj, form: ISeq) = 
+        match op with
+        | :? Symbol as sym ->
+            let sname = sym.Name
+            // We want to expand  (.name ...args...) to (. name ...args...)
+            // want namespace == null to sure that Class/.isntancemethd is not expanded to . form
+            if sname.Length > 1 && sname.[0] = '.' && isNull sym.Namespace then
+                if form.count() < 2 then
+                    raise <| ArgumentException("Malformed member expression, expecting (.member target ...) ")
+                let method = Symbol.intern(sname.Substring(1))
+                let mutable target = RTSeq.second(form)
+                if not <| isNull (Compiler.MaybeType(cctx, target, false)) then
+                    target <- (RTSeq.list(IdentitySym, target) :?> IObj).withMeta(RTMap.map(RTReader.TagKeyword, ClassSym))
+                Compiler.MaybeTransferSourceInfo(Compiler.PreserveTag(form, RTSeq.listStar(LispReader.DotSym, target, method, form.next().next())), form)
+            else
+                // (x.substring 2 5) =>  (. x substring 2 5)
+                // also (package.class.name ... ) (. package.class name ... )
+                let index = sname.IndexOf('.')
+                if index = sname.Length-1 then
+                    let target = Symbol.intern(sname.Substring(0, index))
+                    Compiler.MaybeTransferSourceInfo( RTSeq.listStar(LispReader.NewSym, target, form.next()), form)
+                else form
+        | _ -> form
+
+
+            
+
+    //public static Regex UnpackFnNameRE = new Regex("^(.+)/$([^_]+)(__[0-9]+)*$");
+    static member val FnNameSuffixRE = new Regex("__[0-9]+$")
+    static member RemoveFnSuffix(s: string) =
+        let rec loop (s: string) =
+            let m = Compiler.FnNameSuffixRE.Match(s)
+            if m.Success then
+                loop(s.Substring(0, s.Length - m.Groups.[0].Length))
+            else s
+
+        loop s
+
+    static member PreserveTag(src: ISeq, dst: ISeq) : obj =
+        match Compiler.TagOf(src) with 
+        | null -> dst
+        | _ as tag ->
+            match dst with
+            | :? IObj as iobj -> (dst :?> IObj).withMeta(RTMap.map(RTReader.TagKeyword, tag))
+            | _ -> dst
+
+    static member MaybeTransferSourceInfo(newForm: obj, oldForm: obj) : obj =
+        match oldForm, newForm with 
+        | (:? IObj as oldObj), (:? IObj as newObj) -> 
+            match oldObj.meta() with
+            | null -> newForm
+            | _ as oldMeta ->
+                let spanMap = oldMeta.valAt(RTReader.SourceSpanKeyword)
+                let mutable newMeta = newObj.meta()
+                if isNull newMeta then newMeta <- RTMap.map()
+                newMeta <- newMeta.assoc(RTReader.SourceSpanKeyword, spanMap)
+                newObj.withMeta(newMeta)
+        | _, _ -> newForm
+             

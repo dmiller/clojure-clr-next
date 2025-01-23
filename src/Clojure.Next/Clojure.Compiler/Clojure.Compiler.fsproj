@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="CompilerException.fs" />
+    <Compile Include="Munger.fs" />
     <Compile Include="IType.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="Compiler.fs" />

@@ -6,6 +6,7 @@ open Clojure.Numerics
 open System.Text.RegularExpressions
 open System.Reflection
 open System.Threading
+open System.Linq
 
 [<AbstractClass;Sealed>]
 type RT0() =
@@ -213,5 +214,18 @@ type RT0() =
     static member nextID() = Interlocked.Increment(&_id)
 
 
-
+    static member toArray(coll: obj) : obj array =
+        match coll with
+        | null -> RT0.emptyObjectArray
+        | :? (obj array) as a -> a
+        | :? string as s -> s.ToCharArray() |> Array.map box
+        | :? Array as a -> 
+            let len = a.Length
+            let ret = Array.zeroCreate len
+            for i = 0 to len - 1 do
+                ret[i] <- a.GetValue(i)
+            ret
+        | :? IEnumerable as ie -> ie.Cast<obj>().ToArray()
+        | _ -> 
+            raise <| InvalidOperationException($"Unable to convert: {coll.GetType()} to Object[]")
 
