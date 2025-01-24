@@ -11,7 +11,7 @@ open Clojure.Lib
 open System.Text.RegularExpressions
 open System.Text
 
-
+type SpecialFormParser = CompilerContext * obj -> Expr
 
 [<Sealed;AbstractClass>]
 type Compiler private () =
@@ -20,6 +20,35 @@ type Compiler private () =
     static let IdentitySym = Symbol.intern("clojure.core", "identity")
     static let ClassSym = Symbol.intern("System", "Type")
 
+    // Why not a Dictionary<Symbol, SpecialFormParser> ???
+    static let SpecialFormToParserMap : IPersistentMap = PersistentHashMap.create(
+            RTVar.DefSym, Compiler.DefExprParser,
+            RTVar.LoopSym, Compiler.LetExprParser,
+            RTVar.RecurSym, Compiler.RecurExprParser,
+            RTVar.IfSym, Compiler.IfExprParser,
+            RTVar.CaseSym, Compiler.CaseExprParser,
+            RTVar.LetSym, Compiler.LetExprParser,
+            RTVar.LetfnSym, Compiler.LetFnExprParser,
+            RTVar.DoSym, Compiler.BodyExprParser,
+            RTVar.FnSym, null,
+            RTVar.QuoteSym, Compiler.ConstantExprParser,
+            RTVar.TheVarSym, Compiler.TheVarExprParser,
+            RTVar.ImportSym, Compiler.ImportExprParser,
+            RTVar.DotSym, Compiler.HostExprParser,
+            RTVar.AssignSym, Compiler.AssignExprParser,
+            RTVar.DeftypeSym, Compiler.DefTypeParser(),
+            RTVar.ReifySym, Compiler.ReifyParser(),
+            RTVar.TrySym, Compiler.TryExprParser,
+            RTVar.ThrowSym, Compiler.ThrowExprParser,
+            RTVar.MonitorEnterSym, Compiler.MonitorEnterExprParser,
+            RTVar.MonitorExitSym, Compiler.MonitorExitExprParser,
+            RTVar.CatchSym, null,
+            RTVar.FinallySym, null,
+            RTVar.NewSym, Compiler.NewExprParser,
+            RTVar.AmpersandSym, null
+   
+    
+        )
 
     static let TypeToTagDict = Dictionary<Type, Symbol>()
 
@@ -42,8 +71,11 @@ type Compiler private () =
     static member val NilExprInstance = LiteralExpr({Type=NilType; Value=null})
     static member val TrueExprInstance = LiteralExpr({Type=BoolType; Value=true})
     static member val FalseExprInstance = LiteralExpr({Type=BoolType; Value=false})
+    
+    static member GetSpecialFormParser(op: obj) = SpecialFormToParserMap.valAt(op) 
 
-    static member Analyze(cctx: CompilerContext, form: obj) : Expr =
+    static member Analyze(cctx : CompilerContext, form: obj) : Expr = Compiler.Analyze(cctx, form, null)
+    static member Analyze(cctx: CompilerContext, form: obj, name: string) : Expr =
 
         try         
             // If we have a LazySeq, realize it and  attach the meta data from the initial form
@@ -68,7 +100,7 @@ type Compiler private () =
                     when not <| form :? IType && 
                          not <| form :? IRecord && 
                          coll.count() = 0  -> Compiler.OptionallyGenerateMetaInit(cctx, form, LiteralExpr({Type = EmptyType; Value = coll}))
-            | :? ISeq -> Compiler.AnalyzeSeq(cctx, form)
+            | :? ISeq as seq -> Compiler.AnalyzeSeq(cctx, seq, name)
             | :? IPersistentVector as pv-> Compiler.AnalyzeVector(cctx, pv)
             | :? IRecord -> LiteralExpr({Type=OtherType; Value=form})
             | :? IType -> LiteralExpr({Type=OtherType; Value=form})
@@ -195,7 +227,6 @@ type Compiler private () =
         
         let tag = Compiler.TagOf(sym)
 
-
         // See if we are a local variable or a field/property/QM reference
         let maybeExpr : Expr option = 
             if isNull sym.Namespace then
@@ -240,11 +271,59 @@ type Compiler private () =
             
 
 
-    static member AnalyzeSeq(cctx: CompilerContext, form: obj) : Expr =
-        Compiler.NilExprInstance   // TODO
+    static member AnalyzeSeq(cctx: CompilerContext, form: ISeq, name:string) : Expr =
+        // TODO: deal with source info
 
+        try
+            let me = Compiler.MacroexpandSeq1(cctx, form)
+            if  Object.ReferenceEquals(me,form) then
+                Compiler.Analyze(cctx, me, name)
+            else
+                
+                let op = RTSeq.first(form)
+                if isNull op then
+                    raise <| ArgumentNullException("form", "Can't call nil")
 
-    
+                let inl = Compiler.IsInline(cctx, op, RT0.count(RTSeq.next(form)))
+                if not <| isNull inl then
+                    Compiler.Analyze(cctx, Compiler.MaybeTransferSourceInfo( Compiler.PreserveTag(form, inl.applyTo(RTSeq.next(form))), form))
+                elif op.Equals(RTVar.FnSym) then
+                    Compiler.FnExprParser(cctx, form, name)
+                else
+                    match Compiler.GetSpecialFormParser(op) with
+                    | null -> Compiler.InvokeExprParser(cctx, form)
+                    | _ as parseFn ->  (parseFn :?> SpecialFormParser)(cctx, form)
+        with
+        | :? CompilerException -> reraise()
+        | _ as e -> 
+            let sym = 
+                match RTSeq.first(form) with
+                | :? Symbol as sym -> sym
+                | _ -> null
+            raise <| new CompilerException("help",0,0,sym,e)  // TODO: pass source info
+
+    static member FnExprParser(cctx: CompilerContext, form: obj, name: string) : Expr = Compiler.NilExprInstance
+    static member DefExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member RecurExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member IfExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member CaseExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member LetExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member LetFnExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member BodyExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member ConstantExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member TheVarExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member ImportExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member HostExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member AssignExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member DefTypeParser()(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member ReifyParser()(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member TryExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member ThrowExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member MonitorEnterExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member MonitorExitExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member NewExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member InvokeExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+   
 
     static member TagOf(o: obj) = 
         match RT0.get(RT0.meta(), RTVar.TagKeyword) with
@@ -312,6 +391,33 @@ type Compiler private () =
                 else 
                     raise <| new InvalidOperationException($"Unable to resolve symbol: {sym} int this context")
             | _ as o -> o
+
+
+    static member IsInline(cctx: CompilerContext, op: obj, arity: int) : IFn =
+        let v = 
+            match op with
+            | :? Var as v -> v
+            | :? Symbol as s -> 
+                match cctx.GetLocalBinding(s) with
+                | Some _  -> Compiler.LookupVar(cctx, s, false)
+                | _ -> null
+
+        match v with
+        | null -> null
+        | _ ->
+            if not <| Object.ReferenceEquals(v.Namespace, RTVar.getCurrentNamespace())  & not v.isPublic then
+                raise <| new InvalidOperationException($"Var: {v} is not public")
+
+            match RT0.get((v :> IMeta).meta(), RTVar.InlineKeyword) :?> IFn with
+            | null -> null
+            | _ as ret ->
+                match RT0.get((v :> IMeta).meta(), RTVar.InlineAritiesKeyword) with
+                | null -> ret
+                | :? IFn as aritiesPred ->
+                    if RT0.booleanCast(aritiesPred.invoke(arity)) then ret
+                    else null
+                | _ -> ret         // Probably this should be an error: :inline-arities value should be an IFn.  Original code does a cast that might fail
+
 
     static member IsMacro(cctx: CompilerContext, op: obj) : Var = 
         let checkVar(v: Var) = 
@@ -467,7 +573,7 @@ type Compiler private () =
 
         loop s
 
-    static member PreserveTag(src: ISeq, dst: ISeq) : obj =
+    static member PreserveTag(src: ISeq, dst: obj) : obj =
         match Compiler.TagOf(src) with 
         | null -> dst
         | _ as tag ->
@@ -488,3 +594,4 @@ type Compiler private () =
                 newObj.withMeta(newMeta)
         | _, _ -> newForm
              
+

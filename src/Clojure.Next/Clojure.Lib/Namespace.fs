@@ -1361,8 +1361,13 @@ and [<Sealed; AbstractClass>] RTVar() =
     static member val EndLineKeyword = Keyword.intern (null, "end-line")
     static member val EndColumnKeyword = Keyword.intern (null, "end-column")
 
-    // Keywords for LispReader
+    // Keywords for inline
 
+    static member val InlineKeyword = Keyword.intern (null, "inline")
+    static member val InlineAritiesKeyword = Keyword.intern (null, "inline-arities")
+
+
+    // Keywords for LispReader
 
     static member val UnknownKeyword = Keyword.intern (null, "unknown")
     static member val ParamTagsKeyword = Keyword.intern (null, "param-tags")
