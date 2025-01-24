@@ -13,6 +13,8 @@ open System.Text
 
 type SpecialFormParser = CompilerContext * obj -> Expr
 
+exception ParseException of string
+
 [<Sealed;AbstractClass>]
 type Compiler private () =
 
@@ -302,25 +304,136 @@ type Compiler private () =
                 | _ -> null
             raise <| new CompilerException("help",0,0,sym,e)  // TODO: pass source info
 
+    // Special form parsers
+
+    // Let's start with some easy ones
+    
+    static member ImportExprParser(cctx: CompilerContext, form: obj) : Expr = 
+        ImportExpr({Ctx = cctx; Typename = RTSeq.second(form) :?> string})
+
+    static member MonitorEnterExprParser(cctx: CompilerContext, form: obj) : Expr = 
+        let cctx = cctx.WithParserContext(Expression)
+        UntypedExpr({Ctx = cctx; Type=MonitorEnter; Target = Some <|  Compiler.Analyze(cctx, RTSeq.second(form))})
+        
+    static member MonitorExitExprParser(cctx: CompilerContext, form: obj) : Expr = 
+        let cctx = cctx.WithParserContext(Expression)
+        UntypedExpr({Ctx = cctx; Type=MonitorExit; Target = Some <| Compiler.Analyze(cctx, RTSeq.second(form))})
+
+ 
+    // cranking up the difficulty level
+
+    static member AssignExprParser(cctx: CompilerContext, form: obj) : Expr = 
+        let form = form :?> ISeq
+
+        if RT0.length(form) <> 3 then
+            raise <| ParseException("Malformed assignment, expecting (set! target val)")
+
+        let targetCtx = cctx.WithParserContext(Expression).WithIsAssign(true)
+        let target = Compiler.Analyze(targetCtx, RTSeq.second(form))
+
+        if not <| Compiler.IsAssignableExpr(target) then
+            raise <| ParseException("Invalid assignment target")
+
+        let bodyCtx = cctx.WithParserContext(Expression)
+        AssignExpr({Ctx = cctx; Target = target; Value = Compiler.Analyze(bodyCtx, RTSeq.third(form))})
+
+
+    static member ThrowExprParser(cctx: CompilerContext, form: obj) : Expr = 
+        // special case for Eval:  Wrap in FnOnceSym
+        let cctx = cctx.WithParserContext(Expression).WithIsAssign(false)
+        match RT0.count(form) with
+        | 1 ->  UntypedExpr({Ctx = cctx; Type=MonitorExit; Target = None})  
+        | 2 ->  UntypedExpr({Ctx = cctx; Type=MonitorExit; Target =  Some <| Compiler.Analyze(cctx, RTSeq.second(form))})  
+        | _ -> raise <| InvalidOperationException("Too many arguments to throw, throw expects a single Exception instance")
+
+    static member TheVarExprParser(cctx: CompilerContext, form: obj) : Expr = 
+        match RTSeq.second(form) with
+        | :? Symbol as sym ->
+            match Compiler.LookupVar(cctx, sym, false) with
+            | null -> raise <| ParseException($"Unable to resolve var: {sym} in this context")
+            | _ as v -> TheVarExpr({Ctx = cctx; Var = v})
+        | _ as v -> raise <| ParseException($"Second argument to the-var must be a symbol, found: {v}")        
+
+    static member BodyExprParser(cctx: CompilerContext, forms: obj) : Expr = 
+        let forms = 
+            if Util.equals(RTSeq.first(forms), RTVar.DoSym) then RTSeq.next(forms)
+            else forms :?> ISeq
+
+        let stmtCctx = cctx.WithParserContext(Statement)
+        let exprs = List<Expr>()
+
+        let rec loop (seq: ISeq) =
+            match seq with
+            | null -> ()
+            | _ -> 
+                let e = 
+                    if cctx.ParserContext = ParserContext.Statement || not <| isNull (seq.next())  then
+                        Compiler.Analyze(stmtCctx, seq.first())
+                    else
+                        Compiler.Analyze(cctx, seq.first())
+                exprs.Add(e)
+                loop(seq.next())
+        loop forms
+
+        BodyExpr({Ctx = cctx; Exprs = exprs})
+
+    static member IfExprParser(cctx: CompilerContext, form: obj) : Expr =
+        let form = form :?> ISeq
+
+        // (if test then) or (if test then else)
+
+        if form.count() > 4 then
+            raise <| ParseException("Too many arguments to if")
+
+        if form.count() < 3 then
+            raise <| ParseException("Too few arguments to if")
+
+        let bodyCtx = cctx.WithIsAssign(false)
+        let testCtx = bodyCtx.WithParserContext(Expression)
+
+        let testExpr = Compiler.Analyze(testCtx, RTSeq.second(form))
+        let thenExpr = Compiler.Analyze(bodyCtx, RTSeq.third(form))
+        let elseExpr = Compiler.Analyze(bodyCtx, RTSeq.fourth(form))
+
+        IfExpr({Test = testExpr; Then = thenExpr; Else = elseExpr; SourceInfo = None})  // TODO source info
+
+
+    static member ConstantExprParser(cctx: CompilerContext, form: obj) : Expr =
+        let argCount = RT0.count(form)
+        if argCount <> 1 then
+            let exData = PersistentArrayMap([| RTVar.FormKeywoard :> obj; form|])
+            raise <| ExceptionInfo($"Wrong number of arguments ({argCount}) passed to quote", exData)
+
+        match RTSeq.second(form) with
+        | null -> Compiler.NilExprInstance
+        | :? bool as b -> if b then Compiler.TrueExprInstance else Compiler.FalseExprInstance
+        | _ as n when Numbers.IsNumeric(n) -> Compiler.AnalyzeNumber(cctx,n)
+        | :? string as s -> LiteralExpr({Type=StringType; Value=s})
+        | :? IPersistentCollection as pc when pc.count() = 0 && ( not <| pc :? IMeta || isNull ((pc :?> IMeta).meta())) ->
+            LiteralExpr({Type=EmptyType; Value = pc})
+        | _ as v -> LiteralExpr({Type=OtherType; Value = v})
+
+
+
+
+    // Saving for later, when I figure out what I'm doing
+    static member DefTypeParser()(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member ReifyParser()(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+    static member CaseExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+
     static member FnExprParser(cctx: CompilerContext, form: obj, name: string) : Expr = Compiler.NilExprInstance
     static member DefExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
     static member RecurExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member IfExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member CaseExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+
+
     static member LetExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
     static member LetFnExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member BodyExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member ConstantExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member TheVarExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member ImportExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+
     static member HostExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member AssignExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member DefTypeParser()(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member ReifyParser()(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+
+
     static member TryExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member ThrowExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member MonitorEnterExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
-    static member MonitorExitExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
+
     static member NewExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
     static member InvokeExprParser(cctx: CompilerContext, form: obj) : Expr = Compiler.NilExprInstance
    
@@ -336,7 +449,7 @@ type Compiler private () =
 
     // TODO: Source info needed,   context is not needed (probably)
     static member CreateStaticFieldOrPropertyExpr(cctx: CompilerContext, tag: Symbol, t: Type, memberName: string, info: MemberInfo) : Expr =
-        HostExpr({Ctx = cctx; Tag = tag; Target = None; TargetType = t; MemberName = memberName; TInfo = info; Args = null;  IsTailPosition = false; SourceInfo = None})
+        HostExpr({Ctx = cctx; Type=FieldOrPropertyExpr; Tag = tag; Target = None; TargetType = t; MemberName = memberName; TInfo = info; Args = null;  IsTailPosition = false; SourceInfo = None})
 
     static member MaybeType(cctx: CompilerContext, form: obj, stringOk: bool) = 
         match form with
@@ -401,11 +514,12 @@ type Compiler private () =
                 match cctx.GetLocalBinding(s) with
                 | Some _  -> Compiler.LookupVar(cctx, s, false)
                 | _ -> null
+            | _ -> null
 
         match v with
         | null -> null
         | _ ->
-            if not <| Object.ReferenceEquals(v.Namespace, RTVar.getCurrentNamespace())  & not v.isPublic then
+            if not <| Object.ReferenceEquals(v.Namespace, RTVar.getCurrentNamespace())  && not v.isPublic then
                 raise <| new InvalidOperationException($"Var: {v} is not public")
 
             match RT0.get((v :> IMeta).meta(), RTVar.InlineKeyword) :?> IFn with
@@ -595,3 +709,9 @@ type Compiler private () =
         | _, _ -> newForm
              
 
+    static member IsAssignableExpr(expr: Expr) : bool =
+        match expr with
+        |  LocalBindingExpr _
+        |  VarExpr _ -> true
+        |  HostExpr deets when deets.Type = HostExprType.FieldOrPropertyExpr -> true
+        | _ -> false

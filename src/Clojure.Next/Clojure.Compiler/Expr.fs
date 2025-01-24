@@ -38,6 +38,10 @@ type LiteralType =
 | EmptyType
 | OtherType
 
+type HostExprType =
+| FieldOrPropertyExpr
+| MethodExpr
+| InstanceZeroArityCallExpr
 
 type ProtocolDetails = { ProtocolOn: Type; OnMethod: MethodInfo; SiteIndex: int}
 
@@ -61,13 +65,14 @@ type Expr =
 | NewExpr of NewDetails
 | NewInstanceExpr of NewInstanceDetails
 | QualifiedMethodExpr of QualifiedMethodDetails
+| TheVarExpr of TheVarDetails
 | TryExpr of TryDetails
 | UnresolvedVarExpr of UnresolvedVarDetails
 | VarExpr of VarDetails
 | UntypedExpr of UntypedExprDetails  // combines MonitorEnterExpr, MonitorExitExpr, ThrowExpr
 
 and AssignDetails = { Ctx: CompilerContext; Target: Expr; Value: Expr }
-and BodyDetails = { Ctx: CompilerContext; Exprs: Expr list }
+and BodyDetails = { Ctx: CompilerContext; Exprs: List<Expr> }
 and CaseDetails = { 
     Ctx: CompilerContext; 
     Expr: Expr; 
@@ -94,6 +99,7 @@ and DefDetails = {
 and FnDetails = { Ctx: CompilerContext; (* help *) SourceInfo: SourceInfo }
 and HostExprDetails = { 
     Ctx: CompilerContext; 
+    Type: HostExprType;
     Tag: Symbol;
     Target: Expr option;
     TargetType: Type;
@@ -102,7 +108,7 @@ and HostExprDetails = {
     Args: ResizeArray<HostArg>;
     IsTailPosition: bool;    
     SourceInfo: SourceInfo option }
-and IfDetails = { Test: Expr; Then: Expr; Else: Expr; SourceInfo: SourceInfo }
+and IfDetails = { Test: Expr; Then: Expr; Else: Expr; SourceInfo: SourceInfo option}
 and ImportDetails = { Ctx: CompilerContext; Typename: string  }
 and InstanceOfDetails = { Ctx: CompilerContext; Expr: Expr; Type: Type; SourceInfo: SourceInfo }
 and InvokeDetails = { 
@@ -118,12 +124,13 @@ and LetDetails = { Ctx: CompilerContext; Mode: LetExprMode; BindingInits: Bindin
 and LocalBindingDetails = { Ctx: CompilerContext; Binding: LocalBinding; Tag: Symbol }
 and MetaDetails = { Ctx: CompilerContext; Target: Expr; Meta: Expr }
 and MethodDetails = { Ctx: CompilerContext; MethodName: string; Args : HostArg list; }
-and UntypedExprDetails = { Ctx: CompilerContext; Type: UntypedExprType; Target: Expr}
+and UntypedExprDetails = { Ctx: CompilerContext; Type: UntypedExprType; Target: Expr option}
 and NewDetails = { Ctx: CompilerContext; Args: HostArg list; Type: Type; IsNoArgValueTypeCtor: bool; SourceInfo: SourceInfo }
 and NewInstanceDetails = { Ctx: CompilerContext (* help*) }  // maybe combindwith fn?
 and NumberDetails = { Ctx: CompilerContext; Value: obj }
 and QualifiedMethodDetails = { Ctx: CompilerContext; (* help *) SourceInfo: SourceInfo option}
 and RecurDetails = { Ctx: CompilerContext; Args: Expr list; LoopLocals: LocalBinding list; SourceInfo: SourceInfo }
+and TheVarDetails = { Ctx: CompilerContext; Var: Var}
 and TryDetails = { Ctx: CompilerContext; TryExpr: Expr; Catches: CatchClause list; Finally: Expr }
 and UnresolvedVarDetails = { Ctx: CompilerContext; Sym: Symbol }
 and VarDetails = { Ctx: CompilerContext; Var: Var; Tag: obj }
@@ -135,14 +142,15 @@ and HostArg = { ParamType: ParameterType; ArgExpr: Expr; LocalBinding: LocalBind
 and ObjMethod() =
     member val UsesThis = false with get, set
 
-and CompilerContext(_ctx: ParserContext, lbs : IPersistentMap, _method : ObjMethod option) =
+and CompilerContext(_ctx: ParserContext, lbs : IPersistentMap, _method : ObjMethod option, _isAssignContext : bool ) =
     
     // Map from Symbol to LocalBinding
     let mutable _localBindings = lbs
 
-    new(ctx: ParserContext) = new CompilerContext(ctx, PersistentHashMap.Empty, None)
+    new(ctx: ParserContext) = new CompilerContext(ctx, PersistentHashMap.Empty, None, false)
         
-    member this.WithParserContext(ctx: ParserContext) = new CompilerContext(ctx,_localBindings, _method) 
+    member this.WithParserContext(ctx: ParserContext) = new CompilerContext(ctx,_localBindings, _method, _isAssignContext) 
+    member this.WithIsAssign(isAssign: bool)= new CompilerContext(_ctx,_localBindings, _method, isAssign) 
 
     member _.ParserContext = _ctx
     member _.LocalBindings = _localBindings
@@ -151,6 +159,7 @@ and CompilerContext(_ctx: ParserContext, lbs : IPersistentMap, _method : ObjMeth
     member _.IsExpr = _ctx = ParserContext.Expression
     member _.IsStmt = _ctx = ParserContext.Statement
     member _.IsReturn = _ctx = ParserContext.Return
+    member _.IsAssignContext = _isAssignContext
 
     member this.GetLocalBinding(sym: Symbol) = 
         match RT0.get(_localBindings,sym) with

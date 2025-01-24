@@ -229,3 +229,10 @@ type RT0() =
         | _ -> 
             raise <| InvalidOperationException($"Unable to convert: {coll.GetType()} to Object[]")
 
+
+    static member length(seq: ISeq) =
+        let rec loop (s:ISeq) (cnt:int) =
+            match s with
+            | null -> cnt
+            | _ -> loop (s.next()) (cnt + 1)
+        loop seq 0

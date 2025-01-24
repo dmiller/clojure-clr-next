@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="IExceptionInfo.fs" />
+    <Compile Include="ExceptionInfo.fs" />
     <Compile Include="ReaderException.fs" />
     <Compile Include="TaggedLiteral.fs" />
     <Compile Include="ReaderConditional.fs" />
