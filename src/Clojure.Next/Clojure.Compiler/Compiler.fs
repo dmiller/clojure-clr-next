@@ -39,11 +39,6 @@ type Compiler private () =
         TypeToTagDict.Add(typeof<decimal>, Symbol.intern(null,"decimal"))
 
 
-
-
-
-
-
     static member val NilExprInstance = LiteralExpr({Type=NilType; Value=null})
     static member val TrueExprInstance = LiteralExpr({Type=BoolType; Value=true})
     static member val FalseExprInstance = LiteralExpr({Type=BoolType; Value=false})
@@ -232,7 +227,7 @@ type Compiler private () =
                 if not <| isNull (Compiler.IsMacro(cctx, v)) then 
                     raise <| CompilerException($"Can't take the value of a macro: {sym.Name}")
                 elif RT0.booleanCast(RT0.get((v :> IMeta).meta(),ConstKeyword))then 
-                    Compiler.Analyze(cctx.WithParserContext(Expression), RTSeq.list(LispReader.QuoteSym, v))
+                    Compiler.Analyze(cctx.WithParserContext(Expression), RTSeq.list(RTVar.QuoteSym, v))
                 else VarExpr({Ctx = cctx; Var = v; Tag = tag})
             | :? Type ->
                 LiteralExpr({Type=OtherType; Value = sym;})
@@ -252,7 +247,7 @@ type Compiler private () =
     
 
     static member TagOf(o: obj) = 
-        match RT0.get(RT0.meta(), RTReader.TagKeyword) with
+        match RT0.get(RT0.meta(), RTVar.TagKeyword) with
         | :? Symbol as sym -> sym
         | :? string as str -> Symbol.intern(null,str)
         | :? Type as t -> 
@@ -304,9 +299,9 @@ type Compiler private () =
                 | _ as v -> v
         elif sym.Name.IndexOf('.') > 0 || sym.Name.Length > 0 && sym.Name[sym.Name.Length - 1] = ']' then
             RTType.ClassForNameE(sym.Name)
-        elif sym.Equals(RTReader.NsSym) then
+        elif sym.Equals(RTVar.NsSym) then
             RTVar.NsVar
-        elif sym.Equals(RTReader.InNsSym) then
+        elif sym.Equals(RTVar.InNsSym) then
             RTVar.InNSVar
         //elif CompileStubSymVar / CompileStubClassVar  // TODO: Decide on stubs
         else
@@ -349,8 +344,8 @@ type Compiler private () =
                         RTVar.getCurrentNamespace().intern(name)
                     else
                         ns.findInternedVar(name)
-            | _ when sym.Equals(RTReader.NsSym) -> RTVar.NsVar
-            | _ when sym.Equals(RTReader.InNsSym) -> RTVar.InNSVar
+            | _ when sym.Equals(RTVar.NsSym) -> RTVar.NsVar
+            | _ when sym.Equals(RTVar.InNsSym) -> RTVar.InNSVar
             | _ -> 
                 match RTVar.getCurrentNamespace().getMapping(sym) with
                 | null -> 
@@ -446,15 +441,15 @@ type Compiler private () =
                 let method = Symbol.intern(sname.Substring(1))
                 let mutable target = RTSeq.second(form)
                 if not <| isNull (Compiler.MaybeType(cctx, target, false)) then
-                    target <- (RTSeq.list(IdentitySym, target) :?> IObj).withMeta(RTMap.map(RTReader.TagKeyword, ClassSym))
-                Compiler.MaybeTransferSourceInfo(Compiler.PreserveTag(form, RTSeq.listStar(LispReader.DotSym, target, method, form.next().next())), form)
+                    target <- (RTSeq.list(IdentitySym, target) :?> IObj).withMeta(RTMap.map(RTVar.TagKeyword, ClassSym))
+                Compiler.MaybeTransferSourceInfo(Compiler.PreserveTag(form, RTSeq.listStar(RTVar.DotSym, target, method, form.next().next())), form)
             else
                 // (x.substring 2 5) =>  (. x substring 2 5)
                 // also (package.class.name ... ) (. package.class name ... )
                 let index = sname.IndexOf('.')
                 if index = sname.Length-1 then
                     let target = Symbol.intern(sname.Substring(0, index))
-                    Compiler.MaybeTransferSourceInfo( RTSeq.listStar(LispReader.NewSym, target, form.next()), form)
+                    Compiler.MaybeTransferSourceInfo( RTSeq.listStar(RTVar.NewSym, target, form.next()), form)
                 else form
         | _ -> form
 
@@ -477,7 +472,7 @@ type Compiler private () =
         | null -> dst
         | _ as tag ->
             match dst with
-            | :? IObj as iobj -> (dst :?> IObj).withMeta(RTMap.map(RTReader.TagKeyword, tag))
+            | :? IObj as iobj -> (dst :?> IObj).withMeta(RTMap.map(RTVar.TagKeyword, tag))
             | _ -> dst
 
     static member MaybeTransferSourceInfo(newForm: obj, oldForm: obj) : obj =
@@ -486,10 +481,10 @@ type Compiler private () =
             match oldObj.meta() with
             | null -> newForm
             | _ as oldMeta ->
-                let spanMap = oldMeta.valAt(RTReader.SourceSpanKeyword)
+                let spanMap = oldMeta.valAt(RTVar.SourceSpanKeyword)
                 let mutable newMeta = newObj.meta()
                 if isNull newMeta then newMeta <- RTMap.map()
-                newMeta <- newMeta.assoc(RTReader.SourceSpanKeyword, spanMap)
+                newMeta <- newMeta.assoc(RTVar.SourceSpanKeyword, spanMap)
                 newObj.withMeta(newMeta)
         | _, _ -> newForm
              

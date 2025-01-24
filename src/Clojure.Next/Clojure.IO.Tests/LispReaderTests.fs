@@ -780,12 +780,12 @@ let ListTests =
             Expect.isTrue ((typeof<IObj>).IsAssignableFrom(o1.GetType())) "Should read a list"
             let io = o1 :?> IObj
             let meta = RT0.meta(io)
-            Expect.equal (meta.valAt(RTReader.LineKeyword)) 3 "Should have line number 3"
-            let sourceSpanMap = meta.valAt(RTReader.SourceSpanKeyword) :?> IPersistentMap
-            Expect.equal (sourceSpanMap.valAt(RTReader.StartLineKeyword)) 3 "Should have line number 3"
-            Expect.equal (sourceSpanMap.valAt(RTReader.StartColumnKeyword)) 3 "Should have column number 3"
-            Expect.equal (sourceSpanMap.valAt(RTReader.EndLineKeyword)) 4 "Should have line number 4"
-            Expect.equal (sourceSpanMap.valAt(RTReader.EndColumnKeyword)) 5 "Should have column number 5"
+            Expect.equal (meta.valAt(RTVar.LineKeyword)) 3 "Should have line number 3"
+            let sourceSpanMap = meta.valAt(RTVar.SourceSpanKeyword) :?> IPersistentMap
+            Expect.equal (sourceSpanMap.valAt(RTVar.StartLineKeyword)) 3 "Should have line number 3"
+            Expect.equal (sourceSpanMap.valAt(RTVar.StartColumnKeyword)) 3 "Should have column number 3"
+            Expect.equal (sourceSpanMap.valAt(RTVar.EndLineKeyword)) 4 "Should have line number 4"
+            Expect.equal (sourceSpanMap.valAt(RTVar.EndColumnKeyword)) 5 "Should have column number 5"
 
         ]
         

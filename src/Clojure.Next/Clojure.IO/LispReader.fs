@@ -24,25 +24,6 @@ type ReaderResolver =
 type RTReader() =
 
 
-    // THis could almost be in RTVar,given that it is namespace/var-related, but it also needs things from RTType.
-    // So maybe this is the best place
-    
-    static member val NsSym = Symbol.intern ("ns")
-    static member val InNsSym = Symbol.intern ("in-ns")
-
-
-        // These are used externally 
-    static member val LineKeyword = Keyword.intern (null, "line")
-    static member val ColumnKeyword = Keyword.intern (null, "column")
-    static member val FileKeyword = Keyword.intern (null, "file")
-    static member val SourceSpanKeyword = Keyword.intern (null, "source-span")
-    static member val StartLineKeyword = Keyword.intern (null, "start-line")
-    static member val StartColumnKeyword = Keyword.intern (null, "start-column")
-    static member val EndLineKeyword = Keyword.intern (null, "end-line")
-    static member val EndColumnKeyword = Keyword.intern (null, "end-column")
-
-    static member val TagKeyword = Keyword.intern (null, "tag")
-
     static member MaybeResolveIn(n: Namespace, sym: Symbol) : obj =
         // note: ns-qualified vars must already exist
         if not <| isNull sym.Namespace then
@@ -57,9 +38,9 @@ type RTReader() =
             || sym.Name.Length > 0 && sym.Name[sym.Name.Length - 1] = ']'
         then // TODO: What is this?  I don't remember what this is for.
             RTType.ClassForName(sym.Name)
-        elif sym.Equals(RTReader.NsSym) then
+        elif sym.Equals(RTVar.NsSym) then
             RTVar.NsVar
-        elif sym.Equals(RTReader.InNsSym) then
+        elif sym.Equals(RTVar.InNsSym) then
             RTVar.InNSVar
         else
             n.getMapping (sym)
@@ -137,105 +118,7 @@ type ReaderFunction = PushbackTextReader * char * obj * obj -> obj
 [<AbstractClass; Sealed>]
 type LispReader() =
 
-    // Symbol definitions
-
-
-    static let TheVarSym = Symbol.intern ("var")
-    static let UnquoteSym = Symbol.intern ("clojure.core", "unquote")
-    static let UnquoteSplicingSym = Symbol.intern ("clojure.core", "unquote-splicing")
-    static let DerefSym = Symbol.intern ("clojure.core", "deref")
-    static let ApplySym = Symbol.intern ("clojure.core", "apply")
-    static let ConcatSym = Symbol.intern ("clojure.core", "concat")
-    static let HashMapSym = Symbol.intern ("clojure.core", "hash-map")
-    static let HashSetSym = Symbol.intern ("clojure.core", "hash-set")
-    static let VectorSym = Symbol.intern ("clojure.core", "vector")
-    static let ListSym = Symbol.intern ("clojure.core", "list")
-    static let WithMetaSym = Symbol.intern ("clojure.core", "with-meta")
-    static let SeqSym = Symbol.intern ("clojure.core", "seq")
-
-
-
-    // Compiler special forms
-    // Obviously this should be over in the Clojure.Compiler, but it is used here.
-    // I had hoped to have a version of LispReader that could be delivered separately, but perhaps that is just the EdnReader and LispReader should reside with the compiler?
-
-    static let DefSym = Symbol.intern ("def")
-    static let LoopSym = Symbol.intern ("loop*")
-    static let RecurSym = Symbol.intern ("recur")
-    static let IfSym = Symbol.intern ("if")
-    static let CaseSym = Symbol.intern ("case*")
-    static let LetSym = Symbol.intern ("let*")
-    static let LetfnSym = Symbol.intern ("letfn*")
-    static let DoSym = Symbol.intern ("do")
-    static let FnSym = Symbol.intern ("fn*")
-    static let TheVarSym = Symbol.intern ("var")
-    static let ImportSym = Symbol.intern ("clojure.core", "import*")
-    static let AssignSym = Symbol.intern ("set!")
-    static let DeftypeSym = Symbol.intern ("deftype*")
-    static let ReifySym = Symbol.intern ("reify*")
-    static let TrySym = Symbol.intern ("try")
-    static let ThrowSym = Symbol.intern ("throw")
-    static let MonitorEnterSym = Symbol.intern ("monitor-enter")
-    static let MonitorExitSym = Symbol.intern ("monitor-exit")
-    static let CatchSym = Symbol.intern ("catch")
-    static let FinallySym = Symbol.intern ("finally")
-
-    static let AmpersandSym = Symbol.intern ("&")
-
-    static let CompilerSpecialSymbols =
-        PersistentHashSet.create (
-            DefSym,
-            LoopSym,
-            RecurSym,
-            IfSym,
-            CaseSym,
-            LetSym,
-            LetfnSym,
-            DoSym,
-            FnSym,
-            LispReader.QuoteSym,
-            TheVarSym,
-            ImportSym,
-            LispReader.DotSym,
-            AssignSym,
-            DeftypeSym,
-            ReifySym,
-            TrySym,
-            ThrowSym,
-            MonitorEnterSym,
-            MonitorExitSym,
-            CatchSym,
-            FinallySym,
-            LispReader.NewSym,
-            AmpersandSym
-        )
-
-    // Keyword definitions
-
-    static let UnknownKeyword = Keyword.intern (null, "unknown")
-
-
-
-    static let ParamTagsKeyword = Keyword.intern (null, "param-tags")
-
-    // Parser options
-
-    static let OptEofKeword = Keyword.intern (null, "eof")
-    static let OptFeaturesKeyword = Keyword.intern (null, "features")
-    static let OptReadCondKeyword = Keyword.intern (null, "read-cond")
-
     static let EofOptionsDefault: bool * obj = (true, null)
-
-    // Platform features - always installed
-
-    static let PlatformKey = Keyword.intern (null, "cljr")
-    static let PlatformFeatureSet = PersistentHashSet.create (PlatformKey)
-
-    // Reader conditional options - use with :read-cond
-
-    static let CondAllowKeyword = Keyword.intern (null, "allow")
-    static let CondPreserveKeyword = Keyword.intern (null, "preserve")
-
 
     // EOF special value to throw on eof
     static let EofThrowKeyword = Keyword.intern (null, "eofthrow")
@@ -256,16 +139,6 @@ type LispReader() =
     /// Dynamically bound Var set to true in a read-cond context
     static let ReadCondEnvVar = Var.create(false).setDynamic ()
 
-    static let DataReadersVar =
-        Var
-            .intern(Namespace.ClojureNamespace, Symbol.intern ("*data-readers*"), RTMap.map ())
-            .setDynamic ()
-
-    static let DefaultDataReaderFnVar =
-        Var.intern (Namespace.ClojureNamespace, Symbol.intern ("*default-data-reader-fn*"), RTMap.map ())
-
-    static let DefaultDataReadersVar =
-        Var.intern (Namespace.ClojureNamespace, Symbol.intern ("default-data-readers"), RTMap.map ())
 
     // macro characters and #-dispatch
     static let macros = Array.zeroCreate<ReaderFunction option> (256)
@@ -287,8 +160,8 @@ type LispReader() =
     static do
         macros[int '"'] <- Some LispReader.stringReader
         macros[int ';'] <- Some LispReader.commentReader
-        macros[int '\''] <- Some <| LispReader.wrappingReader (LispReader.QuoteSym)
-        macros[int '@'] <- Some <| LispReader.wrappingReader (DerefSym)
+        macros[int '\''] <- Some <| LispReader.wrappingReader (RTVar.QuoteSym)
+        macros[int '@'] <- Some <| LispReader.wrappingReader (RTVar.DerefSym)
         macros[int '^'] <- Some LispReader.metaReader
         macros[int '`'] <- Some LispReader.syntaxQuoteReader
         macros[int '~'] <- Some LispReader.unquoteReader
@@ -315,9 +188,8 @@ type LispReader() =
         dispatchMacros[int '?'] <- Some LispReader.conditionalReader
         dispatchMacros[int ':'] <- Some LispReader.namespaceMapReader
 
-    static member val QuoteSym = Symbol.intern ("quote")  // TODO: We have a mess -- these things are defined in too many places
-    static member val NewSym = Symbol.intern ("new")
-    static member val DotSym = Symbol.intern (".")
+
+    static member val PlatformFeatureSet = PersistentHashSet.create (RTVar.PlatformKey)
 
     static member isMacro(ch: int) = ch < macros.Length && macros[ch].IsSome
 
@@ -333,7 +205,7 @@ type LispReader() =
     static member parseEofOptions(opts: obj) =
         match opts with
         | :? IPersistentMap as optsMap ->
-            let eofValue = optsMap.valAt (OptEofKeword, EofThrowKeyword)
+            let eofValue = optsMap.valAt (RTVar.OptEofKeword, EofThrowKeyword)
 
             if EofThrowKeyword.Equals(eofValue) then
                 EofOptionsDefault
@@ -348,11 +220,11 @@ type LispReader() =
 
     static member installPlatformFeature(opts: obj) : obj =
         match opts with
-        | null -> RTMap.mapUniqueKeys (OptFeaturesKeyword, PlatformFeatureSet)
+        | null -> RTMap.mapUniqueKeys (RTVar.OptFeaturesKeyword, LispReader.PlatformFeatureSet)
         | :? IPersistentMap as mopts ->
-            match mopts.valAt (OptFeaturesKeyword) with
-            | null -> mopts.assoc (OptFeaturesKeyword, PlatformFeatureSet)
-            | :? IPersistentSet as features -> mopts.assoc (OptFeaturesKeyword, RTSeq.conj (features, PlatformKey))
+            match mopts.valAt (RTVar.OptFeaturesKeyword) with
+            | null -> mopts.assoc (RTVar.OptFeaturesKeyword, LispReader.PlatformFeatureSet)
+            | :? IPersistentSet as features -> mopts.assoc (RTVar.OptFeaturesKeyword, RTSeq.conj (features, RTVar.PlatformKey))
             | _ -> raise <| invalidOp "LispReader: the value of :features must be a set"
         | _ -> raise <| invalidOp "LispReader options must be a map"
 
@@ -433,7 +305,7 @@ type LispReader() =
             resolverOpt: ReaderResolver option
         ) : obj =
 
-        if UnknownKeyword.Equals((RTVar.ReadEvalVar :> IDeref).deref ()) then
+        if RTVar.UnknownKeyword.Equals((RTVar.ReadEvalVar :> IDeref).deref ()) then
             raise <| invalidOp "Reading disallowed - *read-eval* bound to :unknown"
 
         let fullOpts = LispReader.installPlatformFeature (opts)
@@ -1166,24 +1038,24 @@ type LispReader() =
 
             if startLine <> -1 then
                 let mutable meta = RT0.meta (s) :> Associative
-                meta <- RTMap.assoc (meta, RTReader.LineKeyword, RT0.getWithDefault (meta, RTReader.LineKeyword, startLine))
-                meta <- RTMap.assoc (meta, RTReader.ColumnKeyword, RT0.getWithDefault (meta, RTReader.ColumnKeyword, startCol))
+                meta <- RTMap.assoc (meta, RTVar.LineKeyword, RT0.getWithDefault (meta, RTVar.LineKeyword, startLine))
+                meta <- RTMap.assoc (meta, RTVar.ColumnKeyword, RT0.getWithDefault (meta, RTVar.ColumnKeyword, startCol))
 
                 meta <-
                     RTMap.assoc (
                         meta,
-                        RTReader.SourceSpanKeyword,
+                        RTVar.SourceSpanKeyword,
                         RT0.getWithDefault (
                             meta,
-                            RTReader.SourceSpanKeyword,
+                            RTVar.SourceSpanKeyword,
                             RTMap.map (
-                                RTReader.StartLineKeyword,
+                                RTVar.StartLineKeyword,
                                 startLine,
-                                RTReader.StartColumnKeyword,
+                                RTVar.StartColumnKeyword,
                                 startCol,
-                                RTReader.EndLineKeyword,
+                                RTVar.EndLineKeyword,
                                 lntr.LineNumber,
-                                RTReader.EndColumnKeyword,
+                                RTVar.EndColumnKeyword,
                                 lntr.ColumnNumber
                             )
                         )
@@ -1415,26 +1287,26 @@ type LispReader() =
                 let newMeta =
                     iobj
                         .meta()
-                        .without(RTReader.LineKeyword)
-                        .without(RTReader.ColumnKeyword)
-                        .without (RTReader.SourceSpanKeyword)
+                        .without(RTVar.LineKeyword)
+                        .without(RTVar.ColumnKeyword)
+                        .without (RTVar.SourceSpanKeyword)
 
                 if newMeta.count () = 0 then
                     ret
                 else
-                    RTSeq.list (WithMetaSym, ret, LispReader.SyntaxQuote(iobj.meta ()))
+                    RTSeq.list (RTVar.WithMetaSym, ret, LispReader.SyntaxQuote(iobj.meta ()))
             | _ -> ret
         else
             ret
 
-    static member IsSpecial(sym: obj) = CompilerSpecialSymbols.Contains(sym)
+    static member IsSpecial(sym: obj) = RTVar.CompilerSpecialSymbols.Contains(sym)
 
     static member private AnalyzeSyntaxQuote(form: obj) : obj * bool =
         match form with
-        | _ when LispReader.IsSpecial(form) -> RTSeq.list (LispReader.QuoteSym, form), true
+        | _ when LispReader.IsSpecial(form) -> RTSeq.list (RTVar.QuoteSym, form), true
         | :? Symbol as sym ->
             let analyzedSym = LispReader.AnalyzeSymbolForSyntaxQuote(sym)
-            RTSeq.list (LispReader.QuoteSym, analyzedSym), true
+            RTSeq.list (RTVar.QuoteSym, analyzedSym), true
         | _ when LispReader.IsUnquote(form) -> RTSeq.second (form), false
         | _ when LispReader.IsUnquoteSplicing(form) -> raise <| new ArgumentException("splice not in list")
         | :? IPersistentCollection ->
@@ -1444,36 +1316,36 @@ type LispReader() =
                 let keyvals: IPersistentVector = LispReader.FlattenMap(form)
 
                 RTSeq.list (
-                    ApplySym,
-                    HashMapSym,
-                    RTSeq.list (SeqSym, RTSeq.cons (ConcatSym, LispReader.SyntaxQuoteExpandList(keyvals.seq ())))
+                    RTVar.ApplySym,
+                    RTVar.HashMapSym,
+                    RTSeq.list (RTVar.SeqSym, RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(keyvals.seq ())))
                 ),
                 true
             | :? IPersistentVector as v ->
                 RTSeq.list (
-                    ApplySym,
-                    VectorSym,
-                    RTSeq.list (SeqSym, RTSeq.cons (ConcatSym, LispReader.SyntaxQuoteExpandList(v.seq ())))
+                    RTVar.ApplySym,
+                    RTVar.VectorSym,
+                    RTSeq.list (RTVar.SeqSym, RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(v.seq ())))
                 ),
                 true
             | :? IPersistentSet as s ->
                 RTSeq.list (
-                    ApplySym,
-                    HashSetSym,
-                    RTSeq.list (SeqSym, RTSeq.cons (ConcatSym, LispReader.SyntaxQuoteExpandList(s.seq ())))
+                    RTVar.ApplySym,
+                    RTVar.HashSetSym,
+                    RTSeq.list (RTVar.SeqSym, RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(s.seq ())))
                 ),
                 true
             | :? ISeq
             | :? IPersistentList ->
                 match RT0.seq (form) with
-                | null -> RTSeq.cons (ListSym, null), true
-                | _ as seq -> RTSeq.list (SeqSym, RTSeq.cons (ConcatSym, LispReader.SyntaxQuoteExpandList(seq))), true
+                | null -> RTSeq.cons (RTVar.ListSym, null), true
+                | _ as seq -> RTSeq.list (RTVar.SeqSym, RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(seq))), true
             | _ -> raise <| new ArgumentException("Unknown collection type")
         | :? Keyword
         | :? Char
         | :? String -> form, true
         | _ when Numbers.IsNumeric(form) -> form, true
-        | _ -> RTSeq.list (LispReader.QuoteSym, form), true
+        | _ -> RTSeq.list (RTVar.QuoteSym, form), true
 
 
     static member private AnalyzeSymbolForSyntaxQuote(sym: Symbol) =
@@ -1568,11 +1440,11 @@ type LispReader() =
 
                 let nextRet =
                     if LispReader.IsUnquote(item) then
-                        ret.cons (RTSeq.list (ListSym, RTSeq.second (item)))
+                        ret.cons (RTSeq.list (RTVar.ListSym, RTSeq.second (item)))
                     elif LispReader.IsUnquoteSplicing(item) then
                         ret.cons (RTSeq.second (item))
                     else
-                        ret.cons (RTSeq.list (ListSym, LispReader.SyntaxQuote(item)))
+                        ret.cons (RTSeq.list (RTVar.ListSym, LispReader.SyntaxQuote(item)))
 
                 loop (s.next ()) nextRet
 
@@ -1619,13 +1491,13 @@ type LispReader() =
 
     static member IsUnquote(form: obj) =
         match form with
-        | :? ISeq as s -> Util.equals (RTSeq.first (s), UnquoteSym)
+        | :? ISeq as s -> Util.equals (RTSeq.first (s), RTVar.UnquoteSym)
         | _ -> false
 
 
     static member IsUnquoteSplicing(form: obj) =
         match form with
-        | :? ISeq as s -> Util.equals (RTSeq.first (s), UnquoteSplicingSym)
+        | :? ISeq as s -> Util.equals (RTSeq.first (s), RTVar.UnquoteSplicingSym)
         | _ -> false
 
 
@@ -1645,11 +1517,11 @@ type LispReader() =
 
         if ch = int '@' then
             let o = LispReader.readAux (r, opts, pendingForms)
-            RTSeq.list (UnquoteSplicingSym, o)
+            RTSeq.list (RTVar.UnquoteSplicingSym, o)
         else
             LispReader.unread (r, ch)
             let o = LispReader.readAux (r, opts, pendingForms)
-            RTSeq.list (UnquoteSym, o)
+            RTSeq.list (RTVar.UnquoteSym, o)
 
 
     static member private dispatchReader(r: PushbackTextReader, hash: char, opts: obj, pendingForms: obj) : obj =
@@ -1684,10 +1556,10 @@ type LispReader() =
 
         let mutable metaAsMap =
             match LispReader.readAux (r, opts, pendingForms) with
-            | :? Symbol as s -> RTMap.map (RTReader.TagKeyword, s)
-            | :? String as s -> RTMap.map (RTReader.TagKeyword, s)
+            | :? Symbol as s -> RTMap.map (RTVar.TagKeyword, s)
+            | :? String as s -> RTMap.map (RTVar.TagKeyword, s)
             | :? Keyword as k -> RTMap.map (k, true)
-            | :? IPersistentVector as v -> RTMap.map (ParamTagsKeyword, v)
+            | :? IPersistentVector as v -> RTMap.map (RTVar.ParamTagsKeyword, v)
             | :? IPersistentMap as m -> m
             | _ ->
                 raise
@@ -1700,25 +1572,25 @@ type LispReader() =
 
             if startLine <> -1 && o :? ISeq then
                  metaAsMap <-
-                    metaAsMap.assoc (RTReader.LineKeyword, RT0.getWithDefault (metaAsMap, RTReader.LineKeyword, startLine))
+                    metaAsMap.assoc (RTVar.LineKeyword, RT0.getWithDefault (metaAsMap, RTVar.LineKeyword, startLine))
 
                  metaAsMap <-
-                    metaAsMap.assoc (RTReader.ColumnKeyword, RT0.getWithDefault (metaAsMap, RTReader.ColumnKeyword, startCol))
+                    metaAsMap.assoc (RTVar.ColumnKeyword, RT0.getWithDefault (metaAsMap, RTVar.ColumnKeyword, startCol))
 
                  metaAsMap <-
                     metaAsMap.assoc (
-                        RTReader.SourceSpanKeyword,
+                        RTVar.SourceSpanKeyword,
                         RT0.getWithDefault (
                             metaAsMap,
-                            RTReader.SourceSpanKeyword,
+                            RTVar.SourceSpanKeyword,
                             RTMap.map (
-                                RTReader.StartLineKeyword,
+                                RTVar.StartLineKeyword,
                                 startLine,
-                                RTReader.StartColumnKeyword,
+                                RTVar.StartColumnKeyword,
                                 startCol,
-                                RTReader.EndLineKeyword,
+                                RTVar.EndLineKeyword,
                                 lntr.LineNumber,
-                                RTReader.EndColumnKeyword,
+                                RTVar.EndColumnKeyword,
                                 lntr.ColumnNumber
                             )
                         )
@@ -1744,7 +1616,7 @@ type LispReader() =
 
     static member varReader(r: PushbackTextReader, quote: char, opts: obj, pendingForms: obj) : obj =
         let o = LispReader.readAux (r, opts, LispReader.ensurePending (pendingForms))
-        RTSeq.list (TheVarSym, o)
+        RTSeq.list (RTVar.TheVarSym, o)
 
     static member private regexReader(r: PushbackTextReader, doublequote: char, opts: obj, pendingForms: obj) : obj =
         let sb = StringBuilder()
@@ -1800,10 +1672,10 @@ type LispReader() =
                 let restSym = (argSyms :> ILookup).valAt (-1)
 
                 if not <| isNull restSym then
-                    args <- args.cons (AmpersandSym)
+                    args <- args.cons (RTVar.AmpersandSym)
                     args <- args.cons (restSym)
 
-            RTSeq.list (FnSym, args, form)
+            RTSeq.list (RTVar.FnSym, args, form)
 
         finally
             Var.popThreadBindings () |> ignore
@@ -1858,7 +1730,7 @@ type LispReader() =
         | :? IPersistentList ->
             let fs = RTSeq.first (o) :?> Symbol
 
-            if TheVarSym.Equals(fs) then
+            if RTVar.TheVarSym.Equals(fs) then
                 let vs = RTSeq.second (o) :?> Symbol
                 RTVar.var (vs.Namespace, vs.Name)
             elif fs.Name.EndsWith(".") then
@@ -1901,24 +1773,24 @@ type LispReader() =
         else
             match opts with
             | :? IPersistentMap as m ->
-                let readCond = m.valAt (OptReadCondKeyword)
-                CondPreserveKeyword.Equals(readCond)
+                let readCond = m.valAt (RTVar.OptReadCondKeyword)
+                RTVar.CondPreserveKeyword.Equals(readCond)
             | _ -> false
 
     static member ReadTagged(o: obj, tag: Symbol, opts: obj, pendingForms: obj) =
-        let dataReaders = (DataReadersVar :> IDeref).deref () :?> ILookup
+        let dataReaders = (RTVar.DataReadersVar :> IDeref).deref () :?> ILookup
         let dataReader = RT0.get (dataReaders, tag)
 
         match dataReader with
         | :? IFn as f -> f.invoke (o)
         | _ ->
-            let defaultDataReaders = (DefaultDataReadersVar :> IDeref).deref () :?> ILookup
+            let defaultDataReaders = (RTVar.DefaultDataReadersVar :> IDeref).deref () :?> ILookup
             let defaultDataReaderForTag = RT0.get (defaultDataReaders, tag)
 
             match defaultDataReaderForTag with
             | :? IFn as f -> f.invoke (o)
             | _ ->
-                match (DefaultDataReaderFnVar :> IDeref).deref () with
+                match (RTVar.DefaultDataReaderFnVar :> IDeref).deref () with
                 | :? IFn as f -> f.invoke (tag, o)
                 | _ -> raise <| new InvalidOperationException($"No reader function for tag: {tag}")
 
@@ -2023,7 +1895,7 @@ type LispReader() =
             if DefaultFeatureKeyword.Equals(feature) then
                 true
             else
-                let custom = (opts :?> IPersistentMap).valAt (OptFeaturesKeyword) :?> IPersistentSet
+                let custom = (opts :?> IPersistentMap).valAt (RTVar.OptFeaturesKeyword) :?> IPersistentSet
                 not <| isNull custom && custom.contains (feature)
         | _ ->
             raise
@@ -2155,8 +2027,8 @@ type LispReader() =
         if RT0.booleanCast ((ReadCondEnvVar :> IDeref).deref ()) then
             match opts with
             | :? IPersistentMap as m ->
-                let readCond = m.valAt (OptReadCondKeyword)
-                CondPreserveKeyword.Equals(readCond)
+                let readCond = m.valAt (RTVar.OptReadCondKeyword)
+                RTVar.CondPreserveKeyword.Equals(readCond)
             | _ -> false
         else
             false
@@ -2165,8 +2037,8 @@ type LispReader() =
         let allowed =
             match opts with
             | :? IPersistentMap as m ->
-                let readCond = m.valAt (OptReadCondKeyword)
-                CondAllowKeyword.Equals(readCond) || CondPreserveKeyword.Equals(readCond)
+                let readCond = m.valAt (RTVar.OptReadCondKeyword)
+                RTVar.CondAllowKeyword.Equals(readCond) || RTVar.CondPreserveKeyword.Equals(readCond)
             | _ -> false
 
         if not allowed then
