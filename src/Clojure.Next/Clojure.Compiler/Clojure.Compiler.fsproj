@@ -10,7 +10,7 @@
     <Compile Include="Munger.fs" />
     <Compile Include="IType.fs" />
     <Compile Include="Expr.fs" />
-    <Compile Include="Compiler.fs" />
+    <Compile Include="Parser.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -16,7 +16,7 @@ type SpecialFormParser = CompilerEnv * obj -> Expr
 exception ParseException of string
 
 [<Sealed;AbstractClass>]
-type Compiler private () =
+type Parser private () =
 
     static let ConstKeyword = Keyword.intern(null,"const")
     static let IdentitySym = Symbol.intern("clojure.core", "identity")
@@ -24,29 +24,29 @@ type Compiler private () =
 
     // Why not a Dictionary<Symbol, SpecialFormParser> ???
     static let SpecialFormToParserMap : IPersistentMap = PersistentHashMap.create(
-            RTVar.DefSym, Compiler.DefExprParser,
-            RTVar.LoopSym, Compiler.LetExprParser,
-            RTVar.RecurSym, Compiler.RecurExprParser,
-            RTVar.IfSym, Compiler.IfExprParser,
-            RTVar.CaseSym, Compiler.CaseExprParser,
-            RTVar.LetSym, Compiler.LetExprParser,
-            RTVar.LetfnSym, Compiler.LetFnExprParser,
-            RTVar.DoSym, Compiler.BodyExprParser,
-            RTVar.FnSym, null,
-            RTVar.QuoteSym, Compiler.ConstantExprParser,
-            RTVar.TheVarSym, Compiler.TheVarExprParser,
-            RTVar.ImportSym, Compiler.ImportExprParser,
-            RTVar.DotSym, Compiler.HostExprParser,
-            RTVar.AssignSym, Compiler.AssignExprParser,
-            RTVar.DeftypeSym, Compiler.DefTypeParser(),
-            RTVar.ReifySym, Compiler.ReifyParser(),
-            RTVar.TrySym, Compiler.TryExprParser,
-            RTVar.ThrowSym, Compiler.ThrowExprParser,
-            RTVar.MonitorEnterSym, Compiler.MonitorEnterExprParser,
-            RTVar.MonitorExitSym, Compiler.MonitorExitExprParser,
+            RTVar.DefSym, Parser.DefExprParser,
+            RTVar.LoopSym, Parser.LetExprParser,
+            RTVar.RecurSym, Parser.RecurExprParser,
+            RTVar.IfSym, Parser.IfExprParser,
+            RTVar.CaseSym, Parser.CaseExprParser,
+            RTVar.LetSym, Parser.LetExprParser,
+            RTVar.LetfnSym, Parser.LetFnExprParser,
+            RTVar.DoSym, Parser.BodyExprParser,
+            RTVar.FnSym, null,     // FnSym is a special case.  It parser takes an additional argument.
+            RTVar.QuoteSym, Parser.ConstantExprParser,
+            RTVar.TheVarSym, Parser.TheVarExprParser,
+            RTVar.ImportSym, Parser.ImportExprParser,
+            RTVar.DotSym, Parser.HostExprParser,
+            RTVar.AssignSym, Parser.AssignExprParser,
+            RTVar.DeftypeSym, Parser.DefTypeParser(),
+            RTVar.ReifySym, Parser.ReifyParser(),
+            RTVar.TrySym, Parser.TryExprParser,
+            RTVar.ThrowSym, Parser.ThrowExprParser,
+            RTVar.MonitorEnterSym, Parser.MonitorEnterExprParser,
+            RTVar.MonitorExitSym, Parser.MonitorExitExprParser,
             RTVar.CatchSym, null,
             RTVar.FinallySym, null,
-            RTVar.NewSym, Compiler.NewExprParser,
+            RTVar.NewSym, Parser.NewExprParser,
             RTVar.AmpersandSym, null
    
     
@@ -76,7 +76,7 @@ type Compiler private () =
     
     static member GetSpecialFormParser(op: obj) = SpecialFormToParserMap.valAt(op) 
 
-    static member Analyze(cctx : CompilerEnv, form: obj) : Expr = Compiler.Analyze(cctx, form, null)
+    static member Analyze(cctx : CompilerEnv, form: obj) : Expr = Parser.Analyze(cctx, form, null)
     static member Analyze(cctx: CompilerEnv, form: obj, name: string) : Expr =
 
         try         
@@ -92,22 +92,22 @@ type Compiler private () =
                 | _ -> form
 
             match form with
-            | null -> Compiler.NilExprInstance
-            | :? bool as b -> if b then Compiler.TrueExprInstance else Compiler.FalseExprInstance
-            | :? Symbol as sym -> Compiler.AnalyzeSymbol(cctx,sym)
+            | null -> Parser.NilExprInstance
+            | :? bool as b -> if b then Parser.TrueExprInstance else Parser.FalseExprInstance
+            | :? Symbol as sym -> Parser.AnalyzeSymbol(cctx,sym)
             | :? Keyword as kw -> LiteralExpr({Type=KeywordType; Value=kw})       // we'll have to walk to get keywords
-            | _ when Numbers.IsNumeric(form) -> Compiler.AnalyzeNumber(cctx,form)
+            | _ when Numbers.IsNumeric(form) -> Parser.AnalyzeNumber(cctx,form)
             | :? String as s -> LiteralExpr({Type=StringType; Value=String.Intern(s)})
             | :? IPersistentCollection as coll 
                     when not <| form :? IType && 
                          not <| form :? IRecord && 
-                         coll.count() = 0  -> Compiler.OptionallyGenerateMetaInit(cctx, form, LiteralExpr({Type = EmptyType; Value = coll}))
-            | :? ISeq as seq -> Compiler.AnalyzeSeq(cctx, seq, name)
-            | :? IPersistentVector as pv-> Compiler.AnalyzeVector(cctx, pv)
+                         coll.count() = 0  -> Parser.OptionallyGenerateMetaInit(cctx, form, LiteralExpr({Type = EmptyType; Value = coll}))
+            | :? ISeq as seq -> Parser.AnalyzeSeq(cctx, seq, name)
+            | :? IPersistentVector as pv-> Parser.AnalyzeVector(cctx, pv)
             | :? IRecord -> LiteralExpr({Type=OtherType; Value=form})
             | :? IType -> LiteralExpr({Type=OtherType; Value=form})
-            | :? IPersistentMap as pm -> Compiler.AnalyzeMap(cctx, pm)
-            | :? IPersistentSet  as ps -> Compiler.AnalyzeSet(cctx, ps)
+            | :? IPersistentMap as pm -> Parser.AnalyzeMap(cctx, pm)
+            | :? IPersistentSet  as ps -> Parser.AnalyzeSet(cctx, ps)
             | _ -> LiteralExpr({Type=OtherType; Value=form})
 
         with 
@@ -120,7 +120,7 @@ type Compiler private () =
     static member OptionallyGenerateMetaInit(cctx: CompilerEnv, form: obj, expr: Expr) : Expr =
         match RT0.meta(form) with
         | null -> expr
-        | _ as meta -> MetaExpr({Ctx = cctx; Target = expr; Meta = Compiler.AnalyzeMap(cctx, meta)})
+        | _ as meta -> MetaExpr({Ctx = cctx; Target = expr; Meta = Parser.AnalyzeMap(cctx, meta)})
 
     static member AnalyzeNumber(cctx: CompilerEnv, num: obj) : Expr =
         match num with
@@ -136,14 +136,14 @@ type Compiler private () =
         let mutable args = PersistentVector.Empty :> IPersistentVector
 
         for i = 0 to form.count() - 1 do
-            let v = Compiler.Analyze(cctx, form.nth(i))
+            let v = Parser.Analyze(cctx, form.nth(i))
             args <- args.cons(v)
             if not <| v.IsLiteralExpr then constant <- false
 
         let ret =  CollectionExpr({Ctx = cctx; Value = args})
 
         match form with
-        | :? IObj as iobj when not <| isNull (iobj.meta()) -> Compiler.OptionallyGenerateMetaInit(cctx, form, ret)
+        | :? IObj as iobj when not <| isNull (iobj.meta()) -> Parser.OptionallyGenerateMetaInit(cctx, form, ret)
         | _ when constant -> 
             let mutable rv = PersistentVector.Empty :> IPersistentVector
             for i = 0 to args.count() - 1 do
@@ -165,8 +165,8 @@ type Compiler private () =
             | null -> ()
             | _ -> 
                 let me = s.first() :?> IMapEntry
-                let k = Compiler.Analyze(cctx, me.key())
-                let v = Compiler.Analyze(cctx, me.value())
+                let k = Parser.Analyze(cctx, me.key())
+                let v = Parser.Analyze(cctx, me.value())
                 keyvals <- keyvals.cons(k).cons(v)
                 if k.IsLiteralExpr then
                     let kval = ExprUtils.GetLiteralValue(k)
@@ -182,7 +182,7 @@ type Compiler private () =
         let ret = CollectionExpr({Ctx = cctx; Value = keyvals})
 
         match form with
-        | :? IObj as iobj when not <| isNull (iobj.meta()) -> Compiler.OptionallyGenerateMetaInit(cctx, form, ret)
+        | :? IObj as iobj when not <| isNull (iobj.meta()) -> Parser.OptionallyGenerateMetaInit(cctx, form, ret)
         | _ when keysConstant -> 
             if not allConstantKeysUnique then raise <| ArgumentException("Duplicate constant keys in map")
             if valsConstant then
@@ -204,7 +204,7 @@ type Compiler private () =
             match s with
             | null -> ()
             | _ -> 
-                let k = Compiler.Analyze(cctx, s.first())
+                let k = Parser.Analyze(cctx, s.first())
                 keys <- keys.cons(k)
                 if not <| k.IsLiteralExpr then constant <- false
                 loop(s.next())
@@ -213,7 +213,7 @@ type Compiler private () =
         let ret = CollectionExpr({Ctx = cctx; Value = keys})
 
         match form with
-        | :? IObj as iobj when not <| isNull (iobj.meta()) -> Compiler.OptionallyGenerateMetaInit(cctx, form, ret)
+        | :? IObj as iobj when not <| isNull (iobj.meta()) -> Parser.OptionallyGenerateMetaInit(cctx, form, ret)
         | _ when constant -> 
             let mutable rv = PersistentHashSet.Empty :> IPersistentCollection
             let x : Expr = ret
@@ -227,7 +227,7 @@ type Compiler private () =
 
     static member AnalyzeSymbol(cctx: CompilerEnv, sym: Symbol) : Expr =
         
-        let tag = Compiler.TagOf(sym)
+        let tag = Parser.TagOf(sym)
 
         // See if we are a local variable or a field/property/QM reference
         let maybeExpr : Expr option = 
@@ -241,12 +241,12 @@ type Compiler private () =
     
                 // we have a namespace, coudl be Typename/Field
                 let nsSym = Symbol.intern(sym.Namespace)
-                match Compiler.MaybeType(cctx,nsSym,false) with
+                match Parser.MaybeType(cctx,nsSym,false) with
                 | null -> None
                 | _ as t -> 
                     let info = Reflector.GetFieldOrPropertyInfo(t,sym.Name,true)
                     if not <| isNull info then
-                        Some(Compiler.CreateStaticFieldOrPropertyExpr(cctx,tag, t, sym.Name, info))
+                        Some(Parser.CreateStaticFieldOrPropertyExpr(cctx,tag, t, sym.Name, info))
                     else Some(QualifiedMethodExpr({Ctx = cctx; SourceInfo = None}))  // TODO: Implement QualifiedMethodExpr)
 
             else 
@@ -255,12 +255,12 @@ type Compiler private () =
         match maybeExpr with 
         | Some e -> e
         | None ->
-            match Compiler.Resolve(sym) with
+            match Parser.Resolve(sym) with
             | :? Var as v -> 
-                if not <| isNull (Compiler.IsMacro(cctx, v)) then 
+                if not <| isNull (Parser.IsMacro(cctx, v)) then 
                     raise <| CompilerException($"Can't take the value of a macro: {sym.Name}")
                 elif RT0.booleanCast(RT0.get((v :> IMeta).meta(),ConstKeyword))then 
-                    Compiler.Analyze(cctx.WithParserContext(Expression), RTSeq.list(RTVar.QuoteSym, v))
+                    Parser.Analyze(cctx.WithParserContext(Expression), RTSeq.list(RTVar.QuoteSym, v))
                 else VarExpr({Ctx = cctx; Var = v; Tag = tag})
             | :? Type ->
                 LiteralExpr({Type=OtherType; Value = sym;})
@@ -277,23 +277,23 @@ type Compiler private () =
         // TODO: deal with source info
 
         try
-            let me = Compiler.MacroexpandSeq1(cctx, form)
+            let me = Parser.MacroexpandSeq1(cctx, form)
             if  Object.ReferenceEquals(me,form) then
-                Compiler.Analyze(cctx, me, name)
+                Parser.Analyze(cctx, me, name)
             else
                 
                 let op = RTSeq.first(form)
                 if isNull op then
                     raise <| ArgumentNullException("form", "Can't call nil")
 
-                let inl = Compiler.IsInline(cctx, op, RT0.count(RTSeq.next(form)))
+                let inl = Parser.IsInline(cctx, op, RT0.count(RTSeq.next(form)))
                 if not <| isNull inl then
-                    Compiler.Analyze(cctx, Compiler.MaybeTransferSourceInfo( Compiler.PreserveTag(form, inl.applyTo(RTSeq.next(form))), form))
+                    Parser.Analyze(cctx, Parser.MaybeTransferSourceInfo( Parser.PreserveTag(form, inl.applyTo(RTSeq.next(form))), form))
                 elif op.Equals(RTVar.FnSym) then
-                    Compiler.FnExprParser(cctx, form, name)
+                    Parser.FnExprParser(cctx, form, name)
                 else
-                    match Compiler.GetSpecialFormParser(op) with
-                    | null -> Compiler.InvokeExprParser(cctx, form)
+                    match Parser.GetSpecialFormParser(op) with
+                    | null -> Parser.InvokeExprParser(cctx, form)
                     | _ as parseFn ->  (parseFn :?> SpecialFormParser)(cctx, form)
         with
         | :? CompilerException -> reraise()
@@ -313,11 +313,11 @@ type Compiler private () =
 
     static member MonitorEnterExprParser(cctx: CompilerEnv, form: obj) : Expr = 
         let cctx = cctx.WithParserContext(Expression)
-        UntypedExpr({Ctx = cctx; Type=MonitorEnter; Target = Some <|  Compiler.Analyze(cctx, RTSeq.second(form))})
+        UntypedExpr({Ctx = cctx; Type=MonitorEnter; Target = Some <|  Parser.Analyze(cctx, RTSeq.second(form))})
         
     static member MonitorExitExprParser(cctx: CompilerEnv, form: obj) : Expr = 
         let cctx = cctx.WithParserContext(Expression)
-        UntypedExpr({Ctx = cctx; Type=MonitorExit; Target = Some <| Compiler.Analyze(cctx, RTSeq.second(form))})
+        UntypedExpr({Ctx = cctx; Type=MonitorExit; Target = Some <| Parser.Analyze(cctx, RTSeq.second(form))})
 
  
     // cranking up the difficulty level
@@ -329,13 +329,13 @@ type Compiler private () =
             raise <| ParseException("Malformed assignment, expecting (set! target val)")
 
         let targetCtx = { cctx with Pctx = Expression; IsAssignContext = true }
-        let target = Compiler.Analyze(targetCtx, RTSeq.second(form))
+        let target = Parser.Analyze(targetCtx, RTSeq.second(form))
 
-        if not <| Compiler.IsAssignableExpr(target) then
+        if not <| Parser.IsAssignableExpr(target) then
             raise <| ParseException("Invalid assignment target")
 
         let bodyCtx = cctx.WithParserContext(Expression)
-        AssignExpr({Ctx = cctx; Target = target; Value = Compiler.Analyze(bodyCtx, RTSeq.third(form))})
+        AssignExpr({Ctx = cctx; Target = target; Value = Parser.Analyze(bodyCtx, RTSeq.third(form))})
 
 
     static member ThrowExprParser(cctx: CompilerEnv, form: obj) : Expr = 
@@ -343,13 +343,13 @@ type Compiler private () =
         let cctx = { cctx with Pctx = Expression; IsAssignContext = false }
         match RT0.count(form) with
         | 1 ->  UntypedExpr({Ctx = cctx; Type=MonitorExit; Target = None})  
-        | 2 ->  UntypedExpr({Ctx = cctx; Type=MonitorExit; Target =  Some <| Compiler.Analyze(cctx, RTSeq.second(form))})  
+        | 2 ->  UntypedExpr({Ctx = cctx; Type=MonitorExit; Target =  Some <| Parser.Analyze(cctx, RTSeq.second(form))})  
         | _ -> raise <| InvalidOperationException("Too many arguments to throw, throw expects a single Exception instance")
 
     static member TheVarExprParser(cctx: CompilerEnv, form: obj) : Expr = 
         match RTSeq.second(form) with
         | :? Symbol as sym ->
-            match Compiler.LookupVar(cctx, sym, false) with
+            match Parser.LookupVar(cctx, sym, false) with
             | null -> raise <| ParseException($"Unable to resolve var: {sym} in this context")
             | _ as v -> TheVarExpr({Ctx = cctx; Var = v})
         | _ as v -> raise <| ParseException($"Second argument to the-var must be a symbol, found: {v}")        
@@ -368,9 +368,9 @@ type Compiler private () =
             | _ -> 
                 let e = 
                     if cctx.Pctx = ParserContext.Statement || not <| isNull (seq.next())  then
-                        Compiler.Analyze(stmtCctx, seq.first())
+                        Parser.Analyze(stmtCctx, seq.first())
                     else
-                        Compiler.Analyze(cctx, seq.first())
+                        Parser.Analyze(cctx, seq.first())
                 exprs.Add(e)
                 loop(seq.next())
         loop forms
@@ -391,9 +391,9 @@ type Compiler private () =
         let bodyCtx = { cctx with IsAssignContext = false} 
         let testCtx = { bodyCtx  with  Pctx = Expression }
 
-        let testExpr = Compiler.Analyze(testCtx, RTSeq.second(form))
-        let thenExpr = Compiler.Analyze(bodyCtx, RTSeq.third(form))
-        let elseExpr = Compiler.Analyze(bodyCtx, RTSeq.fourth(form))
+        let testExpr = Parser.Analyze(testCtx, RTSeq.second(form))
+        let thenExpr = Parser.Analyze(bodyCtx, RTSeq.third(form))
+        let elseExpr = Parser.Analyze(bodyCtx, RTSeq.fourth(form))
 
         IfExpr({Test = testExpr; Then = thenExpr; Else = elseExpr; SourceInfo = None})  // TODO source info
 
@@ -405,9 +405,9 @@ type Compiler private () =
             raise <| ExceptionInfo($"Wrong number of arguments ({argCount}) passed to quote", exData)
 
         match RTSeq.second(form) with
-        | null -> Compiler.NilExprInstance
-        | :? bool as b -> if b then Compiler.TrueExprInstance else Compiler.FalseExprInstance
-        | _ as n when Numbers.IsNumeric(n) -> Compiler.AnalyzeNumber(cctx,n)
+        | null -> Parser.NilExprInstance
+        | :? bool as b -> if b then Parser.TrueExprInstance else Parser.FalseExprInstance
+        | _ as n when Numbers.IsNumeric(n) -> Parser.AnalyzeNumber(cctx,n)
         | :? string as s -> LiteralExpr({Type=StringType; Value=s})
         | :? IPersistentCollection as pc when pc.count() = 0 && ( not <| pc :? IMeta || isNull ((pc :?> IMeta).meta())) ->
             LiteralExpr({Type=EmptyType; Value = pc})
@@ -454,15 +454,16 @@ type Compiler private () =
         // TODO: The original code also detects recur mismatches and insert boxing code as needed.
         //       We need to do that in a later pass -- hoping to have more powerful type handling here.
 
-        let loopId = if isLoop then Some(RTVar.NextID()) else None
-        let mutable initCtx =  {cctx with Pctx = Expression; IsAssignContext = false; LoopId = Some (RT0.nextID())}
+        let loopId = if isLoop then Some(RT0.nextID()) else None
+        let mutable initCtx =  {cctx with Pctx = Expression; IsAssignContext = false; LoopId = loopId}
         let bindingInits = ResizeArray<BindingInit>()
+        let loopLocals = ResizeArray<LocalBinding>()
 
         for i in 0 .. 2 .. (bindings.count()-1) do
-            let sym = Compiler.ValidateBindingSymbol(bindings.nth(i))
+            let sym = Parser.ValidateBindingSymbol(bindings.nth(i))
 
             let initForm = bindings.nth(i+1)
-            let initExpr = Compiler.Analyze(initCtx, initForm, sym.Name)
+            let initExpr = Parser.Analyze(initCtx, initForm, sym.Name)
 
             // A bunch of analysis and validation goes here in the original code -- related to recur mismatches.
             //  And it adds wrapping expressions to handle boxing, plus warnings.
@@ -471,15 +472,49 @@ type Compiler private () =
             let localBinding = { Sym = sym; Tag = null; Init = initExpr; Name = sym.Name; IsArg = false; IsByRef = false; IsRecur = isLoop; IsThis = false; Index = i/2 }
             let bindingInit = { Binding = localBinding; Init = initExpr }
             bindingInits.Add(bindingInit)
+            if isLoop then loopLocals.Add(localBinding)
 
             initCtx <- { initCtx with Locals = (RTMap.assoc(initCtx.Locals, sym, localBinding) :?> IPersistentMap) }
 
         // TODO: Original code also sets up MethodReturnContextVar , either pass-along or null  Do we need this?
-        let bodyCtx = { initCtx with Pctx = (if isLoop then Return else cctx.Pctx); IsRecurContext = isLoop}
-        let bodyExpr = Compiler.Analyze(bodyCtx, body)
+        let bodyCtx = { initCtx with Pctx = (if isLoop then Return else cctx.Pctx); IsRecurContext = isLoop; LoopLocals=(if isLoop then loopLocals else null);}
+        let bodyExpr = Parser.BodyExprParser(bodyCtx, body)
         LetExpr({Ctx = cctx; BindingInits = bindingInits; Body = bodyExpr; LoopId = loopId; Mode=(if isLoop then Loop else Let); SourceInfo=None})  // TODO: source info
 
             
+    static member RecurExprParser(cctx: CompilerEnv, form: obj) : Expr = 
+        
+            // TODO: source info
+
+            let form = form :?> ISeq
+
+            let loopLocals = cctx.LoopLocals
+            if cctx.Pctx <> Return  || isNull loopLocals then
+                raise <| ParseException("Can only recur from tail position")
+
+            if not <| cctx.IsRecurContext then
+                raise <| ParseException("Can only recur across try")
+
+            let args = ResizeArray<Expr>()
+
+            let argCtx = { cctx with Pctx = Expression; IsAssignContext = false }
+
+            let rec argLoop (s: ISeq) =
+                match s with
+                | null -> ()
+                | _ -> 
+                    args.Add(Parser.Analyze(argCtx, s.first()))
+                    argLoop(s.next())
+
+            argLoop (RTSeq.next(form))
+
+            if args.Count <> loopLocals.Count then
+                raise <| ParseException($"Mismatched argument count to recur, expected: {loopLocals.Count} args, got {args.Count}")
+
+            // TODO: original code does type checking on the args here.  We'll have to do that in a later pass.
+
+            RecurExpr({Ctx = cctx; Args = args; LoopLocals = loopLocals; SourceInfo=None})  // TODO: SourceInfo
+
 
 
 
@@ -488,25 +523,25 @@ type Compiler private () =
 
 
     // Saving for later, when I figure out what I'm doing
-    static member DefTypeParser()(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
-    static member ReifyParser()(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
-    static member CaseExprParser(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
+    static member DefTypeParser()(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+    static member ReifyParser()(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+    static member CaseExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
 
-    static member FnExprParser(cctx: CompilerEnv, form: obj, name: string) : Expr = Compiler.NilExprInstance
-    static member DefExprParser(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
-    static member RecurExprParser(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
-
+    static member FnExprParser(cctx: CompilerEnv, form: obj, name: string) : Expr = Parser.NilExprInstance
+    static member DefExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
 
 
-    static member LetFnExprParser(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
-
-    static member HostExprParser(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
 
 
-    static member TryExprParser(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
+    static member LetFnExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
 
-    static member NewExprParser(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
-    static member InvokeExprParser(cctx: CompilerEnv, form: obj) : Expr = Compiler.NilExprInstance
+    static member HostExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+
+
+    static member TryExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+
+    static member NewExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+    static member InvokeExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
    
 
     static member TagOf(o: obj) = 
@@ -545,7 +580,7 @@ type Compiler private () =
         | _ -> null
 
 
-    static member Resolve(sym: Symbol) : obj  = Compiler.ResolveIn(RTVar.getCurrentNamespace(), sym, false)
+    static member Resolve(sym: Symbol) : obj  = Parser.ResolveIn(RTVar.getCurrentNamespace(), sym, false)
 
     static member ResolveIn(ns: Namespace, sym: Symbol, allowPrivate: bool) : obj = 
         if not <| isNull sym.Namespace then
@@ -583,7 +618,7 @@ type Compiler private () =
             | :? Var as v -> v
             | :? Symbol as s -> 
                 match cctx.GetLocalBinding(s) with
-                | Some _  -> Compiler.LookupVar(cctx, s, false)
+                | Some _  -> Parser.LookupVar(cctx, s, false)
                 | _ -> null
             | _ -> null
 
@@ -615,12 +650,12 @@ type Compiler private () =
             if cctx.ContainsBindingForSym(s) then
                 null
             else
-                match Compiler.LookupVar(cctx, s, false, false) with
+                match Parser.LookupVar(cctx, s, false, false) with
                 | null -> null
                 | _ as v -> checkVar(v); v
         | _ -> null
 
-    static member LookupVar(cctx:CompilerEnv, sym: Symbol, internNew: bool) = Compiler.LookupVar(cctx, sym, internNew, true)
+    static member LookupVar(cctx:CompilerEnv, sym: Symbol, internNew: bool) = Parser.LookupVar(cctx, sym, internNew, true)
 
     static member LookupVar(cctx: CompilerEnv, sym: Symbol, internNew: bool, registerMacro: bool) : Var = 
         let var = 
@@ -658,30 +693,30 @@ type Compiler private () =
     // TODO: Macrochecking via Spec
     static member CheckSpecs(v: Var, form: ISeq) = ()
 
-    static member Macroexpand1(form: obj) = Compiler.Macroexpand1(CompilerEnv.Create(Expression), form)
-    static member Macroexpand(form : obj) = Compiler.Macroexpand(CompilerEnv.Create(Expression), form)
+    static member Macroexpand1(form: obj) = Parser.Macroexpand1(CompilerEnv.Create(Expression), form)
+    static member Macroexpand(form : obj) = Parser.Macroexpand(CompilerEnv.Create(Expression), form)
 
     static member Macroexpand1(cctx: CompilerEnv, form: obj) =
         match form with 
-        | :? ISeq as s -> Compiler.MacroexpandSeq1(cctx, s)
+        | :? ISeq as s -> Parser.MacroexpandSeq1(cctx, s)
         | _ -> form
 
     static member Macroexpand(cctx: CompilerEnv, form : obj) = 
-        let exf = Compiler.Macroexpand1(cctx, form)
+        let exf = Parser.Macroexpand1(cctx, form)
         if Object.ReferenceEquals(exf, form) then form 
-        else Compiler.Macroexpand(cctx, exf)
+        else Parser.Macroexpand(cctx, exf)
 
     static member private MacroexpandSeq1(cctx: CompilerEnv, form: ISeq) = 
         let op = form.first()
         if (LispReader.IsSpecial(form)) then
             form
         else
-            match Compiler.IsMacro(cctx, op) with
-            | null -> Compiler.MacroExpandNonSpecial(cctx, op, form)
-            | _ as v -> Compiler.MacroExpandSpecial(cctx, v, form)
+            match Parser.IsMacro(cctx, op) with
+            | null -> Parser.MacroExpandNonSpecial(cctx, op, form)
+            | _ as v -> Parser.MacroExpandSpecial(cctx, v, form)
 
     static member private MacroExpandSpecial(cctx: CompilerEnv, v: Var, form: ISeq) = 
-        Compiler.CheckSpecs(v,form)
+        Parser.CheckSpecs(v,form)
         try
             // Here is macro magic -- supply the &form and &env args in front
             let args = RTSeq.cons(form, RTSeq.cons(cctx.Locals, form.next()))
@@ -692,7 +727,7 @@ type Compiler private () =
             // This simple test is used in the JVM:   if (e.Name.Equals(munge(v.ns.Name.Name) + "$" + munge(v.sym.Name)))
             // Does not work for us because have to append a __1234 to the type name for functions in order to avoid name collisiions in the eval assembly.
             // So we have to see if the name is of the form   namespace$name__xxxx  where the __xxxx can be repeated.
-            let reducedName = Compiler.RemoveFnSuffix(e.name)
+            let reducedName = Parser.RemoveFnSuffix(e.name)
             if reducedName.Equals($"{Munger.Munge(v.Namespace.Name.Name)}${Munger.Munge(v.Symbol.Name)}")  then
                 raise <| new ArityException(e.actual-2, e.name)
             else
@@ -731,16 +766,16 @@ type Compiler private () =
                     raise <| ArgumentException("Malformed member expression, expecting (.member target ...) ")
                 let method = Symbol.intern(sname.Substring(1))
                 let mutable target = RTSeq.second(form)
-                if not <| isNull (Compiler.MaybeType(cctx, target, false)) then
+                if not <| isNull (Parser.MaybeType(cctx, target, false)) then
                     target <- (RTSeq.list(IdentitySym, target) :?> IObj).withMeta(RTMap.map(RTVar.TagKeyword, ClassSym))
-                Compiler.MaybeTransferSourceInfo(Compiler.PreserveTag(form, RTSeq.listStar(RTVar.DotSym, target, method, form.next().next())), form)
+                Parser.MaybeTransferSourceInfo(Parser.PreserveTag(form, RTSeq.listStar(RTVar.DotSym, target, method, form.next().next())), form)
             else
                 // (x.substring 2 5) =>  (. x substring 2 5)
                 // also (package.class.name ... ) (. package.class name ... )
                 let index = sname.IndexOf('.')
                 if index = sname.Length-1 then
                     let target = Symbol.intern(sname.Substring(0, index))
-                    Compiler.MaybeTransferSourceInfo( RTSeq.listStar(RTVar.NewSym, target, form.next()), form)
+                    Parser.MaybeTransferSourceInfo( RTSeq.listStar(RTVar.NewSym, target, form.next()), form)
                 else form
         | _ -> form
 
@@ -751,7 +786,7 @@ type Compiler private () =
     static member val FnNameSuffixRE = new Regex("__[0-9]+$")
     static member RemoveFnSuffix(s: string) =
         let rec loop (s: string) =
-            let m = Compiler.FnNameSuffixRE.Match(s)
+            let m = Parser.FnNameSuffixRE.Match(s)
             if m.Success then
                 loop(s.Substring(0, s.Length - m.Groups.[0].Length))
             else s
@@ -759,7 +794,7 @@ type Compiler private () =
         loop s
 
     static member PreserveTag(src: ISeq, dst: obj) : obj =
-        match Compiler.TagOf(src) with 
+        match Parser.TagOf(src) with 
         | null -> dst
         | _ as tag ->
             match dst with
