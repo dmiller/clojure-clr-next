@@ -561,16 +561,91 @@ type Parser private () =
 
         LetExpr({Ctx = cctx; BindingInits = bindingInits; Body = Parser.BodyExprParser(cctx, body); Mode=LetFn; LoopId = None; SourceInfo=None})  // TODO: source info)
 
+    static member DefExprParser(cctx: CompilerEnv, form: obj) : Expr =
 
-    // Saving for later, when I figure out what I'm doing
-    static member DefTypeParser()(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
-    static member ReifyParser()(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
-    static member CaseExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+        // (def x) or (def x initexpr) or (def x "docstring" initexpr)
+
+        let docString, form =
+            if RT0.count(form) = 4 && RTSeq.third(form) :? String then
+                (RTSeq.third(form) :?> string), RTSeq.list(RTSeq.first(form), RTSeq.second(form), RTSeq.fourth(form))
+            else
+                null, form :?> ISeq
+
+        if RT0.count(form) > 3 then
+            raise <| ParseException("Too many  arguments to def")
+
+        if RT0.count(form) < 2 then
+            raise <| ParseException("Too few arguments to def")
+
+        let sym = 
+            match RTSeq.second(form) with
+            | :? Symbol as sym -> sym
+            | _ -> raise <| ParseException("First argument to def must be a symbol")
+
+        let mutable var = Parser.LookupVar(cctx,sym,true)
+
+        if isNull var then
+            raise <| ParseException($"Can't refer to qualified var that doesn't exist: {sym}")
+
+        let currentNS = RTVar.getCurrentNamespace()
+        let mutable shadowsCoreMapping = false
+
+        if not <| Object.ReferenceEquals(var.Namespace, currentNS) then
+            if isNull sym.Namespace then
+                var <- currentNS.intern(sym)
+                shadowsCoreMapping <- true
+                Parser.RegisterVar(var)
+            else
+                raise <| ParseException($"Can't create defs outside of current namespace: {sym}")
+
+        let mm = RT0.meta(form)
+        let isDynamic = RT0.booleanCast(RT0.get(mm, RTVar.DynamicKeyword))
+        if isDynamic then
+            var.setDynamic() |> ignore
+
+        if not isDynamic && sym.Name.StartsWith("*") && sym.Name.EndsWith("*") then
+            RTVar.errPrintWriter().WriteLine($"Warning: {sym} not declared dynamic and thus is not dynamically rebindable, but its name suggests otherwise. Please either indicate ^:dynamic {sym} or change the name.")
+            // TODO: source info
+            RTVar.errPrintWriter().Flush()
+
+        if RT0.booleanCast(RT0.get(mm, RTVar.ArglistsKeyword)) then
+            let vm = RTMap.assoc( (var :> IMeta).meta(), RTVar.ArglistsKeyword, RTSeq.second(mm.valAt(RTVar.ArglistsKeyword)))
+            var.setMeta(vm :?> IPersistentMap)
+
+        // TODO: Source-info stuff
+
+        let mm =
+            if isNull docString then mm
+            else RTMap.assoc(mm, RTVar.DocKeyword, docString) :?> IPersistentMap
+
+        let mm = Parser.ElideMeta(mm);
+
+        let exprCtx = { cctx with Pctx = Expression}
+        let meta = if isNull mm || (mm :> Counted).count() = 0 then None else Some <| Parser.Analyze(exprCtx, mm)
+        let init = Parser.Analyze(exprCtx, RTSeq.third(form), var.Symbol.Name)
+        let initProvided = RT0.count(form) = 3
+
+        DefExpr({Ctx = cctx; Var = var; Init = init; InitProvided = initProvided; IsDynamic = isDynamic; ShadowsCoreMapping = shadowsCoreMapping; Meta = meta; SourceInfo = None})  // TODO: source info})
+
+                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     static member FnExprParser(cctx: CompilerEnv, form: obj, name: string) : Expr = Parser.NilExprInstance
-    static member DefExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
-
-
 
 
 
@@ -582,6 +657,11 @@ type Parser private () =
 
     static member NewExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
     static member InvokeExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+
+    // Saving for later, when I figure out what I'm doing
+    static member DefTypeParser()(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+    static member ReifyParser()(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+    static member CaseExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
    
 
     static member TagOf(o: obj) = 
@@ -861,3 +941,7 @@ type Parser private () =
         |  VarExpr _ -> true
         |  HostExpr deets when deets.Type = HostExprType.FieldOrPropertyExpr -> true
         | _ -> false
+
+    static member ElideMeta(m: IPersistentMap) = m  // TODO: Source-info
+
+    static member RegisterVar(v: Var) = ()  // TODO: constants registration

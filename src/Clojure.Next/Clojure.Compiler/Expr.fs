@@ -109,11 +109,11 @@ and DefDetails =
     { Ctx: CompilerEnv
       Var: Var
       Init: Expr
-      Meta: Expr
+      Meta: Expr option
       InitProvided: bool
       IsDynamic: bool
       ShadowsCoreMapping: bool
-      SourceInfo: SourceInfo }
+      SourceInfo: SourceInfo option}
 
 and FnDetails =
     { Ctx: CompilerEnv (* help *)
