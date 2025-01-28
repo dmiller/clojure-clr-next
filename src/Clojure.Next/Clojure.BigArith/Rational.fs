@@ -6,8 +6,8 @@ open System.Numerics
 
 [<Sealed>]
 type Rational(n: BigInteger, d: BigInteger) =
-    let mutable numerator = n
-    let mutable denominator = d
+    let mutable _numerator = n
+    let mutable _denominator = d
 
     do
         if d.IsZero then
@@ -20,8 +20,8 @@ type Rational(n: BigInteger, d: BigInteger) =
             else (n, d)
 
         let n2, d2 = Rational.normalize n1 d1
-        numerator <- n2
-        denominator <- d2
+        _numerator <- n2
+        _denominator <- d2
 
 
     // integer constructors
@@ -71,8 +71,8 @@ type Rational(n: BigInteger, d: BigInteger) =
 
     // some accessors
 
-    member _.Numerator = numerator
-    member _.Denominator = denominator
+    member _.Numerator = _numerator
+    member _.Denominator = _denominator
 
     // Some contants
     static member val Zero =

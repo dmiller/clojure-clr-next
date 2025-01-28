@@ -17,37 +17,43 @@ type RoundingMode =
 
 [<Struct>]
 type Context =
-    { precision: uint32
-      roundingMode: RoundingMode }
+    { Precision: uint32
+      RoundingMode: RoundingMode }
 
     /// Standard precision for 32-bit decimal
     static member val Decimal32 =
-        { precision = 7u
-          roundingMode = HalfEven }
+        { Precision = 7u
+          RoundingMode = HalfEven }
+
     /// Standard precision for 64-bit decimal
     static member val Decimal64 =
-        { precision = 16u
-          roundingMode = HalfEven }
+        { Precision = 16u
+          RoundingMode = HalfEven }
+
     /// Standard precision for 128-bit decimal
     static member val Decimal128 =
-        { precision = 34u
-          roundingMode = HalfEven }
+        { Precision = 34u
+          RoundingMode = HalfEven }
+
     /// No precision limit
     static member val Unlimited =
-        { precision = 0u
-          roundingMode = HalfUp }
+        { Precision = 0u
+          RoundingMode = HalfUp }
+
     /// Default mode
     static member val Default =
-        { precision = 9ul
-          roundingMode = HalfUp }
+        { Precision = 9ul
+          RoundingMode = HalfUp }
+
     /// Create a Context with specified precision and roundingMode = HalfEven
     static member ExtendedDefault precision =
-        { precision = precision
-          roundingMode = HalfEven }
+        { Precision = precision
+          RoundingMode = HalfEven }
+
     /// Create a Context from the given precision and rounding mode
     static member Create(precision, roundingMode) =
-        { precision = precision
-          roundingMode = roundingMode }
+        { Precision = precision
+          RoundingMode = roundingMode }
 
 
 // Parser support
@@ -62,54 +68,69 @@ type internal ParseData =
 
 type internal ParseResult = ParseResult of ParseData * int
 
+// Represents a BigDecimal number
 [<Sealed>]
-type BigDecimal private (coeff, exp, precision) =
+type BigDecimal private (_coeff, _exp, precision) =
 
     // Precision
 
     // Constructor precision is shadowed with a mutable.
     // Value of 0 indicates precision not computed
-    let mutable precision: uint = precision
+    let mutable _precision: uint = precision
 
     // Compute actual precision and cache it.
     member private _.GetPrecision() =
-        match precision with
-        | 0u -> precision <- Math.Max(ArithmeticHelpers.getBIPrecision (coeff), 1u)
+        match _precision with
+        | 0u -> _precision <- Math.Max(ArithmeticHelpers.getBIPrecision (_coeff), 1u)
         | _ -> ()
 
-        precision
+        _precision
 
     member this.Precision = this.GetPrecision()
-    member _.RawPrecision = precision
+    member _.RawPrecision = _precision
     member this.IsPrecisionKnown = this.RawPrecision <> 0u
 
     // Other accessors
 
-    member _.Coefficient = coeff
-    member _.Exponent = exp
+    /// The coefficient of this BigDecimal
+    member _.Coefficient = _coeff
+
+    /// The exponent of this BigDecimal
+    member _.Exponent = _exp
 
     // Useful info
 
+    ///  The signum of this BigDecimal (-1, 0, or 1)
     member this.Signum(): int =
         match this.Coefficient.Sign with
         | 0 -> 0
         | sign when sign > 0 -> 1
         | _ -> -1
 
-    member this.IsZero = this.Coefficient.IsZero
-    member this.IsPositive = this.Coefficient.Sign > 0
-    member this.IsNegative = this.Coefficient.Sign < 0
+    /// Returns true if the BigDecimal is zero
+    member _.IsZero = _coeff.IsZero
+
+    /// Returns true if the BigDecimal is positive
+    member _.IsPositive = _coeff.Sign > 0
+
+    /// Returns true if the BigDecimal is negative
+    member _.IsNegative = _coeff.Sign < 0
 
 
     // Useful constants
 
+    /// The BigDecimal constant 0
     static member val Zero = BigDecimal(BigInteger.Zero, 0, 1u)
+
+    /// The BigDecimal constant 1
     static member val One = BigDecimal(BigInteger.One, 0, 1u)
+
+    /// The BigDecimal constant 10
     static member val Ten = BigDecimal(new BigInteger(10), 0, 2u)
 
     // Exponent support
 
-    static member checkExponent (candidate: int64) (isZero: bool): int option =
+    static member private checkExponent (candidate: int64) (isZero: bool): int option =
         match candidate with
         | x when x <= (int64 Int32.MaxValue)
                  && x >= (int64 Int32.MinValue) -> Some(int32 x)
@@ -117,7 +138,7 @@ type BigDecimal private (coeff, exp, precision) =
         | x when isZero && x > 0L -> Some Int32.MaxValue
         | _ -> None
 
-    static member checkExponentE (candidate: int64) (isZero: bool): int =
+    static member private checkExponentE (candidate: int64) (isZero: bool): int =
         match BigDecimal.checkExponent candidate isZero with
         | Some e -> e
         | None when candidate > 0L -> raise <| ArithmeticException("Overflow in scale")
@@ -155,25 +176,25 @@ type BigDecimal private (coeff, exp, precision) =
     static member private round (v: BigDecimal) c =
         let vp = v.GetPrecision()
 
-        if (vp <= c.precision) then
+        if (vp <= c.Precision) then
             v
         else
-            let drop = vp - c.precision
+            let drop = vp - c.Precision
             let divisor = ArithmeticHelpers.biPowerOfTen (drop)
 
             let rounded =
-                BigDecimal.roundingDivide2 v.Coefficient divisor c.roundingMode
+                BigDecimal.roundingDivide2 v.Coefficient divisor c.RoundingMode
 
             let exp =
                 BigDecimal.checkExponentE ((int64 v.Exponent) + (int64 drop)) rounded.IsZero
 
             // check for the case where we had a 9999... that rounded up to 10000...
 
-            if (ArithmeticHelpers.getBIPrecision(rounded) > c.precision && c.precision > 0u) then
+            if (ArithmeticHelpers.getBIPrecision(rounded) > c.Precision && c.Precision > 0u) then
                 let newCoeff =  rounded / ArithmeticHelpers.biTen
-                BigDecimal(newCoeff, exp+1, c.precision)
+                BigDecimal(newCoeff, exp+1, c.Precision)
             else
-                BigDecimal(rounded, exp, c.precision)
+                BigDecimal(rounded, exp, c.Precision)
 
     static member Round(v: BigDecimal, c: Context) = BigDecimal.round v c
     member x.Round(c: Context) = BigDecimal.Round(x, c)
@@ -189,8 +210,8 @@ type BigDecimal private (coeff, exp, precision) =
 
             let r =
                 lhs.Round
-                    ({ precision = newPrecision
-                       roundingMode = mode })
+                    ({ Precision = newPrecision
+                       RoundingMode = mode })
 
             if (r.Exponent = newExponent) then r else BigDecimal.Rescale(r, newExponent, mode)
 
@@ -593,16 +614,16 @@ type BigDecimal private (coeff, exp, precision) =
     // ToString implementation
 
     member _.ToScientificString() =
-        let sb = StringBuilder(coeff.ToString())
+        let sb = StringBuilder(_coeff.ToString())
 
         let coeffLen, negOffset =
-            if coeff.Sign < 0 then (sb.Length - 1, 1) else (sb.Length, 0)
+            if _coeff.Sign < 0 then (sb.Length - 1, 1) else (sb.Length, 0)
 
-        let adjustedExp = (int64 exp) + (int64 coeffLen) - 1L
+        let adjustedExp = (int64 _exp) + (int64 coeffLen) - 1L
 
-        if exp <= 0 && adjustedExp >= -6L then
-            if exp <> 0 then // we need a decimal point
-                match -exp with
+        if _exp <= 0 && adjustedExp >= -6L then
+            if _exp <> 0 then // we need a decimal point
+                match -_exp with
                 | numDec when numDec < coeffLen ->
                     sb.Insert(coeffLen - numDec + negOffset, '.')
                     |> ignore
@@ -776,8 +797,8 @@ type BigDecimal private (coeff, exp, precision) =
         // Translated the Sun Java code pretty directly.
         let result = this.Add(y)
 
-        if c.precision = 0u
-           || c.roundingMode = RoundingMode.Unnecessary then
+        if c.Precision = 0u
+           || c.RoundingMode = RoundingMode.Unnecessary then
             result
         else
             BigDecimal.round result c
@@ -795,8 +816,8 @@ type BigDecimal private (coeff, exp, precision) =
         // Translated the Sun Java code pretty directly.
         let result = this.Subtract(y)
 
-        if c.precision = 0u
-           || c.roundingMode = RoundingMode.Unnecessary then
+        if c.Precision = 0u
+           || c.RoundingMode = RoundingMode.Unnecessary then
             result
         else
             BigDecimal.round result c
@@ -893,7 +914,7 @@ type BigDecimal private (coeff, exp, precision) =
             Using these adjusted values of x and y, divide to get q and r, round using those, then adjust the exponent.
         *)
 
-        if c.precision = 0u then
+        if c.Precision = 0u then
             lhs.Divide(rhs)
         else
 
@@ -943,7 +964,7 @@ type BigDecimal private (coeff, exp, precision) =
 
                 // Now make sure x and y themselves are in the proper range.
 
-                let delta = (int32 c.precision) - (xprec - yprec)
+                let delta = (int32 c.Precision) - (xprec - yprec)
 
                 let xprime, yprime =
                     if (delta > 0) then
@@ -954,7 +975,7 @@ type BigDecimal private (coeff, exp, precision) =
                         * ArithmeticHelpers.biPowerOfTen (-delta |> uint)
 
                 let roundedInt =
-                    BigDecimal.roundingDivide2 xprime yprime c.roundingMode
+                    BigDecimal.roundingDivide2 xprime yprime c.RoundingMode
 
                 let exp =
                     BigDecimal.checkExponentE (preferredExp - (int64 delta) + (int64 adjust)) roundedInt.IsZero
@@ -1106,7 +1127,7 @@ type BigDecimal private (coeff, exp, precision) =
         // The OpenJDK implementation does otherwise.
         // So I modified it to yield a zero exponent.
 
-        if c.precision = 0u
+        if c.Precision = 0u
            || (this.Abs() :> IComparable<BigDecimal>)
                .CompareTo(y.Abs()) < 0 then // exact result || zero result
             this.DivideInteger(y)
@@ -1125,7 +1146,7 @@ type BigDecimal private (coeff, exp, precision) =
             *)
 
             let result =
-                this.Divide(y, Context.Create(c.precision, RoundingMode.Down))
+                this.Divide(y, Context.Create(c.Precision, RoundingMode.Down))
 
             let resultExp = result.Exponent
 
@@ -1159,7 +1180,7 @@ type BigDecimal private (coeff, exp, precision) =
                 | _ -> result
 
             if preferredExp < resultExp
-               && c.precision > result.Precision then
+               && c.Precision > result.Precision then
                 BigDecimal.Rescale(result, 0, RoundingMode.Unnecessary)
             else
                 BigDecimal.stripZerosToMatchExponent result (int64 preferredExp)
@@ -1180,7 +1201,7 @@ type BigDecimal private (coeff, exp, precision) =
 
     member this.DivRem(y: BigDecimal, c: Context, remainder: outref<BigDecimal>): BigDecimal =
         // x = q * y + r
-        if c.roundingMode = RoundingMode.Unnecessary then
+        if c.RoundingMode = RoundingMode.Unnecessary then
             this.DivRem(y, &remainder)
         else
             let q = this.DivideInteger(y, c)
@@ -1235,7 +1256,7 @@ type BigDecimal private (coeff, exp, precision) =
         // -- The final value from either the positive or negative case
         //    is then rounded to the destination precision.
 
-        if c.precision = 0u then
+        if c.Precision = 0u then
             this.Power(n)
         elif n < -999999999 || n > 999999999 then
             raise <| ArithmeticException("invalid operation")
@@ -1245,15 +1266,15 @@ type BigDecimal private (coeff, exp, precision) =
             let mutable mag = Math.Abs(n)
 
             let workC =
-                if c.precision > 0u then
+                if c.Precision > 0u then
                     let elength =
                         ArithmeticHelpers.uintPrecision (uint mag)
 
-                    if elength > c.precision then
+                    if elength > c.Precision then
                         raise
                         <| ArithmeticException("Invalid precision for exponentiation") // X3.274 rule
 
-                    Context.Create((c.precision + elength + 1u), c.roundingMode)
+                    Context.Create((c.Precision + elength + 1u), c.RoundingMode)
                 else
                     c
             // I suppose I could encapsulate this as a tail-recursive function. Another day

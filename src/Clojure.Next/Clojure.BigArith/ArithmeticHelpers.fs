@@ -8,9 +8,13 @@ module internal ArithmeticHelpers =
 
     // BigInteger helpers
 
+    /// BigInteger w/ value 5
     let biFive = BigInteger(5)
+
+    /// BigInteger w/ value 10
     let biTen = BigInteger(10)
 
+    /// The precision (number of digits) of a BigInteger
     let getBIPrecision (bi: BigInteger) =
         if bi.IsZero then
             1u
@@ -26,6 +30,7 @@ module internal ArithmeticHelpers =
     //    let log = BigInteger.Log10 (if bi.Sign <= 0 then -bi else bi)
     //    1u+((Math.Floor(log) |> uint32)
 
+    // BigInteger powers of 10 up to 10^11
     let biPowersOfTen =
         [| BigInteger.One
            BigInteger(10)
@@ -40,6 +45,7 @@ module internal ArithmeticHelpers =
            BigInteger(10000000000L)
            BigInteger(100000000000L) |]
 
+    /// Compute 10^n as a BigInteger
     let biPowerOfTen (n: uint) =
         if n < uint biPowersOfTen.Length then
             biPowersOfTen.[(int n)]
@@ -84,6 +90,7 @@ module internal ArithmeticHelpers =
         ((uint16 (v.[7] &&& 0x7fuy)) <<< 4)
         ||| ((uint16 (v.[6] &&& 0xF0uy)) >>> 4)
 
+    // DU expressing different flavors of a double representation
     type DoubleData =
         | Zero of isPositive: bool // +/- 0
         | Denormalized of isPositive: bool * fraction: uint64 * exponent: int // Denormalized  +/- 2^-1022 x 0.fraction  -1022 passed in exponent
@@ -112,8 +119,6 @@ module internal ArithmeticHelpers =
                  mantissa = setBit52 significand,
                  exponent = (int biasedExp) - doubleExponentBias,
                  isSignificandZero = (significand = 0UL))
-
-
 
 
     /// Given a Decimal value, return a BigInteger with the mantissa and the exponent.
