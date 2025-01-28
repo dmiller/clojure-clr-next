@@ -469,11 +469,12 @@ type Parser private () =
             //  And it adds wrapping expressions to handle boxing, plus warnings.
             // TODO: put into a later pass
 
-            let localBinding = { Sym = sym; Tag = null; Init = initExpr; Name = sym.Name; IsArg = false; IsByRef = false; IsRecur = isLoop; IsThis = false; Index = i/2 }
+            let localBinding = { Sym = sym; Tag = null; Init = Some initExpr; Name = sym.Name; IsArg = false; IsByRef = false; IsRecur = isLoop; IsThis = false; Index = i/2 }
             let bindingInit = { Binding = localBinding; Init = initExpr }
             bindingInits.Add(bindingInit)
             if isLoop then loopLocals.Add(localBinding)
 
+            // progressive enhancement of bindings
             initCtx <- { initCtx with Locals = (RTMap.assoc(initCtx.Locals, sym, localBinding) :?> IPersistentMap) }
 
         // TODO: Original code also sets up MethodReturnContextVar , either pass-along or null  Do we need this?
@@ -516,10 +517,49 @@ type Parser private () =
             RecurExpr({Ctx = cctx; Args = args; LoopLocals = loopLocals; SourceInfo=None})  // TODO: SourceInfo
 
 
+    static member LetFnExprParser(cctx: CompilerEnv, form: obj) : Expr = 
 
+        let form = form :?> ISeq
 
+        // form => (letfn*  [var1 (fn [args] body) ... ] body ... )
 
+        let bindings = 
+            match RTSeq.second(form) with
+            | :? IPersistentVector as pv -> pv
+            | _ -> raise <| ParseException("Bad binding form, expected vector")
 
+        if bindings.count() % 2 <> 0 then
+            raise <| ParseException("Bad binding form, expected matched symbol/expression pairs")
+
+        let body = RTSeq.next(RTSeq.next(form))
+
+        // Original code did a wrapper here.  Do we need to do this?
+                    //   if (pcon.Rhc == RHC.Eval)
+                    //return Compiler.Analyze(pcon, RT.list(RT.list(Compiler.FnOnceSym, PersistentVector.EMPTY, form)), "letfn__" + RT.nextID());
+
+        // because mutually recursive functions are allowed, we need to pre-seed the locals map before we parse the functions in the initializations
+        let mutable contextLocalBindings = cctx.Locals
+        let lbs = ResizeArray<LocalBinding>()
+
+        for i in 0 .. 2 .. (bindings.count()-1) do
+            let sym = Parser.ValidateBindingSymbol(bindings.nth(i))
+
+            let lb = { Sym = sym; Tag = null; Init = None; Name = sym.Name; IsArg = false; IsByRef = false; IsRecur = false; IsThis = false; Index = i/2 }
+            lbs.Add(lb)
+            contextLocalBindings <- contextLocalBindings.assoc(sym,lb)
+
+        let bindingInits = ResizeArray<BindingInit>()
+        let initCtxt = { cctx with Locals = contextLocalBindings; Pctx = Expression; IsAssignContext = false }
+
+        for i in 0 .. 2 .. (bindings.count()-1) do
+            let sym = Parser.ValidateBindingSymbol(bindings.nth(i))
+            let init = Parser.Analyze(initCtxt, bindings.nth(i+1), sym.Name)
+            let lb = lbs[i/2]
+            lb.Init <- Some init
+            let bindingInit = { Binding = lb; Init = init }
+            bindingInits.Add(bindingInit)
+
+        LetExpr({Ctx = cctx; BindingInits = bindingInits; Body = Parser.BodyExprParser(cctx, body); Mode=LetFn; LoopId = None; SourceInfo=None})  // TODO: source info)
 
 
     // Saving for later, when I figure out what I'm doing
@@ -533,7 +573,7 @@ type Parser private () =
 
 
 
-    static member LetFnExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+
 
     static member HostExprParser(cctx: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
 

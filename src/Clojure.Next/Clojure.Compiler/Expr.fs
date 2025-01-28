@@ -228,7 +228,7 @@ and BindingInit = { Binding: LocalBinding; Init: Expr }
 and LocalBinding =
     { Sym: Symbol
       Tag: obj
-      Init: Expr
+      mutable Init: Expr option  // Needs to be mutable for LetFn -- we have to create all bindings, parse the inits, then go back and fill in the inits.
       Name: string
       IsArg: bool
       IsByRef: bool
