@@ -1,0 +1,660 @@
+   
+-source-info ->    from form + env
+   
+analyze-method-impls
+check for errors (method must byy symbol, parms must be vector, must supply an argument for this <- this is used in deftype and reify
+
+ this-expr   {:name  this
+                     :env   env
+                     :form  this
+                     :op    :binding
+                     :o-tag (:this env)
+                     :tag   (:this env)
+                     :local :this}
+add 'this to :locals
+analyze-fn-method <<____
+    (assoc (dissoc method-expr :variadic?)
+      :op       :method
+      :form     form
+      :this     this-expr
+      :name     (symbol (name method))
+      :children (into [:this] (:children method-expr)))))
+
+
+
+default-passes:
+#{#'warn-on-reflection
+    #'warn-earmuff
+    #'uniquify-locals
+    #'source-info
+    #'elide-meta
+    #'constant-lift
+    #'trim
+    #'box
+    #'analyze-host-expr
+    #'validate-loop-locals
+    #'validate
+    #'infer-tag
+    #'classify-invoke}
+	
+wrapping-meta
+      {:op       :with-meta
+       :env      env
+       :form     form
+       :meta     (analyze-form meta (ctx env :ctx/expr))
+       :expr     (assoc-in expr [:env :context] :ctx/expr)
+       :children [:meta :expr]}
+	   
+	   
+defmulti -analyze-form
+Symbol -> analyze-symbol
+IPersistentVector -> analyze-vector
+IPersistentMap -> analyze-map
+IPersistentSet -> analyze-set
+ISeq ->   if seq null then analyze-const else analyze-seq
+IType -> (analyze-const form env :type)    (prefer over IPersistentMap, ..Vector, ..Set, and ISeq)
+IRecord -> (analyze-const form env :record)  (ditto)
+:default -> analyze-const
+
+classify:
+nil => :nil
+boolean => : boolean
+etc.
+
+
+analyze-const (takes an optional 'type' parameter)  
+
+Note that IType and IRecord supply the type parameter, other calls don't
+Calls classify (above) if type not provided
+
+    (merge
+     {:op       :const
+      :env      env
+      :type     type
+      :literal? true
+      :val      form
+      :form     form}
+	       (when-let [m (and (obj? form)
+                       (not-empty (meta form)))]
+       {:meta     (analyze-const m (ctx env :ctx/expr) :map) ;; metadata on a constant literal will not be evaluated at
+        :children [:meta]}))))                               ;; runtime, this is also true for metadata on quoted collection literals
+
+
+analyze-vector
+
+    (wrapping-meta
+     {:op       :vector
+      :env      env
+      :items    items
+      :form     form
+      :children [:items]})))
+
+
+analyze-map
+    (wrapping-meta
+     {:op       :map
+      :env      env
+      :keys     ks
+      :vals     vs
+      :form     form
+      :children [:keys :vals]})))
+
+    (wrapping-meta
+     {:op       :set
+      :env      env
+      :items    items
+      :form     form
+      :children [:items]})))
+
+analyze-symbol
+
+	calls macroexpand-1 -- notable this expands Class/Field into (. Class Field) when called on symbols
+	if there is a change, then recursively call analyze-form. and add :raw-forms to the resulting map
+	if no change:
+		check for local binding
+	        if so pull in the local binding data, and amend the map with 
+				(merge (dissoc local-binding :init)                                      
+                      {:op          :local
+                       :assignable? (boolean mutable)
+                       :children    (vec (remove #{:init} children))  <- this is the equivalent to LocalBindingExpr
+	    Check if sym resolves to a var.  
+		    if so,  we have a VarExpr
+				{:op          :var
+                    :assignable? (dynamic? var m) ;; we cannot statically determine if a Var is in a thread-local context
+                    :var         var              ;; so checking whether it's dynamic or not is the most we can do
+                    :meta        m})
+		If the sym has a namespace, could be  host expression:  looks like "potential" host expresion -- how is this refined later?
+			    {:op    :maybe-host-form
+                      :class maybe-class
+                      :field (symbol (name sym))})
+		To each of the above, add 
+			{:env  env
+              :form mform}
+		
+analyze-seq
+	op <- (first form)
+	op = nil -> error "Can't call nil"
+	macroexpand-form
+		if no change - parse the form (see below)  comment says: function/special-form invocation
+		if changes: analyze the result  And play games adding :raw-forms and ::Resolved-op
+	
+	
+parse: supplied by tools.analyzer.clr -- supplies some extra cases, then defaults to -parse.
+In its entirety
+
+discriminates on first arg = op
+
+  monitor-enter        parse-monitor-enter
+     monitor-exit         parse-monitor-exit
+     clojure.core/import* parse-import*
+     reify*               parse-reify*
+     deftype*             parse-deftype*
+     case*                parse-case*
+     do      parse-do
+     if      parse-if
+     new     parse-new
+     quote   parse-quote
+     set!    parse-set!
+     try     parse-try
+     throw   parse-throw
+     def     parse-def
+     .       parse-dot
+     let*    parse-let*
+     letfn*  parse-letfn*
+     loop*   parse-loop*
+     recur   parse-recur
+     fn*     parse-fn*
+     var     parse-var
+     #_:else parse-invoke)	 
+	 
+parse-monitor-enter 
+ {:op       :monitor-enter
+   :env      env
+   :form     form
+   :target   (-analyze target (ctx env :ctx/expr))
+   :children [:target]}
+   
+parse-monitor-exit 
+ {:op       :monitor-exit
+   :env      env
+   :form     form
+   :target   (-analyze target (ctx env :ctx/expr))
+   :children [:target]}
+   
+parse-import
+{:op    :import
+   :env   env
+   :form  form
+   :class class}
+ 
+parse-reify*
+    (wrapping-meta
+     {:op         :reify
+      :env        env
+      :form       form
+      :class-name class-name
+      :methods    methods
+      :interfaces interfaces
+      :children   [:methods]})))
+	  
+parse-deftype
+    {:op         :deftype
+     :env        env
+     :form       form
+     :name       name
+     :class-name class-name ;; internal, don't use as a Class
+     :fields     fields-expr
+     :methods    methods
+     :interfaces interfaces
+     :children   [:fields :methods]}))
+
+parse-case*
+    {:op          :case
+     :form        form
+     :env         env
+     :test        (assoc test-expr :case-test true)
+     :default     default-expr
+     :tests       tests
+     :thens       thens
+     :shift       shift
+     :mask        mask
+     :low         low
+     :high        high
+     :switch-type switch-type
+     :test-type   test-type
+     :skip-check? skip-check?
+     :children    [:test :tests :thens :default]})) 
+	 
+parse-do	 
+
+  {:op         :do
+     :env        env
+     :form       form
+     :statements statements
+     :ret        ret
+     :children   [:statements :ret]}))
+	 
+	 
+parse-if
+    {:op       :if
+     :form     form
+     :env      env
+     :test     test-expr
+     :then     then-expr
+     :else     else-expr
+     :children [:test :then :else]
+	 
+parse-new	 
+    {:op          :new
+     :env         env
+     :form        form
+     :class       (analyze-form class (assoc env :locals {})) ;; avoid shadowing
+     :args        args
+     :children    [:class :args]})
+	 
+ parse-quote	 
+   {:op       :quote
+     :expr     const
+     :form     form
+     :env      env
+     :literal? true
+     :children [:expr]})
+	 
+parse-set!
+    {:op       :set!
+     :env      env
+     :form     form
+     :target   target
+     :val      val
+     :children [:target :val]}
+	 
+(defn analyze-body [body env]
+  ;; :body is used by emit-form to remove the artificial 'do
+  (assoc (parse (cons 'do body) env) :body? true))
+  wrap a do around a sequence of forms parse it, which will invoke parse-do, then add a marker that the :do is fake.
+  Basically a BodyExpr with a flag indicating that the do was an addition.
+  
+ (defn valid-binding-symbol? [s]
+  (and (symbol? s)
+       (not (namespace s))
+       (not (re-find #"\." (name s)))))
+Used to check that a symbol used for the name of a local is appropriate:
+being a symbol with no namespace -- I see that in the Clojure(CLR) code.
+I don't see the check for a period.
+And it seems to work fine in ClojureCLR but NOT in Clojure(JVM)
+(let [x.y 12] x.y) 
+Syntax error (ClassFormatError) compiling fn* at (REPL:1:1).
+Illegal field name "x.y" in class user$eval134
+Note that this is an error caught be the Java runtime, not by the Clojure compiler.
+
+
+parse-try
+
+      (merge {:op      :try
+              :env     env
+              :form    form
+              :body    body
+              :catches cblocks}
+             (when fblock
+               {:finally fblock})
+             {:children (into [:body :catches]
+                              (when fblock [:finally]))}))))
+							  
+ parse-catch
+     {:op          :catch
+     :class       (analyze-form etype (assoc env :locals {}))
+     :local       local
+     :env         env
+     :form        form
+     :body        (analyze-body body (assoc-in env [:locals ename] (dissoc-env local)))
+     :children    [:class :local :body]}))
+	 
+	where local = 
+			{:op    :binding
+               :env   env
+               :form  ename
+               :name  ename
+               :local :catch}
+			   
+parse-throw			   
+ {:op        :throw
+   :env       env
+   :form      form
+   :exception (analyze-form throw (ctx env :ctx/expr))
+   :children  [:exception]}
+   
+   
+ parse-letfn*
+ Lots of work under the surface
+  pick up the names of the letfn binding variables
+     (assoc binds name
+                                 {:op    :binding
+                                  :env   env
+                                  :name  name
+                                  :form  name
+                                  :local :letfn})
+	analyze each init and add that into the binds above
+	Note that this has to occure in an environment where the local is bound
+	
+   {:op       :letfn
+       :env      env
+       :form     form
+       :bindings (vec (vals binds)) ;; order is irrelevant
+       :body     body
+       :children [:bindings :body]}
+	   
+analyze-let
+	analyze each binding init and create
+	{:op       :binding
+                           :env      env
+                           :name     name
+                           :init     init-expr
+                           :form     name
+                           :local    (if loop? :loop :let)
+                           :children [:init]}
+			note that we have to add each local to the env before moving to the next clause
+	analyze the body in the resulting environment.
+			if it's a loop merge in   {:loop-id     loop-id
+                                       :loop-locals (count binds)})
+			
+	 {:body     body
+           :bindings binds
+           :children [:bindings :body]})
+
+parse-let*
+	this adds the op information
+	  (into {:op   :let
+         :form form
+         :env  env}
+        (analyze-let form env)))
+
+ parse-loop*			
+	this add a :loop-id  (gensym'd value) so that the recur can be matched to it
+  (into {:op      :loop
+           :form    form
+           :env     env
+           :loop-id loop-id}
+          (analyze-let form env)))
+		  
+parse-recur		  
+{:op          :recur
+     :env         env
+     :form        form
+     :exprs       exprs
+     :loop-id     loop-id
+     :children    [:exprs]}
+	 
+analyze-fn-method  -- used in parse-fn* to handle methods!
+a lot of error checking.
+Determine arity, whether variadic 
+Create expressions for each parameter, with an index:
+							{:env       env
+                             :form      name
+                             :name      name
+                             :variadic? (and variadic?
+                                             (= id (dec arity)))
+                             :op        :binding
+                             :arg-id    id
+                             :local     :arg}
+generate a loop id.
+Create an env in which to analyze the body.
+Analyze the body.
+more error checking on parameters.
+
+   (merge
+     {:op          :fn-method
+      :form        form
+      :loop-id     loop-id
+      :env         env
+      :variadic?   variadic?
+      :params      params-expr
+      :fixed-arity fixed-arity
+      :body        body
+      :children    [:params :body]}
+     (when local
+       {:local (dissoc-env local)}))))  <---- not sure on :local
+	   
+parse-fn*
+An expression for the name:
+
+	{:op    :binding
+                    :env   env
+                    :form  n
+                    :local :fn
+                    :name  n}
+					
+error checking across the methods, e.g., not two variadic					
+	 (merge {:op              :fn
+             :env             env
+             :form            form
+             :variadic?       variadic?
+             :max-fixed-arity max-fixed-arity
+             :methods         methods-exprs
+             :once            once?}
+            (when n
+              {:local name-expr})
+            {:children (conj (if n [:local] []) :methods)}))))
+			
+			
+parse-def
+  (merge {:op   :def
+            :env  env
+            :form form
+            :name sym
+            :var  var}
+           (when meta
+             {:meta meta-expr})
+           args
+           (when-not (empty? children)
+             {:children children}))))
+			 
+			 
+parse-dot
+do some analysis on args:  try to distinguish method or field
+Analyze the target
+
+ (merge {:form   form
+            :env    env
+            :target target-expr}
+           (cond
+            call?
+            {:op       :host-call
+             :method   (symbol (name (first m-or-f)))
+             :args     (mapv (analyze-in-env (ctx env :ctx/expr)) (next m-or-f))
+             :children [:target :args]}
+
+            field?
+            {:op          :host-field
+             :assignable? true
+             :field       (symbol (name m-or-f))
+             :children    [:target]}
+
+            :else
+            {:op          :host-interop ;; either field access or no-args method call
+             :assignable? true
+             :m-or-f      (symbol (name m-or-f))
+             :children    [:target]}))))
+			 
+parse-invoke			 
+
+ (merge {:op   :invoke
+            :form form
+            :env  env
+            :fn   fn-expr
+            :args args-expr}
+           (when (seq m)
+             {:meta m}) ;; meta on invoke form will not be evaluated
+           {:children [:fn :args]})))
+		   
+parse-var
+    {:op   :the-var
+     :env  env
+     :form form
+     :var  var}
+	 
+================
+
+Passes	 
+	 
+#{#'warn-on-reflection
+    #'warn-earmuff
+    #'uniquify-locals
+    #'source-info
+    #'elide-meta
+    #'constant-lift
+    #'trim
+    #'box
+    #'analyze-host-expr
+    #'validate-loop-locals
+    #'validate
+    #'infer-tag
+    #'classify-invoke}
+		 
+warn-on-reflection    {:pass-info {:walk :pre  :depends #{#'validate} :after #{#'validate-loop-locals}}}
+uniquify-locals       {:pass-info {:walk :none :depends #{}}}
+source-info           {:pass-info {:walk :pre  :depends #{}}}
+elide-meta            {:pass-info {:walk :any  :depends #{} :after #{#'source-info}}}
+constant-lift         {:pass-info {:walk :post :depends #{}}}
+trim                  {:pass-info {:walk :none :depends #{} :after #{#'elide-meta}}}
+box                   {:pass-info {:walk :pre  :depends #{#'infer-tag} :after #{#'validate}}}
+analyze-host-expr     {:pass-info {:walk :post :depends #{}}}
+validate-loop-locals  {:pass-info {:walk :post :depends #{#'validate} :affects #{#'analyze-host-expr #'infer-tag #'validate} :after #{#'classify-invoke}}}
+validate              {:pass-info {:walk :post :depends #{#'infer-tag #'analyze-host-expr #'validate-recur}}}
+infer-tag             {:pass-info {:walk :post :depends #{#'annotate-tag #'annotate-host-info #'fix-case-test #'analyze-host-expr} :after #{#'trim}}}
+classify-invoke       {:pass-info {:walk :post :depends #{#'validate}}}
+
+// mentioned above but not in explicit passes
+
+annotate-tag            {:pass-info {:walk :post :depends #{} :after #{#'constant-lift}}}
+annotate-host-info      {:pass-info {:walk :pre :depends #{} :after #{#'elide-meta}}}
+fix-case-test           {:pass-info {:walk :pre :depends #{#'add-binding-atom}}}
+
+add-binding-atom        {:pass-info {:walk :pre :depends #{#'uniquify-locals} :state (fn [] (atom {}))}}
+
+
+// passes available but not mentioned above
+
+cleanup                 {:pass-info {:walk :any :depends #{}}}
+collect-closed-overs    {:pass-info {:walk :none :depends #{#'uniquify-locals}}}
+emit-form               {:pass-info {:walk :none :depends #{#'uniquify-locals} :compiler true}}
+index-vector-nodes      {:pass-info {:walk :any :depends #{}}}
+annotate-branch         {:pass-info {:walk :any :depends #{}}}
+
+
+A comprehensive(?) dictionary of keys
+Keys used in env;
+
+:locals     a map from binding symbol to AST of the binding value
+:context    a keyword describing the form's context from the :ctx/* hierarchy.
+ :ctx/expr      the form is an expression: its value is used
+ :ctx/return    the form is an expression in return position, derives :ctx/expr
+ :ctx/statement the value of the form is not used
+:ns         a symbol representing the current namespace of the form to be analyzed
+
+
+// structure of :locals
+key = symbol
+value = AST for the binding value
+:op :binding
+:env
+:name
+:form   :letfn or 
+
+:in-try -- set when analyzing body of try
+:loop-id
+:loop-locals
+:local  ??
+
+
+global env
+:namespaces
+
+Keys used in ASTs
+
+Guaranteed:
+
+   Every node in the AST is a map that is *guaranteed* to have the following keys:
+   * :op   a keyword describing the AST node
+   * :form the form represented by the AST node
+   * :env  the environment map of the AST node
+
+   Additionally if the AST node contains sub-nodes, it is guaranteed to have:
+   * :children a vector of the keys of the AST node mapping to the sub-nodes,
+               ordered, when that makes sense
+			   
+Values for :op--
+:with-meta
+:const
+:vector
+:set
+:vector
+:map
+:maybe-host-form
+:maybe-class
+:var
+:local
+:do
+:if
+:new
+:quote
+:set!
+:try
+:catch
+:throw
+:letfn
+:let
+:loop
+:recur
+:fn-method
+:fn
+:def
+:host-call
+:host-field
+:host-interop
+:invoke
+:the-var
+
+
+
+:binding
+
+
+
+
+
+:top-level -- marked as true on the top-level node
+:env - the environment in effect
+
+For :var
+:private
+:macro
+:const
+:dynamic
+:protocol
+
+for :fn
+:arglists
+
+source-info
+:file
+:line
+:column
+:end-line
+:end-column
+:source-span
+
+
+constant nodes  :quote or :const
+:form
+:val
+
+:type -- can be :record or :type for IRecord or IType
+         :map for metadata on constant literal
+
+:meta -- op=:with-meta
+
+:literal (true/absent) 
+
+:raw-forms records original form, before macroexpand, in result of analyze-seq
+
+:body?  added to AST for :do if the do was added to deal with a body sequence

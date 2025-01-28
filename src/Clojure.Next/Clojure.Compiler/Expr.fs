@@ -71,10 +71,10 @@ type Expr =
 | VarExpr of VarDetails
 | UntypedExpr of UntypedExprDetails  // combines MonitorEnterExpr, MonitorExitExpr, ThrowExpr
 
-and AssignDetails = { Ctx: CompilerContext; Target: Expr; Value: Expr }
-and BodyDetails = { Ctx: CompilerContext; Exprs: List<Expr> }
+and AssignDetails = { Ctx: CompilerEnv; Target: Expr; Value: Expr }
+and BodyDetails = { Ctx: CompilerEnv; Exprs: List<Expr> }
 and CaseDetails = { 
-    Ctx: CompilerContext; 
+    Ctx: CompilerEnv; 
     Expr: Expr; 
     DefaultExpr: Expr; 
     Shift: int; 
@@ -85,10 +85,10 @@ and CaseDetails = {
     TestType: Keyword;
     SkipCheck: IPersistentSet
     ReturnType: Type}
-and CollectionDetails = { Ctx: CompilerContext; Value: obj }
+and CollectionDetails = { Ctx: CompilerEnv; Value: obj }
 and LiteralDetails = { Type: LiteralType; Value: obj }
 and DefDetails = { 
-    Ctx: CompilerContext; 
+    Ctx: CompilerEnv; 
     Var: Var; 
     Init: Expr; 
     Meta: Expr; 
@@ -96,9 +96,9 @@ and DefDetails = {
     IsDynamic: bool; 
     ShadowsCoreMapping: bool; 
     SourceInfo: SourceInfo} 
-and FnDetails = { Ctx: CompilerContext; (* help *) SourceInfo: SourceInfo }
+and FnDetails = { Ctx: CompilerEnv; (* help *) SourceInfo: SourceInfo }
 and HostExprDetails = { 
-    Ctx: CompilerContext; 
+    Ctx: CompilerEnv; 
     Type: HostExprType;
     Tag: Symbol;
     Target: Expr option;
@@ -109,31 +109,31 @@ and HostExprDetails = {
     IsTailPosition: bool;    
     SourceInfo: SourceInfo option }
 and IfDetails = { Test: Expr; Then: Expr; Else: Expr; SourceInfo: SourceInfo option}
-and ImportDetails = { Ctx: CompilerContext; Typename: string  }
-and InstanceOfDetails = { Ctx: CompilerContext; Expr: Expr; Type: Type; SourceInfo: SourceInfo }
+and ImportDetails = { Ctx: CompilerEnv; Typename: string  }
+and InstanceOfDetails = { Ctx: CompilerEnv; Expr: Expr; Type: Type; SourceInfo: SourceInfo }
 and InvokeDetails = { 
-    Ctx: CompilerContext; 
+    Ctx: CompilerEnv; 
     Fexpr: Expr; 
     Args: Expr list; 
     Tag: obj; 
     TailPosition: bool;  
     ProtocolDetails: ProtocolDetails option; 
     SourceInfo: SourceInfo }
-and KeywordInvokeDetails = {Ctx: CompilerContext; KwExpr: Expr; Target: Expr; Tag: obj; SiteIndex: int; SourceInfo: SourceInfo }
-and LetDetails = { Ctx: CompilerContext; Mode: LetExprMode; BindingInits: BindingInit list; Body: Expr; SourceInfo: SourceInfo }
-and LocalBindingDetails = { Ctx: CompilerContext; Binding: LocalBinding; Tag: Symbol }
-and MetaDetails = { Ctx: CompilerContext; Target: Expr; Meta: Expr }
-and MethodDetails = { Ctx: CompilerContext; MethodName: string; Args : HostArg list; }
-and UntypedExprDetails = { Ctx: CompilerContext; Type: UntypedExprType; Target: Expr option}
-and NewDetails = { Ctx: CompilerContext; Args: HostArg list; Type: Type; IsNoArgValueTypeCtor: bool; SourceInfo: SourceInfo }
-and NewInstanceDetails = { Ctx: CompilerContext (* help*) }  // maybe combindwith fn?
-and NumberDetails = { Ctx: CompilerContext; Value: obj }
-and QualifiedMethodDetails = { Ctx: CompilerContext; (* help *) SourceInfo: SourceInfo option}
-and RecurDetails = { Ctx: CompilerContext; Args: Expr list; LoopLocals: LocalBinding list; SourceInfo: SourceInfo }
-and TheVarDetails = { Ctx: CompilerContext; Var: Var}
-and TryDetails = { Ctx: CompilerContext; TryExpr: Expr; Catches: CatchClause list; Finally: Expr }
-and UnresolvedVarDetails = { Ctx: CompilerContext; Sym: Symbol }
-and VarDetails = { Ctx: CompilerContext; Var: Var; Tag: obj }
+and KeywordInvokeDetails = {Ctx: CompilerEnv; KwExpr: Expr; Target: Expr; Tag: obj; SiteIndex: int; SourceInfo: SourceInfo }
+and LetDetails = { Ctx: CompilerEnv; Mode: LetExprMode; BindingInits: BindingInit list; Body: Expr; SourceInfo: SourceInfo }
+and LocalBindingDetails = { Ctx: CompilerEnv; Binding: LocalBinding; Tag: Symbol }
+and MetaDetails = { Ctx: CompilerEnv; Target: Expr; Meta: Expr }
+and MethodDetails = { Ctx: CompilerEnv; MethodName: string; Args : HostArg list; }
+and UntypedExprDetails = { Ctx: CompilerEnv; Type: UntypedExprType; Target: Expr option}
+and NewDetails = { Ctx: CompilerEnv; Args: HostArg list; Type: Type; IsNoArgValueTypeCtor: bool; SourceInfo: SourceInfo }
+and NewInstanceDetails = { Ctx: CompilerEnv (* help*) }  // maybe combindwith fn?
+and NumberDetails = { Ctx: CompilerEnv; Value: obj }
+and QualifiedMethodDetails = { Ctx: CompilerEnv; (* help *) SourceInfo: SourceInfo option}
+and RecurDetails = { Ctx: CompilerEnv; Args: Expr list; LoopLocals: LocalBinding list; SourceInfo: SourceInfo }
+and TheVarDetails = { Ctx: CompilerEnv; Var: Var}
+and TryDetails = { Ctx: CompilerEnv; TryExpr: Expr; Catches: CatchClause list; Finally: Expr }
+and UnresolvedVarDetails = { Ctx: CompilerEnv; Sym: Symbol }
+and VarDetails = { Ctx: CompilerEnv; Var: Var; Tag: obj }
 and BindingInit = { Binding: LocalBinding; Init: Expr }
 and LocalBinding = { Sym: Symbol; Tag: obj; Init: Expr; Name: string; IsArg: bool; IsByRef: bool; IsRecur: bool; IsThis: bool; Index: int }
 and CatchClause = { CaughtType: Type; LocalBinding: LocalBinding; Handler: Expr }
@@ -142,29 +142,28 @@ and HostArg = { ParamType: ParameterType; ArgExpr: Expr; LocalBinding: LocalBind
 and ObjMethod() =
     member val UsesThis = false with get, set
 
-and CompilerContext(_ctx: ParserContext, lbs : IPersistentMap, _method : ObjMethod option, _isAssignContext : bool ) =
-    
-    // Map from Symbol to LocalBinding
-    let mutable _localBindings = lbs
+and CompilerEnv = 
+    { Pctx: ParserContext; 
+      Locals: IPersistentMap;
+      Method: ObjMethod option; 
+      IsAssignContext: bool; 
+      LoopId: int option; 
+      LoopLocals: int }
 
-    new(ctx: ParserContext) = new CompilerContext(ctx, PersistentHashMap.Empty, None, false)
-        
-    member this.WithParserContext(ctx: ParserContext) = new CompilerContext(ctx,_localBindings, _method, _isAssignContext) 
-    member this.WithIsAssign(isAssign: bool)= new CompilerContext(_ctx,_localBindings, _method, isAssign) 
+    // Locals = Map from Symbol to LocalBinding
 
-    member _.ParserContext = _ctx
-    member _.LocalBindings = _localBindings
-    member _.Method = _method
+    static member Create(ctx: ParserContext) = { Pctx = ctx; Locals = PersistentHashMap.Empty; Method = None; IsAssignContext = false; LoopId = None; LoopLocals = 0 }       
 
-    member _.IsExpr = _ctx = ParserContext.Expression
-    member _.IsStmt = _ctx = ParserContext.Statement
-    member _.IsReturn = _ctx = ParserContext.Return
-    member _.IsAssignContext = _isAssignContext
+    member this.IsExpr = this.Pctx = ParserContext.Expression
+    member this.IsStmt = this.Pctx = ParserContext.Statement
+    member this.IsReturn = this.Pctx = ParserContext.Return
+
+    member this.WithParserContext(ctx: ParserContext) = { this with Pctx = ctx }
 
     member this.GetLocalBinding(sym: Symbol) = 
-        match RT0.get(_localBindings,sym) with
+        match RT0.get(this.Locals,sym) with
         | :? LocalBinding as lb ->
-            match _method with
+            match this.Method with
             | Some m -> 
                 if lb.Index = 0 then 
                     m.UsesThis <- true
@@ -175,7 +174,7 @@ and CompilerContext(_ctx: ParserContext, lbs : IPersistentMap, _method : ObjMeth
         | _ -> None
 
     member this.ContainsBindingForSym(sym: Symbol) = 
-        not <| isNull (RT0.get(_localBindings,sym))
+        not <| isNull (RT0.get(this.Locals,sym))
 
 
     member this.ClosesOver(b: LocalBinding, method: ObjMethod) = 
