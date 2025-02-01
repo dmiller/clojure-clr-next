@@ -167,21 +167,21 @@ discriminates on first arg = op
      var     parse-var
      #_:else parse-invoke)	 
 	 
-parse-monitor-enter 
+parse-monitor-enter  +++
  {:op       :monitor-enter
    :env      env
    :form     form
    :target   (-analyze target (ctx env :ctx/expr))
    :children [:target]}
    
-parse-monitor-exit 
+parse-monitor-exit   +++
  {:op       :monitor-exit
    :env      env
    :form     form
    :target   (-analyze target (ctx env :ctx/expr))
    :children [:target]}
    
-parse-import
+parse-import  +++
 {:op    :import
    :env   env
    :form  form
@@ -225,7 +225,7 @@ parse-case*
      :skip-check? skip-check?
      :children    [:test :tests :thens :default]})) 
 	 
-parse-do	 
+parse-do	   +++
 
   {:op         :do
      :env        env
@@ -235,7 +235,7 @@ parse-do
      :children   [:statements :ret]}))
 	 
 	 
-parse-if
+parse-if  +++
     {:op       :if
      :form     form
      :env      env
@@ -244,7 +244,7 @@ parse-if
      :else     else-expr
      :children [:test :then :else]
 	 
-parse-new	 
+parse-new	   +++
     {:op          :new
      :env         env
      :form        form
@@ -252,7 +252,7 @@ parse-new
      :args        args
      :children    [:class :args]})
 	 
- parse-quote	 
+ parse-quote	   +++
    {:op       :quote
      :expr     const
      :form     form
@@ -260,7 +260,7 @@ parse-new
      :literal? true
      :children [:expr]})
 	 
-parse-set!
+parse-set!  +++
     {:op       :set!
      :env      env
      :form     form
@@ -288,7 +288,7 @@ Illegal field name "x.y" in class user$eval134
 Note that this is an error caught be the Java runtime, not by the Clojure compiler.
 
 
-parse-try
+parse-try  +++
 
       (merge {:op      :try
               :env     env
@@ -300,7 +300,7 @@ parse-try
              {:children (into [:body :catches]
                               (when fblock [:finally]))}))))
 							  
- parse-catch
+ parse-catch  +++
      {:op          :catch
      :class       (analyze-form etype (assoc env :locals {}))
      :local       local
@@ -316,7 +316,7 @@ parse-try
                :name  ename
                :local :catch}
 			   
-parse-throw			   
+parse-throw			     +++
  {:op        :throw
    :env       env
    :form      form
@@ -324,7 +324,7 @@ parse-throw
    :children  [:exception]}
    
    
- parse-letfn*
+ parse-letfn*     +++
  Lots of work under the surface
   pick up the names of the letfn binding variables
      (assoc binds name
@@ -343,7 +343,7 @@ parse-throw
        :body     body
        :children [:bindings :body]}
 	   
-analyze-let
+analyze-let     +++
 	analyze each binding init and create
 	{:op       :binding
                            :env      env
@@ -361,14 +361,14 @@ analyze-let
            :bindings binds
            :children [:bindings :body]})
 
-parse-let*
+parse-let*  +++
 	this adds the op information
 	  (into {:op   :let
          :form form
          :env  env}
         (analyze-let form env)))
 
- parse-loop*			
+ parse-loop*	  +++		
 	this add a :loop-id  (gensym'd value) so that the recur can be matched to it
   (into {:op      :loop
            :form    form
@@ -376,7 +376,7 @@ parse-let*
            :loop-id loop-id}
           (analyze-let form env)))
 		  
-parse-recur		  
+parse-recur		    +++
 {:op          :recur
      :env         env
      :form        form
@@ -384,7 +384,7 @@ parse-recur
      :loop-id     loop-id
      :children    [:exprs]}
 	 
-analyze-fn-method  -- used in parse-fn* to handle methods!
+analyze-fn-method  -- used in parse-fn* to handle methods!     +++
 a lot of error checking.
 Determine arity, whether variadic 
 Create expressions for each parameter, with an index:
@@ -414,7 +414,7 @@ more error checking on parameters.
      (when local
        {:local (dissoc-env local)}))))  <---- not sure on :local
 	   
-parse-fn*
+parse-fn*   +++
 An expression for the name:
 
 	{:op    :binding

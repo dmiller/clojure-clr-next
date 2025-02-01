@@ -513,6 +513,7 @@ The passes defined for in _tools.analyzer.clr_ are:
 Note that this is a set, not a sequence.  Grouping and ordering are done by the scheduler.  Here is the metadata for these passes.  (These are all under the `:pass-info` key in the metadata for the function.)
 
 ```Clojure
+warn-earmuff           {:walk :pre :depends #{}}
 warn-on-reflection     {:walk :pre  :depends #{#'validate} :after #{#'validate-loop-locals}}
 uniquify-locals        {:walk :none :depends #{}}
 source-info            {:walk :pre  :depends #{}}
@@ -531,9 +532,197 @@ classify-invoke        {:walk :post :depends #{#'validate}}
 annotate-tag             {:walk :post :depends #{} :after #{#'constant-lift}}
 annotate-host-info       {:walk :pre :depends #{} :after #{#'elide-meta}}
 fix-case-test            {:walk :pre :depends #{#'add-binding-atom}}
-
+validate-recur           {:walk :pre :depends #{}}
 add-binding-atom         {:walk :pre :depends #{#'uniquify-locals} :state (fn [] (atom {}))}
 ```
 
-At this time, I am not prepared to go into detail on each of these.
+The interpretation of the keys:
 
+* `:after`  --  a set of `Var`s, the passes that must be run before this pass
+* `:before` --  a set of `Var`s, the passes that must be run after this pass
+* `:depends` -- a set of `Var`s, the passes this pass depends on, implies `:after`
+* `:walk` --    a keyword, one of:
+    - `:none` -- if the pass does its own tree walking and cannot be composed
+                        with other passes
+    - `:post` -- if the pass requires a postwalk and can be composed with other
+                        passes
+    - `:pre`  -- if the pass requires a prewalk and can be composed with other
+                        passes
+     - `:any`  -- if the pass can be composed with other passes in both a prewalk
+                        or a postwalk
+* `:affects` --  a set of `Var`s, this pass must be the last in the same tree traversal that all
+            the specified passes must participate in
+            This pass must take a function as argument and return the actual pass, the
+            argument represents the reified tree traversal which the pass can use to
+            control a recursive traversal, implies `:depends`
+* `:state`  --   a no-arg function that should return an atom holding an init value that will be
+            passed as the first argument to the pass (the pass will thus take the ast
+            as the second parameter), the atom will be the same for the whole tree traversal
+            and thus can be used to preserve state across the traversal
+
+               
+
+The `:pass-info` data defines a DAG.  I just put all the info into my favorite graph grapher and got this:
+
+![pass dependency diagram](./tools-analyzer-passes-graphs.dot.png "Pass dependency diagram")
+
+The only strange dependency is `:affects`.  I'm still figuring it out.  But before I do, we can take a quick tour of what each pass does, following an order somewhat related to the dependency graph.  Fortunately, many of the passes have docstrings that provide a good overview of what they do.
+
+- `source-info` -- Adds (when avaliable) `:line`, `:column`, `:end-line`, `:end-column` and `:file info` to the AST `:env.
+
+Given that this is such as an easy one, let's look at the source:
+
+```Clojure
+
+(defn source-info
+  "Adds (when avaliable) :line, :column, :end-line, :end-column and :file info to the AST :env"
+  {:pass-info {:walk :pre :depends #{}}}
+  [ast]
+  (let [source-info (-source-info (:form ast) (:env ast))
+        merge-source-info (-merge-source-info source-info)]
+    (update-children (merge-source-info ast) merge-source-info)))
+```
+
+`-source-info` is defined elsewhere as
+
+```Clojure
+(defn merge'
+  "Like merge, but uses transients"
+  [m & mms]
+  (persistent! (reduce conj! (transient (or m {})) mms)))
+
+(defn source-info
+  "Returns the available source-info keys from a map"
+  [m]
+  (when (:line m)
+    (select-keys' m #{:file :line :column :end-line :end-column :source-span})))
+
+(defn -source-info
+  "Returns the source-info of x"
+  [x env]
+  (merge' (source-info env)
+          (source-info (meta x))
+          (when-let [file (and (not= *file* "NO_SOURCE_FILE")
+                               *file*)]
+            {:file file})))
+```
+Back to our file.  `-merge-source-info` is defined as:
+
+```Clojure
+(defn -merge-source-info [source-info]
+  (fn [ast]
+    (update-in ast [:env] merge' source-info)))
+```
+
+Note that this returns a function.  `update-children` is going to apply that function to every node among the chldresn of the node in question. `update-children` is one of a group of helper functions for tree walking; I'll skip the details.
+
+That was just to get the flavor.  We'll skip the code on the rest of the passes.
+
+
+- `elide-meta` --   "If elides is not empty and the AST node contains metadata,
+   dissoc all the keys in elides from the metadata."   The default is to get rid of all keys listed in `*compiler-options*.
+
+- `trim` -- "Trims the AST of unnecessary nodes, e.g. (do (do 1)) -> 1".  The targets are `:do`, `:let`, and `:try`.  (There is a comment that `:letfn` and `:loop` are _TODO_.)
+
+
+- `constant-lift` --   "If the node represents a collection with no metadata, and every item of that collection is a literal, transform the node to an equivalent :const node."  Affects `:vector`, `:set`, and `:map` nodes.
+
+- `annotate-tag` --   "If the AST node type is a constant object or contains :tag metadata,
+   attach the appropriate `:tag` and `:o-tag` to the node."  I'm still trying to figure out when the two have different values -- mostly they seem to be identical.  There are some cute details, such as `:local` nodes getting an `atom` value for later modification.
+
+- `annotate-host-info` --  "Adds a `:methods` key to reify/deftype `:methods` info representing
+   the reflected informations for the required methods, replaces
+   `(catch :default ..)` forms with `(catch Throwable ..)`".  Well, repalce `Throwable` with `Exception` for the CLR.
+
+- `uniqify-locals` --   "Walks the AST performing alpha-conversion on the `:name` field
+   of `:local`/`:binding` nodes, invalidates `:local` map in `:env` field."  This is a pre-walk pass."
+
+- `add-binding-atom` --   "Adds an atom-backed-map to every local binding,the same
+   atom will be shared between all occurences of that local.
+
+   The atom is put in the `:atom` field of the node."
+
+- `fix-case-test` --    "If the node is a `:case-test`, annotates in the atom shared
+   by the binding and the local node with `:case-test`"
+
+- `infer-tag` --   "Performs local type inference on the AST adds, when possible,
+   one or more of the following keys to the AST:
+   * :o-tag      represents the current type of the
+                 expression represented by the node
+   * :tag        represents the type the expression represented by the
+                 node is required to have, possibly the same as :o-tag
+   * :return-tag implies that the node will return a function whose
+                 invocation will result in a object of this type
+   * :arglists   implies that the node will return a function with
+                 this arglists
+   * :ignore-tag true when the node is untyped, does not imply that
+                 all untyped node will have this
+
+  Passes opts:
+  * :infer-tag/level  If :global, infer-tag will perform Var tag
+                      inference"
+
+- `validate-recur` --   "Ensures recurs don't cross try boundaries"
+
+- `analyze-host-expr` --   "Performing some reflection, transforms `:host-interop`/`:host-call`/`:host-field`
+   nodes in either: `:static-field`, `:static-call`, `:instance-call`, `:instance-field`
+   or `:host-interop` nodes, and a `:var` or `:maybe-class` node in a `:const` `:class` node,
+   if necessary (class literals shadow `Var`s).
+
+   A `:host-interop` node represents either an instance-field or a no-arg instance-method. "
+
+- `validate` --   "Validate tags, classes, method calls.
+   Throws exceptions when invalid forms are encountered, replaces
+   class symbols with class objects.
+
+   Passes opts:
+   * `:validate/throw-on-arity-mismatch`
+      If true, validate will throw on potential arity mismatch
+   * `:validate/wrong-tag-handler`
+      If bound to a function, will invoke that function instead of
+      throwing on invalid tag.
+      The function takes the tag key (or :name/tag if the node is :def and
+      the wrong tag is the one on the :name field meta) and the originating
+      AST node and must return a map (or nil) that will be merged into the AST,
+      possibly shadowing the wrong tag with Object or nil.
+   * `:validate/unresolvable-symbol-handler`
+      If bound to a function, will invoke that function instead of
+      throwing on unresolvable symbol.
+      The function takes three arguments: the namespace (possibly nil)
+      and name part of the symbol, as symbols and the originating
+      AST node which can be either a :maybe-class or a :maybe-host-form,
+      those nodes are documented in the tools.analyzer quickref.
+      The function must return a valid tools.analyzer.jvm AST node."
+
+- `box` --  "Box the AST node tag where necessary"
+
+- `classify-invoke` --   "If the AST node is an `:invoke`, check the node in function position,
+   * if it is a keyword, transform the node in a `:keyword-invoke` node;
+   * if it is the `clojure.core/instance?` var and the first argument is a
+     literal class, transform the node in a `:instance?` node to be inlined by
+     the emitter
+   * if it is a protocol function var, transform the node in a `:protocol-invoke`
+     node
+   * if it is a regular function with primitive type hints that match a
+     `clojure.lang.IFn$[primitive interface]`, transform the node in a `:prim-invoke`
+     node"
+
+- `validate-loop-locals` --   "Returns a pass that validates the loop locals, calling analyze on the loop AST when
+   a mismatched loop-local is found"
+
+- `warn-earmuff` --   "Prints a warning to `*err*` if the AST node is a `:def` node and the
+   var name contains earmuffs but the var is not marked dynamic"
+
+- `warn-on-reflection` --     "Prints a warning to `*err*` when `*warn-on-reflection*` is true
+   and a node requires runtime reflection"
+
+
+There is occasional mention of options for the passes.  These are passed in a global environment.  The defaults are
+
+```Clojure
+  {:collect/what                    #{:constants :callsites}
+   :collect/where                   #{:deftype :reify :fn}
+   :collect/top-level?              false
+   :collect-closed-overs/where      #{:deftype :reify :fn :loop :try}
+   :collect-closed-overs/top-level? false}
+```

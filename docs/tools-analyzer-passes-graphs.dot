@@ -1,0 +1,29 @@
+strict digraph G {
+
+rankdir = RL;
+
+
+{
+	node [shape=box];
+	
+	ConstantLift;
+	UniquifyLocals;
+	AnalyzeHostExpr;
+	SourceInfo;
+	ValidateRecur;
+	AnnotateTag -> { ConstantLift };
+	AnnotateHostInfo -> { ElideMeta }; 
+	FixCaseTest -> { AddBindingAtom };
+	AddBindingAtom -> { UniquifyLocals };
+	WarnOnReflection -> { Validate, ValidateLoopLocals };
+	ElideMeta -> { SourceInfo };
+	Trim -> { ElideMeta };
+	Box -> { InferTag; Validate };
+	ValidateLoopLocals -> { Validate; AnalyzeHostExpr; InferTag; Validate ClassifyInvoke };
+	Validate -> { InferTag, AnalyzeHostExpr, ValidateRecur };
+    InferTag -> { AnnotateTag, AnnotateHostInfo, FixCaseTest, AnnotateHostInfo, Trim };
+	ClassifyInvoke -> { Validate };
+	WarnEarmuff;
+	
+}
+}	
