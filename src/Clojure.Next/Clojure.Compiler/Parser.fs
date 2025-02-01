@@ -559,7 +559,9 @@ type Parser private () =
             let bindingInit = { Binding = lb; Init = init }
             bindingInits.Add(bindingInit)
 
-        LetExpr({Ctx = cctx; BindingInits = bindingInits; Body = Parser.BodyExprParser(cctx, body); Mode=LetFn; LoopId = None; SourceInfo=None})  // TODO: source info)
+        LetExpr({Ctx = cctx; BindingInits = bindingInits; Body = Parser.BodyExprParser(cctx, body); Mode=LetFn; LoopId = None; SourceInfo=None})  // TODO: source info
+
+
 
     static member DefExprParser(cctx: CompilerEnv, form: obj) : Expr =
 
@@ -627,25 +629,162 @@ type Parser private () =
 
         DefExpr({Ctx = cctx; Var = var; Init = init; InitProvided = initProvided; IsDynamic = isDynamic; ShadowsCoreMapping = shadowsCoreMapping; Meta = meta; SourceInfo = None})  // TODO: source info})
 
-                
+    // This naming convention drawn from the Java code.             
+    static member ComputeFnNames(cctx: CompilerEnv, form: ISeq, name:string) : string * string =
+        let enclosingMethod = cctx.Method
+
+        let baseName =
+            match enclosingMethod with
+            | Some m -> m.ObjExpr.Name
+            | None -> Munger.Munge(RTVar.getCurrentNamespace().Name.Name + "$")
+
+        let newName =
+            match RTSeq.second(form) with
+            | :? Symbol as sym -> $"{sym.Name}__{RT0.nextID()}"
+            | _ when isNull name -> $"fn__{RT0.nextID()}"
+            | _ when enclosingMethod.IsNone -> name
+            | _ -> $"{name}__{RT0.nextID()}"
+
+        let simpleName = Munger.Munge(newName).Replace(".", "_DOT_")
+
+        let finalName = baseName + simpleName
+
+        // TODO: The original code has a comment that indicates the second value used to be finalName.Replace('.','/') 
+        // I'm not sure why I took it out.  I'm going to put it back in to see what happens.
+        // BTW, noe that simpleName had all dots replace, but baseName might still have dots?
+        (finalName, finalName.Replace('.', '/') )
+               
+        
+
+    static member FnExprParser(cctx: CompilerEnv, form: ISeq, name: string) : Expr = 
+
+            let origForm = form
+
+            let enclosingMethod = cctx.Method
+            let onceOnly = 
+                match RT0.meta(form.first()) with
+                | null -> false
+                | _ as m -> RT0.booleanCast(RT0.get(m, RTVar.OnceOnlyKeyword))
+
+            //arglist might be preceded by symbol naming this fn
+            let nm, form =
+                match RTSeq.second(form) with
+                | :? Symbol as sym -> sym, (RTSeq.cons(RTVar.FnSym, RTSeq.next(form)))
+                | _ -> null, form
+
+            let name, internalName = Parser.ComputeFnNames(cctx, form, name)
+
+            let fnExpr = ObjExpr({
+                Ctx = cctx; 
+                Type = ObjXType.Fn;
+                Name = name;
+                InternalName = internalName;
+                Tag = Parser.TagOf(form); 
+                Source=origForm; 
+                HasEnclosingMethod = enclosingMethod.IsSome; 
+                ThisName = if isNull nm then null else nm.Name;
+                OnceOnly = onceOnly;
+                SourceInfo = None })  // TODO: source info  -- original has a SpanMap field
+
+            let retTag = RT0.get(RT0.meta(form), RTVar.RettagKeyword)
+
+            // Normalize body
+            //now (fn [args] body...) or (fn ([args] body...) ([args2] body2...) ...)
+            //turn former into latter
+            let form = 
+                match RTSeq.second(form) with
+                | :? IPersistentVector -> RTSeq.list(RTVar.FnSym, RTSeq.next(form))
+                | _ -> form
+
+            // Because generation happens during parsing in the original code, we generate a context with a dynInitHelper here
+            //  and push it as the value of CompilerContextVar.  
+            // TODO: move this to a later pass
+
+            // Here the original code pushes a bunch of Var bindings.
+            // We could just pass a structure that contains the appropriate fields for these collections to the method parser.
+            // Or do it in later pass.
+            // TODO: decide
+
+            //Var.pushThreadBindings(RT.mapUniqueKeys(
+            //    Compiler.ConstantsVar, PersistentVector.EMPTY,
+            //    Compiler.ConstantIdsVar, new IdentityHashMap(),
+            //    Compiler.KeywordsVar, PersistentHashMap.EMPTY,
+            //    Compiler.VarsVar, PersistentHashMap.EMPTY,
+            //    Compiler.KeywordCallsitesVar, PersistentVector.EMPTY,
+            //    Compiler.ProtocolCallsitesVar, PersistentVector.EMPTY,
+            //    Compiler.VarCallsitesVar, Compiler.EmptyVarCallSites(),
+            //    Compiler.NoRecurVar, null));
+
+            let methods = SortedDictionary<int, ObjMethod>()
+            let mutable variadicMethod : ObjMethod option = None
+            let mutable usesThis = false
+
+            let rec loop (s: ISeq) =
+                match s with
+                | null -> ()
+                | _ -> 
+                    let m = Parser.FnMethodParser(cctx, s.first(), fnExpr, retTag)
+                    if m.IsVariadic then
+                        if variadicMethod.IsSome then
+                            raise <| ParseException("Can't have more than one variadic overload")
+                        variadicMethod <- Some m
+                    elif methods.ContainsKey(m.NumParams) then
+                        raise <| ParseException("Can't have two overloads with the same arity")
+                    else
+                        methods.Add(m.NumParams, m)
+                    usesThis <- usesThis || m.UsesThis
+                    loop(s.next())
+            loop(RTSeq.next(form))
+
+            match variadicMethod with
+            | Some vm when methods.Count > 0 && methods.Keys.Max() >= vm.NumParams ->
+                raise <| ParseException("Can't have fixed arity methods with more params than the variadic method.")
+
+            // TODO: Defer this until emit time
+            //fn.CanBeDirect <- ! fn.HasEnclosingMethod && not usesThis && fn.Closes.Count() == 0
+
+            
+            //if ( fn.CanBeDirect )
+            //{
+            //    for (ISeq s = RT.seq(allMethods); s != null; s = s.next())
+            //    {
+            //        FnMethod fm = s.first() as FnMethod;
+            //        if ( fm.Locals != null)
+            //        {
+            //            for (ISeq sl = RT.seq(RT.keys(fm.Locals)); sl != null; sl = sl.next())
+            //            {
+            //                LocalBinding lb = sl.first() as LocalBinding;
+            //                if ( lb.IsArg)
+            //                    lb.Index -= 1;
+            //            }
+            //        }
+            //    }
+            //}
+
+            fnExpr.Methods <-  allMethods;
+            fnExpr.VariadicMethod <- variadicMethod;
+
+            // TODO: Defer to later pass?
+            //fn.Keywords = (IPersistentMap)Compiler.KeywordsVar.deref();
+            //fn.Vars = (IPersistentMap)Compiler.VarsVar.deref();
+            //fn.Constants = (PersistentVector)Compiler.ConstantsVar.deref();
+            //fn.KeywordCallsites = (IPersistentVector)Compiler.KeywordCallsitesVar.deref();
+            //fn.ProtocolCallsites = (IPersistentVector)Compiler.ProtocolCallsitesVar.deref();
+            //fn.VarCallsites = (IPersistentSet)Compiler.VarCallsitesVar.deref();
+
+            //fn.ConstantsID = RT.nextID();
+
+
+
+
+    static member FnMethodParser(cctx: CompilerEnv, form: obj, fnExpr: Expr, retTag: obj) =
+        Parser.NilExprInstance
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-    static member FnExprParser(cctx: CompilerEnv, form: obj, name: string) : Expr = Parser.NilExprInstance
 
 
 

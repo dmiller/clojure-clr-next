@@ -48,6 +48,10 @@ type HostExprType =
     | MethodExpr
     | InstanceZeroArityCallExpr
 
+type ObjXType =
+    | Fn
+    | NewInstance
+
 type ProtocolDetails =
     { ProtocolOn: Type
       OnMethod: MethodInfo
@@ -59,7 +63,6 @@ type Expr =
     | CollectionExpr of CollectionDetails // combines MapExpr, SetExpr, VectorExpr
     | LiteralExpr of LiteralDetails // Combines ConstExpr, NumberExpr, NilExpr, StringExpr, BoolExpr , KeywordExpr, EmptyExpr
     | DefExpr of DefDetails
-    | FnExpr of FnDetails
     | HostExpr of HostExprDetails
     | IfExpr of IfDetails
     | ImportExpr of ImportDetails
@@ -71,7 +74,7 @@ type Expr =
     | MetaExpr of MetaDetails
     | MethodExpr of MethodDetails
     | NewExpr of NewDetails
-    | NewInstanceExpr of NewInstanceDetails
+    | ObjExpr of ObjDetails
     | QualifiedMethodExpr of QualifiedMethodDetails
     | RecurExpr of RecurDetails
     | TheVarExpr of TheVarDetails
@@ -113,11 +116,7 @@ and DefDetails =
       InitProvided: bool
       IsDynamic: bool
       ShadowsCoreMapping: bool
-      SourceInfo: SourceInfo option}
-
-and FnDetails =
-    { Ctx: CompilerEnv (* help *)
-      SourceInfo: SourceInfo }
+      SourceInfo: SourceInfo option }
 
 and HostExprDetails =
     { Ctx: CompilerEnv
@@ -168,7 +167,7 @@ and LetDetails =
       BindingInits: ResizeArray<BindingInit>
       Body: Expr
       LoopId: int option
-      SourceInfo: SourceInfo option}
+      SourceInfo: SourceInfo option }
 
 and LocalBindingDetails =
     { Ctx: CompilerEnv
@@ -197,7 +196,25 @@ and NewDetails =
       IsNoArgValueTypeCtor: bool
       SourceInfo: SourceInfo }
 
-and NewInstanceDetails = { Ctx: CompilerEnv (* help*)  } // maybe combindwith fn?
+and ObjBaseDetails =
+    { RequiredArity: int
+      RestArg: string option
+      IsVariadic: bool
+      PrePostMeta: ResizeArray<Expr> }
+
+and ObjDetails =
+    { Ctx: CompilerEnv
+      Type: ObjXType;
+      Tag: obj
+      Source: obj
+      Name: string;
+      InternalName: string;
+      OnceOnly: bool
+      HasEnclosingMethod: bool
+      ThisName: string
+
+      SourceInfo: SourceInfo option}
+
 and NumberDetails = { Ctx: CompilerEnv; Value: obj }
 
 and QualifiedMethodDetails =
@@ -228,7 +245,7 @@ and BindingInit = { Binding: LocalBinding; Init: Expr }
 and LocalBinding =
     { Sym: Symbol
       Tag: obj
-      mutable Init: Expr option  // Needs to be mutable for LetFn -- we have to create all bindings, parse the inits, then go back and fill in the inits.
+      mutable Init: Expr option // Needs to be mutable for LetFn -- we have to create all bindings, parse the inits, then go back and fill in the inits.
       Name: string
       IsArg: bool
       IsByRef: bool
@@ -246,8 +263,51 @@ and HostArg =
       ArgExpr: Expr
       LocalBinding: LocalBinding }
 
-and ObjMethod() =
+and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod) = 
+
+    let mutable _body : Expr option = None  // will get filled in later
+
+    do 
+        if not _objx.IsObjExpr then
+            failwith "Method must be an ObjExpr"
+
+    member _.Parent = _parent
+    member _.Objx = _objx
+    member _.Type = _type
+    
+    member val Locals : IPersistentMap = null with get, set
     member val UsesThis = false with get, set
+
+    member _.Body 
+        with get() = 
+            match _body with
+            | Some b -> b
+            | None -> failwith "Body not yet set"
+        and set b = _body <- Some b
+
+
+    member _.IsVariadic = 
+        match _type with
+        | Fn -> _restParm.IsSome
+        | NewInstance -> false
+
+    member this.NumParams = 
+        match _type with
+        | Fn -> _reqParms.count() + (this.IsVariadic ? 1 : 0)
+        | NewInstance -> _argLocals.count()
+
+    member this.RequiredArity = 
+        match _type with
+        | Fn -> _reqParms.count()
+        | NewInstance -> _argLocals.count()
+
+    member this.MethodName =
+        match _type with
+        | Fn -> if this.IsVariadic then "doInvoke" else "invoke"
+        | NewInstance -> _name
+
+    member _.ReturnType = _retType  // FNMethod had a check of prim here with typeof(Object) as default.
+    member _.ArgTypes = 
 
 and CompilerEnv =
     { Pctx: ParserContext
