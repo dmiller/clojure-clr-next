@@ -35,21 +35,21 @@ let BasicParserTests =
           <| fun _ ->
             let form = ReadFromString "42"
             let ast = Parser.Analyze(CompilerEnv.Create(Expression),form)
-            Expect.isTrue (ast.IsLiteralExpr) "Should return a Literal"
+            Expect.isTrue (ast.IsLiteral) "Should return a Literal"
 
 
           testCase "Parses a string"
           <| fun _ ->
             let form = ReadFromString "\"abc\""
             let ast = Parser.Analyze(CompilerEnv.Create(Expression),form)
-            Expect.isTrue (ast.IsLiteralExpr) "Should return a Literal"
+            Expect.isTrue (ast.IsLiteral) "Should return a Literal"
 
           testCase "Parses a vector"
           <| fun _ ->
             let form = ReadFromString "[1 2 3]"
             let cctx = CompilerEnv.Create(Expression)
             let ast = Parser.Analyze(cctx,form)
-            Expect.equal ast (LiteralExpr({Value=form; Type=OtherType})) "Should return a Literal"
+            Expect.equal ast (Expr.Literal(Env = cctx, Form = form, Value=form, Type=OtherType)) "Should return a Literal"
 
 
           ftestCase "Parses a list"
@@ -57,7 +57,7 @@ let BasicParserTests =
             let form = ReadFromString "(1 2 3)"
             let cctx = CompilerEnv.Create(Expression)
             let ast = Parser.Analyze(cctx,form)
-            Expect.equal ast (LiteralExpr({Value=form; Type=OtherType})) "Should return a Literal"
+            Expect.equal ast (Expr.Literal(Env = cctx, Form = form, Value=form, Type=OtherType)) "Should return a Literal"
 
 
         
