@@ -197,12 +197,8 @@ type Expr =
         Env: CompilerEnv *
         Form: obj *
         Type: ObjXType *
-        Tag: obj *
-        Name: string *
-        InternalName: string *
-        OnceOnly: bool *
-        HasEnclosingMethod: bool *
-        ThisName: string *
+        Internals: ObjXInternals *
+        Register : ObjXRegister *
         SourceInfo: SourceInfo option
 
     | QualifiedMethod of 
@@ -247,11 +243,11 @@ type Expr =
         Type: UntypedExprType *
         Target: Expr option
 
-and ObjBaseDetails =
-    { RequiredArity: int
-      RestArg: string option
-      IsVariadic: bool
-      PrePostMeta: ResizeArray<Expr> }
+//and ObjBaseDetails =
+//    { RequiredArity: int
+//      RestArg: string option
+//      IsVariadic: bool
+//      PrePostMeta: ResizeArray<Expr> }
 
 and BindingInit = { Binding: LocalBinding; Init: Expr }
 
@@ -276,7 +272,7 @@ and HostArg =
       ArgExpr: Expr
       LocalBinding: LocalBinding }
 
-and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod) = 
+and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod option) = 
 
     let mutable _body : Expr option = None  // will get filled in later
 
@@ -289,15 +285,16 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod) =
     member _.Type = _type
 
     // TODO: I just tossed these in -- verify
-    member _._restParm : obj option = None
-    member _._reqParms : ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
-    member _._argLocals : ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
-    member _._name : string = ""
-    member _._retType : Type = typeof<Object>
+    member val RestParam : obj option = None with get, set
+    member _.ReqParams : ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
+    member _.ArgLocals : ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
+    member _.Name : string = ""
+    member val RetType : Type = typeof<Object> with get, set
 
     
     member val Locals : IPersistentMap = null with get, set
     member val UsesThis = false with get, set
+    member val LocalsUsedInCatchFinally : IPersistentSet = PersistentHashSet.Empty with get, set
 
     member _.Body 
         with get() = 
@@ -309,25 +306,25 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod) =
 
     member this.IsVariadic = 
         match _type with
-        | Fn -> this._restParm.IsSome
+        | Fn -> this.RestParam.IsSome
         | NewInstance -> false
 
     member this.NumParams = 
         match _type with
-        | Fn -> this._reqParms.Count + (if this.IsVariadic then 1 else 0)
-        | NewInstance -> this._argLocals.Count
+        | Fn -> this.ReqParams.Count + (if this.IsVariadic then 1 else 0)
+        | NewInstance -> this.ArgLocals.Count
 
     member this.RequiredArity = 
         match _type with
-        | Fn -> this._reqParms.Count
-        | NewInstance -> this._argLocals.Count
+        | Fn -> this.ReqParams.Count
+        | NewInstance -> this.ArgLocals.Count
 
     member this.MethodName =
         match _type with
         | Fn -> if this.IsVariadic then "doInvoke" else "invoke"
-        | NewInstance -> this._name
+        | NewInstance -> this.Name
 
-    member this.ReturnType = this._retType  // FNMethod had a check of prim here with typeof(Object) as default.
+    member this.ReturnType = this.RetType  // FNMethod had a check of prim here with typeof(Object) as default.
     //member _.ArgTypes = 
 
 and CompilerEnv =
@@ -337,8 +334,10 @@ and CompilerEnv =
       IsAssignContext: bool
       IsRecurContext: bool // TOOD: can we just check the loop id != None?
       InTry: bool
+      InCatchFinally: bool
       LoopId: int option
       LoopLocals: ResizeArray<LocalBinding> 
+      NoRecur: bool
       ObjXRegister: ObjXRegister option}
 
     // Locals = Map from Symbol to LocalBinding
@@ -350,8 +349,10 @@ and CompilerEnv =
           IsAssignContext = false
           IsRecurContext = false
           InTry = false
+          InCatchFinally = false
           LoopId = None
           LoopLocals = null
+          NoRecur = false
           ObjXRegister = None}
 
     static member val Empty = CompilerEnv.Create(ParserContext.Expression)
@@ -380,11 +381,46 @@ and CompilerEnv =
 
 
     member this.ClosesOver(b: LocalBinding, method: ObjMethod) =
-        // TODO: Implement ClosesOver
-        ()
+        match RT0.get(method.Locals, b) with
+        | :? LocalBinding as lb -> 
+           if lb.Index = 0 then
+                method.UsesThis <- true
+           if this.InCatchFinally then
+                method.LocalsUsedInCatchFinally <- method.LocalsUsedInCatchFinally.cons(b.Index) :?> IPersistentSet
+        | _ -> 
+               // The binding is not already in the method's locals
+            // Add it, then move up the chain
+            method.Locals <- RTMap.assoc(method.Locals, b, b) :?> IPersistentMap
+            if method.Parent.IsSome then
+                this.ClosesOver(b, method.Parent.Value)      
 
     // Bindings and registrations
+     member this.RegisterLocalThis(sym: Symbol, tag: Symbol, init: Expr option) =
+        this.RegisterLocalInternal(sym, tag, init, typeof<Object>,  true, false, false);
 
+    member this.RegisterLocal(sym: Symbol, tag: Symbol, init: Expr option, declaredType : Type, isArg: bool) =
+        this.RegisterLocalInternal(sym, tag, init, declaredType, false, isArg,false)
+
+    member this.RegisterLocal(sym: Symbol, tag: Symbol, init: Expr option, declaredType : Type, isArg: bool, isByRef: bool) =
+        this.RegisterLocalInternal(sym, tag, init, declaredType, false, isArg,false)
+
+    member private this.RegisterLocalInternal(sym: Symbol, tag: Symbol, init: Expr option, declaredType : Type, isThis: bool, isArg: bool, isByRef: bool) =
+        if isThis && this.Locals.count() > 0 then
+            failwith "Registration of 'this' must precede other locals"
+        let lb = { Sym = sym
+                   Tag = tag
+                   Init = init
+                   Name = sym.Name
+                   IsArg = isArg
+                   IsByRef = isByRef
+                   IsRecur = false
+                   IsThis = isThis
+                   Index = this.Locals.count() }
+
+        let newLocals = RTMap.assoc(this.Locals, sym, lb) :?> IPersistentMap
+        { this with Locals = newLocals }, lb
+
+        
     member this.RegisterVar(v: Var) = 
         match this.ObjXRegister with
         | Some r -> r.RegisterVar(v)
@@ -407,14 +443,26 @@ and CompilerEnv =
         
 
      member this.RegisterProtoclCallsite(v: Var) = 
-         match this.ObjXRegister with
+        match this.ObjXRegister with
         | Some r -> r.RegisterProtocolCallsite(v)
         | None -> raise <| new InvalidOperationException("ObjXRegister is not bound in envinroment")
         
        
+ and ObjXInternals() =
         
+        member val Tag : obj = null with get, set
+        member val Name : string = null with get, set
+        member val InternalName : string = null with get, set
+        member val ThisName : string = null with get, set
+        member val OnceOnly : bool = false with get, set 
+        member val HasEnclosingMethod : bool =  false with get, set
+        member val Methods : List<ObjMethod> = null with get, set
+        member val VariadicMethod : ObjMethod option = None with get, set
 
-and ObjXRegister() =
+
+and ObjXRegister(parent: ObjXRegister option) =
+
+    let mutable _parent = parent
 
     static member val ReferenceEqualityComparer : IEqualityComparer<obj> = 
         { new Object() with
@@ -426,6 +474,11 @@ and ObjXRegister() =
            }
     static member NewIdentityHashMap() = new Dictionary<obj, int>(ObjXRegister.ReferenceEqualityComparer)
 
+    member this.Parent 
+        with get() = _parent
+        and set p = _parent <- p
+
+    member val Closes : IPersistentMap  = PersistentHashMap.Empty with get, set
     member val Constants : IPersistentVector = PersistentVector.Empty with get, set
     member val ConstantIds : Dictionary<obj, int> = ObjXRegister.NewIdentityHashMap() with get, set
     member val Keywords : IPersistentMap = PersistentHashMap.Empty with get, set
@@ -433,7 +486,6 @@ and ObjXRegister() =
     member val KeywordCallsites : IPersistentVector = PersistentVector.Empty with get, set
     member val ProtocolCallsites : IPersistentVector = PersistentVector.Empty with get, set
     member val VarCallsites : IPersistentSet = PersistentHashSet.Empty with get, set
-
 
     member this.RegisterConstant(o: obj) = 
         let v = this.Constants
@@ -447,7 +499,6 @@ and ObjXRegister() =
             this.Constants <- newV :?> IPersistentVector
             this.ConstantIds[o] <- count
             count
-
 
     member this.RegisterVar(v: Var) =
         let varsMap = this.Vars;

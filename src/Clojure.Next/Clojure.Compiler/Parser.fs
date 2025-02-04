@@ -1,19 +1,24 @@
 ﻿namespace Clojure.Compiler
 
 open Clojure.Collections
+open Clojure.IO
+open Clojure.Lib
 open Clojure.Numerics
+open Clojure.Reflection
 open System
 open System.Collections.Generic
-open Clojure.IO
-open Clojure.Reflection
+open System.Linq
 open System.Reflection
-open Clojure.Lib
 open System.Text.RegularExpressions
-open System.Text
 
 type SpecialFormParser = CompilerEnv * obj -> Expr
 
 exception ParseException of string
+
+type ParamParseState = 
+| Required
+| Rest
+| Done
 
 [<Sealed;AbstractClass>]
 type Parser private () =
@@ -68,6 +73,8 @@ type Parser private () =
         TypeToTagDict.Add(typeof<single>, Symbol.intern(null,"float"))
         TypeToTagDict.Add(typeof<float>, Symbol.intern(null,"long"))
         TypeToTagDict.Add(typeof<decimal>, Symbol.intern(null,"decimal"))
+
+    static member val MaxPositionalArity = 20  // TODO: Do we want to adjust this down to 16? (Match for System.Func)
 
     static member val NilExprInstance = Expr.Literal(Env = CompilerEnv.Empty, Form="nil", Type=NilType, Value=null)
     static member val TrueExprInstance = Expr.Literal(Env = CompilerEnv.Empty, Form="true", Type=BoolType, Value=true)
@@ -630,7 +637,7 @@ type Parser private () =
 
         let baseName =
             match enclosingMethod with
-            | Some m -> m.ObjExpr.Name
+            | Some m -> m.Name
             | None -> Munger.Munge(RTVar.getCurrentNamespace().Name.Name + "$")
 
         let newName =
@@ -669,17 +676,24 @@ type Parser private () =
 
             let name, internalName = Parser.ComputeFnNames(cenv, form, name)
 
+            let register = ObjXRegister(cenv.ObjXRegister)
+            let internals =ObjXInternals(
+                Name = name, 
+                InternalName = internalName, 
+                ThisName = (if isNull nm then null else nm.Name), 
+                Tag = Parser.TagOf(form),
+                OnceOnly = onceOnly, 
+                HasEnclosingMethod = enclosingMethod.IsSome)
+
             let fnExpr = Expr.Obj(
                 Env = cenv, 
                 Form = origForm,
                 Type = ObjXType.Fn,
-                Name = name,
-                InternalName = internalName,
-                Tag = Parser.TagOf(form), 
-                HasEnclosingMethod = enclosingMethod.IsSome,
-                ThisName = (if isNull nm then null else nm.Name),
-                OnceOnly = onceOnly,
+                Internals = internals,
+                Register = register,
                 SourceInfo = None )  // TODO: source info  -- original has a SpanMap field
+
+            let newCenv = { cenv with ObjXRegister = Some register; NoRecur = false }
 
             let retTag = RT0.get(RT0.meta(form), RTVar.RettagKeyword)
 
@@ -715,7 +729,7 @@ type Parser private () =
                 match s with
                 | null -> ()
                 | _ -> 
-                    let m = Parser.FnMethodParser(cenv, s.first(), fnExpr, retTag)
+                    let m : ObjMethod = Parser.FnMethodParser(newCenv, s.first(), fnExpr, internals, retTag)
                     if m.IsVariadic then
                         if variadicMethod.IsSome then
                             raise <| ParseException("Can't have more than one variadic overload")
@@ -731,6 +745,7 @@ type Parser private () =
             match variadicMethod with
             | Some vm when methods.Count > 0 && methods.Keys.Max() >= vm.NumParams ->
                 raise <| ParseException("Can't have fixed arity methods with more params than the variadic method.")
+            | _ -> ()
 
             // TODO: Defer this until emit time
             //fn.CanBeDirect <- ! fn.HasEnclosingMethod && not usesThis && fn.Closes.Count() == 0
@@ -753,8 +768,13 @@ type Parser private () =
             //    }
             //}
 
-            fnExpr.Methods <-  allMethods;
-            fnExpr.VariadicMethod <- variadicMethod;
+            let allMethods = 
+                match variadicMethod with
+                | Some vm -> methods.Values |> Seq.append [vm]
+                | None -> methods.Values
+
+            internals.Methods <-  allMethods.ToList()
+            internals.VariadicMethod <- variadicMethod
 
             // TODO: Defer to later pass?
             //fn.Keywords = (IPersistentMap)Compiler.KeywordsVar.deref();
@@ -765,6 +785,8 @@ type Parser private () =
             //fn.VarCallsites = (IPersistentSet)Compiler.VarCallsitesVar.deref();
 
             //fn.ConstantsID = RT.nextID();
+
+            fnExpr
 
 
 
@@ -829,13 +851,95 @@ type Parser private () =
             
      
 
-    static member FnMethodParser(cenv: CompilerEnv, form: obj, fnExpr: Expr, retTag: obj) =
-        Parser.NilExprInstance
+    static member FnMethodParser(cenv: CompilerEnv, form: obj, objx: Expr, objxInternals: ObjXInternals, retTag: obj) =
+        // ([args] body ... )
+
+        let parameters = RTSeq.first(form) :?> IPersistentVector
+        let body = RTSeq.next(form)
+
+        let method = ObjMethod(ObjXType.Fn, objx, cenv.Method)  // TODO: source info
 
 
 
+        // TODO: Original code does prim interface calculation based on the params.
 
+        let symRetTag =
+            match retTag with
+            | :? Symbol as sym -> sym
+            | :? String as str -> Symbol.intern(null, str)
+            | _ -> null
 
+        // TODO: original code sets symRetTag to null if not symRetTag.name = "long" or "double"
+        //       Need to figure this out.  Classic mode?
+
+        method.RetType <- Parser.TagType(
+            match Parser.TagOf(parameters) with
+            | null -> symRetTag
+            | _ as tag -> tag)
+
+        // TODO: original code has check for primitive here.  Rests to typeof<Object> if not primitive
+
+        // register 'this' as local 0  
+        let thisName = 
+            match objxInternals.ThisName with
+            | null -> $"fn__{RT0.nextID()}"
+            | _ as n  -> n
+
+        let mutable newEnv, _ = { cenv with Method = Some method }.RegisterLocalThis(Symbol.intern(null,thisName),null,None)
+
+        let validateParam(param: obj) =
+            match param with
+            | :? Symbol as sym -> 
+                if not <| isNull sym.Namespace then
+                    raise <| ParseException("Can't use qualified name as paramter: {sym}")
+                sym
+            | _ -> raise <| ParseException("fn params must be Symbols")
+
+        let mutable paramState = ParamParseState.Required
+        let paramCount = parameters.count()
+        let argTypes = ResizeArray<Type>()
+
+        for i = 0 to paramCount - 1 do
+            let param = validateParam(parameters.nth(i))
+            if RTVar.AmpersandSym.Equals(param) then
+                if paramState = ParamParseState.Required then
+                    paramState <- ParamParseState.Rest
+                else
+                    raise <| ParseException("Invalid parameter list")
+            else
+                // TODO: original code does primitive type analysis here
+                let paramTag = Parser.TagOf(param)
+
+                if paramState = ParamParseState.Rest && not <| isNull paramTag  then
+                    raise <| ParseException("& arg cannot have type hint")
+
+                // original code checks for primtive type signature on method + variadic
+
+                let paramType = 
+                    if paramState = ParamParseState.Rest then
+                        typeof<ISeq>
+                    else
+                        Parser.TagType(paramTag)
+                argTypes.Add(paramType)
+
+                let env, b = newEnv.RegisterLocal(param, (if paramState = Rest then RTVar.ISeqSym else paramTag), None, paramType, true )
+                newEnv <- env
+                method.ArgLocals.Add(b)
+
+                match paramState with
+                | ParamParseState.Required -> method.ReqParams.Add(b)
+                | ParamParseState.Rest -> 
+                    method.RestParam <- Some b
+                    paramState <- Done
+                | _ -> raise <| ParseException("Unexpected parameter")
+
+        if method.ReqParams.Count > Parser.MaxPositionalArity then 
+            raise <| ParseException("Can't specify more than {Parser.MaxPositionalArity} positional arguments")
+        
+        let bodyEnv = { newEnv with Pctx = Return; LoopLocals = method.ArgLocals }
+        method.Body <- Parser.BodyExprParser(bodyEnv, body)
+
+        method
 
 
 
@@ -869,6 +973,17 @@ type Parser private () =
             let ok, sym = TypeToTagDict.TryGetValue(t)
             if ok then sym else null
         | _ -> null
+
+    static member TagType(tag: obj) : Type =
+        match tag with
+        | null -> typeof<Object>
+        | :? Symbol as sym ->
+            match RTType.PrimType(sym) with 
+            | null -> RTType.TagToType(sym)
+            | _ as t -> t
+        | _ -> RTType.TagToType(tag)
+            
+            
 
     // TODO: Source info needed,   context is not needed (probably)
     static member CreateStaticFieldOrPropertyExpr(cenv: CompilerEnv, form: obj, tag: Symbol, t: Type, memberName: string, info: MemberInfo) : Expr =

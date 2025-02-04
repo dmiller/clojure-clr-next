@@ -143,8 +143,42 @@ type RTType private () =
         | :? string as s when stringOk -> RTType.ClassForNameE(s)
         | _ -> null
         
-            
 
+    static member MaybeSpecialTag(sym: Symbol) = 
+        match RTType.PrimType(sym) with
+        | null -> 
+            match sym.Name with
+            | "objects" -> typeof<Object[]>
+            | "ints" -> typeof<int[]>
+            | "longs" -> typeof<int64[]>
+            | "floats" -> typeof<single[]>
+            | "doubles" -> typeof<float[]>
+            | "shorts" -> typeof<int16[]>
+            | "bytes" -> typeof<byte[]>
+            | "chars" -> typeof<char[]>
+            | "bools" | "booleans" -> typeof<bool[]>
+            | "uints" -> typeof<uint32[]>
+            | "ulongs" -> typeof<uint64[]>
+            | "ushorts" -> typeof<uint16[]>
+            | "sbytes" -> typeof<sbyte[]>
+            | _ -> null
+        | _ as t -> t
+
+    static member TagToType(tag: obj) = 
+        let t = 
+            match tag with 
+            | :? Symbol as sym ->
+                let mutable t = null
+                if isNull sym.Namespace then
+                    t <- RTType.MaybeSpecialTag(sym)
+                if isNull t then
+                    t <- RTType.MaybeArrayType(sym)
+                t
+            | _ -> null
+        let t = if isNull t then RTType.MaybeType(tag, true) else t
+        match t with
+        | null -> raise <| ArgumentException($"Unable to resolve typename: {tag}")
+        | _ -> t
 
 
     // TODO: Will we need this in the new compiler?  I hope we can get rid of it.

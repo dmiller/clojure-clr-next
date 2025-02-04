@@ -1292,6 +1292,7 @@ and [<Sealed; AbstractClass>] RTVar() =
     static member val ListSym = Symbol.intern ("clojure.core", "list")
     static member val WithMetaSym = Symbol.intern ("clojure.core", "with-meta")
     static member val SeqSym = Symbol.intern ("clojure.core", "seq")
+    static member val ISeqSym = Symbol.intern("clojure.lang.ISeq")
 
     // Compiler special forms
     // One would think they would be over in Clojure.Compiler, but the LispReader needs to know about specials
