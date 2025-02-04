@@ -1350,6 +1350,9 @@ and [<Sealed; AbstractClass>] RTVar() =
             RTVar.AmpersandSym
         )
 
+    // other special symbols
+    static member val FnOnceSym : Symbol = (Symbol.intern("fn*") :> IObj).withMeta(RTMap.map(Keyword.intern(null, "once"), true)) :?> Symbol
+
 
     // Keywords for file info
 

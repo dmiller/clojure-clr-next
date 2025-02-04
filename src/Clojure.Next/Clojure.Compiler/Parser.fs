@@ -776,80 +776,8 @@ type Parser private () =
             internals.Methods <-  allMethods.ToList()
             internals.VariadicMethod <- variadicMethod
 
-            // TODO: Defer to later pass?
-            //fn.Keywords = (IPersistentMap)Compiler.KeywordsVar.deref();
-            //fn.Vars = (IPersistentMap)Compiler.VarsVar.deref();
-            //fn.Constants = (PersistentVector)Compiler.ConstantsVar.deref();
-            //fn.KeywordCallsites = (IPersistentVector)Compiler.KeywordCallsitesVar.deref();
-            //fn.ProtocolCallsites = (IPersistentVector)Compiler.ProtocolCallsitesVar.deref();
-            //fn.VarCallsites = (IPersistentSet)Compiler.VarCallsitesVar.deref();
-
-            //fn.ConstantsID = RT.nextID();
-
             fnExpr
 
-
-
-
-    // This is a draft based on tools.analyzer. 
-    // Maybe steal some ideas from here.
-    //static member FnExprParser(cenv: CompilerEnv, form: ISeq, name: string) : Expr = 
-
-    //    let op = RTSeq.first(form)
-    //    let args = RTSeq.next(form)
-
-    //    let fnName, methods = 
-    //        match RTSeq.first(args) with
-    //        | :? Symbol as sym -> sym, RTSeq.next(args)
-    //        | _ -> null, RT0.seq(args)
-
-    //    let nameLB = { Sym = fnName; Tag = null; Init = None; Name = fnName.Name; IsArg = false; IsByRef = false; IsRecur = false; IsThis = false; Index = 0}
-    //    let newcenv = { cenv with Locals = cenv.Locals.assoc(fnName, nameLB) }
-    //    let isOnce = RT0.booleanCast(RT0.get(RT0.meta(op), RTVar.OnceOnlyKeyword))
-
-    //    // Turn (fn [] ... ) into (fn ([] ... ))
-    //    let methods = 
-    //        match RTSeq.first(methods) with
-    //        | :? IPersistentVector as pv -> RTSeq.list(methods) :> ISeq
-    //        | _ -> methods
-
-    //    let methodExprs = ResizeArray<Expr>()
-    //    let methodCtx = { newcenv with InTry = false }
-
-    //    let rec loop (s:ISeq) =
-    //        match s with
-    //        | null -> ()
-    //        | _ -> 
-    //            let methodExpr = Parser.FnMethodParser(newcenv, s.first(), nameLB, isOnce)
-    //            methodExprs.Add(methodExpr)
-    //            loop(s.next())
-
-
-    //    loop methods
-
-    //    let variadicMethods = methodExprs |> Seq.filter (fun m -> m.IsVariadic)
-    //    let variadicCount = variadicMethods |> Seq.length
-    //    let isVariadic = variadicCount >= 1
-    //    let fixedArityMethods = methodExprs |> Seq.filter (fun m -> not m.IsVariadic)
-    //    let fixedArityCount = fixedArityMethods |> Seq.length
-    //    let fixedArities = fixedArityMethods |> Seq.map (fun m -> m.NumParams)
-    //    let maxFixedArity = if fixedArityCount = 0 then 0 else  fixedArities|> Seq.max
-
-    //    if variadicCount >= 2 then
-    //        raise <| ParseException("Can't have more than one variadic overload")
-
-    //    let numDistinctArities = fixedArityMethods |> Seq.map(fun m -> m.NumParams) |> Seq.distinct |> Seq.length
-    //    if numDistinctArities <> fixedArityCount then
-    //        raise <| ParseException("Can't have two overloads with the same arity")
-
-    //    if isVariadic then
-    //        let variadicMethod = variadicMethods |> Seq.head
-    //        if fixedArityCount > 0 && maxFixedArity > variadicMethod.FixedArity then
-    //            raise <| ParseException("Can't have fixed arity methods with more params than the variadic method.")
-
-    //    Expr.Fn(Env = cenv, Form = form, Name = fnName.Name, Methods = methodExprs, VariadicMethod = if isVariadic then Some(variadicMethods |> Seq.head) else None, SourceInfo = None)  // TODO: source info
-            
-     
 
     static member FnMethodParser(cenv: CompilerEnv, form: obj, objx: Expr, objxInternals: ObjXInternals, retTag: obj) =
         // ([args] body ... )
@@ -943,15 +871,98 @@ type Parser private () =
 
 
 
+    static member TryExprParser(cenv: CompilerEnv, form: obj) : Expr =
+        let form = form :?> ISeq
+
+
+        if cenv.Pctx <> ParserContext.Return then        
+            // I'm not sure why we do this.
+            Parser.Analyze(cenv, RTSeq.list(RTSeq.list(RTVar.FnOnceSym, PersistentVector.Empty, form)), $"try__{RT0.nextID()}")
+        else
+
+            // (try try-expr* catch-expr* finally-expr?)
+            // catch-expr: (catch class sym expr*)
+            // finally-expr: (finally expr*)
+
+            let body = ResizeArray<obj>()
+            let catches = ResizeArray<CatchClause>()
+            let mutable bodyExpr : Expr option = None
+            let mutable finallyExpr : Expr option = None
+            let mutable caught = false
+
+
+            let catchEnv = { cenv with Pctx = Expression; IsAssignContext = false; InCatchFinally = true }
+
+            let rec loop (fs:ISeq) = 
+                let f = fs.first()
+                let op = 
+                    match f with
+                    | :? ISeq as fseq -> fseq.first()
+                    | _ -> null
+                if not <| Util.equals(op,RTVar.CatchSym) && not <| Util.equals(op,RTVar.FinallySym) then
+                    if caught then
+                        raise <| ParseException("Only catch or finally can follow catch")
+                    body.Add(f)
+                else
+                    // We have either a catch or finally.  Process accordingly
+                    
+                    if bodyExpr.IsNone then
+                        // We are on our first catch or finally.  
+                        // All body forms are collected, so build the expression for the body
+                        let bodyEnv = { cenv with NoRecur = true }
+                        bodyExpr <- Some(Parser.BodyExprParser(bodyEnv, RT0.seq(body)))
+
+
+                    if Util.equals(op,RTVar.CatchSym) then
+                        let second =  RTSeq.second(f)
+                        let t = Parser.MaybeType(catchEnv, second, false)
+                        if isNull t then
+                            raise <| ParseException($"Unable to resolve classname: {RTSeq.second(f)}")
+                        match RTSeq.third(f) with
+                        | :? Symbol as sym ->
+                            if not <| isNull sym.Namespace then
+                                raise <| ParseException($"Can't bind qualified name: {sym}")
+
+                            // Everything is looking good, let's parse the catch clause
+                            let clauseTag =
+                                match second with 
+                                | :? Symbol as sym -> sym
+                                | _ -> null
+                            let boundEnv, lb = catchEnv.RegisterLocal(sym, clauseTag, None, typeof<Object>, false)
+                            let handler = Parser.BodyExprParser(boundEnv, RTSeq.next(RTSeq.next(RTSeq.next(f))))
+                            catches.Add({CaughtType = t; LocalBinding = lb; Handler = handler})
+                            
+                        | _ as third -> raise <| ParseException($"Bad binding form, expected Symbol, got: {third}")
+
+                    else
+                        // finally clause
+                        if not <| isNull (fs.next()) then
+                            raise <| InvalidOperationException("finally clause must be last in try expression")
+                        let finallyEnv = { cenv with Pctx = Statement; IsAssignContext = false; InCatchFinally = true }
+                        finallyExpr <- Some(Parser.BodyExprParser(finallyEnv, RTSeq.next(f)))
+                loop (fs.next()) 
+                
+            loop (form.next())
+
+            if bodyExpr.IsNone then
+
+                // the only way this happens if there were catch or finally clauses.  
+                // We can return just the body expression itself.
+                Parser.BodyExprParser(cenv, RT0.seq(body))
+
+            else
+                Expr.Try(Env = cenv, Form = form, TryExpr = bodyExpr.Value, Catches = catches, Finally = finallyExpr)  // TODO: source info)
+
+
+
+
+    static member NewExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+    static member InvokeExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
 
 
     static member HostExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
 
 
-    static member TryExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
-
-    static member NewExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
-    static member InvokeExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
 
     // Saving for later, when I figure out what I'm doing
     static member DefTypeParser()(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance

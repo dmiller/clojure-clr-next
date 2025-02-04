@@ -224,7 +224,7 @@ type Expr =
         Form: obj *
         TryExpr: Expr *
         Catches: ResizeArray<CatchClause> *
-        Finally: Expr
+        Finally: Expr option
 
     | UnresolvedVar of 
         Env: CompilerEnv *
