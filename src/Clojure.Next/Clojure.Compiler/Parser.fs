@@ -11,7 +11,7 @@ open System.Linq
 open System.Reflection
 open System.Text.RegularExpressions
 
-type SpecialFormParser = CompilerEnv * obj -> Expr
+type SpecialFormParser = CompilerEnv * ISeq -> Expr
 
 exception ParseException of string
 
@@ -308,22 +308,21 @@ type Parser private () =
 
     // Let's start with some easy ones
     
-    static member ImportExprParser(cenv: CompilerEnv, form: obj) : Expr = 
+    static member ImportExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
         Expr.Import(Env = cenv, Form = form, Typename = (RTSeq.second(form) :?> string))
 
-    static member MonitorEnterExprParser(cenv: CompilerEnv, form: obj) : Expr = 
+    static member MonitorEnterExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
         let cenv = cenv.WithParserContext(Expression)
         Expr.Untyped(Env = cenv, Form = form, Type=MonitorEnter, Target = (Some <|  Parser.Analyze(cenv, RTSeq.second(form))))
         
-    static member MonitorExitExprParser(cenv: CompilerEnv, form: obj) : Expr = 
+    static member MonitorExitExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
         let cenv = cenv.WithParserContext(Expression)
         Expr.Untyped(Env = cenv, Form = form, Type=MonitorExit, Target = (Some <| Parser.Analyze(cenv, RTSeq.second(form))))
 
  
     // cranking up the difficulty level
 
-    static member AssignExprParser(cenv: CompilerEnv, form: obj) : Expr = 
-        let form = form :?> ISeq
+    static member AssignExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
 
         if RT0.length(form) <> 3 then
             raise <| ParseException("Malformed assignment, expecting (set! target val)")
@@ -338,7 +337,7 @@ type Parser private () =
         Expr.Assign(Env = cenv, Form = form, Target = target, Value = Parser.Analyze(bodyCtx, RTSeq.third(form)))
 
 
-    static member ThrowExprParser(cenv: CompilerEnv, form: obj) : Expr = 
+    static member ThrowExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
         // special case for Eval:  Wrap in FnOnceSym
         let cenv = { cenv with Pctx = Expression; IsAssignContext = false }
         match RT0.count(form) with
@@ -346,7 +345,7 @@ type Parser private () =
         | 2 ->  Expr.Untyped(Env = cenv, Form = form, Type= Throw, Target =  (Some <| Parser.Analyze(cenv, RTSeq.second(form))))
         | _ -> raise <| InvalidOperationException("Too many arguments to throw, throw expects a single Exception instance")
 
-    static member TheVarExprParser(cenv: CompilerEnv, form: obj) : Expr = 
+    static member TheVarExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
         match RTSeq.second(form) with
         | :? Symbol as sym ->
             match Parser.LookupVar(cenv, sym, false) with
@@ -354,10 +353,10 @@ type Parser private () =
             | _ as v -> Expr.TheVar(Env = cenv, Form = form, Var = v)
         | _ as v -> raise <| ParseException($"Second argument to the-var must be a symbol, found: {v}")        
 
-    static member BodyExprParser(cenv: CompilerEnv, forms: obj) : Expr = 
+    static member BodyExprParser(cenv: CompilerEnv, forms: ISeq) : Expr = 
         let forms = 
             if Util.equals(RTSeq.first(forms), RTVar.DoSym) then RTSeq.next(forms)
-            else forms :?> ISeq
+            else forms
 
         let stmtcenv = cenv.WithParserContext(Statement)
         let exprs = List<Expr>()
@@ -377,8 +376,7 @@ type Parser private () =
 
         Expr.Body(Env = cenv, Form = forms, Exprs = exprs)
 
-    static member IfExprParser(cenv: CompilerEnv, form: obj) : Expr =
-        let form = form :?> ISeq
+    static member IfExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
 
         // (if test then) or (if test then else)
 
@@ -398,7 +396,7 @@ type Parser private () =
         Expr.If(Env = cenv, Form = form, Test = testExpr, Then = thenExpr, Else = elseExpr, SourceInfo = None)  // TODO source info
 
 
-    static member ConstantExprParser(cenv: CompilerEnv, form: obj) : Expr =
+    static member ConstantExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
         let argCount = RT0.count(form)
         if argCount <> 1 then
             let exData = PersistentArrayMap([| RTVar.FormKeywoard :> obj; form|])
@@ -421,12 +419,11 @@ type Parser private () =
             else raise <| ParseException($"Can't let qualified name: {sym}")
         | _ -> raise <| ParseException($"Bad binding form, expected symbol, got: {s}")
 
-    static member LetExprParser(cenv: CompilerEnv, form: obj) : Expr =
+    static member LetExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
        
         // form => (let  [var1 val1 var2 val2 ... ] body ... )
         //      or (loop [var1 val1 var2 val2 ... ] body ... )
 
-        let form = form :?> ISeq
         let isLoop = RTVar.LoopSym.Equals(RTSeq.first(form))
 
         let bindings = 
@@ -483,11 +480,9 @@ type Parser private () =
         Expr.Let(Env = cenv, Form = form, BindingInits = bindingInits, Body = bodyExpr, LoopId = loopId, Mode=(if isLoop then Loop else Let), SourceInfo=None)  // TODO: source info
 
             
-    static member RecurExprParser(cenv: CompilerEnv, form: obj) : Expr = 
+    static member RecurExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
         
             // TODO: source info
-
-            let form = form :?> ISeq
 
             let loopLocals = cenv.LoopLocals
             if cenv.Pctx <> Return  || isNull loopLocals then
@@ -517,9 +512,7 @@ type Parser private () =
             Expr.Recur(Env = cenv, Form = form, Args = args, LoopLocals = loopLocals, SourceInfo=None)  // TODO: SourceInfo
 
 
-    static member LetFnExprParser(cenv: CompilerEnv, form: obj) : Expr = 
-
-        let form = form :?> ISeq
+    static member LetFnExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
 
         // form => (letfn*  [var1 (fn [args] body) ... ] body ... )
 
@@ -563,7 +556,7 @@ type Parser private () =
 
 
 
-    static member DefExprParser(cenv: CompilerEnv, form: obj) : Expr =
+    static member DefExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
 
         // (def x) or (def x initexpr) or (def x "docstring" initexpr)
 
@@ -571,7 +564,7 @@ type Parser private () =
             if RT0.count(form) = 4 && RTSeq.third(form) :? String then
                 (RTSeq.third(form) :?> string), RTSeq.list(RTSeq.first(form), RTSeq.second(form), RTSeq.fourth(form))
             else
-                null, form :?> ISeq
+                null, form
 
         if RT0.count(form) > 3 then
             raise <| ParseException("Too many  arguments to def")
@@ -954,20 +947,20 @@ type Parser private () =
                 Expr.Try(Env = cenv, Form = form, TryExpr = bodyExpr.Value, Catches = catches, Finally = finallyExpr)  // TODO: source info)
 
 
+    static member InvokeExprParser(cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
 
 
-    static member NewExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
-    static member InvokeExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
 
+    static member NewExprParser(cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
 
-    static member HostExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+    static member HostExprParser(cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
 
 
 
     // Saving for later, when I figure out what I'm doing
-    static member DefTypeParser()(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
-    static member ReifyParser()(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
-    static member CaseExprParser(cenv: CompilerEnv, form: obj) : Expr = Parser.NilExprInstance
+    static member DefTypeParser()(cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
+    static member ReifyParser()(cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
+    static member CaseExprParser(cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
    
     // helper methods
    
