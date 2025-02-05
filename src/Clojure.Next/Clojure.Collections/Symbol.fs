@@ -101,7 +101,7 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
 
     interface IFn with
         member this.invoke(arg1) = RT0.get (arg1, this)
-        member this.invoke(arg1, arg2) = RT0.getWithDefault (arg1, this, arg2)
+        member this.invoke(arg1, arg2) = RT0.get (arg1, this, arg2)
 
 
 (*

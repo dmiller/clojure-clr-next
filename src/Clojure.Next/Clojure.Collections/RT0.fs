@@ -192,7 +192,7 @@ type RT0() =
         | _ -> RT0.getFrom(coll, key)
      
 
-    static member  getWithDefault(coll: obj, key: obj, notFound: obj) = 
+    static member  get(coll: obj, key: obj, notFound: obj) = 
         match coll with
         | :? ILookup as look ->   look.valAt(key, notFound)
         | _ -> RT0.getFromWithDefault(coll, key, notFound)

@@ -1038,14 +1038,14 @@ type LispReader() =
 
             if startLine <> -1 then
                 let mutable meta = RT0.meta (s) :> Associative
-                meta <- RTMap.assoc (meta, RTVar.LineKeyword, RT0.getWithDefault (meta, RTVar.LineKeyword, startLine))
-                meta <- RTMap.assoc (meta, RTVar.ColumnKeyword, RT0.getWithDefault (meta, RTVar.ColumnKeyword, startCol))
+                meta <- RTMap.assoc (meta, RTVar.LineKeyword, RT0.get (meta, RTVar.LineKeyword, startLine))
+                meta <- RTMap.assoc (meta, RTVar.ColumnKeyword, RT0.get (meta, RTVar.ColumnKeyword, startCol))
 
                 meta <-
                     RTMap.assoc (
                         meta,
                         RTVar.SourceSpanKeyword,
-                        RT0.getWithDefault (
+                        RT0.get (
                             meta,
                             RTVar.SourceSpanKeyword,
                             RTMap.map (
@@ -1572,15 +1572,15 @@ type LispReader() =
 
             if startLine <> -1 && o :? ISeq then
                  metaAsMap <-
-                    metaAsMap.assoc (RTVar.LineKeyword, RT0.getWithDefault (metaAsMap, RTVar.LineKeyword, startLine))
+                    metaAsMap.assoc (RTVar.LineKeyword, RT0.get (metaAsMap, RTVar.LineKeyword, startLine))
 
                  metaAsMap <-
-                    metaAsMap.assoc (RTVar.ColumnKeyword, RT0.getWithDefault (metaAsMap, RTVar.ColumnKeyword, startCol))
+                    metaAsMap.assoc (RTVar.ColumnKeyword, RT0.get (metaAsMap, RTVar.ColumnKeyword, startCol))
 
                  metaAsMap <-
                     metaAsMap.assoc (
                         RTVar.SourceSpanKeyword,
-                        RT0.getWithDefault (
+                        RT0.get (
                             metaAsMap,
                             RTVar.SourceSpanKeyword,
                             RTMap.map (

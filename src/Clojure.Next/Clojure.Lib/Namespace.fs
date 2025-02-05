@@ -1292,7 +1292,7 @@ and [<Sealed; AbstractClass>] RTVar() =
     static member val ListSym = Symbol.intern ("clojure.core", "list")
     static member val WithMetaSym = Symbol.intern ("clojure.core", "with-meta")
     static member val SeqSym = Symbol.intern ("clojure.core", "seq")
-    static member val ISeqSym = Symbol.intern("clojure.lang.ISeq")
+    static member val ISeqSym = Symbol.intern ("clojure.lang.ISeq")
 
     // Compiler special forms
     // One would think they would be over in Clojure.Compiler, but the LispReader needs to know about specials
@@ -1351,7 +1351,13 @@ and [<Sealed; AbstractClass>] RTVar() =
         )
 
     // other special symbols
-    static member val FnOnceSym : Symbol = (Symbol.intern("fn*") :> IObj).withMeta(RTMap.map(Keyword.intern(null, "once"), true)) :?> Symbol
+    static member val FnOnceSym: Symbol =
+        (Symbol.intern ("fn*") :> IObj)
+            .withMeta (RTMap.map (Keyword.intern (null, "once"), true))
+        :?> Symbol
+
+    static member val TypeArgsSym = Symbol.intern("type-args")
+    static member val ByRefSym = Symbol.intern("by-ref")
 
 
     // Keywords for file info
@@ -1375,7 +1381,10 @@ and [<Sealed; AbstractClass>] RTVar() =
     static member val DynamicKeyword = Keyword.intern (null, "dynamic")
     static member val RettagKeyword = Keyword.intern (null, "rettag")
     static member val OnceOnlyKeyword = Keyword.intern (null, "once")
-
+    static member val DirectLinkingKeyword = Keyword.intern (null, "direct-linking")
+    static member val RedefKeyword = Keyword.intern (null, "redef")
+    static member val DeclaredKeyword = Keyword.intern (null, "declared")
+    
 
     // Keywords for LispReader
 
@@ -1413,6 +1422,14 @@ and [<Sealed; AbstractClass>] RTVar() =
 
     static member val InNSVar = Var.intern (RTVar.ClojureNamespace, RTVar.InNsSym, false)
     static member val NsVar = Var.intern (RTVar.ClojureNamespace, Symbol.intern ("ns"), false)
+
+    // Pre-defined vars (compiler-related)
+
+    static member val InstanceVar =
+        Var
+            .intern(RTVar.ClojureNamespace, Symbol.intern ("instance?"), false)
+            .setDynamic (true)
+
 
     // Pre-defined Vars (I/O-related)
 
@@ -1548,4 +1565,3 @@ and [<Sealed; AbstractClass>] RTVar() =
         let ns = Namespace.findOrCreate (Symbol.intern (null, nsString))
         let name = Symbol.intern (null, nameString)
         Var.intern (ns, name, init)
-

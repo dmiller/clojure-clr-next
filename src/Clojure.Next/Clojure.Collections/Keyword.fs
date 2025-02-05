@@ -91,7 +91,7 @@ type Keyword(baseSym: Symbol) =
         member this.invoke(arg1, notFound) =
             match arg1 with
             | :? ILookup as ilu -> ilu.valAt (this, notFound)
-            | _ -> RT0.getWithDefault (arg1, this, notFound)
+            | _ -> RT0.get (arg1, this, notFound)
 
     interface IComparable with
         member this.CompareTo(obj) =
