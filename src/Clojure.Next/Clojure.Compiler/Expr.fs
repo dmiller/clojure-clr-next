@@ -3,10 +3,12 @@
 open System
 open System.Collections
 open System.Collections.Generic
+open System.Linq
 open Clojure.Collections
 open Clojure.Lib
 open System.Reflection
 open Clojure.Reflection
+open System.Text
 
 
 type SourceInfo =
@@ -118,7 +120,7 @@ type Expr =
         MemberName: string *
         TInfo: MemberInfo *
         Args: ResizeArray<HostArg> *
-        TypeArgs: ResizeArray<Type> option *
+        TypeArgs: ResizeArray<Type> *
         SourceInfo: SourceInfo option
 
     | Invoke of
@@ -127,9 +129,7 @@ type Expr =
         Fexpr: Expr *
         Args: ResizeArray<Expr> *
         Tag: obj *
-        TailPosition: bool *
-        ProtocolDetails: ProtocolDetails option *
-        SourceInfo: SourceInfo
+        SourceInfo: SourceInfo option
 
     | KeywordInvoke of
         Env: CompilerEnv *
@@ -164,10 +164,11 @@ type Expr =
     | New of
         Env: CompilerEnv *
         Form: obj *
+        Constructor : MethodBase *
         Args: ResizeArray<HostArg> *
         Type: Type *
         IsNoArgValueTypeCtor: bool *
-        SourceInfo: SourceInfo
+        SourceInfo: SourceInfo option
 
     | Obj of
         Env: CompilerEnv *
@@ -181,8 +182,9 @@ type Expr =
         Env: CompilerEnv *
         Form: obj *
         MethodType: Type *
-        HintedSig: ISignatureHint *
+        HintedSig: ISignatureHint option *  // Problem with circularity -- decided to define an interface to resolve
         MethodSymbol: Symbol *
+        MethodName: string *
         Kind: QMMethodKind *
         TagClass: Type *
         SourceInfo: SourceInfo option
@@ -572,43 +574,7 @@ type TypeUtils private () =
 
     static member TryGetTypeTag(t:Type) = TypeToTagDict.TryGetValue(t)
 
-    static member TagOf(o: obj) =
-        match RT0.get (RT0.meta (), RTVar.TagKeyword) with
-        | :? Symbol as sym -> sym
-        | :? string as str -> Symbol.intern (null, str)
-        | :? Type as t ->
-            let ok, sym = TypeUtils.TryGetTypeTag(t)
-            if ok then sym else null
-        | _ -> null
-
-
-    static member TagType(tag: obj) : Type =
-        match tag with
-        | null -> typeof<Object>
-        | :? Symbol as sym ->
-            match RTType.PrimType(sym) with
-            | null -> RTType.TagToType(sym)
-            | _ as t -> t
-        | _ -> RTType.TagToType(tag)
-
-
-    static member SigTag(argCount: int, v: Var) = 
-
-        let rec loop (s:ISeq) =
-            if isNull s then null
-            else 
-                let signature : APersistentVector = s.first() :?> APersistentVector
-                let restOffset = (signature :> IList).IndexOf(RTVar.AmpersandSym)
-                if argCount = (signature :> Counted).count() || (restOffset >= 0 && argCount >= restOffset) then
-                    TypeUtils.TagOf(signature)
-                else
-                    loop (s.next())
-
-        let arglists = RT0.get(RT0.meta(v), RTVar.ArglistsKeyword)
-        loop (RT0.seq(arglists))
-
-
-
+    static member val EmptyTypeList = ResizeArray<Type>()
 
     static member MaybeType(cenv: CompilerEnv, form: obj, stringOk: bool) =
         match form with
@@ -632,8 +598,79 @@ type TypeUtils private () =
                             null
             else
                 null
-        | _ when stringOk && (form :? string) -> RTType.ClassForName(form :?> string)
+        | :? string as s when stringOk -> RTType.ClassForNameE(s)
+        | _ -> null        
+
+    static member MaybeArrayType(cenv:CompilerEnv, sym: Symbol) : Type =
+        if isNull sym.Namespace || not <| RTType.IsPosDigit(sym.Name) then
+            null
+        else
+            let dim = sym.Name[0] - '0' |> int
+            let componentTypeName = Symbol.intern(null,sym.Namespace)
+            let mutable (componentType: Type) =
+                match RTType.PrimType(componentTypeName) with
+                | null -> TypeUtils.MaybeType(cenv, componentTypeName, false);
+                | _ as t -> t
+
+            match componentType with 
+            | null -> raise <| TypeNotFoundException($"Unable to resolve component typename: {componentTypeName}")
+            | _ ->
+                for i = 0 to dim-1 do
+                    componentType <- componentType.MakeArrayType()
+                componentType
+    
+    static member TagToType(cenv: CompilerEnv, tag: obj) = 
+        let t = 
+            match tag with 
+            | :? Symbol as sym ->
+                let mutable t = null
+                if isNull sym.Namespace then
+                    t <- RTType.MaybeSpecialTag(sym)
+                if isNull t then
+                    t <- TypeUtils.MaybeArrayType(cenv, sym)
+                t
+            | _ -> null
+        let t = if isNull t then TypeUtils.MaybeType(cenv, tag, true) else t
+        match t with
+        | null -> raise <| ArgumentException($"Unable to resolve typename: {tag}")
+        | _ -> t
+
+
+    static member TagOf(o: obj) =
+        match RT0.get (RT0.meta (), RTVar.TagKeyword) with
+        | :? Symbol as sym -> sym
+        | :? string as str -> Symbol.intern (null, str)
+        | :? Type as t ->
+            let ok, sym = TypeUtils.TryGetTypeTag(t)
+            if ok then sym else null
         | _ -> null
+
+
+    static member TagType(cenv: CompilerEnv, tag: obj) : Type =
+        match tag with
+        | null -> typeof<Object>
+        | :? Symbol as sym ->
+            match RTType.PrimType(sym) with
+            | null -> TypeUtils.TagToType(cenv, sym)
+            | _ as t -> t
+        | _ -> TypeUtils.TagToType(cenv, tag)
+
+
+    static member SigTag(argCount: int, v: Var) = 
+
+        let rec loop (s:ISeq) =
+            if isNull s then null
+            else 
+                let signature : APersistentVector = s.first() :?> APersistentVector
+                let restOffset = (signature :> IList).IndexOf(RTVar.AmpersandSym)
+                if argCount = (signature :> Counted).count() || (restOffset >= 0 && argCount >= restOffset) then
+                    TypeUtils.TagOf(signature)
+                else
+                    loop (s.next())
+
+        let arglists = RT0.get(RT0.meta(v), RTVar.ArglistsKeyword)
+        loop (RT0.seq(arglists))
+
 
     static member CreateTypeArgList(cenv: CompilerEnv, targs: ISeq) =
         let types = ResizeArray<Type>()
@@ -655,7 +692,7 @@ type TypeUtils private () =
         types
 
     // calls TagToType on every element, unless it encounters _ which becomes null
-    static member TagsToClasses(paramTags: ISeq) =
+    static member TagsToClasses(cenv: CompilerEnv, paramTags: ISeq) =
         if isNull paramTags then null
         else
             let signature = ResizeArray<Type>()
@@ -667,7 +704,7 @@ type TypeUtils private () =
                     if t.Equals(RTVar.ParamTagAnySym) then
                         signature.Add(null)
                     else
-                        signature.Add(RTType.TagToType(t))
+                        signature.Add(TypeUtils.TagToType(cenv, t))
                     loop (s.next())
             loop paramTags
             signature
@@ -698,12 +735,121 @@ and SignatureHint private (_genericTypeArgs: ResizeArray<Type> option, _args: Re
             | :? ISeq as firstItem when isTypeArgs(RTSeq.first(firstItem)) ->
                 let typeArgs = TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstItem))
                 let args = RTSeq.next(tagV)
-                new SignatureHint(Some typeArgs, TypeUtils.TagsToClasses(args))
+                new SignatureHint(Some typeArgs, TypeUtils.TagsToClasses(cenv, args))
             | _ ->
-                new SignatureHint(None, TypeUtils.TagsToClasses(RTSeq.seq(tagV)))
+                new SignatureHint(None, TypeUtils.TagsToClasses(cenv, RTSeq.seq(tagV)))
 
 
     static member MaybeCreate(cenv: CompilerEnv, tagV: IPersistentVector) =
         match tagV with
         | null -> None
-        | _ -> Some <| SignatureHint.Create(cenv, tagV)
+        | _ -> Some <| (SignatureHint.Create(cenv, tagV) :> ISignatureHint)
+
+
+[<AbstractClass; Sealed>]
+type QMHelpers private () =
+
+    // Returns a list of methods or ctors matching the name and kind given.
+    // Otherwise, will throw if the information provided results in no matches
+    static member private MethodsWithName(t:Type, methodName: string, kind: QMMethodKind) =
+        match kind with
+        | Ctor ->
+            let ctors = t.GetConstructors().Cast<MethodBase>().ToList()
+            if ctors.Count = 0 then
+                raise <| QMHelpers.NoMethodWithNameException(t, methodName, QMMethodKind.Ctor)
+            ctors
+        | _ ->
+            let isStatic = (kind = QMMethodKind.Static)
+            let methods =
+                t.GetMethods()
+                    .Cast<MethodBase>()
+                    .Where(fun m -> m.Name.Equals(methodName) && isStatic = m.IsStatic)
+                    .ToList()
+            if methods.Count = 0 then
+                raise <| QMHelpers.NoMethodWithNameException(t, methodName, QMMethodKind.Instance)
+            methods
+       
+    static member ResolveHintedMethod(t:Type, methodName: string, kind: QMMethodKind, hint: ISignatureHint) = 
+        
+            let methods= QMHelpers.MethodsWithName(t, methodName, kind)
+
+            // If we have generic type args and the list is non-empty, we need to choose only methods that have the same number of generic type args, fully instantiated.
+
+            let methods = 
+                let gtaCount = if hint.GenericTypeArgs.IsSome then hint.GenericTypeArgs.Value.Count else 0
+                if gtaCount > 0 then
+                    methods
+                        .Where(fun m -> m.IsGenericMethod && m.GetGenericArguments().Length = gtaCount)
+                        .Select(fun m -> (m :?> MethodInfo).MakeGenericMethod(hint.GenericTypeArgs.Value.ToArray()))
+                        .Cast<MethodBase>()
+                        .ToList()
+                else
+                    methods
+
+            let arity =
+                match hint.Args with
+                | null -> 0
+                | _ as args-> args.Count
+
+            let filteredMethods =
+                methods
+                    .Where(fun m -> m.GetParameters().Length = arity)
+                    .Where(fun m -> QMHelpers.SignatureMatches(hint.Args, m))
+                    .ToList()
+
+            if filteredMethods.Count = 1 then
+                filteredMethods[0]
+            else
+                raise <| QMHelpers.ParamTagsDontResolveException(t, methodName, hint)
+
+    static member private NoMethodWithNameException(t:Type, methodName: string, kind: QMMethodKind) =
+        let kindStr = if kind = QMMethodKind.Ctor then "" else kind.ToString().ToLower()
+        new ArgumentException($"Error - no matches found for {kindStr} {QMHelpers.MethodDescription(t, methodName)}")
+
+
+    static member private ParamTagsDontResolveException(t:Type, methodName: string, hint: ISignatureHint) =
+        let hintedSig = hint.Args
+        let tagNames = hintedSig.Cast<Object>().Select(fun tag -> if isNull tag then RTVar.ParamTagAnySym :> obj else tag)
+        let paramTags = PersistentVector.create(tagNames)
+        let genericTypeArgs = if hint.GenericTypeArgs.IsSome then "" else $"<{QMHelpers.GenerateGenericTypeArgString(hint.GenericTypeArgs.Value)}>"
+        new ArgumentException($"Error - param-tags {genericTypeArgs}{paramTags} insufficient to resolve {QMHelpers.MethodDescription(t, methodName)}")
+
+    static member MethodDescription(t:Type, name: string) =
+        let isCtor = t <> null && name.Equals("new")
+        let typeType = if isCtor then "constructor" else "method"
+        $"""{typeType} {(if isCtor then "" else name)} in class {t.Name}"""
+
+        // TODO: THis is a duplicate of waht is Clojure.Reflection.Reflector
+        // TODO: REview use of type of GenericTypeArgList vs original
+    // Just a little convenience function for error messages.
+    static member GenerateGenericTypeArgString(typeArgs: ResizeArray<Type>) =
+        if isNull typeArgs then ""
+        else
+            let sb = StringBuilder()
+            sb.Append("<") |> ignore
+            for i = 0 to typeArgs.Count - 1 do
+                if i > 0 then
+                    sb.Append(", ") |> ignore
+                sb.Append(typeArgs[i].Name) |> ignore
+            sb.Append(">") |> ignore
+            sb.ToString()
+
+
+    static member SignatureMatches(signature: List<Type>, method: MethodBase) =
+        let methodSig = method.GetParameters()
+
+        let rec loop (i:int) =
+            if i >= methodSig.Length then
+                true
+            else
+                if not <| isNull signature[i] && not <| signature[i].Equals(methodSig[i].ParameterType) then
+                    false
+                else
+                    loop (i + 1)
+        loop 0
+
+
+
+
+
+

@@ -311,7 +311,7 @@ type Parser private () =
                     if not <| isNull info then
                         Some(Parser.CreateStaticFieldOrPropertyExpr(cenv, sym, tag, t, sym.Name, info))
                     else
-                        Some(Expr.QualifiedMethod(Env = cenv, Form = sym, SourceInfo = None)) // TODO: Implement QualifiedMethodExpr
+                        Some(Parser.CreateQualifiedMethodExpr(cenv, t, sym))
 
             else
                 None
@@ -319,7 +319,7 @@ type Parser private () =
         match maybeExpr with
         | Some e -> e
         | None ->
-            match Parser.Resolve(sym) with
+            match Parser.Resolve(cenv, sym) with
             | :? Var as v ->
                 if not <| isNull (Parser.IsMacro(cenv, v)) then
                     raise <| CompilerException($"Can't take the value of a macro: {sym.Name}")
@@ -1022,8 +1022,8 @@ type Parser private () =
         //       Need to figure this out.  Classic mode?
 
         method.RetType <-
-            TypeUtils.TagType(
-                match TypeUtils.TagOf(parameters) with
+            TypeUtils.TagType(cenv, 
+                match TypeUtils.TagOf(cenv, parameters) with
                 | null -> symRetTag
                 | _ as tag -> tag
             )
@@ -1074,7 +1074,7 @@ type Parser private () =
                     if paramState = ParamParseState.Rest then
                         typeof<ISeq>
                     else
-                        TypeUtils.TagType(paramTag)
+                        TypeUtils.TagType(cenv, paramTag)
 
                 argTypes.Add(paramType)
 
@@ -1298,6 +1298,8 @@ type Parser private () =
 
     static member InvokeExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
 
+        let cenv = cenv.WithParserContext(Expression)
+
         // (func arg1 arg2 ...)
 
         let fexpr = Parser.Analyze(cenv, RTSeq.first (form))
@@ -1319,7 +1321,26 @@ type Parser private () =
         | Some e -> e
         | None ->
             let fexpr = Parser.Analyze(cenv, RTSeq.first (form))
-            Parser.InvokeExprParser(cenv, fexpr, form)  NOPE -- not done yet  wrong name
+
+            let args = ResizeArray<Expr>()
+
+            let rec loop (s: ISeq) =
+                if isNull s then  ()
+                else
+                    args.Add(Parser.Analyze(cenv, s.first ()))
+                    loop (s.next ())
+            loop (RT0.seq(form.next ()))
+
+            // TODO: The constructor would work on protocol details here.
+            // Move to later pass?
+            Expr.Invoke(
+                Env = cenv,
+                Form = form,
+                Fexpr = fexpr,
+                Args = args,
+                Tag = TypeUtils.TagOf(form),
+                SourceInfo = None)
+
             
     static member ParseStaticInvokeExpr(cenv: CompilerEnv, form: obj, v: Var, args: ISeq, tag: obj) : Expr option =
         
@@ -1422,9 +1443,9 @@ type Parser private () =
                 | :? Symbol as sym when sym.Equals(RTVar.TypeArgsSym) -> 
                     // we have type-args supplied for a generic method call
                     // (. target methddname (type-args type1 ... ) arg1 ...)
-                    Some <| TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstArg)), args.next()
-                | _ -> None, args
-            | _ -> None, args
+                    TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstArg)), args.next()
+                | _ -> TypeUtils.EmptyTypeList, args
+            | _ -> TypeUtils.EmptyTypeList, args
                 
         let isZeroArityCall = RT0.length(args) = 0 && not methodRequired
 
@@ -1448,7 +1469,7 @@ type Parser private () =
                 TypeArgs = typeArgs,
                 SourceInfo = None) // TODO: source info
 
-    static member ParseZeroArityCall(cenv: CompilerEnv, form: obj, staticType: Type, instance: Expr option, methodSym: Symbol, typeArgs: ResizeArray<Type> option, tag: Symbol) : Expr =
+    static member ParseZeroArityCall(cenv: CompilerEnv, form: obj, staticType: Type, instance: Expr option, methodSym: Symbol, typeArgs: ResizeArray<Type>, tag: Symbol) : Expr =
 
         // TODO: (in original) Figure out if we want to handle the -propname otherwise.
         let memberSym, isPropName =
@@ -1561,7 +1582,7 @@ type Parser private () =
             MemberName = memberName,
             TInfo = info,
             Args = null,
-            TypeArgs = None,
+            TypeArgs = TypeUtils.EmptyTypeList,
             SourceInfo = None
         )
 
@@ -1588,14 +1609,14 @@ type Parser private () =
 
 
 
-    static member Resolve(sym: Symbol) : obj =
-        Parser.ResolveIn(RTVar.getCurrentNamespace (), sym, false)
+    static member Resolve(cenv: CompilerEnv, sym: Symbol) : obj =
+        Parser.ResolveIn(cenv, RTVar.getCurrentNamespace (), sym, false)
 
-    static member ResolveIn(ns: Namespace, sym: Symbol, allowPrivate: bool) : obj =
+    static member ResolveIn(cenv: CompilerEnv, ns: Namespace, sym: Symbol, allowPrivate: bool) : obj =
         if not <| isNull sym.Namespace then
             match RTReader.NamespaceFor(sym) with
             | null ->
-                match RTType.MaybeArrayType(sym) with
+                match TypeUtils.MaybeArrayType(cenv, sym) with
                 | null -> raise <| new InvalidOperationException($"No such namespace: {sym.Namespace}")
                 | _ as t -> t
             | _ as ns ->
@@ -1957,5 +1978,177 @@ type Parser private () =
 
         loop(argSeq)
         args
+
+
+    static member ParamTagsOf(sym: Symbol) =
+        let paramTags = RT0.get (RT0.meta(sym), RTVar.ParamTagsKeyword)
+        if not <| isNull paramTags && not <| paramTags :? IPersistentVector then
+            raise <| ArgumentException($"param-tags of symbol {sym} should be a vector")
+        paramTags :?> IPersistentVector
+
+    static member CreateQualifiedMethodExpr(cenv: CompilerEnv, methodType: Type, sym: Symbol) = 
+        let tagClass = 
+            match TypeUtils.TagOf(sym) with
+            | null -> typeof<AFn>
+            | _ as tag -> TypeUtils.TagToType(cenv, tag)
+        let hintedSig = SignatureHint.MaybeCreate(cenv, Parser.ParamTagsOf(sym))
+
+        let kind, methodName = 
+            if sym.Name.StartsWith(".") then
+                QMMethodKind.Instance, sym.Name.Substring(1)
+            elif sym.Name.Equals("new") then
+                QMMethodKind.Ctor, sym.Name
+            else 
+                QMMethodKind.Static, sym.Name
+
+        Expr.QualifiedMethod(
+            Env = cenv, 
+            Form = sym, 
+            MethodType = methodType, 
+            HintedSig = hintedSig,
+            MethodSymbol = sym, 
+            MethodName = methodName,
+            Kind = kind, 
+            TagClass = tagClass,
+            SourceInfo = None) // TODO: source info)
+         
+    static member ToHostExpr(cenv: CompilerEnv, qmExpr: Expr, tag: Symbol, args: ISeq) =
+        // TODO: source info
+
+        // we have the form (qmfexpr ...args...)
+        // We need to decide what the pieces are in ...args...
+
+        match qmExpr with
+        | Expr.QualifiedMethod(
+                Env = qmenv; 
+                Form = form; 
+                MethodType = methodType; 
+                HintedSig = hintedSig; 
+                MethodSymbol = methodSymbol; 
+                MethodName = methodName; 
+                Kind = kind; 
+                TagClass = tagClass; 
+                SourceInfo = sourceInfo) ->
+
+            let instance, args =
+                match kind with
+                | QMMethodKind.Instance -> 
+                    let instance = Parser.Analyze(cenv.WithParserContext(Expression), RTSeq.first(args))
+                    Some instance , RTSeq.next(args)
+                | _ -> None, args
+
+
+            // We handle zero-arity calls separately, similarly to how HostExpr handles them.
+            // Well, except here we have enough type information to fill in more details.
+            // Constructors not included here.
+            // We are trying to discriminate field access, property access, and method calls on zero arguments.
+            // 
+            // One special case here:  Suppose we have a zero-arity _generic_method call, with type-args provided.
+            // THis will look like:   (Type/StaticMethod (type-args type1 ..))  or (Type/InstanceMEthod instance-expression (type-args type1 ..))
+            // We check for the arg count before removing the type-args, so these will be handled by the non-zero-arity code.
+            // That is okay -- because this is generic, it can't be a field or property access, so we can treat it as a method call.
+
+            let genericTypeArgs, args = 
+                match RTSeq.first(args) with
+                | :? ISeq as firstArg ->
+                    match RTSeq.first(firstArg) with 
+                    | :? Symbol as sym when sym.Equals(RTVar.TypeArgsSym) -> 
+                        // we have type-args supplied for a generic method call
+                        // (. target methddname (type-args type1 ... ) arg1 ...)
+                        TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstArg)), args.next()
+                    | _ -> TypeUtils.EmptyTypeList, args
+                | _ -> TypeUtils.EmptyTypeList, args
+
+            // Now we have a potential conflict.  What if we have a hinted signature on the QME?
+            // Who wins the type-arg battle?
+            // If the QME has a nonempty generic type args list, we us it in preference.
+
+            let genericTypeArgs = 
+                match hintedSig with
+                | Some hsig -> 
+                    match hsig.GenericTypeArgs with
+                    | Some gta -> gta
+                    | None -> genericTypeArgs
+                | None -> genericTypeArgs
+
+            let hasGenericTypeArgs = genericTypeArgs.Count > 0
+
+            let isZeroArityCall = RT0.count(args) = 0 && kind <> QMMethodKind.Ctor
+
+            if isZeroArityCall then
+                // we know this is not a constructor call.
+                let isStatic = (kind = QMMethodKind.Static)
+                let memberInfo = 
+                    if not hasGenericTypeArgs then 
+                        Reflector.GetFieldOrPropertyInfo(methodType, methodName, isStatic)
+                    else null
+                let memberInfo, hostExprType = 
+                    if isNull memberInfo then 
+                        Reflector.GetArityZeroMethod(methodType, methodName, genericTypeArgs, isStatic)  :> MemberInfo, HostExprType.InstanceZeroArityCallExpr
+                    else 
+                        memberInfo, HostExprType.FieldOrPropertyExpr
+                
+                match memberInfo with
+                | null -> 
+                    let typeArgsStr = 
+                        if hasGenericTypeArgs then $" and generic type args {QMHelpers.GenerateGenericTypeArgString(genericTypeArgs)}"
+                        else ""
+                    let instOrStaticStr = if isStatic then "static" else "instance"
+
+                    raise <| MissingMemberException($"No {instOrStaticStr} field, property or method taking 0 args{typeArgsStr} named {methodName} found for {methodType.Name}")
+                | _ ->
+                    Expr.InteropCall(
+                            Env = cenv, 
+                            Form = form, 
+                            Type=hostExprType, 
+                            IsStatic = isStatic, 
+                            Tag = tag, 
+                            Target = instance, 
+                            TargetType = methodType, 
+                            MemberName = methodName, 
+                            TInfo = memberInfo, 
+                            Args = null, 
+                            TypeArgs = genericTypeArgs, 
+                            SourceInfo = None)  // TODO: source info 
+
+
+            else 
+                // TODO: there are some real differences in the constructors in the oringal code.
+                // NEed to figure out if it matters in the new world order.
+                // Look at contructors for InstanceMethodExpr, StaticMethodExpr, InstanceFieldExpr, InstancePropertyExpr, etc.
+                let method = 
+                    match hintedSig with
+                    | Some hsig -> QMHelpers.ResolveHintedMethod(methodType, methodName, kind, hsig)
+                    | None -> null
+                match kind with
+                | QMMethodKind.Ctor -> 
+                    Expr.New(
+                        Env = cenv, 
+                        Form = form, 
+                        Constructor = method,
+                        Args = Parser.ParseArgs(cenv, args),
+                        Type = methodType,
+                        IsNoArgValueTypeCtor = false,
+                        SourceInfo = None) // TODO: source info)
+
+                | _ ->
+                    let isStatic = (kind = QMMethodKind.Static)
+
+                    let hostArgs = Parser.ParseArgs(cenv, args)
+                    Expr.InteropCall(
+                        Env = cenv,
+                        Form = form,
+                        Type = HostExprType.MethodExpr,
+                        IsStatic = false,
+                        Tag = tag,
+                        Target = instance,
+                        TargetType = methodType,
+                        MemberName = Munger.Munge(methodName),
+                        TInfo = method,
+                        Args = hostArgs,
+                        TypeArgs = genericTypeArgs,
+                        SourceInfo = None) // TODO: source info
+
+        | _ -> raise <| ArgumentException("Expected QualifiedMethod expression")
 
 

@@ -23,6 +23,55 @@ type ReaderResolver =
 [<AbstractClass; Sealed>]
 type RTReader() =
 
+    // This is a duplicate of Clojure.Compiler.TypeUtils.MaybeType
+    // This is for use in the LispReader only.
+    // Cannot look for local shadowing as happens in the parsing phase of the compiler.
+
+    static member internal MaybeType(form: obj, stringOk: bool) =
+        match form with
+        | :? Type as t -> t
+        | :? Symbol as sym ->
+            // TODO: We'll need another version of this for the compiler that checks the CompileStubSymVar/CompileStubClassVar and the LocalEnvVar.
+            // This version will work for the LispReader, as the compiler will not be initiating reads.
+            if isNull sym.Namespace then
+                if sym.Name.IndexOf('.') >= 0 || sym.Name[sym.Name.Length-1] = ']' then  // TODO: Make sure this is still correct -- i think it is array detection
+                    RTType.ClassForName(sym.Name)
+                else
+                    let o = RTVar.getCurrentNamespace().getMapping(sym)
+                    if o :? Type then o :?> Type
+                    else
+                        try
+                            RTType.ClassForName(sym.Name)
+                        with 
+                        | _ -> null
+            else
+                null
+
+        | :? string as s when stringOk -> RTType.ClassForNameE(s)
+        | _ -> null
+        
+    // This is a duplicate of Clojure.Compiler.TypeUtils.MaybeArrayType
+    // This is for use in the LispReader only.
+    // Cannot look for local shadowing as happens in the parsing phase of the compiler.
+
+    static member internal MaybeArrayType(sym: Symbol) : Type =
+        if isNull sym.Namespace || not <| RTType.IsPosDigit(sym.Name) then
+            null
+        else
+            let dim = sym.Name[0] - '0' |> int
+            let componentTypeName = Symbol.intern(null,sym.Namespace)
+            let mutable (componentType: Type) =
+                match RTType.PrimType(componentTypeName) with
+                | null -> RTReader.MaybeType(componentTypeName, false);
+                | _ as t -> t
+
+            match componentType with 
+            | null -> raise <| TypeNotFoundException($"Unable to resolve component typename: {componentTypeName}")
+            | _ ->
+                for i = 0 to dim-1 do
+                    componentType <- componentType.MakeArrayType()
+                componentType
+
 
     static member MaybeResolveIn(n: Namespace, sym: Symbol) : obj =
         // note: ns-qualified vars must already exist
@@ -30,7 +79,7 @@ type RTReader() =
             let ns = RTReader.NamespaceFor(sym)
 
             if isNull ns then
-                RTType.MaybeArrayType(sym)
+                RTReader.MaybeArrayType(sym)
             else
                 ns.findInternedVar (Symbol.intern (sym.Name))
         elif
@@ -74,7 +123,7 @@ type RTReader() =
                     else
                         ns.Name.Name.Equals(sym.Namespace))
             then
-                match RTType.MaybeArrayType(sym) with
+                match RTReader.MaybeArrayType(sym) with
                 | null -> sym
                 | _ as at -> RTReader.ArrayTypeToSymbol(at)
             else

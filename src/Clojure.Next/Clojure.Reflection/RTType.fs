@@ -54,24 +54,6 @@ type RTType private () =
         else
             t
 
-    static member MaybeArrayType(sym: Symbol) : Type =
-        if isNull sym.Namespace || not <| RTType.IsPosDigit(sym.Name) then
-            null
-        else
-            let dim = sym.Name[0] - '0' |> int
-            let componentTypeName = Symbol.intern(null,sym.Namespace)
-            let mutable (componentType: Type) =
-                match RTType.PrimType(componentTypeName) with
-                | null -> RTType.MaybeType(componentTypeName, false);
-                | _ as t -> t
-
-            match componentType with 
-            | null -> raise <| TypeNotFoundException($"Unable to resolve component typename: {componentTypeName}")
-            | _ ->
-                for i = 0 to dim-1 do
-                    componentType <- componentType.MakeArrayType()
-                componentType
-
     static member IsPosDigit(s: string) =
         if s.Length <> 1 then false
         else
@@ -120,29 +102,6 @@ type RTType private () =
         let ok, name = RTType.PrimTypeNamesMap.TryGetValue(t)
         if ok then Some name else None
 
-    static member MaybeType(form: obj, stringOk: bool) =
-        match form with
-        | :? Type as t -> t
-        | :? Symbol as sym ->
-            // TODO: We'll need another version of this for the compiler that checks the CompileStubSymVar/CompileStubClassVar and the LocalEnvVar.
-            // This version will work for the LispReader, as the compiler will not be initiating reads.
-            if isNull sym.Namespace then
-                if sym.Name.IndexOf('.') >= 0 || sym.Name[sym.Name.Length-1] = ']' then  // TODO: Make sure this is still correct -- i think it is array detection
-                    RTType.ClassForName(sym.Name)
-                else
-                    let o = RTVar.getCurrentNamespace().getMapping(sym)
-                    if o :? Type then o :?> Type
-                    else
-                        try
-                            RTType.ClassForName(sym.Name)
-                        with 
-                        | _ -> null
-            else
-                null
-
-        | :? string as s when stringOk -> RTType.ClassForNameE(s)
-        | _ -> null
-        
 
     static member MaybeSpecialTag(sym: Symbol) = 
         match RTType.PrimType(sym) with
@@ -163,22 +122,6 @@ type RTType private () =
             | "sbytes" -> typeof<sbyte[]>
             | _ -> null
         | _ as t -> t
-
-    static member TagToType(tag: obj) = 
-        let t = 
-            match tag with 
-            | :? Symbol as sym ->
-                let mutable t = null
-                if isNull sym.Namespace then
-                    t <- RTType.MaybeSpecialTag(sym)
-                if isNull t then
-                    t <- RTType.MaybeArrayType(sym)
-                t
-            | _ -> null
-        let t = if isNull t then RTType.MaybeType(tag, true) else t
-        match t with
-        | null -> raise <| ArgumentException($"Unable to resolve typename: {tag}")
-        | _ -> t
 
 
     // TODO: Will we need this in the new compiler?  I hope we can get rid of it.

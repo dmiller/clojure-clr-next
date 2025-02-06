@@ -11,6 +11,8 @@ open System.Linq
 [<AbstractClass; Sealed>]
 type Reflector private () =
 
+    static member val EmptyTypeList = ResizeArray<Type>()
+
     // Field/property lookup
 
     static member GetFieldInfo(t: Type, name: string, getStatics: bool ) =
@@ -101,10 +103,10 @@ type Reflector private () =
         if methodName.Equals("new") then
             Reflector.InvokeConstructor(t, args)
         else
-            let methods = Reflector.GetMethods(t, methodName, GenericTypeArgList.Empty, args.Length, true)
+            let methods = Reflector.GetMethods(t, methodName, Reflector.EmptyTypeList, args.Length, true)
             Reflector.InvokeMatchingMethod(methodName, methods, t, null, args)
 
-    static member GetMethods(targetType: Type, methodName: string, typeArgs: GenericTypeArgList, arity: int, getStatics: bool)  : IList<MethodBase> =
+    static member GetMethods(targetType: Type, methodName: string, typeArgs: ResizeArray<Type>, arity: int, getStatics: bool)  : IList<MethodBase> =
         let flags = BindingFlags.Public ||| BindingFlags.FlattenHierarchy ||| BindingFlags.InvokeMethod  ||| (if getStatics then BindingFlags.Static else BindingFlags.Instance)
 
         if targetType.IsInterface && not getStatics then
@@ -115,9 +117,9 @@ type Reflector private () =
        
             |> Seq.choose (fun m -> 
                                 let genArgs = m.GetGenericArguments()
-                                if typeArgs.IsEmpty && genArgs.Length = 0 then
+                                if typeArgs.Count = 0 && genArgs.Length = 0 then
                                     Some m
-                                elif not typeArgs.IsEmpty && typeArgs.Count = genArgs.Length then
+                                elif typeArgs.Count > 0 && typeArgs.Count = genArgs.Length then
                                     Some  <| m.MakeGenericMethod(typeArgs.ToArray())
                                 else
                                     None)
@@ -126,7 +128,7 @@ type Reflector private () =
 
     // We are returning list of MethodBase rather than MethodInfo?  Above and below.
 
-    static member GetInterfaceMethods(targetType: Type, methodName: string, typeArgs: GenericTypeArgList, arity: int) : List<MethodBase> =
+    static member GetInterfaceMethods(targetType: Type, methodName: string, typeArgs: ResizeArray<Type>, arity: int) : List<MethodBase> =
         let flags = BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.InvokeMethod
         let interfaces = List<Type>([| targetType |])
         interfaces.AddRange(targetType.GetInterfaces())
@@ -134,13 +136,31 @@ type Reflector private () =
         |> Seq.collect (fun i -> i.GetMethods(flags).Where(fun m -> m.Name = methodName && m.GetParameters().Length = arity))
         |> Seq.choose (fun m -> 
                 let genArgs = m.GetGenericArguments()
-                if typeArgs.IsEmpty && genArgs.Length = 0 then
+                if typeArgs.Count = 0 && genArgs.Length = 0 then
                     Some m
-                elif not typeArgs.IsEmpty && typeArgs.Count = genArgs.Length then
+                elif typeArgs.Count > 0 && typeArgs.Count = genArgs.Length then
                     Some  <| m.MakeGenericMethod(typeArgs.ToArray())
                 else
                     None)
          |> Seq.cast<MethodBase>).ToList()
+
+
+    static member GetArityZeroMethod(t: Type, methodName: string, typeArgs: ResizeArray<Type>, getStatics: bool) =
+        let infos = Reflector.GetMethods(t, methodName, typeArgs, 0, getStatics)
+        if infos.Count = 1 then
+            infos[0] :?> MethodInfo
+        elif getStatics && infos.Count > 1 then
+            // static method with no arguments, multiple implementations.  Find closest to leaf in hierarchy.
+            let mutable d = infos[0].DeclaringType
+            let mutable m = infos[0]
+            for i = 1 to infos.Count - 1 do
+                let d1 = infos[i].DeclaringType
+                if d1.IsSubclassOf(d) then
+                    d <- d1
+                    m <- infos[i]
+            m :?> MethodInfo
+        else
+            null
 
 
     static member InvokeMatchingMethod(methodName: string, infos: IList<MethodBase>, t: Type, target: obj, args: obj array) =
@@ -275,44 +295,44 @@ type Reflector private () =
             false
         
 
-and [<Sealed>] GenericTypeArgList private (_typeArgs : List<Type>) = 
+//and [<Sealed>] GenericTypeArgList private (_typeArgs : List<Type>) = 
     
-    // An empty instance
-    // In the semantics of (type-args ...), (type-args) is equivalent to not having any type args at all -- it is ignored.
-    static member val Empty = GenericTypeArgList(List<Type>())
+//    // An empty instance
+//    // In the semantics of (type-args ...), (type-args) is equivalent to not having any type args at all -- it is ignored.
+//    static member val Empty = GenericTypeArgList(List<Type>())
 
-    // Some places need a list of the types, some places need an array.
+//    // Some places need a list of the types, some places need an array.
 
-    member _.ToArray() = _typeArgs.ToArray()
-    member _.ToList() = _typeArgs.AsReadOnly()
+//    member _.ToArray() = _typeArgs.ToArray()
+//    member _.ToList() = _typeArgs.AsReadOnly()
 
-    member _.IsEmpty = not <| _typeArgs.Any()
-    member _.Count = _typeArgs.Count
+//    member _.IsEmpty = not <| _typeArgs.Any()
+//    member _.Count = _typeArgs.Count
 
-    static member Create(targs: ISeq) =
-        let types = new List<Type>()
+//    static member Create(targs: ISeq) =
+//        let types = new List<Type>()
 
-        let rec loop (s: ISeq) =
-            match s with
-            | null -> ()
-            | _ ->
-                let arg = s.first()
-                if not <| arg :? Symbol then
-                    raise <| new ArgumentException("Malformed generic method designator: type arg must be a Symbol")
-                else
-                    let t = RTType.MaybeType(arg, false)
-                    if isNull t then
-                        raise <| new ArgumentException($"Malformed generic method designator: invalid type arg")
-                    else
-                        types.Add(t)
-                        loop (s.next())
+//        let rec loop (s: ISeq) =
+//            match s with
+//            | null -> ()
+//            | _ ->
+//                let arg = s.first()
+//                if not <| arg :? Symbol then
+//                    raise <| new ArgumentException("Malformed generic method designator: type arg must be a Symbol")
+//                else
+//                    let t = RTType.MaybeType(arg, false)
+//                    if isNull t then
+//                        raise <| new ArgumentException($"Malformed generic method designator: invalid type arg")
+//                    else
+//                        types.Add(t)
+//                        loop (s.next())
 
-        loop targs
-        GenericTypeArgList(types)
+//        loop targs
+//        GenericTypeArgList(types)
 
-    member _.GenerateGenericTypeArgsString() =
-        let sb = StringBuilder()
-        sb.Append("<") |> ignore
-        _typeArgs.ForEach (fun t -> sb.Append(t.FullName).Append(",") |> ignore)
-        sb.Append(">") |> ignore
-        sb.ToString()
+//    member _.GenerateGenericTypeArgsString() =
+//        let sb = StringBuilder()
+//        sb.Append("<") |> ignore
+//        _typeArgs.ForEach (fun t -> sb.Append(t.FullName).Append(",") |> ignore)
+//        sb.Append(">") |> ignore
+//        sb.ToString()
