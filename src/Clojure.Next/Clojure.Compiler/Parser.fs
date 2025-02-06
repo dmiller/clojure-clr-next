@@ -82,30 +82,10 @@ type Parser private () =
             RTVar.NewSym,
             Parser.NewExprParser,
             RTVar.AmpersandSym,
-            null
+            null)
 
-
-        )
-
-    static let TypeToTagDict = Dictionary<Type, Symbol>()
-
-    static do
-        TypeToTagDict.Add(typeof<bool>, Symbol.intern (null, "bool"))
-        TypeToTagDict.Add(typeof<char>, Symbol.intern (null, "char"))
-        TypeToTagDict.Add(typeof<byte>, Symbol.intern (null, "byte"))
-        TypeToTagDict.Add(typeof<sbyte>, Symbol.intern (null, "sbyte"))
-        TypeToTagDict.Add(typeof<int16>, Symbol.intern (null, "short"))
-        TypeToTagDict.Add(typeof<uint16>, Symbol.intern (null, "ushort"))
-        TypeToTagDict.Add(typeof<int32>, Symbol.intern (null, "int"))
-        TypeToTagDict.Add(typeof<uint32>, Symbol.intern (null, "uint"))
-        TypeToTagDict.Add(typeof<int64>, Symbol.intern (null, "long"))
-        TypeToTagDict.Add(typeof<uint64>, Symbol.intern (null, "ulong"))
-        TypeToTagDict.Add(typeof<single>, Symbol.intern (null, "float"))
-        TypeToTagDict.Add(typeof<float>, Symbol.intern (null, "long"))
-        TypeToTagDict.Add(typeof<decimal>, Symbol.intern (null, "decimal"))
-
+    static do   
         Parser.InitializeCompilerOptions()  // TODO: in the original code, we had to move this call from here to the RT initialization
-
 
 
     static member val MaxPositionalArity = 20 // TODO: Do we want to adjust this down to 16? (Match for System.Func)
@@ -308,13 +288,13 @@ type Parser private () =
 
     static member AnalyzeSymbol(cenv: CompilerEnv, sym: Symbol) : Expr =
 
-        let tag = Parser.TagOf(sym)
+        let tag = TypeUtils.TagOf(sym)
 
         // See if we are a local variable or a field/property/QM reference
         let maybeExpr: Expr option =
             if isNull sym.Namespace then
                 // we might be a local variable
-                match cenv.GetLocalBinding(sym) with
+                match cenv.ReferenceLocal(sym) with
                 | Some lb -> Some(Expr.LocalBinding(Env = cenv, Form = sym, Binding = lb, Tag = tag))
                 | None -> None
 
@@ -323,7 +303,7 @@ type Parser private () =
                 // we have a namespace, coudl be Typename/Field
                 let nsSym = Symbol.intern (sym.Namespace)
 
-                match Parser.MaybeType(cenv, nsSym, false) with
+                match TypeUtils.MaybeType(cenv, nsSym, false) with
                 | null -> None
                 | _ as t ->
                     let info = Reflector.GetFieldOrPropertyInfo(t, sym.Name, true)
@@ -910,7 +890,7 @@ type Parser private () =
                 Name = name,
                 InternalName = internalName,
                 ThisName = (if isNull nm then null else nm.Name),
-                Tag = Parser.TagOf(form),
+                Tag = TypeUtils.TagOf(form),
                 OnceOnly = onceOnly,
                 HasEnclosingMethod = enclosingMethod.IsSome
             )
@@ -1042,8 +1022,8 @@ type Parser private () =
         //       Need to figure this out.  Classic mode?
 
         method.RetType <-
-            Parser.TagType(
-                match Parser.TagOf(parameters) with
+            TypeUtils.TagType(
+                match TypeUtils.TagOf(parameters) with
                 | null -> symRetTag
                 | _ as tag -> tag
             )
@@ -1083,7 +1063,7 @@ type Parser private () =
                     raise <| ParseException("Invalid parameter list")
             else
                 // TODO: original code does primitive type analysis here
-                let paramTag = Parser.TagOf(param)
+                let paramTag = TypeUtils.TagOf(param)
 
                 if paramState = ParamParseState.Rest && not <| isNull paramTag then
                     raise <| ParseException("& arg cannot have type hint")
@@ -1094,7 +1074,7 @@ type Parser private () =
                     if paramState = ParamParseState.Rest then
                         typeof<ISeq>
                     else
-                        Parser.TagType(paramTag)
+                        TypeUtils.TagType(paramTag)
 
                 argTypes.Add(paramType)
 
@@ -1190,7 +1170,7 @@ type Parser private () =
 
                     if Util.equals (op, RTVar.CatchSym) then
                         let second = RTSeq.second (f)
-                        let t = Parser.MaybeType(catchEnv, second, false)
+                        let t = TypeUtils.MaybeType(catchEnv, second, false)
 
                         if isNull t then
                             raise <| ParseException($"Unable to resolve classname: {RTSeq.second (f)}")
@@ -1293,9 +1273,9 @@ type Parser private () =
             if RT0.booleanCast(Parser.GetCompilerOption(RTVar.DirectLinkingKeyword))  && (* && cenv.Pctx <> ParserContext.Eval *) 
                 not v.isDynamic && not <| RT0.booleanCast(RT0.get(RT0.meta(), RTVar.RedefKeyword, false)) && not <| RT0.booleanCast(RT0.get(RT0.meta(), RTVar.DeclaredKeyword, false)) then
                 
-                let formTag = Parser.TagOf(form)
+                let formTag = TypeUtils.TagOf(form)
                 let arity = RT0.count(form.next())
-                let sigTag = Parser.SigTag(arity,v)
+                let sigTag = TypeUtils.SigTag(arity,v)
                 let vTag = RT0.get(RT0.meta(), RTVar.TagKeyword)
                 let tagToUse : obj = 
                     if not <| isNull formTag then formTag
@@ -1328,18 +1308,18 @@ type Parser private () =
                 Parser.MaybeParseVarInvoke(cenv, fexpr, form, v)
             |  Expr.Literal(Type = KeywordType; Value = v) as kwExpr when  RT0.count (form) = 2 && cenv.ObjXRegister.IsSome ->
                 let target = Parser.Analyze(cenv, RTSeq.second (form))
-                Some <| Expr.KeywordInvoke(Env = cenv, Form = form, KwExpr = kwExpr, Target = target, Tag = Parser.TagOf(form), SiteIndex = -1, SourceInfo = None) // TODO: source info)
+                Some <| Expr.KeywordInvoke(Env = cenv, Form = form, KwExpr = kwExpr, Target = target, Tag = TypeUtils.TagOf(form), SiteIndex = -1, SourceInfo = None) // TODO: source info)
             | Expr.InteropCall(Type = HostExprType.FieldOrPropertyExpr; IsStatic = true) as sfpExpr ->
                 Some <| sfpExpr
             | Expr.QualifiedMethod(_) as qmExpr ->
-                Some <| Parser.ToHostExpr(cenv, qmExpr, Parser.TagOf(form), form.next())
+                Some <| Parser.ToHostExpr(cenv, qmExpr, TypeUtils.TagOf(form), form.next())
             | _ -> None
 
         match result with
         | Some e -> e
         | None ->
             let fexpr = Parser.Analyze(cenv, RTSeq.first (form))
-            Parser.InvokeExprParser(cenv, fexpr, form)  NOPE -- not done yet
+            Parser.InvokeExprParser(cenv, fexpr, form)  NOPE -- not done yet  wrong name
             
     static member ParseStaticInvokeExpr(cenv: CompilerEnv, form: obj, v: Var, args: ISeq, tag: obj) : Expr option =
         
@@ -1386,7 +1366,7 @@ type Parser private () =
     static member HostExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
         // TODO: Source info
 
-        let tag = Parser.TagOf(form)
+        let tag = TypeUtils.TagOf(form)
         
         // form is one of:
         //  (. x fieldname-sym)
@@ -1424,7 +1404,7 @@ type Parser private () =
         // static target must be symbol, either fully.qualified.Typename or Typename that has been imported
         // If target does not resolve to a type, then it must be an instance call -- parse it.
 
-        let staticType = Parser.MaybeType(cenv, target, false)
+        let staticType = TypeUtils.MaybeType(cenv, target, false)
         let instance = 
             if isNull staticType then Some <| Parser.Analyze({cenv with Pctx = Expression}, RTSeq.second(form))
             else None
@@ -1442,25 +1422,123 @@ type Parser private () =
                 | :? Symbol as sym when sym.Equals(RTVar.TypeArgsSym) -> 
                     // we have type-args supplied for a generic method call
                     // (. target methddname (type-args type1 ... ) arg1 ...)
-                    Some <| Parser.CreateTypeArgList(cenv, RTSeq.next(firstArg)), args.next()
+                    Some <| TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstArg)), args.next()
                 | _ -> None, args
             | _ -> None, args
                 
-        let hasTypeArgs = typeArgs.IsSome
-
         let isZeroArityCall = RT0.length(args) = 0 && not methodRequired
 
         if isZeroArityCall then
-            ParseZeroArityCall()
+            Parser.ParseZeroArityCall(cenv, form, staticType, instance, methodSym, typeArgs, tag)
         else
             let methodName = Munger.Munge(methodSym.Name)
-            let hostArgs = ParseArgs(cenv, args)
+            let hostArgs = Parser.ParseArgs(cenv, args)
 
-            match staticType with
-            | null ->   staticmethodexpr
-            | _ -> instanceMethodExpr
+            Expr.InteropCall(
+                Env = cenv,
+                Form = form,
+                Type = MethodExpr,
+                IsStatic = (not <| isNull staticType),
+                Tag = tag,
+                Target = instance,
+                TargetType = staticType,
+                MemberName = methodName,
+                TInfo = null,
+                Args = hostArgs,
+                TypeArgs = typeArgs,
+                SourceInfo = None) // TODO: source info
 
-    // TODO: Source info needed,   context is not needed (probably)
+    static member ParseZeroArityCall(cenv: CompilerEnv, form: obj, staticType: Type, instance: Expr option, methodSym: Symbol, typeArgs: ResizeArray<Type> option, tag: Symbol) : Expr =
+
+        // TODO: (in original) Figure out if we want to handle the -propname otherwise.
+        let memberSym, isPropName =
+            if methodSym.Name.[0] = '-' then
+                Symbol.intern(methodSym.Name.Substring(1)), true
+            else
+                methodSym, false
+
+        let memberName = Munger.Munge(memberSym.Name)
+
+        // The JVM version does not have to worry about Properties.  It captures 0-arity methods under fields.
+        // We have to put in special checks here for this.
+        // Also, when reflection is required, we have to capture 0-arity methods under the calls that
+        //   are generated by StaticFieldExpr and InstanceFieldExpr.
+
+        let isStatic =  not <| isNull staticType
+
+        Expr.InteropCall(
+            Env = cenv, 
+            Form=form,
+            Type = FieldOrPropertyExpr,
+            IsStatic = isStatic,
+            Tag = tag,
+            Target = instance,
+            TargetType = staticType,
+            MemberName = memberName,
+            TInfo = null,
+            Args = null,
+            TypeArgs = typeArgs,
+            SourceInfo = None)   // TODO: source info
+
+
+
+
+
+            (*
+            // TODO:  We defer all this calculation for a later pass.
+            // The problem is that this code need the type of the instance.
+            // We may need to defer this to the type inference pass.
+
+            // At this point, we know only static vs instance
+
+
+                    if (staticType != null)
+                    {
+                        if ( ! hasTypeArgs && (finfo = Reflector.GetField(staticType, memberName, true)) != null)
+                            return new StaticFieldExpr(source, spanMap, tag, staticType, memberName, finfo);
+                        if ( ! hasTypeArgs && (pinfo = Reflector.GetProperty(staticType, memberName, true)) != null)
+                            return new StaticPropertyExpr(source, spanMap, tag, staticType, memberName, pinfo);
+                        if (!isPropName && Reflector.GetArityZeroMethod(staticType, memberName, typeArgs, true) != null)
+                            return new StaticMethodExpr(source, spanMap, tag, staticType, memberName, typeArgs, new List<HostArg>(), tailPosition);
+
+                        string typeArgsStr = hasTypeArgs ? $" and generic type args {typeArgs.GenerateGenericTypeArgsString()} " : "";
+                        throw new MissingMemberException($"No field, property, or method taking 0 args{typeArgsStr} named {memberName} found for {staticType.Name}");
+                    }
+                    else if (instance != null && instance.HasClrType && instance.ClrType != null)
+                    {
+                        Type instanceType = instance.ClrType;
+                        if (!hasTypeArgs && (finfo = Reflector.GetField(instanceType, memberName, false)) != null)
+                            return new InstanceFieldExpr(source, spanMap, tag, instance, memberName, finfo);
+                        if (!hasTypeArgs && (pinfo = Reflector.GetProperty(instanceType, memberName, false)) != null)
+                            return new InstancePropertyExpr(source, spanMap, tag, instance, memberName, pinfo);
+                        if (!isPropName && Reflector.GetArityZeroMethod(instanceType, memberName, typeArgs, false) != null)
+                            return new InstanceMethodExpr(source, spanMap, tag, instance, instanceType, memberName, typeArgs, new List<HostArg>(), tailPosition);
+                        if (pcon.IsAssignContext)
+                            return new InstanceFieldExpr(source, spanMap, tag, instance, memberName, null); // same as InstancePropertyExpr when last arg is null
+                        else
+                            return new InstanceZeroArityCallExpr(source, spanMap, tag, instance, memberName);
+                    }
+                    else
+                    {
+                        //  t is null, so we know this is not a static call
+                        //  If instance is null, we are screwed anyway.
+                        //  If instance is not null, then we don't have a type.
+                        //  So we must be in an instance call to a property, field, or 0-arity method.
+                        //  The code generated by InstanceFieldExpr/InstancePropertyExpr with a null FieldInfo/PropertyInfo
+                        //     will generate code to do a runtime call to a Reflector method that will check all three.
+                        //return new InstanceFieldExpr(source, spanMap, tag, instance, fieldName, null); // same as InstancePropertyExpr when last arg is null
+                        //return new InstanceZeroArityCallExpr(source, spanMap, tag, instance, fieldName); 
+                        if (pcon.IsAssignContext)
+                            return new InstanceFieldExpr(source, spanMap, tag, instance, memberName, null); // same as InstancePropertyExpr when last arg is null
+                        else
+                            return new InstanceZeroArityCallExpr(source, spanMap, tag, instance, memberName); 
+
+                    }
+                }
+            *)
+
+
+    // TODO: Source info needed,  
     static member CreateStaticFieldOrPropertyExpr
         (
             cenv: CompilerEnv,
@@ -1505,67 +1583,9 @@ type Parser private () =
         | null -> expr
         | _ as meta -> Expr.Meta(Env = cenv, Form = form, Target = expr, Meta = Parser.AnalyzeMap(cenv, meta))
 
-    static member TagOf(o: obj) =
-        match RT0.get (RT0.meta (), RTVar.TagKeyword) with
-        | :? Symbol as sym -> sym
-        | :? string as str -> Symbol.intern (null, str)
-        | :? Type as t ->
-            let ok, sym = TypeToTagDict.TryGetValue(t)
-            if ok then sym else null
-        | _ -> null
-
-    static member TagType(tag: obj) : Type =
-        match tag with
-        | null -> typeof<Object>
-        | :? Symbol as sym ->
-            match RTType.PrimType(sym) with
-            | null -> RTType.TagToType(sym)
-            | _ as t -> t
-        | _ -> RTType.TagToType(tag)
-
-    static member SigTag(argCount: int, v: Var) = 
-
-        let rec loop (s:ISeq) =
-            if isNull s then null
-            else 
-                let signature : APersistentVector = s.first() :?> APersistentVector
-                let restOffset = (signature :> IList).IndexOf(RTVar.AmpersandSym)
-                if argCount = (signature :> Counted).count() || (restOffset >= 0 && argCount >= restOffset) then
-                    Parser.TagOf(signature)
-                else
-                    loop (s.next())
-
-        let arglists = RT0.get(RT0.meta(v), RTVar.ArglistsKeyword)
-        loop (RT0.seq(arglists))
 
 
 
-
-
-    static member MaybeType(cenv: CompilerEnv, form: obj, stringOk: bool) =
-        match form with
-        | :? Type as t -> t
-        | :? Symbol as sym ->
-            if isNull sym.Namespace then
-                // TODO: Original code has check of CompilerStubSymVar and CompilerStubClassVar here -- are we going to need this?
-                if
-                    sym.Name.IndexOf('.') > 0
-                    || sym.Name.Length > 0 && sym.Name[sym.Name.Length - 1] = ']'
-                then
-                    RTType.ClassForNameE(sym.Name)
-                else
-                    match RTVar.getCurrentNamespace().getMapping (sym) with
-                    | :? Type as t -> t
-                    | _ when cenv.ContainsBindingForSym(sym) -> null
-                    | _ ->
-                        try
-                            RTType.ClassForName(sym.Name)
-                        with _ ->
-                            null
-            else
-                null
-        | _ when stringOk && (form :? string) -> RTType.ClassForName(form :?> string)
-        | _ -> null
 
 
     static member Resolve(sym: Symbol) : obj =
@@ -1614,7 +1634,7 @@ type Parser private () =
             match op with
             | :? Var as v -> v
             | :? Symbol as s ->
-                match cenv.GetLocalBinding(s) with
+                match cenv.ReferenceLocal(s) with
                 | Some _ -> Parser.LookupVar(cenv, s, false)
                 | _ -> null
             | _ -> null
@@ -1652,7 +1672,7 @@ type Parser private () =
             checkVar (v)
             v
         | :? Symbol as s ->
-            if cenv.ContainsBindingForSym(s) then
+            if cenv.ReferenceLocal(s).IsSome then
                 null
             else
                 match Parser.LookupVar(cenv, s, false, false) with
@@ -1793,7 +1813,7 @@ type Parser private () =
                 let method = Symbol.intern (sname.Substring(1))
                 let mutable target = RTSeq.second (form)
 
-                if not <| isNull (Parser.MaybeType(cenv, target, false)) then
+                if not <| isNull (TypeUtils.MaybeType(cenv, target, false)) then
                     target <-
                         (RTSeq.list (IdentitySym, target) :?> IObj)
                             .withMeta (RTMap.map (RTVar.TagKeyword, ClassSym))
@@ -1832,7 +1852,7 @@ type Parser private () =
         loop s
 
     static member PreserveTag(src: ISeq, dst: obj) : obj =
-        match Parser.TagOf(src) with
+        match TypeUtils.TagOf(src) with
         | null -> dst
         | _ as tag ->
             match dst with
@@ -1904,22 +1924,38 @@ type Parser private () =
         use r = new PushbackTextReader(new StringReader(s))
         LispReader.read(r, opts)
 
-    static member CreateTypeArgList(cenv: CompilerEnv, targs: ISeq) =
-        let types = ResizeArray<Type>()
+
+
+    static member ParseArgs(cenv: CompilerEnv, argSeq: ISeq) =
+        let args = ResizeArray<HostArg>()
+
+        let analyzeArg(arg: obj) : obj * ParameterType * LocalBinding option =
+            match arg with
+            | :? ISeq as s ->
+                match RTSeq.first(s) with
+                | :? Symbol as op when op.Equals(RTVar.ByRefSym) ->
+                    if RT0.length(s) <> 2 then
+                        raise <| ParseException("Wrong number of arguments to by-ref")
+
+                    match RTSeq.second(s) with
+                    | :? Symbol as localArg -> 
+                        match cenv.ReferenceLocal(localArg) with
+                        | Some _ as lbOpt -> localArg, ParameterType.ByRef, lbOpt
+                        | _ -> raise <| ArgumentException($"Argument to by-ref must be a local variable: {localArg}")
+                    | _ as arg -> raise <| ArgumentException($"Argument to by-ref must be a Symbol: {arg}")
+                | _ as v -> raise <| ArgumentException("Expected (by-ref arg), got: {v}")
+            | _ ->
+                arg, ParameterType.Standard, None
 
         let rec loop (s:ISeq) =
             match s with
             | null -> ()
             | _ ->
-                let arg = s.first()
-                if not <| arg :? Symbol then
-                    raise <| ArgumentException("Malformed generic method designator: type arg must be a Symbol")
-                let t = Parser.MaybeType(cenv, arg, false)
-                if isNull t then
-                    raise <| ArgumentException($"Malformed generic method designator: invalid type arg: {arg}")
-                types.Add(Parser.MaybeType(cenv, s.first(), false))
-                loop (s.next())
+                let arg, paramType, lb = analyzeArg(s.first())
+                let expr = Parser.Analyze(cenv.WithParserContext(Expression), arg)
+                args.Add({HostArg.ArgExpr = expr; ParamType = paramType; LocalBinding = lb})
 
-        loop targs
+        loop(argSeq)
+        args
 
-        types
+

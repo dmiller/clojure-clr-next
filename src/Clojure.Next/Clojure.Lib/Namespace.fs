@@ -1358,6 +1358,7 @@ and [<Sealed; AbstractClass>] RTVar() =
 
     static member val TypeArgsSym = Symbol.intern("type-args")
     static member val ByRefSym = Symbol.intern("by-ref")
+    static member val ParamTagAnySym = Symbol.intern(null, "_")
 
 
     // Keywords for file info

@@ -1,10 +1,12 @@
 ﻿namespace Clojure.Compiler
 
 open System
+open System.Collections
 open System.Collections.Generic
 open Clojure.Collections
 open Clojure.Lib
 open System.Reflection
+open Clojure.Reflection
 
 
 type SourceInfo =
@@ -51,6 +53,11 @@ type HostExprType =
 type ObjXType =
     | Fn
     | NewInstance
+
+type QMMethodKind =
+    | Static
+    | Instance
+    | Ctor
 
 type ProtocolDetails =
     { ProtocolOn: Type
@@ -173,7 +180,11 @@ type Expr =
     | QualifiedMethod of
         Env: CompilerEnv *
         Form: obj *
-        (* help *)
+        MethodType: Type *
+        HintedSig: ISignatureHint *
+        MethodSymbol: Symbol *
+        Kind: QMMethodKind *
+        TagClass: Type *
         SourceInfo: SourceInfo option
 
     | Recur of
@@ -188,7 +199,7 @@ type Expr =
         Form: obj *
         Target: Type *
         Method: MethodInfo *
-        RetType : Type *
+        RetType: Type *
         Args: ResizeArray<Expr> *
         IsVariadic: bool *
         Tag: obj
@@ -234,7 +245,13 @@ and CatchClause =
 and HostArg =
     { ParamType: ParameterType
       ArgExpr: Expr
-      LocalBinding: LocalBinding }
+      LocalBinding: LocalBinding option }
+
+and ISignatureHint = 
+    abstract member GenericTypeArgs: ResizeArray<Type> option
+    abstract member Args: ResizeArray<Type>
+    abstract member ArgCount: int
+    abstract member HasGenericTypeArgs: bool
 
 and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod option) =
 
@@ -248,7 +265,6 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod option) =
     member _.Objx = _objx
     member _.Type = _type
 
-    // TODO: I just tossed these in -- verify
     member val RestParam: obj option = None with get, set
     member _.ReqParams: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
     member _.ArgLocals: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
@@ -327,7 +343,7 @@ and CompilerEnv =
 
     member this.WithParserContext(ctx: ParserContext) = { this with Pctx = ctx }
 
-    member this.GetLocalBinding(sym: Symbol) =
+    member this.ReferenceLocal(sym: Symbol) =
         match RT0.get (this.Locals, sym) with
         | :? LocalBinding as lb ->
             match this.Method with
@@ -532,3 +548,162 @@ type ExprUtils private () =
         match e with
         | Expr.Literal(Value = value) -> value
         | _ -> failwith "Not a literal expression"
+
+
+[<AbstractClass; Sealed>]
+type TypeUtils private () =
+
+    static let TypeToTagDict = Dictionary<Type, Symbol>()
+
+    static do
+        TypeToTagDict.Add(typeof<bool>, Symbol.intern (null, "bool"))
+        TypeToTagDict.Add(typeof<char>, Symbol.intern (null, "char"))
+        TypeToTagDict.Add(typeof<byte>, Symbol.intern (null, "byte"))
+        TypeToTagDict.Add(typeof<sbyte>, Symbol.intern (null, "sbyte"))
+        TypeToTagDict.Add(typeof<int16>, Symbol.intern (null, "short"))
+        TypeToTagDict.Add(typeof<uint16>, Symbol.intern (null, "ushort"))
+        TypeToTagDict.Add(typeof<int32>, Symbol.intern (null, "int"))
+        TypeToTagDict.Add(typeof<uint32>, Symbol.intern (null, "uint"))
+        TypeToTagDict.Add(typeof<int64>, Symbol.intern (null, "long"))
+        TypeToTagDict.Add(typeof<uint64>, Symbol.intern (null, "ulong"))
+        TypeToTagDict.Add(typeof<single>, Symbol.intern (null, "float"))
+        TypeToTagDict.Add(typeof<float>, Symbol.intern (null, "long"))
+        TypeToTagDict.Add(typeof<decimal>, Symbol.intern (null, "decimal"))
+
+    static member TryGetTypeTag(t:Type) = TypeToTagDict.TryGetValue(t)
+
+    static member TagOf(o: obj) =
+        match RT0.get (RT0.meta (), RTVar.TagKeyword) with
+        | :? Symbol as sym -> sym
+        | :? string as str -> Symbol.intern (null, str)
+        | :? Type as t ->
+            let ok, sym = TypeUtils.TryGetTypeTag(t)
+            if ok then sym else null
+        | _ -> null
+
+
+    static member TagType(tag: obj) : Type =
+        match tag with
+        | null -> typeof<Object>
+        | :? Symbol as sym ->
+            match RTType.PrimType(sym) with
+            | null -> RTType.TagToType(sym)
+            | _ as t -> t
+        | _ -> RTType.TagToType(tag)
+
+
+    static member SigTag(argCount: int, v: Var) = 
+
+        let rec loop (s:ISeq) =
+            if isNull s then null
+            else 
+                let signature : APersistentVector = s.first() :?> APersistentVector
+                let restOffset = (signature :> IList).IndexOf(RTVar.AmpersandSym)
+                if argCount = (signature :> Counted).count() || (restOffset >= 0 && argCount >= restOffset) then
+                    TypeUtils.TagOf(signature)
+                else
+                    loop (s.next())
+
+        let arglists = RT0.get(RT0.meta(v), RTVar.ArglistsKeyword)
+        loop (RT0.seq(arglists))
+
+
+
+
+    static member MaybeType(cenv: CompilerEnv, form: obj, stringOk: bool) =
+        match form with
+        | :? Type as t -> t
+        | :? Symbol as sym ->
+            if isNull sym.Namespace then
+                // TODO: Original code has check of CompilerStubSymVar and CompilerStubClassVar here -- are we going to need this?
+                if
+                    sym.Name.IndexOf('.') > 0
+                    || sym.Name.Length > 0 && sym.Name[sym.Name.Length - 1] = ']'
+                then
+                    RTType.ClassForNameE(sym.Name)
+                else
+                    match RTVar.getCurrentNamespace().getMapping (sym) with
+                    | :? Type as t -> t
+                    | _ when cenv.ContainsBindingForSym(sym) -> null
+                    | _ ->
+                        try
+                            RTType.ClassForName(sym.Name)
+                        with _ ->
+                            null
+            else
+                null
+        | _ when stringOk && (form :? string) -> RTType.ClassForName(form :?> string)
+        | _ -> null
+
+    static member CreateTypeArgList(cenv: CompilerEnv, targs: ISeq) =
+        let types = ResizeArray<Type>()
+
+        let rec loop (s:ISeq) =
+            match s with
+            | null -> ()
+            | _ ->
+                let arg = s.first()
+                if not <| arg :? Symbol then
+                    raise <| ArgumentException("Malformed generic method designator: type arg must be a Symbol")
+                let t = TypeUtils.MaybeType(cenv, arg, false)
+                if isNull t then
+                    raise <| ArgumentException($"Malformed generic method designator: invalid type arg: {arg}")
+                types.Add(TypeUtils.MaybeType(cenv, s.first(), false))
+                loop (s.next())
+
+        loop targs
+        types
+
+    // calls TagToType on every element, unless it encounters _ which becomes null
+    static member TagsToClasses(paramTags: ISeq) =
+        if isNull paramTags then null
+        else
+            let signature = ResizeArray<Type>()
+            let rec loop (s:ISeq) =
+                match s with
+                | null -> ()
+                | _ ->
+                    let t = s.first()
+                    if t.Equals(RTVar.ParamTagAnySym) then
+                        signature.Add(null)
+                    else
+                        signature.Add(RTType.TagToType(t))
+                    loop (s.next())
+            loop paramTags
+            signature
+
+                  
+and SignatureHint private (_genericTypeArgs: ResizeArray<Type> option, _args: ResizeArray<Type>) =
+
+    interface ISignatureHint with
+        member _.HasGenericTypeArgs = _genericTypeArgs.IsSome
+        member _.GenericTypeArgs = _genericTypeArgs
+        member _.Args = _args
+        member _.ArgCount = _args.Count
+
+
+    static member private Create(cenv: CompilerEnv, tagV: IPersistentVector) =
+        // tagV is not null (though I'll check anyway), but might be empty.
+        // tagV == []  -> no type-args, zero-argument method or property or field.
+        if isNull tagV || tagV.count() = 0 then
+            new SignatureHint(None, ResizeArray<Type>())
+        else
+
+            let isTypeArgs(item: obj) =
+                match item with
+                | :? Symbol as sym  -> sym.Equals(RTVar.TypeArgsSym)
+                | _ -> false
+
+            match tagV.nth(0) with
+            | :? ISeq as firstItem when isTypeArgs(RTSeq.first(firstItem)) ->
+                let typeArgs = TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstItem))
+                let args = RTSeq.next(tagV)
+                new SignatureHint(Some typeArgs, TypeUtils.TagsToClasses(args))
+            | _ ->
+                new SignatureHint(None, TypeUtils.TagsToClasses(RTSeq.seq(tagV)))
+
+
+    static member MaybeCreate(cenv: CompilerEnv, tagV: IPersistentVector) =
+        match tagV with
+        | null -> None
+        | _ -> Some <| SignatureHint.Create(cenv, tagV)
