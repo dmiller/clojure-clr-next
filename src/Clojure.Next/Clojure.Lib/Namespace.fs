@@ -1418,7 +1418,7 @@ and [<Sealed; AbstractClass>] RTVar() =
 
     static member val CurrentNSVar =
         Var
-            .intern(RTVar.ClojureNamespace, RTVar.NsSym, RTVar.ClojureNamespace)
+            .intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), Namespace.ClojureNamespace)
             .setDynamic ()
 
     static member val InNSVar = Var.intern (RTVar.ClojureNamespace, RTVar.InNsSym, false)

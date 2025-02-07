@@ -1269,7 +1269,7 @@ let SyntaxQuoteTests =
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("`~@x") |> ignore) "Should throw if unquote-splice not in list"
 
           
-          testCase "SQ on unquote-splice splices"
+          ftestCase "SQ on unquote-splice splices"
           <| fun _ ->
 
             let o = ReadFromString("`(a ~@b)")

@@ -93,8 +93,7 @@ type RTType private () =
               (typeof<uint32>, "uint"); 
               (typeof<uint64>, "ulong"); 
               (typeof<uint16>, "ushort"); 
-              (typeof<decimal>, "decimal"); 
-              (typeof<char>, "char") ],
+              (typeof<decimal>, "decimal")],
               fst,
               snd)
 
