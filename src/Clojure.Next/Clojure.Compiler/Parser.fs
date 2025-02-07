@@ -91,13 +91,13 @@ type Parser private () =
     static member val MaxPositionalArity = 20 // TODO: Do we want to adjust this down to 16? (Match for System.Func)
 
     static member val NilExprInstance =
-        Expr.Literal(Env = CompilerEnv.Empty, Form = "nil", Type = NilType, Value = null)
+        Expr.Literal(Env = CompilerEnv.Empty, Form = null, Type = NilType, Value = null)
 
     static member val TrueExprInstance =
-        Expr.Literal(Env = CompilerEnv.Empty, Form = "true", Type = BoolType, Value = true)
+        Expr.Literal(Env = CompilerEnv.Empty, Form = true, Type = BoolType, Value = true)
 
     static member val FalseExprInstance =
-        Expr.Literal(Env = CompilerEnv.Empty, Form = "false", Type = BoolType, Value = false)
+        Expr.Literal(Env = CompilerEnv.Empty, Form = false, Type = BoolType, Value = false)
 
     static member GetSpecialFormParser(op: obj) = SpecialFormToParserMap.valAt (op)
 
@@ -338,7 +338,7 @@ type Parser private () =
         try
             let me = Parser.MacroexpandSeq1(cenv, form)
 
-            if Object.ReferenceEquals(me, form) then
+            if not <| Object.ReferenceEquals(me, form) then
                 Parser.Analyze(cenv, me, name)
             else
 
@@ -1320,7 +1320,6 @@ type Parser private () =
         match result with
         | Some e -> e
         | None ->
-            let fexpr = Parser.Analyze(cenv, RTSeq.first (form))
 
             let args = ResizeArray<Expr>()
 
