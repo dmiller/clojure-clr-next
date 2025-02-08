@@ -18,6 +18,7 @@
 
 
   <ItemGroup>
+    <Compile Include="ExprUtils.fs" />
     <Compile Include="ParserTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

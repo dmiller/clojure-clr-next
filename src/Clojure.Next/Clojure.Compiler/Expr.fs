@@ -255,9 +255,11 @@ and ISignatureHint =
     abstract member ArgCount: int
     abstract member HasGenericTypeArgs: bool
 
-and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod option) =
+and ObjMethod(_type: ObjXType, _objx: Expr, _objxInternals : ObjXInternals, _objXRegsiter: ObjXRegister, _parent: ObjMethod option) =
 
     let mutable _body: Expr option = None // will get filled in later
+
+    let mutable _localNum = 0
 
     do
         if not _objx.IsObj then
@@ -266,12 +268,19 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod option) =
     member _.Parent = _parent
     member _.Objx = _objx
     member _.Type = _type
+    member _.ObjxRegister = _objXRegsiter
+    member _.ObjxInternals = _objxInternals
 
     member val RestParam: obj option = None with get, set
     member _.ReqParams: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
     member _.ArgLocals: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
     member _.Name: string = ""
     member val RetType: Type = typeof<Object> with get, set
+
+    member _.GetAndIncLocalNum() =
+        let n = _localNum
+        _localNum <- _localNum + 1
+        n
 
 
     member val Locals: IPersistentMap = null with get, set
@@ -308,6 +317,9 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _parent: ObjMethod option) =
 
     member this.ReturnType = this.RetType // FNMethod had a check of prim here with typeof(Object) as default.
 //member _.ArgTypes =
+
+    member this.AddLocal(lb: LocalBinding) =
+        this.Locals <- RTMap.assoc(this.Locals, lb, lb) :?> IPersistentMap
 
 and CompilerEnv =
     { Pctx: ParserContext
@@ -352,7 +364,7 @@ and CompilerEnv =
             | Some m ->
                 if lb.Index = 0 then
                     m.UsesThis <- true
-                    this.ClosesOver(lb, m)
+                this.CloseOver(lb, m)
 
                 Some lb
             | _ -> None
@@ -362,7 +374,7 @@ and CompilerEnv =
         not <| isNull (RT0.get (this.Locals, sym))
 
 
-    member this.ClosesOver(b: LocalBinding, method: ObjMethod) =
+    member this.CloseOver(b: LocalBinding, method: ObjMethod) =
         match RT0.get (method.Locals, b) with
         | :? LocalBinding as lb ->
             if lb.Index = 0 then
@@ -371,12 +383,12 @@ and CompilerEnv =
             if this.InCatchFinally then
                 method.LocalsUsedInCatchFinally <- method.LocalsUsedInCatchFinally.cons (b.Index) :?> IPersistentSet
         | _ ->
-            // The binding is not already in the method's locals
-            // Add it, then move up the chain
-            method.Locals <- RTMap.assoc (method.Locals, b, b) :?> IPersistentMap
+            // The binding is not in the method's locals.
+            // We need to close over it.
+            method.ObjxRegister.AddClose(b)
 
             if method.Parent.IsSome then
-                this.ClosesOver(b, method.Parent.Value)
+                this.CloseOver(b, method.Parent.Value)
 
     // Bindings and registrations
     member this.RegisterLocalThis(sym: Symbol, tag: Symbol, init: Expr option) =
@@ -406,8 +418,11 @@ and CompilerEnv =
             isArg: bool,
             isByRef: bool
         ) =
-        if isThis && this.Locals.count () > 0 then
-            failwith "Registration of 'this' must precede other locals"
+
+        let index = 
+            match this.Method with
+            | Some m -> m.GetAndIncLocalNum()
+            | None -> -1 // I'm not sure we should ever call this when there is no method.
 
         let lb =
             { Sym = sym
@@ -418,9 +433,14 @@ and CompilerEnv =
               IsByRef = isByRef
               IsRecur = false
               IsThis = isThis
-              Index = this.Locals.count () }
+              Index = index }
 
         let newLocals = RTMap.assoc (this.Locals, sym, lb) :?> IPersistentMap
+
+        match this.Method with
+        | Some m -> m.AddLocal(lb)
+        | None -> ()
+
         { this with Locals = newLocals }, lb
 
 
@@ -495,6 +515,9 @@ and ObjXRegister(parent: ObjXRegister option) =
     member val KeywordCallsites: IPersistentVector = PersistentVector.Empty with get, set
     member val ProtocolCallsites: IPersistentVector = PersistentVector.Empty with get, set
     member val VarCallsites: IPersistentSet = PersistentHashSet.Empty with get, set
+
+    member this.AddClose(b: LocalBinding) =
+        this.Closes <- RTMap.assoc (this.Closes, b, b) :?> IPersistentMap
 
     member this.RegisterConstant(o: obj) =
         let v = this.Constants
@@ -637,7 +660,7 @@ type TypeUtils private () =
 
 
     static member TagOf(o: obj) =
-        match RT0.get (RT0.meta (), RTVar.TagKeyword) with
+        match RT0.get (RT0.meta (o), RTVar.TagKeyword) with
         | :? Symbol as sym -> sym
         | :? string as str -> Symbol.intern (null, str)
         | :? Type as t ->
@@ -717,7 +740,6 @@ and SignatureHint private (_genericTypeArgs: ResizeArray<Type> option, _args: Re
         member _.GenericTypeArgs = _genericTypeArgs
         member _.Args = _args
         member _.ArgCount = _args.Count
-
 
     static member private Create(cenv: CompilerEnv, tagV: IPersistentVector) =
         // tagV is not null (though I'll check anyway), but might be empty.

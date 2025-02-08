@@ -945,7 +945,7 @@ type Parser private () =
             | null -> ()
             | _ ->
                 let m: ObjMethod =
-                    Parser.FnMethodParser(newCenv, s.first (), fnExpr, internals, retTag)
+                    Parser.FnMethodParser(newCenv, s.first (), fnExpr, internals, register, retTag)
 
                 if m.IsVariadic then
                     if variadicMethod.IsSome then
@@ -1000,13 +1000,13 @@ type Parser private () =
         fnExpr
 
 
-    static member FnMethodParser(cenv: CompilerEnv, form: obj, objx: Expr, objxInternals: ObjXInternals, retTag: obj) =
+    static member FnMethodParser(cenv: CompilerEnv, form: obj, objx: Expr, objxInternals: ObjXInternals, objxRegister: ObjXRegister, retTag: obj) =
         // ([args] body ... )
 
         let parameters = RTSeq.first (form) :?> IPersistentVector
         let body = RTSeq.next (form)
 
-        let method = ObjMethod(ObjXType.Fn, objx, cenv.Method) // TODO: source info
+        let method = ObjMethod(ObjXType.Fn, objx, objxInternals, objxRegister, cenv.Method) // TODO: source info
 
 
 

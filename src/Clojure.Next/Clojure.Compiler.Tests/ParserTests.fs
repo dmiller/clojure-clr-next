@@ -9,6 +9,7 @@ open Clojure.Compiler
 open System.Collections.Generic
 open System.Linq
 open Clojure.Collections
+open ExprUtils
 
 let CreatePushbackReaderFromString (s: string) =
     let sr = new System.IO.StringReader(s)
@@ -250,63 +251,6 @@ let CollectionTests =
 
           ]
 
-let compareGenericLists (a: ResizeArray<'T>, b: ResizeArray<'T>) =
-    if isNull a then
-        Expect.isTrue (isNull b) "First list is null, second list is not"
-    else
-        Expect.isNotNull b "First list is not null, second list is"
-
-        let comp =
-            a
-            |> Seq.zip b
-            |> Seq.forall (fun (x, y) -> if isNull x then isNull y else x.Equals(y))
-
-        Expect.isTrue comp "Expect same list"
-
-
-let compareInteropCalls (a: Expr, b: Expr) =
-    match a, b with
-    | Expr.InteropCall(
-        Env = aenv
-        Form = aform
-        Type = atype
-        IsStatic = aisstatic
-        Tag = atag
-        Target = atarget
-        TargetType = atargettype
-        MemberName = amembername
-        TInfo = atinfo
-        Args = aargs
-        TypeArgs = atypeargs
-        SourceInfo = asourceinfo),
-      Expr.InteropCall(
-          Env = benv
-          Form = bform
-          Type = btype
-          IsStatic = bisstatic
-          Tag = btag
-          Target = btarget
-          TargetType = btargettype
-          MemberName = bmembername
-          TInfo = btinfo
-          Args = bargs
-          TypeArgs = btypeargs
-          SourceInfo = bsourceinfo) ->
-        Expect.equal aenv benv "Env should be equal"
-        Expect.equal aform bform "Form should be equal"
-        Expect.equal atype btype "Type should be equal"
-        Expect.equal aisstatic bisstatic "IsStatic should be equal"
-        Expect.equal atag btag "Tag should be equal"
-        Expect.equal atarget btarget "Target should be equal"
-        Expect.equal atargettype btargettype "TargetType should be equal"
-        Expect.equal amembername bmembername "MemberName should be equal"
-        Expect.equal atinfo btinfo "TInfo should be equal"
-        compareGenericLists (aargs, bargs)
-        compareGenericLists (atypeargs, btypeargs)
-        Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
-    | _ -> failwith "Not an InteropCall"
-
-
 [<Tests>]
 let SymbolTests =
     testList
@@ -335,7 +279,7 @@ let SymbolTests =
                   ))
               )
 
-          ftestCase "Parses TypeName/FieldName with Fieldname not found as static QualifiedMethod"
+          testCase "Parses TypeName/FieldName with Fieldname not found as static QualifiedMethod"
           <| fun _ ->
               let form = ReadFromString "Int64/asdf"
               let cctx = CompilerEnv.Create(Expression)
@@ -356,7 +300,7 @@ let SymbolTests =
                   ))
                   "Should find static QM"
 
-          ftestCase "Parses TypeName/.FieldName with Fieldname not found as instance QualifiedMethod"
+          testCase "Parses TypeName/.FieldName with Fieldname not found as instance QualifiedMethod"
           <| fun _ ->
               let form = ReadFromString "Int64/.asdf"
               let cctx = CompilerEnv.Create(Expression)
@@ -375,9 +319,128 @@ let SymbolTests =
                       TagClass = typeof<AFn>,
                       SourceInfo = None
                   ))
-                  "Should find static QM"
+                  "Should find instance QM"
 
-          // TODO: If tag on form, should be a tagged QM
-          // TODO: if params-tag on form should supply signature hint 
+          testCase "Throws on ^NotAType TypeName/FieldName with Fieldname not found as static QualifiedMethod, with tag used for TagClass"
+          <| fun _ ->
+              let form = ReadFromString "^NotAType Int64/asdf"
+              let cctx = CompilerEnv.Create(Expression)
+
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "Should throw with non-type as :tag meta"
+
+
+          testCase "Parses ^String TypeName/FieldName with Fieldname not found as static QualifiedMethod, with TagClass"
+          <| fun _ ->
+              let form = ReadFromString "^String Int64/asdf"
+              let cctx = CompilerEnv.Create(Expression)
+              let ast = Parser.Analyze(cctx, form)
+
+              Expect.equal
+                  ast
+                  (Expr.QualifiedMethod(
+                      Env = cctx,
+                      Form = form,
+                      MethodType = typeof<Int64>,
+                      HintedSig = None,
+                      MethodSymbol = Symbol.intern ("Int64/asdf"),
+                      MethodName = "asdf",
+                      Kind = Static,
+                      TagClass = typeof<String>,
+                      SourceInfo = None
+                  ))
+                  "Should find static QM, with TagClass"
+
+          testCase "Parses ^[String int] TypeName/FieldName with Fieldname not found as static QualifiedMethod, with HintedSig"
+          <| fun _ ->
+              let form = ReadFromString "^[String int] Int64/asdf"
+              let cctx = CompilerEnv.Create(Expression)
+              let ast = Parser.Analyze(cctx, form)
+
+              compareQualifiedMethods(
+                  ast,
+                  (Expr.QualifiedMethod(
+                      Env = cctx,
+                      Form = form,
+                      MethodType = typeof<Int64>,
+                      HintedSig = (SignatureHint.MaybeCreate(cctx, PersistentVector.create(typeof<String>, typeof<Int32>))),
+                      MethodSymbol = Symbol.intern ("Int64/asdf"),
+                      MethodName = "asdf",
+                      Kind = Static,
+                      TagClass = typeof<AFn>,
+                      SourceInfo = None
+                  )))
+
+
+
+          testCase "Detects local bindings."
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let register = ObjXRegister(None)
+              let internals = ObjXInternals()
+              let objx = Expr.Obj(Env = cctx, Form = null, Type = ObjXType.Fn, Internals = internals, Register=register, SourceInfo = None)
+              let method = ObjMethod(ObjXType.Fn, objx, internals, register, None )
+
+              let cctx = {cctx with Method = Some method; ObjXRegister= Some register}
+
+
+              let cctx, lbThis = cctx.RegisterLocalThis(Symbol.intern("this"), null, None)
+              let cctx, lbAsdf = cctx.RegisterLocal(Symbol.intern("asdf"), null, None, null, false)       
+
+              let form0  = ReadFromString "this"
+              let form1 = ReadFromString "asdf"
+
+              let ast0 = Parser.Analyze(cctx, form0)
+
+              Expect.equal ast0 (Expr.LocalBinding(Env = cctx, Form = form0, Binding = lbThis, Tag=null)) "Should find binding for this"
+
+              let ast1 = Parser.Analyze(cctx, form1)
+              Expect.equal ast1 (Expr.LocalBinding(Env = cctx, Form = form1, Binding = lbAsdf, Tag=null)) "Should find binding for asdf"
+
+              let closes = register.Closes
+              Expect.equal (closes.count()) 0 "Should no closeovers"
+
+          ftestCase "Detects local bindings, does close over if not in method locals."
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              // Let's add a local binding to the environment, but before we add the method, so this binding will be non-local to the methld.
+              let locals = cctx.Locals
+              let pqrsSym = Symbol.intern("pqrs")
+              let lbPqrs = {Sym = pqrsSym; Tag = null; Init = None; Name = pqrsSym.Name; IsArg = false; IsByRef = false; IsRecur = false; IsThis = false; Index =20}
+              let newLocals = RTMap.assoc(locals, pqrsSym, lbPqrs) :?> IPersistentMap
+              let cctx = {cctx with Locals = newLocals}
+
+              let register = ObjXRegister(None)
+              let internals = ObjXInternals()
+              let objx = Expr.Obj(Env = cctx, Form = null, Type = ObjXType.Fn, Internals = internals, Register=register, SourceInfo = None)
+              let method = ObjMethod(ObjXType.Fn, objx, internals, register, None )
+
+              let cctx = {cctx with Method = Some method; ObjXRegister= Some register}
+
+              let cctx, lbThis = cctx.RegisterLocalThis(Symbol.intern("this"), null, None)
+              let cctx, lbAsdf = cctx.RegisterLocal(Symbol.intern("asdf"), null, None, null, false)       
+
+              let form0  = ReadFromString "this"
+              let form1 = ReadFromString "asdf"
+
+              let ast0 = Parser.Analyze(cctx, form0)
+
+              Expect.equal ast0 (Expr.LocalBinding(Env = cctx, Form = form0, Binding = lbThis, Tag=null)) "Should find binding for this"
+
+              let ast1 = Parser.Analyze(cctx, form1)
+              Expect.equal ast1 (Expr.LocalBinding(Env = cctx, Form = form1, Binding = lbAsdf, Tag=null)) "Should find binding for asdf"
+
+              let ast2 = Parser.Analyze(cctx, pqrsSym)
+              Expect.equal ast2 (Expr.LocalBinding(Env = cctx, Form = pqrsSym, Binding = lbPqrs, Tag=null)) "Should find binding for pqrs"
+
+              let closes = register.Closes
+              Expect.equal (closes.count()) 1 "Should be one closeover"
+              Expect.isTrue (closes.containsKey(lbPqrs)) "Should contain pqrs closeover"
+              Expect.equal (closes.valAt(lbPqrs)) lbPqrs "Should contain pqrs closeover"
+
+              
 
           ]
