@@ -315,9 +315,7 @@ type Namespace(name: Symbol) =
 
     // Find the Var mapped to a Symbol.
     member this.findInternedVar(sym: Symbol) =
-        let o = this.Mappings.valAt (sym)
-
-        match o with
+        match this.Mappings.valAt (sym) with
         | :? Var as v when Object.ReferenceEquals(v.Namespace, this) -> v
         | _ -> null
 
@@ -466,7 +464,7 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     ////////////////////////////////
 
     static member val private privateKey = Keyword.intern (null, "private")
-    static member val private privateMeta = PersistentArrayMap([| Var.privateKey, true |])
+    static member val private privateMeta = PersistentArrayMap([| Var.privateKey; true |])
     static member val private macroKey = Keyword.intern (null, "macro")
     static member val private nameKey = Keyword.intern (null, "name")
     static member val private nsKey = Keyword.intern (null, "ns")

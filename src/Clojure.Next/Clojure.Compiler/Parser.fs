@@ -1613,7 +1613,7 @@ type Parser private () =
 
     static member ResolveIn(cenv: CompilerEnv, ns: Namespace, sym: Symbol, allowPrivate: bool) : obj =
         if not <| isNull sym.Namespace then
-            match RTReader.NamespaceFor(sym) with
+            match RTReader.NamespaceFor(ns, sym) with
             | null ->
                 match TypeUtils.MaybeArrayType(cenv, sym) with
                 | null -> raise <| new InvalidOperationException($"No such namespace: {sym.Namespace}")

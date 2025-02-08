@@ -10,6 +10,9 @@ open System.Collections.Generic
 open System.Linq
 open Clojure.Collections
 open ExprUtils
+open Clojure.Lib
+open Clojure.Reflection
+open System.Threading
 
 let CreatePushbackReaderFromString (s: string) =
     let sr = new System.IO.StringReader(s)
@@ -251,6 +254,169 @@ let CollectionTests =
 
           ]
 
+
+
+let mutable namespaceCounter = 0
+let nextNamespaceNum() = Interlocked.Increment(&namespaceCounter)
+
+let abcSym = Symbol.intern("abc")
+let defSym = Symbol.intern("def")
+let pqrSym = Symbol.intern("pqr")
+let privateSym = Symbol.intern("private")
+let ns2Sym = Symbol.intern("ns2")
+
+let createTestNameSpaces() =
+    let ns1Name = $"ns1_{nextNamespaceNum()}"
+    let ns2Name = $"ns2_{nextNamespaceNum()}"
+    let ns1 = Namespace.findOrCreate(Symbol.intern(ns1Name))
+    let ns2 = Namespace.findOrCreate(Symbol.intern(ns2Name))
+    ns1.addAlias(ns2Sym, ns2)
+    ns1.intern(abcSym) |> ignore
+    ns1.intern(defSym) |> ignore
+    ns2.intern(pqrSym) |> ignore
+    Var.internPrivate(ns2Name, "private") |> ignore
+    ns1, ns2
+
+
+[<Tests>]
+let ResolveTests =
+    testList
+        "Resolve Tests"
+        [ 
+          testCase "Test namespace test harness"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+
+            let other = ns1.lookupAlias(ns2Sym)
+            Expect.equal other ns2 "SHould find ns2 under alias"
+
+            Expect.isNotNull (ns1.getMapping(abcSym)) "Should find abc in ns1"
+            Expect.isNotNull (ns1.getMapping(defSym)) "Should find def in ns1"
+            Expect.isNotNull (ns2.getMapping(pqrSym)) "Should find pqr in ns2"
+
+            let privateVar = ns2.getMapping(privateSym)
+            Expect.isNotNull privateVar "Should find private var"
+            Expect.equal (privateVar.GetType()) typeof<Var> "Should be a Var"
+            Expect.isFalse ((privateVar :?> Var).isPublic) "Should not be public"
+
+          testCase "Namespace alias, var not found => throws"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern(ns2Sym.Name, "fred")
+            let cctx = CompilerEnv.Create(Expression)
+            Expect.throwsT<InvalidOperationException> (fun _ -> Parser.ResolveIn(cctx, ns1, sym, true) |> ignore) "Should throw with non-existent var in aliased ns"
+
+          testCase "Namespace alias, private var found, not allow private => throws"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern(ns2Sym.Name,  privateSym.Name)
+            let cctx = CompilerEnv.Create(Expression)
+            Expect.throwsT<InvalidOperationException> (fun _ -> Parser.ResolveIn(cctx, ns1, sym, false) |> ignore) "Should throw with private var in aliased ns, but private not allowed"
+
+          testCase "Namespace alias, private var found, private allowed => return var"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern(ns2Sym.Name, privateSym.Name)
+            let cctx = CompilerEnv.Create(Expression)
+            let v = Parser.ResolveIn(cctx, ns1, sym, true)
+            Expect.isNotNull v "Should find private var in aliased ns, and private allowed"
+            Expect.equal (v:?>Var).Name privateSym "Should find private var in aliased ns, and private allowed"
+
+          testCase "Namespace alias, public var found, private not allowed => return var"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern(ns2Sym.Name, pqrSym.Name)
+            let cctx = CompilerEnv.Create(Expression)
+            let v = Parser.ResolveIn(cctx, ns1, sym, false)
+            Expect.isNotNull v "Should find private var in aliased ns, and private allowed"
+            Expect.equal (v:?>Var).Name pqrSym "Should find private var in aliased ns, and private allowed"
+
+          testCase "Looks like array type (Name/2), but Name not type => throws"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern("Mustard",  "2")
+            let cctx = CompilerEnv.Create(Expression)
+            Expect.throwsT<TypeNotFoundException> (fun _ -> Parser.ResolveIn(cctx, ns1, sym, false) |> ignore) "Should throw with looks like array type, but namespace is not a Type"
+
+          testCase "Is array type (String/2) => return type"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern("String",  "2")
+            let cctx = CompilerEnv.Create(Expression)
+            let v = Parser.ResolveIn(cctx, ns1, sym, false)
+            Expect.isNotNull v "Should find type"
+            Expect.equal v  typeof<String[][]> "Should find an array type"
+
+          testCase "No namespace, name ends in ] => Look for array type"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern(null,  "System.String[]")
+            let cctx = CompilerEnv.Create(Expression)
+            let v = Parser.ResolveIn(cctx, ns1, sym, false)
+            Expect.isNotNull v "Should find type"
+            Expect.equal v  typeof<String[]> "Should find an array type"
+
+          testCase "No namespace, name has . in it => Look for  type"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern(null,  "System.Text.StringBuilder")
+            let cctx = CompilerEnv.Create(Expression)
+            let v = Parser.ResolveIn(cctx, ns1, sym, false)
+            Expect.isNotNull v "Should find type"
+            Expect.equal v  typeof<System.Text.StringBuilder> "Should find the named type"
+
+          testCase "No namespace, name has . in it  type missing => trhows"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let sym = Symbol.intern(null,  "System.Wrong.StringBuilder")
+            let cctx = CompilerEnv.Create(Expression)
+            Expect.throwsT<TypeNotFoundException> (fun _ -> Parser.ResolveIn(cctx, ns1, sym, false) |> ignore) "Should throw with looks like array type, but namespace is not a Type"
+
+          testCase "in-ns and ns are special cases"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let cctx = CompilerEnv.Create(Expression)
+
+            let v1 = Parser.ResolveIn(cctx, ns1, RTVar.NsSym, false)
+            Expect.equal v1 RTVar.NsVar "Should find ns var"
+
+            let v2 = Parser.ResolveIn(cctx, ns1, RTVar.InNsSym, false)
+            Expect.equal v2 RTVar.InNSVar "Should find in-ns var"
+
+          testCase "no namespace sym, not mapped, unresolved vars not allows => throws"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let cctx = CompilerEnv.Create(Expression)
+            Expect.throwsT<InvalidOperationException> (fun _ -> Parser.ResolveIn(cctx, ns1, pqrSym, true) |> ignore) "should throw on unmapped var with unresolved vars not allows"
+
+          testCase "no namespace sym, not mapped, unresolved vars allowd => just return the s"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let cctx = CompilerEnv.Create(Expression)
+
+            Var.pushThreadBindings(RTMap.map(RTVar.AllowUnresolvedVarsVar, true))
+            try 
+                let v1 = Parser.ResolveIn(cctx, ns1, pqrSym, true)
+                Expect.isNotNull v1 "Should find something"
+                Expect.equal v1 pqrSym "Should return the  symbol itself"
+            finally 
+                Var.popThreadBindings() |> ignore
+
+          testCase "Return mapped symbol's value"
+          <| fun _ ->
+            let ns1, ns2 = createTestNameSpaces()
+            let cctx = CompilerEnv.Create(Expression)
+
+            let v1 = Parser.ResolveIn(cctx, ns1, abcSym, true)
+            Expect.isNotNull v1 "Should find something"
+            Expect.equal (v1.GetType()) typeof<Var> "Should return a var"
+
+            let v2 = v1 :?> Var
+            Expect.equal v2.Namespace  ns1  "Namespace of var should be namespace we are looking in"
+            Expect.equal v2.Name abcSym "Name of var should be the symbol we are looking for"
+        ]
+
+
 [<Tests>]
 let SymbolTests =
     testList
@@ -401,7 +567,7 @@ let SymbolTests =
               let closes = register.Closes
               Expect.equal (closes.count()) 0 "Should no closeovers"
 
-          ftestCase "Detects local bindings, does close over if not in method locals."
+          testCase "Detects local bindings, does close over if not in method locals."
           <| fun _ ->
 
               let cctx = CompilerEnv.Create(Expression)
