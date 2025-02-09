@@ -439,6 +439,7 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
         match _ns with
         | null -> $"""#<Var: {if isNull _sym then "--unnamed--" else _sym.ToString()}>"""
         | _ -> $"#'{_ns}/{_sym}"
+
     // To avoid initialization checks that would be caused by the circular dependency between the Var and the Unbound value in its root,
     // I made the constructor private and created a factory method to create a Var.
     // Called createInternal to avoid name collision with the 'create' method in the public interface.
@@ -1354,9 +1355,9 @@ and [<Sealed; AbstractClass>] RTVar() =
             .withMeta (RTMap.map (Keyword.intern (null, "once"), true))
         :?> Symbol
 
-    static member val TypeArgsSym = Symbol.intern("type-args")
-    static member val ByRefSym = Symbol.intern("by-ref")
-    static member val ParamTagAnySym = Symbol.intern(null, "_")
+    static member val TypeArgsSym = Symbol.intern ("type-args")
+    static member val ByRefSym = Symbol.intern ("by-ref")
+    static member val ParamTagAnySym = Symbol.intern (null, "_")
 
 
     // Keywords for file info
@@ -1383,7 +1384,7 @@ and [<Sealed; AbstractClass>] RTVar() =
     static member val DirectLinkingKeyword = Keyword.intern (null, "direct-linking")
     static member val RedefKeyword = Keyword.intern (null, "redef")
     static member val DeclaredKeyword = Keyword.intern (null, "declared")
-    
+
 
     // Keywords for LispReader
 
@@ -1416,7 +1417,7 @@ and [<Sealed; AbstractClass>] RTVar() =
 
     static member val CurrentNSVar =
         Var
-            .intern(RTVar.ClojureNamespace, Symbol.intern("*ns*"), Namespace.ClojureNamespace)
+            .intern(RTVar.ClojureNamespace, Symbol.intern ("*ns*"), Namespace.ClojureNamespace)
             .setDynamic ()
 
     static member val InNSVar = Var.intern (RTVar.ClojureNamespace, RTVar.InNsSym, false)

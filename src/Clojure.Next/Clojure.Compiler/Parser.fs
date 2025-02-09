@@ -30,7 +30,7 @@ type Parser private () =
     static let IdentitySym = Symbol.intern ("clojure.core", "identity")
     static let ClassSym = Symbol.intern ("System", "Type")
 
-    static let mutable CompilerOptionsVar : Var = null
+    static let mutable CompilerOptionsVar: Var = null
 
     // Why not a Dictionary<Symbol, SpecialFormParser> ???
     static let SpecialFormToParserMap: IPersistentMap =
@@ -82,16 +82,15 @@ type Parser private () =
             RTVar.NewSym,
             Parser.NewExprParser,
             RTVar.AmpersandSym,
-            null)
+            null
+        )
 
-    static do   
-        Parser.InitializeCompilerOptions()  // TODO: in the original code, we had to move this call from here to the RT initialization
+    static do Parser.InitializeCompilerOptions() // TODO: in the original code, we had to move this call from here to the RT initialization
 
 
     static member val MaxPositionalArity = 20 // TODO: Do we want to adjust this down to 16? (Match for System.Func)
 
-    static member val NilExprInstance =
-        Expr.Literal(Env = CompilerEnv.Empty, Form = null, Type = NilType, Value = null)
+    static member val NilExprInstance = Expr.Literal(Env = CompilerEnv.Empty, Form = null, Type = NilType, Value = null)
 
     static member val TrueExprInstance =
         Expr.Literal(Env = CompilerEnv.Empty, Form = true, Type = BoolType, Value = true)
@@ -370,9 +369,9 @@ type Parser private () =
 
             raise <| new CompilerException("help", 0, 0, sym, e) // TODO: pass source info
 
-  
-  
-    // Special form parsers  
+
+
+    // Special form parsers
     // These are called from AnalyzeSeq() to parse the various special forms
 
     // Let's start with some easy ones
@@ -521,7 +520,7 @@ type Parser private () =
             Expr.Literal(Env = cenv, Form = form, Type = EmptyType, Value = pc)
         | _ as v -> Expr.Literal(Env = cenv, Form = form, Type = OtherType, Value = v)
 
-    
+
     // Cranking up the difficulty level.
     // let*, letfn*, loop*  all introduce new bindings, causing us to augment the compiler environment as we go
 
@@ -772,7 +771,7 @@ type Parser private () =
             if isNull sym.Namespace then
                 var <- currentNS.intern (sym)
                 shadowsCoreMapping <- true
-                Parser.RegisterVar(var)        // TODO -- call on CENV, get new environment
+                Parser.RegisterVar(var) // TODO -- call on CENV, get new environment
             else
                 raise
                 <| ParseException($"Can't create defs outside of current namespace: {sym}")
@@ -1000,7 +999,15 @@ type Parser private () =
         fnExpr
 
 
-    static member FnMethodParser(cenv: CompilerEnv, form: obj, objx: Expr, objxInternals: ObjXInternals, objxRegister: ObjXRegister, retTag: obj) =
+    static member FnMethodParser
+        (
+            cenv: CompilerEnv,
+            form: obj,
+            objx: Expr,
+            objxInternals: ObjXInternals,
+            objxRegister: ObjXRegister,
+            retTag: obj
+        ) =
         // ([args] body ... )
 
         let parameters = RTSeq.first (form) :?> IPersistentVector
@@ -1022,7 +1029,8 @@ type Parser private () =
         //       Need to figure this out.  Classic mode?
 
         method.RetType <-
-            TypeUtils.TagType(cenv, 
+            TypeUtils.TagType(
+                cenv,
                 match TypeUtils.TagOf(cenv, parameters) with
                 | null -> symRetTag
                 | _ as tag -> tag
@@ -1236,7 +1244,7 @@ type Parser private () =
     //              and arg1 analyzes a literal with a Type value
     //           Then we output an Expr.InstanceOf  -- that's what this expression type is for.
     // Case 1b:  Direct linking is on (and in the orginal code:  not in an eval context)
-    //           and the var is not dynamic, has not been marked as ^:redef or ^:declared      
+    //           and the var is not dynamic, has not been marked as ^:redef or ^:declared
     //           and we _can_ parse is as an Expr.StaticInvoke  && original code has extra conditions not compiling and not compling deftype and with an internal assembly -- we're not there yet)
     //           Then we output the Expr.StaticInvoke
     // Case 1c:  Otherwise, (original code: we're not in an Eval Context -- if we are in an eval context, the code will be the default case)
@@ -1244,7 +1252,7 @@ type Parser private () =
     //           Then we turn the form into  (.invokePrim  .... ) with a bunch of metainfo manipulation.
     //           We'll ignore this option for now.
     // Case 1d:  Otherwise, we'll parse it as a normal invoke -- default case.
-    // Case 2:  func analyzes as an Expr.Keyword  (Expr.Literal with a Keyword value 
+    // Case 2:  func analyzes as an Expr.Keyword  (Expr.Literal with a Keyword value
     //          and the form is (kw arg)
     //          and we have keyword callsites (objxregister is some)
     //          Then we output an Expr.KeywordInvoke
@@ -1254,45 +1262,55 @@ type Parser private () =
     //          then return the result of ToHostExpr
     // Case 5:  Default case -- just parse it as an invoke.
     //          analyze the args, and make an Expr.Invoke
-                                    
+
 
     static member MaybeParseVarInvoke(cenv: CompilerEnv, fexpr: Expr, form: ISeq, v: Var) : Expr option =
 
-        let analyzeMaybeInstanceQ() : Expr option = 
+        let analyzeMaybeInstanceQ () : Expr option =
             match fexpr with
             | Expr.Var(Env = e; Form = f; Var = v; Tag = t) when v.Equals(RTVar.InstanceVar) && RT0.count (form) = 3 ->
-                let sexpr = Parser.Analyze({cenv with Pctx = Expression}, RTSeq.second (form))
+                let sexpr = Parser.Analyze({ cenv with Pctx = Expression }, RTSeq.second (form))
+
                 match sexpr with
                 | Expr.Literal(Value = v) when (v :? Type) ->
-                    let texpr = Parser.Analyze({cenv with Pctx = Expression}, RTSeq.third (form))
-                    Some <| Expr.InstanceOf(Env = cenv, Form = form, Expr= texpr, Type = (v :?> Type), SourceInfo = None) // TODO: source info
+                    let texpr = Parser.Analyze({ cenv with Pctx = Expression }, RTSeq.third (form))
+
+                    Some
+                    <| Expr.InstanceOf(Env = cenv, Form = form, Expr = texpr, Type = (v :?> Type), SourceInfo = None) // TODO: source info
                 | _ -> None
             | _ -> None
 
-        let analyzeMaybeStaticInvoke() : Expr option =
-            if RT0.booleanCast(Parser.GetCompilerOption(RTVar.DirectLinkingKeyword))  && (* && cenv.Pctx <> ParserContext.Eval *) 
-                not v.isDynamic && not <| RT0.booleanCast(RT0.get(RT0.meta(), RTVar.RedefKeyword, false)) && not <| RT0.booleanCast(RT0.get(RT0.meta(), RTVar.DeclaredKeyword, false)) then
-                
+        let analyzeMaybeStaticInvoke () : Expr option =
+            if
+                RT0.booleanCast (Parser.GetCompilerOption(RTVar.DirectLinkingKeyword))
+                && (* && cenv.Pctx <> ParserContext.Eval *) not v.isDynamic
+                && not <| RT0.booleanCast (RT0.get (RT0.meta (), RTVar.RedefKeyword, false))
+                && not <| RT0.booleanCast (RT0.get (RT0.meta (), RTVar.DeclaredKeyword, false))
+            then
+
                 let formTag = TypeUtils.TagOf(form)
-                let arity = RT0.count(form.next())
-                let sigTag = TypeUtils.SigTag(arity,v)
-                let vTag = RT0.get(RT0.meta(), RTVar.TagKeyword)
-                let tagToUse : obj = 
+                let arity = RT0.count (form.next ())
+                let sigTag = TypeUtils.SigTag(arity, v)
+                let vTag = RT0.get (RT0.meta (), RTVar.TagKeyword)
+
+                let tagToUse: obj =
                     if not <| isNull formTag then formTag
                     elif not <| isNull vTag then vTag
                     else sigTag
-                match Parser.ParseStaticInvokeExpr(cenv, form, v, RTSeq.next(form), tagToUse) with
+
+                match Parser.ParseStaticInvokeExpr(cenv, form, v, RTSeq.next (form), tagToUse) with
                 | Some _ as se -> se
                 | None -> None
 
-            else None
-        
+            else
+                None
 
-        match analyzeMaybeInstanceQ() with
-        | Some _ as se -> se  // Case 1a
+
+        match analyzeMaybeInstanceQ () with
+        | Some _ as se -> se // Case 1a
         | None ->
-            match analyzeMaybeStaticInvoke() with
-            | Some _ as se  -> se // case 1b
+            match analyzeMaybeStaticInvoke () with
+            | Some _ as se -> se // case 1b
             | None -> None
 
 
@@ -1306,15 +1324,25 @@ type Parser private () =
 
         let result =
             match fexpr with
-            |  Expr.Var(Env = e; Form = f; Var = v; Tag = t) ->
-                Parser.MaybeParseVarInvoke(cenv, fexpr, form, v)
-            |  Expr.Literal(Type = KeywordType; Value = v) as kwExpr when  RT0.count (form) = 2 && cenv.ObjXRegister.IsSome ->
+            | Expr.Var(Env = e; Form = f; Var = v; Tag = t) -> Parser.MaybeParseVarInvoke(cenv, fexpr, form, v)
+            | Expr.Literal(Type = KeywordType; Value = v) as kwExpr when
+                RT0.count (form) = 2 && cenv.ObjXRegister.IsSome
+                ->
                 let target = Parser.Analyze(cenv, RTSeq.second (form))
-                Some <| Expr.KeywordInvoke(Env = cenv, Form = form, KwExpr = kwExpr, Target = target, Tag = TypeUtils.TagOf(form), SiteIndex = -1, SourceInfo = None) // TODO: source info)
-            | Expr.InteropCall(Type = HostExprType.FieldOrPropertyExpr; IsStatic = true) as sfpExpr ->
-                Some <| sfpExpr
+
+                Some
+                <| Expr.KeywordInvoke(
+                    Env = cenv,
+                    Form = form,
+                    KwExpr = kwExpr,
+                    Target = target,
+                    Tag = TypeUtils.TagOf(form),
+                    SiteIndex = -1,
+                    SourceInfo = None
+                ) // TODO: source info)
+            | Expr.InteropCall(Type = HostExprType.FieldOrPropertyExpr; IsStatic = true) as sfpExpr -> Some <| sfpExpr
             | Expr.QualifiedMethod(_) as qmExpr ->
-                Some <| Parser.ToHostExpr(cenv, qmExpr, TypeUtils.TagOf(form), form.next())
+                Some <| Parser.ToHostExpr(cenv, qmExpr, TypeUtils.TagOf(form), form.next ())
             | _ -> None
 
         match result with
@@ -1324,11 +1352,13 @@ type Parser private () =
             let args = ResizeArray<Expr>()
 
             let rec loop (s: ISeq) =
-                if isNull s then  ()
+                if isNull s then
+                    ()
                 else
                     args.Add(Parser.Analyze(cenv, s.first ()))
                     loop (s.next ())
-            loop (RT0.seq(form.next ()))
+
+            loop (RT0.seq (form.next ()))
 
             // TODO: The constructor would work on protocol details here.
             // Move to later pass?
@@ -1338,56 +1368,72 @@ type Parser private () =
                 Fexpr = fexpr,
                 Args = args,
                 Tag = TypeUtils.TagOf(form),
-                SourceInfo = None)
+                SourceInfo = None
+            )
 
-            
+
     static member ParseStaticInvokeExpr(cenv: CompilerEnv, form: obj, v: Var, args: ISeq, tag: obj) : Expr option =
-        
-        if not <| v.isBound || isNull <| v.get() then
+
+        if not <| v.isBound || isNull <| v.get () then
             None
         else
             let target = v.get().GetType()
-            let argCount = RT0.count(args)
-            let mutable method : MethodInfo = null
+            let argCount = RT0.count (args)
+            let mutable method: MethodInfo = null
 
-            let isValidMethod(m: MethodInfo) =
+            let isValidMethod (m: MethodInfo) =
                 let pInfos = m.GetParameters()
-                argCount = pInfos.Length ||
-                argCount > pInfos.Length && pInfos.Length > 0 && pInfos.[pInfos.Length - 1].ParameterType = typeof<ISeq>
+
+                argCount = pInfos.Length
+                || argCount > pInfos.Length
+                   && pInfos.Length > 0
+                   && pInfos.[pInfos.Length - 1].ParameterType = typeof<ISeq>
 
 
-            let maybeMatch = 
+            let maybeMatch =
                 target.GetMethods()
-                |> Array.tryFind (fun m -> m.IsStatic && 
-                                           m.Name = "invokeStatic" && 
-                                           isValidMethod(m))
+                |> Array.tryFind (fun m -> m.IsStatic && m.Name = "invokeStatic" && isValidMethod (m))
 
             match maybeMatch with
             | None -> None
             | Some m ->
                 let pInfos = m.GetParameters()
-                let isVariadic = 
+
+                let isVariadic =
                     if argCount = pInfos.Length then
                         argCount > 0 && pInfos.[pInfos.Length - 1].ParameterType = typeof<ISeq>
-                    else true
+                    else
+                        true
+
                 let argExprs = ResizeArray<Expr>()
 
                 let rec loop (s: ISeq) =
-                    if isNull s then  ()
-                    else 
-                        argExprs.Add(Parser.Analyze({cenv with Pctx = Expression}, s.first()))
-                        loop (s.next())
+                    if isNull s then
+                        ()
+                    else
+                        argExprs.Add(Parser.Analyze({ cenv with Pctx = Expression }, s.first ()))
+                        loop (s.next ())
 
-                loop (RT0.seq(args))
+                loop (RT0.seq (args))
 
-                Some <| Expr.StaticInvoke(Env = cenv, Form = form, Target = target, Method = m, RetType= m.ReturnType, Args = argExprs, IsVariadic = isVariadic, Tag = tag)
+                Some
+                <| Expr.StaticInvoke(
+                    Env = cenv,
+                    Form = form,
+                    Target = target,
+                    Method = m,
+                    RetType = m.ReturnType,
+                    Args = argExprs,
+                    IsVariadic = isVariadic,
+                    Tag = tag
+                )
 
 
-    static member HostExprParser(cenv: CompilerEnv, form: ISeq) : Expr = 
+    static member HostExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
         // TODO: Source info
 
         let tag = TypeUtils.TagOf(form)
-        
+
         // form is one of:
         //  (. x fieldname-sym)
         //  (. x 0-ary-methodname-sym)
@@ -1406,28 +1452,42 @@ type Parser private () =
         //  (. x methodname-sym args+)      Target = x member-name = methodname-sym, args = args+
         //  (. x (methodname-sym args?))    Target = x member-name = methodname-sym, args = args?  -- note: in this case, we explicity cannot be a field or property
 
-        if RT0.length(form) < 3 then
-            raise <| ParseException("Malformed member expression, expecting (. target member ... ) or  (. target (member ...))")
+        if RT0.length (form) < 3 then
+            raise
+            <| ParseException(
+                "Malformed member expression, expecting (. target member ... ) or  (. target (member ...))"
+            )
 
-        let target = RTSeq.second(form)
+        let target = RTSeq.second (form)
 
-        let methodSym, args, methodRequired = 
-            match RTSeq.third(form) with
-            | :? Symbol as sym -> sym, RTSeq.next(RTSeq.next(RTSeq.next(form))), false
-            | :? ISeq as seq when RT0.length(form) = 3 -> 
-                match RTSeq.first(seq) with
-                | :? Symbol as sym -> sym, RTSeq.next(seq), true
-                | _ -> raise <| ParseException("Malformed member expression, expecting (. target member-name args... )  or (. target (member-name args...), where member-name is a Symbol")
-            | _ -> raise <| ParseException("Malformed member expression, expecting (. target member-name args... )  or (. target (member-name args...)")
+        let methodSym, args, methodRequired =
+            match RTSeq.third (form) with
+            | :? Symbol as sym -> sym, RTSeq.next (RTSeq.next (RTSeq.next (form))), false
+            | :? ISeq as seq when RT0.length (form) = 3 ->
+                match RTSeq.first (seq) with
+                | :? Symbol as sym -> sym, RTSeq.next (seq), true
+                | _ ->
+                    raise
+                    <| ParseException(
+                        "Malformed member expression, expecting (. target member-name args... )  or (. target (member-name args...), where member-name is a Symbol"
+                    )
+            | _ ->
+                raise
+                <| ParseException(
+                    "Malformed member expression, expecting (. target member-name args... )  or (. target (member-name args...)"
+                )
 
         // determine static or instance be examinung the target
         // static target must be symbol, either fully.qualified.Typename or Typename that has been imported
         // If target does not resolve to a type, then it must be an instance call -- parse it.
 
         let staticType = TypeUtils.MaybeType(cenv, target, false)
-        let instance = 
-            if isNull staticType then Some <| Parser.Analyze({cenv with Pctx = Expression}, RTSeq.second(form))
-            else None
+
+        let instance =
+            if isNull staticType then
+                Some <| Parser.Analyze({ cenv with Pctx = Expression }, RTSeq.second (form))
+            else
+                None
 
         // staticType not null => static method call, instance set to null.
         // staticType null, instance is not null, set to an expression yielding the instance to make the call on.
@@ -1435,18 +1495,18 @@ type Parser private () =
         // If there is a type-args form, it must be the first argument.
         // Pull it out if it's there.
 
-        let typeArgs, args = 
-            match RTSeq.first(args) with
+        let typeArgs, args =
+            match RTSeq.first (args) with
             | :? ISeq as firstArg ->
-                match RTSeq.first(firstArg) with 
-                | :? Symbol as sym when sym.Equals(RTVar.TypeArgsSym) -> 
+                match RTSeq.first (firstArg) with
+                | :? Symbol as sym when sym.Equals(RTVar.TypeArgsSym) ->
                     // we have type-args supplied for a generic method call
                     // (. target methddname (type-args type1 ... ) arg1 ...)
-                    TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstArg)), args.next()
+                    TypeUtils.CreateTypeArgList(cenv, RTSeq.next (firstArg)), args.next ()
                 | _ -> TypeUtils.EmptyTypeList, args
             | _ -> TypeUtils.EmptyTypeList, args
-                
-        let isZeroArityCall = RT0.length(args) = 0 && not methodRequired
+
+        let isZeroArityCall = RT0.length (args) = 0 && not methodRequired
 
         if isZeroArityCall then
             Parser.ParseZeroArityCall(cenv, form, staticType, instance, methodSym, typeArgs, tag)
@@ -1466,14 +1526,24 @@ type Parser private () =
                 TInfo = null,
                 Args = hostArgs,
                 TypeArgs = typeArgs,
-                SourceInfo = None) // TODO: source info
+                SourceInfo = None
+            ) // TODO: source info
 
-    static member ParseZeroArityCall(cenv: CompilerEnv, form: obj, staticType: Type, instance: Expr option, methodSym: Symbol, typeArgs: ResizeArray<Type>, tag: Symbol) : Expr =
+    static member ParseZeroArityCall
+        (
+            cenv: CompilerEnv,
+            form: obj,
+            staticType: Type,
+            instance: Expr option,
+            methodSym: Symbol,
+            typeArgs: ResizeArray<Type>,
+            tag: Symbol
+        ) : Expr =
 
         // TODO: (in original) Figure out if we want to handle the -propname otherwise.
         let memberSym, isPropName =
             if methodSym.Name.[0] = '-' then
-                Symbol.intern(methodSym.Name.Substring(1)), true
+                Symbol.intern (methodSym.Name.Substring(1)), true
             else
                 methodSym, false
 
@@ -1484,11 +1554,11 @@ type Parser private () =
         // Also, when reflection is required, we have to capture 0-arity methods under the calls that
         //   are generated by StaticFieldExpr and InstanceFieldExpr.
 
-        let isStatic =  not <| isNull staticType
+        let isStatic = not <| isNull staticType
 
         Expr.InteropCall(
-            Env = cenv, 
-            Form=form,
+            Env = cenv,
+            Form = form,
             Type = FieldOrPropertyExpr,
             IsStatic = isStatic,
             Tag = tag,
@@ -1498,13 +1568,14 @@ type Parser private () =
             TInfo = null,
             Args = null,
             TypeArgs = typeArgs,
-            SourceInfo = None)   // TODO: source info
+            SourceInfo = None
+        ) // TODO: source info
 
 
 
 
 
-            (*
+    (*
             // TODO:  We defer all this calculation for a later pass.
             // The problem is that this code need the type of the instance.
             // We may need to defer this to the type inference pass.
@@ -1558,7 +1629,7 @@ type Parser private () =
             *)
 
 
-    // TODO: Source info needed,  
+    // TODO: Source info needed,
     static member CreateStaticFieldOrPropertyExpr
         (
             cenv: CompilerEnv,
@@ -1682,25 +1753,19 @@ type Parser private () =
 
 
     static member IsMacro(cenv: CompilerEnv, op: obj) : Var =
-        let checkVar (v: Var) =
-            if not <| isNull v && v.isMacro then
-                if v.Namespace = RTVar.getCurrentNamespace () && not v.isPublic then
-                    raise <| new InvalidOperationException($"Var: {v} is not public")
+        let v = 
+            match op with
+            | :? Var as v -> v
+            | :? Symbol as s ->
+                match cenv.ReferenceLocal(s) with
+                | Some _ -> null  // if there is local reference, it is not a macro, so return null
+                | _ -> Parser.LookupVar(cenv, s, false)
+            | _ -> null
 
-        match op with
-        | :? Var as v ->
-            checkVar (v)
-            v
-        | :? Symbol as s ->
-            if cenv.ReferenceLocal(s).IsSome then
-                null
-            else
-                match Parser.LookupVar(cenv, s, false, false) with
-                | null -> null
-                | _ as v ->
-                    checkVar (v)
-                    v
-        | _ -> null
+        if not <| isNull v && v.isMacro then
+            if v.Namespace = RTVar.getCurrentNamespace () && not v.isPublic then
+                raise <| new InvalidOperationException($"Var: {v} is not public")
+        v
 
     static member LookupVar(cenv: CompilerEnv, sym: Symbol, internNew: bool) =
         Parser.LookupVar(cenv, sym, internNew, true)
@@ -1734,7 +1799,7 @@ type Parser private () =
                     raise
                     <| new InvalidOperationException($"Expecting var, but {sym} is mapped to {o}")
 
-        if not <| isNull var && (not var.isPublic || registerMacro) then
+        if not <| isNull var && (not var.isMacro || registerMacro) then
             cenv.RegisterVar(var)
 
         var
@@ -1907,110 +1972,131 @@ type Parser private () =
 
     static member RegisterVar(v: Var) = () // TODO: constants registration
 
-    static member GetCompilerOption(kw: Keyword) =
-         RT0.get (CompilerOptionsVar, kw) 
+    static member GetCompilerOption(kw: Keyword) = RT0.get (CompilerOptionsVar, kw)
 
     static member InitializeCompilerOptions() =
-        
-        let mutable compilerOptions : obj = null
+
+        let mutable compilerOptions: obj = null
 
         let nixPrefix = "CLOJURE_COMPILER_"
         let winPrefix = "clojure.compiler."
 
         let envVars = Environment.GetEnvironmentVariables()
+
         for de in envVars do
             let de = de :?> DictionaryEntry
             let name = de.Key :?> string
             let value = de.Value :?> string
+
             if name.StartsWith(nixPrefix) then
                 // compiler options on *nix need to be of the form
                 // CLOJURE_COMPILER_DIRECT_LINKING because most shells do not
                 // support hyphens in variable names
                 let optionName = name.Substring(nixPrefix.Length).Replace("_", "-").ToLower()
-                compilerOptions <- RTMap.assoc (compilerOptions, Keyword.intern (null, optionName), Parser.ReadString(value))
+
+                compilerOptions <-
+                    RTMap.assoc (compilerOptions, Keyword.intern (null, optionName), Parser.ReadString(value))
             elif name.StartsWith(winPrefix) then
                 // compiler options on Windows need to be of the form
                 // clojure.compiler.direct-linking because most shells do not
                 // support hyphens in variable names
                 let optionName = name.Substring(winPrefix.Length)
-                compilerOptions <- RTMap.assoc (compilerOptions, Keyword.intern (null, optionName), Parser.ReadString(value))
 
-        CompilerOptionsVar <- Var.intern(Namespace.findOrCreate(Symbol.intern("clojure.core")), Symbol.intern("*compiler-options*"), compilerOptions).setDynamic()
+                compilerOptions <-
+                    RTMap.assoc (compilerOptions, Keyword.intern (null, optionName), Parser.ReadString(value))
 
-    static member ReadString( s: string) = 
-        Parser.ReadString(s, null)
+        CompilerOptionsVar <-
+            Var
+                .intern(
+                    Namespace.findOrCreate (Symbol.intern ("clojure.core")),
+                    Symbol.intern ("*compiler-options*"),
+                    compilerOptions
+                )
+                .setDynamic ()
 
-    static member ReadString(s: string, opts: obj) = 
+    static member ReadString(s: string) = Parser.ReadString(s, null)
+
+    static member ReadString(s: string, opts: obj) =
         use r = new PushbackTextReader(new StringReader(s))
-        LispReader.read(r, opts)
+        LispReader.read (r, opts)
 
 
 
     static member ParseArgs(cenv: CompilerEnv, argSeq: ISeq) =
         let args = ResizeArray<HostArg>()
 
-        let analyzeArg(arg: obj) : obj * ParameterType * LocalBinding option =
+        let analyzeArg (arg: obj) : obj * ParameterType * LocalBinding option =
             match arg with
             | :? ISeq as s ->
-                match RTSeq.first(s) with
+                match RTSeq.first (s) with
                 | :? Symbol as op when op.Equals(RTVar.ByRefSym) ->
-                    if RT0.length(s) <> 2 then
+                    if RT0.length (s) <> 2 then
                         raise <| ParseException("Wrong number of arguments to by-ref")
 
-                    match RTSeq.second(s) with
-                    | :? Symbol as localArg -> 
+                    match RTSeq.second (s) with
+                    | :? Symbol as localArg ->
                         match cenv.ReferenceLocal(localArg) with
                         | Some _ as lbOpt -> localArg, ParameterType.ByRef, lbOpt
-                        | _ -> raise <| ArgumentException($"Argument to by-ref must be a local variable: {localArg}")
+                        | _ ->
+                            raise
+                            <| ArgumentException($"Argument to by-ref must be a local variable: {localArg}")
                     | _ as arg -> raise <| ArgumentException($"Argument to by-ref must be a Symbol: {arg}")
                 | _ as v -> raise <| ArgumentException("Expected (by-ref arg), got: {v}")
-            | _ ->
-                arg, ParameterType.Standard, None
+            | _ -> arg, ParameterType.Standard, None
 
-        let rec loop (s:ISeq) =
+        let rec loop (s: ISeq) =
             match s with
             | null -> ()
             | _ ->
-                let arg, paramType, lb = analyzeArg(s.first())
+                let arg, paramType, lb = analyzeArg (s.first ())
                 let expr = Parser.Analyze(cenv.WithParserContext(Expression), arg)
-                args.Add({HostArg.ArgExpr = expr; ParamType = paramType; LocalBinding = lb})
 
-        loop(argSeq)
+                args.Add(
+                    { HostArg.ArgExpr = expr
+                      ParamType = paramType
+                      LocalBinding = lb }
+                )
+
+        loop (argSeq)
         args
 
 
     static member ParamTagsOf(sym: Symbol) =
-        let paramTags = RT0.get (RT0.meta(sym), RTVar.ParamTagsKeyword)
+        let paramTags = RT0.get (RT0.meta (sym), RTVar.ParamTagsKeyword)
+
         if not <| isNull paramTags && not <| paramTags :? IPersistentVector then
             raise <| ArgumentException($"param-tags of symbol {sym} should be a vector")
+
         paramTags :?> IPersistentVector
 
-    static member CreateQualifiedMethodExpr(cenv: CompilerEnv, methodType: Type, sym: Symbol) = 
-        let tagClass = 
+    static member CreateQualifiedMethodExpr(cenv: CompilerEnv, methodType: Type, sym: Symbol) =
+        let tagClass =
             match TypeUtils.TagOf(sym) with
             | null -> typeof<AFn>
             | _ as tag -> TypeUtils.TagToType(cenv, tag)
+
         let hintedSig = SignatureHint.MaybeCreate(cenv, Parser.ParamTagsOf(sym))
 
-        let kind, methodName = 
+        let kind, methodName =
             if sym.Name.StartsWith(".") then
                 QMMethodKind.Instance, sym.Name.Substring(1)
             elif sym.Name.Equals("new") then
                 QMMethodKind.Ctor, sym.Name
-            else 
+            else
                 QMMethodKind.Static, sym.Name
 
         Expr.QualifiedMethod(
-            Env = cenv, 
-            Form = sym, 
-            MethodType = methodType, 
+            Env = cenv,
+            Form = sym,
+            MethodType = methodType,
             HintedSig = hintedSig,
-            MethodSymbol = sym, 
+            MethodSymbol = sym,
             MethodName = methodName,
-            Kind = kind, 
+            Kind = kind,
             TagClass = tagClass,
-            SourceInfo = None) // TODO: source info)
-         
+            SourceInfo = None
+        ) // TODO: source info)
+
     static member ToHostExpr(cenv: CompilerEnv, qmExpr: Expr, tag: Symbol, args: ISeq) =
         // TODO: source info
 
@@ -2019,21 +2105,23 @@ type Parser private () =
 
         match qmExpr with
         | Expr.QualifiedMethod(
-                Env = qmenv; 
-                Form = form; 
-                MethodType = methodType; 
-                HintedSig = hintedSig; 
-                MethodSymbol = methodSymbol; 
-                MethodName = methodName; 
-                Kind = kind; 
-                TagClass = tagClass; 
-                SourceInfo = sourceInfo) ->
+            Env = qmenv
+            Form = form
+            MethodType = methodType
+            HintedSig = hintedSig
+            MethodSymbol = methodSymbol
+            MethodName = methodName
+            Kind = kind
+            TagClass = tagClass
+            SourceInfo = sourceInfo) ->
 
             let instance, args =
                 match kind with
-                | QMMethodKind.Instance -> 
-                    let instance = Parser.Analyze(cenv.WithParserContext(Expression), RTSeq.first(args))
-                    Some instance , RTSeq.next(args)
+                | QMMethodKind.Instance ->
+                    let instance =
+                        Parser.Analyze(cenv.WithParserContext(Expression), RTSeq.first (args))
+
+                    Some instance, RTSeq.next (args)
                 | _ -> None, args
 
 
@@ -2041,20 +2129,20 @@ type Parser private () =
             // Well, except here we have enough type information to fill in more details.
             // Constructors not included here.
             // We are trying to discriminate field access, property access, and method calls on zero arguments.
-            // 
+            //
             // One special case here:  Suppose we have a zero-arity _generic_method call, with type-args provided.
             // THis will look like:   (Type/StaticMethod (type-args type1 ..))  or (Type/InstanceMEthod instance-expression (type-args type1 ..))
             // We check for the arg count before removing the type-args, so these will be handled by the non-zero-arity code.
             // That is okay -- because this is generic, it can't be a field or property access, so we can treat it as a method call.
 
-            let genericTypeArgs, args = 
-                match RTSeq.first(args) with
+            let genericTypeArgs, args =
+                match RTSeq.first (args) with
                 | :? ISeq as firstArg ->
-                    match RTSeq.first(firstArg) with 
-                    | :? Symbol as sym when sym.Equals(RTVar.TypeArgsSym) -> 
+                    match RTSeq.first (firstArg) with
+                    | :? Symbol as sym when sym.Equals(RTVar.TypeArgsSym) ->
                         // we have type-args supplied for a generic method call
                         // (. target methddname (type-args type1 ... ) arg1 ...)
-                        TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstArg)), args.next()
+                        TypeUtils.CreateTypeArgList(cenv, RTSeq.next (firstArg)), args.next ()
                     | _ -> TypeUtils.EmptyTypeList, args
                 | _ -> TypeUtils.EmptyTypeList, args
 
@@ -2062,9 +2150,9 @@ type Parser private () =
             // Who wins the type-arg battle?
             // If the QME has a nonempty generic type args list, we us it in preference.
 
-            let genericTypeArgs = 
+            let genericTypeArgs =
                 match hintedSig with
-                | Some hsig -> 
+                | Some hsig ->
                     match hsig.GenericTypeArgs with
                     | Some gta -> gta
                     | None -> genericTypeArgs
@@ -2072,68 +2160,82 @@ type Parser private () =
 
             let hasGenericTypeArgs = genericTypeArgs.Count > 0
 
-            let isZeroArityCall = RT0.count(args) = 0 && kind <> QMMethodKind.Ctor
+            let isZeroArityCall = RT0.count (args) = 0 && kind <> QMMethodKind.Ctor
 
             if isZeroArityCall then
                 // we know this is not a constructor call.
                 let isStatic = (kind = QMMethodKind.Static)
-                let memberInfo = 
-                    if not hasGenericTypeArgs then 
+
+                let memberInfo =
+                    if not hasGenericTypeArgs then
                         Reflector.GetFieldOrPropertyInfo(methodType, methodName, isStatic)
-                    else null
-                let memberInfo, hostExprType = 
-                    if isNull memberInfo then 
-                        Reflector.GetArityZeroMethod(methodType, methodName, genericTypeArgs, isStatic)  :> MemberInfo, HostExprType.InstanceZeroArityCallExpr
-                    else 
+                    else
+                        null
+
+                let memberInfo, hostExprType =
+                    if isNull memberInfo then
+                        Reflector.GetArityZeroMethod(methodType, methodName, genericTypeArgs, isStatic) :> MemberInfo,
+                        HostExprType.InstanceZeroArityCallExpr
+                    else
                         memberInfo, HostExprType.FieldOrPropertyExpr
-                
+
                 match memberInfo with
-                | null -> 
-                    let typeArgsStr = 
-                        if hasGenericTypeArgs then $" and generic type args {QMHelpers.GenerateGenericTypeArgString(genericTypeArgs)}"
-                        else ""
+                | null ->
+                    let typeArgsStr =
+                        if hasGenericTypeArgs then
+                            $" and generic type args {QMHelpers.GenerateGenericTypeArgString(genericTypeArgs)}"
+                        else
+                            ""
+
                     let instOrStaticStr = if isStatic then "static" else "instance"
 
-                    raise <| MissingMemberException($"No {instOrStaticStr} field, property or method taking 0 args{typeArgsStr} named {methodName} found for {methodType.Name}")
+                    raise
+                    <| MissingMemberException(
+                        $"No {instOrStaticStr} field, property or method taking 0 args{typeArgsStr} named {methodName} found for {methodType.Name}"
+                    )
                 | _ ->
                     Expr.InteropCall(
-                            Env = cenv, 
-                            Form = form, 
-                            Type=hostExprType, 
-                            IsStatic = isStatic, 
-                            Tag = tag, 
-                            Target = instance, 
-                            TargetType = methodType, 
-                            MemberName = methodName, 
-                            TInfo = memberInfo, 
-                            Args = null, 
-                            TypeArgs = genericTypeArgs, 
-                            SourceInfo = None)  // TODO: source info 
+                        Env = cenv,
+                        Form = form,
+                        Type = hostExprType,
+                        IsStatic = isStatic,
+                        Tag = tag,
+                        Target = instance,
+                        TargetType = methodType,
+                        MemberName = methodName,
+                        TInfo = memberInfo,
+                        Args = null,
+                        TypeArgs = genericTypeArgs,
+                        SourceInfo = None
+                    ) // TODO: source info
 
 
-            else 
+            else
                 // TODO: there are some real differences in the constructors in the oringal code.
                 // NEed to figure out if it matters in the new world order.
                 // Look at contructors for InstanceMethodExpr, StaticMethodExpr, InstanceFieldExpr, InstancePropertyExpr, etc.
-                let method = 
+                let method =
                     match hintedSig with
                     | Some hsig -> QMHelpers.ResolveHintedMethod(methodType, methodName, kind, hsig)
                     | None -> null
+
                 match kind with
-                | QMMethodKind.Ctor -> 
+                | QMMethodKind.Ctor ->
                     Expr.New(
-                        Env = cenv, 
-                        Form = form, 
+                        Env = cenv,
+                        Form = form,
                         Constructor = method,
                         Args = Parser.ParseArgs(cenv, args),
                         Type = methodType,
                         IsNoArgValueTypeCtor = false,
-                        SourceInfo = None) // TODO: source info)
+                        SourceInfo = None
+                    ) // TODO: source info)
 
                 | _ ->
                     let isStatic = (kind = QMMethodKind.Static)
 
                     let hostArgs = Parser.ParseArgs(cenv, args)
+
                     Expr.InteropCall(
                         Env = cenv,
                         Form = form,
@@ -2146,8 +2248,7 @@ type Parser private () =
                         TInfo = method,
                         Args = hostArgs,
                         TypeArgs = genericTypeArgs,
-                        SourceInfo = None) // TODO: source info
+                        SourceInfo = None
+                    ) // TODO: source info
 
         | _ -> raise <| ArgumentException("Expected QualifiedMethod expression")
-
-
