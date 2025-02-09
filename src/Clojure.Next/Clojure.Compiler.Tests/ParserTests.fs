@@ -278,6 +278,7 @@ let createTestNameSpaces () =
     ns1.addAlias (ns2Sym, ns2)
     ns1.intern (abcSym) |> ignore
     ns1.intern (defSym) |> ignore
+    ns1.reference(RTVar.InstanceVar.Name, RTVar.InstanceVar) |> ignore
     ns1.importClass(impSym, typeof<System.Text.StringBuilder>) |> ignore
 
     let mv = ns1.intern(macroSym)
@@ -332,6 +333,10 @@ let ResolveTests =
               Expect.isNotNull privateVar "Should find private var"
               Expect.isTrue (privateVar :? Var) "Should be a Var"
               Expect.isFalse ((privateVar :?> Var).isPublic) "Should not be public"
+
+              let inst = ns1.getMapping(RTVar.InstanceVar.Name)
+              Expect.isNotNull inst "Should find instance? in ns2"
+              Expect.equal inst RTVar.InstanceVar"Should map to a Var(instance?)"
 
           testCase "Namespace alias, var not found => throws"
           <| fun _ ->
@@ -1096,7 +1101,7 @@ let BasicInvokeTests =
               Expect.equal ast astFexpr "Should be the same as fexpr"
 
       
-          ftestCase "(abc 7), fred not special   => basic invoke expr"
+          testCase "(abc 7), abc bound to Var in namespace, not special   => basic invoke expr"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -1128,9 +1133,103 @@ let BasicInvokeTests =
               finally
                   Var.popThreadBindings () |> ignore
 
+                        
+          testCase "(fred 7), fred not bound to Var in namespace, not special   => trhows"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
+              let form = ReadFromString "(fred 7)"
 
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+               
+              try 
+                  Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "should throw"
 
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "(instance? System.Int64 7), instance? mapped to Var in naemsspace   =>  Expr.InstanceOf"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "(instance? System.Int64 7)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+               
+              try 
+                  let ast = Parser.Analyze(cctx, form)
+                  Expect.equal ast (Expr.InstanceOf(Env = cctx, Form = form, Type = typeof<int64>, Expr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType), SourceInfo=None))  "Should be an InstanceOf"
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "(instance? 8 7), instance? mapped to Var in naemsspace (first arg not a Type Literal)  =>  regular invoke"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "(instance? 8 7)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+               
+              try 
+                  let ast = Parser.Analyze(cctx, form)
+                  match ast with 
+                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+    
+                        Expect.equal iEnv cctx "Should have the expected env"
+                        Expect.equal iForm form "Should have the expected form"
+                        Expect.equal fexpr  (Expr.Var(Env = cctx, Form=RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))  "Fexpr should be an Expr.Var"
+
+                        let expectedArgs = ResizeArray<Expr>()
+                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                        compareGenericLists(args, expectedArgs)
+      
+                        Expect.isNull tag "Tag should be null"
+                        Expect.isNone si "SourceInfo should be None"
+                  | _ -> failtest "Should be an Invoke"              
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          ftestCase "(instance? System.Int64 7 8), instance? mapped to Var in naemsspace (first arg not a Type Literal)  =>  regular invoke"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "(instance? System.Int64 8 7)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+               
+              try 
+                  let ast = Parser.Analyze(cctx, form)
+                  match ast with 
+                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+    
+                        Expect.equal iEnv cctx "Should have the expected env"
+                        Expect.equal iForm form "Should have the expected form"
+                        Expect.equal fexpr  (Expr.Var(Env = cctx, Form=RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))  "Fexpr should be an Expr.Var"
+
+                        let expectedArgs = ResizeArray<Expr>()
+                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = Symbol.intern("System.Int64"), Value = typeof<int64>, Type = OtherType))
+                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                        compareGenericLists(args, expectedArgs)
+      
+                        Expect.isNull tag "Tag should be null"
+                        Expect.isNone si "SourceInfo should be None"
+                  | _ -> failtest "Should be an Invoke"              
+              finally
+                  Var.popThreadBindings () |> ignore
 
         
 
