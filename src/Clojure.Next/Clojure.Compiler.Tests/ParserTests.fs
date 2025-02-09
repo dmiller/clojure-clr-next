@@ -989,3 +989,150 @@ let SymbolTests =
 
           ]
           
+
+[<Tests>]
+let BasicInvokeTests =
+    testList
+        "Basic Invoke Tests"
+        [ testCase "(nil x y z) throws"
+          <| fun _ ->
+              let form = ReadFromString "(nil 7 8)"
+              let cctx = CompilerEnv.Create(Expression)
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw with nil as fexpr"
+
+          testCase "(:keyword x)  (Just one arg + Register exists) => Expr.KeywordInvoke, callsite registered"
+          <| fun _ ->
+              let kw = Keyword.intern (null, "kw")
+              let form = ReadFromString "(:kw 7)"
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let ast = Parser.Analyze(cctx, form)
+              Expect.equal ast (Expr.KeywordInvoke(Env = cctx, 
+                Form = form, 
+                KwExpr = (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType)), 
+                Target = (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)), 
+                Tag = null,
+                SiteIndex = 0,
+                SourceInfo = None)) "Should return a KeywordInvoke"
+              // Had to debug what was wrong with my test.  For reference.  (I had the wrong value for SiteIndex)
+              //match ast with
+              //| Expr.KeywordInvoke(Env = kiEnv; Form = kiForm; KwExpr = kwExpr; Target = target; Tag = tag; SiteIndex = index; SourceInfo = si) as ki ->
+
+              //      Expect.equal kiEnv cctx "Should have the expected env"
+              //      Expect.equal kiForm form "Should have the expected form"
+              //      Expect.isTrue (kwExpr.IsLiteral) "KwExpr should be a Literal"
+              //      Expect.equal kwExpr  (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "KwExpr should be a Literal"
+    
+              //      Expect.isTrue (target.IsLiteral) "Target should be a Literal"
+              //      Expect.equal target  (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)) "Target should be a Literal"
+    
+              //      Expect.isNull tag "Tag should be null"
+              //      Expect.equal index 0 "SiteIndex should be 0"
+              //      Expect.isNone si "SourceInfo should be None"
+              //| _ -> failtest "Should be a KeywordInvoke"
+    
+          testCase "(:keyword x)  (Wrong number of args + Register exists) => Should not be KeywordInvoke"
+          <| fun _ ->
+              let kw = Keyword.intern (null, "kw")
+              let form = ReadFromString "(:kw 7 8)"
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let ast = Parser.Analyze(cctx, form)
+
+              match ast with 
+              | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+    
+                    Expect.equal iEnv cctx "Should have the expected env"
+                    Expect.equal iForm form "Should have the expected form"
+                    Expect.equal fexpr  (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "Fexpr should be a keyword Literal"
+
+                    let expectedArgs = ResizeArray<Expr>()
+                    expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                    expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                    compareGenericLists(args, expectedArgs)   
+     
+                    Expect.isNull tag "Tag should be null"
+                    Expect.isNone si "SourceInfo should be None"
+              | _ -> failtest "Should be an Invoke"
+
+    
+          testCase "(:keyword x)  (Just one arg + Register does not exist) => Should not be KeywordInvoke"
+          <| fun _ ->
+              let kw = Keyword.intern (null, "kw")
+              let form = ReadFromString "(:kw 7)"
+              let cctx = CompilerEnv.Create(Expression)
+
+              let ast = Parser.Analyze(cctx, form)
+
+              match ast with 
+              | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+    
+                    Expect.equal iEnv cctx "Should have the expected env"
+                    Expect.equal iForm form "Should have the expected form"
+                    Expect.equal fexpr  (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "Fexpr should be a keyword Literal"
+
+                    let expectedArgs = ResizeArray<Expr>()
+                    expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                    compareGenericLists(args, expectedArgs)
+      
+                    Expect.isNull tag "Tag should be null"
+                    Expect.isNone si "SourceInfo should be None"
+              | _ -> failtest "Should be an Invoke"
+
+    
+          testCase "(staticFieldOrProperty)   =>  same as staticFieldOrProperty -- almost deprecated, not recommended"
+          <| fun _ ->
+              let form = ReadFromString "(System.Int64/MaxValue)"
+              let cctx = CompilerEnv.Create(Expression)
+              let fexpr = ReadFromString "System.Int64/MaxValue"
+
+              let ast = Parser.Analyze(cctx, form)
+              let astFexpr = Parser.Analyze(cctx, fexpr)
+
+              Expect.equal ast astFexpr "Should be the same as fexpr"
+
+      
+          ftestCase "(abc 7), fred not special   => basic invoke expr"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "(abc 7)"
+              let abcVar = ns1.findInternedVar(abcSym)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+               
+              try 
+                  let ast = Parser.Analyze(cctx, form)
+                  match ast with 
+                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+    
+                        Expect.equal iEnv cctx "Should have the expected env"
+                        Expect.equal iForm form "Should have the expected form"
+                        Expect.equal fexpr  (Expr.Var(Env = cctx, Form=abcSym, Var = abcVar, Tag = null))  "Fexpr should be an Expr.Var"
+
+                        let expectedArgs = ResizeArray<Expr>()
+                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                        compareGenericLists(args, expectedArgs)
+      
+                        Expect.isNull tag "Tag should be null"
+                        Expect.isNone si "SourceInfo should be None"
+                  | _ -> failtest "Should be an Invoke"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+
+
+
+        
+
+
+        ]
