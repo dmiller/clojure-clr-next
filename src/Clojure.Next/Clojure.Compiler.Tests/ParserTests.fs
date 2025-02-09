@@ -903,9 +903,89 @@ let SymbolTests =
               Expect.isTrue (closes.containsKey (lbPqrs)) "Should contain pqrs closeover"
               Expect.equal (closes.valAt (lbPqrs)) lbPqrs "Should contain pqrs closeover"
 
-          //testCase "Detects local bindings, does close over if not in method locals."
-          //<| fun _ ->
+          testCase "non-local, non-Type, resolves to Var, is macro => throws"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
 
-          //    let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+              try 
+
+                Expect.throwsT<CompilerException>(fun _ -> Parser.Analyze(cctx, macroSym) |> ignore) "Should throw with non-local, non-Type, resolves to Var, is macro"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "non-local, non-Type, resolves to Var, is const =>  Analyzes 'V, returns Literal"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+              try 
+
+                let constVar = ns1.findInternedVar(constSym)
+                let ast = Parser.Analyze(cctx, constSym)
+
+                Expect.equal ast (Expr.Literal(Env = cctx, Form = constVar, Value = constVar, Type = OtherType)) "Should return a Literal"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+          testCase "non-local, non-Type, resolves to Var, =>  returns Expr.Var"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+              try 
+
+                let abcVar = ns1.findInternedVar(abcSym)
+                let ast = Parser.Analyze(cctx, abcSym)
+
+                Expect.equal ast (Expr.Var(Env = cctx, Form = abcSym, Var = abcVar, Tag = null)) "Should return an Expr.Var"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+          testCase "non-local, non-Type, resolves to symbol (allow-unresolved = true) =>  Expr.UnresolvedVar"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1, RTVar.AllowUnresolvedVarsVar, true))
+              try 
+
+                let sym = Symbol.intern(null, "fred")
+                let ast = Parser.Analyze(cctx, sym)
+
+                Expect.equal ast (Expr.UnresolvedVar(Env = cctx, Form = sym, Sym = sym)) "Should return an UnresolvedVar"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+
+          testCase "non-local, non-Type, resolves to symbol (allow-unresolved = false) =>  throws"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1, RTVar.AllowUnresolvedVarsVar, false))
+              try 
+
+                let sym = Symbol.intern(null, "fred")
+                Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, sym) |> ignore) "Should throw with non-local, non-Type, resolves to symbol (allow-unresolved = false)"
+
+              finally
+                  Var.popThreadBindings () |> ignore
 
           ]
+          

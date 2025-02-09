@@ -326,7 +326,7 @@ type Parser private () =
                     Parser.Analyze(cenv.WithParserContext(Expression), RTSeq.list (RTVar.QuoteSym, v))
                 else
                     Expr.Var(Env = cenv, Form = sym, Var = v, Tag = tag)
-            | :? Type -> Expr.Literal(Env = cenv, Form = sym, Type = OtherType, Value = sym)
+            | :? Type as t -> Expr.Literal(Env = cenv, Form = sym, Type = OtherType, Value = t)
             | :? Symbol -> Expr.UnresolvedVar(Env = cenv, Form = sym, Sym = sym)
             | _ -> raise <| CompilerException($"Unable to resolve symbol: {sym} in this context")
 
@@ -499,7 +499,7 @@ type Parser private () =
 
 
     static member ConstantExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
-        let argCount = RT0.count (form)
+        let argCount = RT0.count (form) - 1
 
         if argCount <> 1 then
             let exData = PersistentArrayMap([| RTVar.FormKeywoard :> obj; form |])
@@ -515,10 +515,10 @@ type Parser private () =
             else
                 Parser.FalseExprInstance
         | _ as n when Numbers.IsNumeric(n) -> Parser.AnalyzeNumber(cenv, n)
-        | :? string as s -> Expr.Literal(Env = cenv, Form = form, Type = StringType, Value = s)
+        | :? string as s -> Expr.Literal(Env = cenv, Form = s, Type = StringType, Value = s)
         | :? IPersistentCollection as pc when pc.count () = 0 && (not <| pc :? IMeta || isNull ((pc :?> IMeta).meta ())) ->
-            Expr.Literal(Env = cenv, Form = form, Type = EmptyType, Value = pc)
-        | _ as v -> Expr.Literal(Env = cenv, Form = form, Type = OtherType, Value = v)
+            Expr.Literal(Env = cenv, Form = pc, Type = EmptyType, Value = pc)
+        | _ as v -> Expr.Literal(Env = cenv, Form = v, Type = OtherType, Value = v)
 
 
     // Cranking up the difficulty level.
@@ -1765,7 +1765,9 @@ type Parser private () =
         if not <| isNull v && v.isMacro then
             if v.Namespace = RTVar.getCurrentNamespace () && not v.isPublic then
                 raise <| new InvalidOperationException($"Var: {v} is not public")
-        v
+            v
+        else
+            null
 
     static member LookupVar(cenv: CompilerEnv, sym: Symbol, internNew: bool) =
         Parser.LookupVar(cenv, sym, internNew, true)
@@ -1832,7 +1834,7 @@ type Parser private () =
     static member private MacroexpandSeq1(cenv: CompilerEnv, form: ISeq) =
         let op = form.first ()
 
-        if (LispReader.IsSpecial(form)) then
+        if (LispReader.IsSpecial(op)) then
             form
         else
             match Parser.IsMacro(cenv, op) with
