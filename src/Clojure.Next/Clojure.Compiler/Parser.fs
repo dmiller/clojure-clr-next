@@ -1557,7 +1557,7 @@ type Parser private () =
                 let memberInfo, hostExprType =
                     if isNull memberInfo then
                         Reflector.GetArityZeroMethod(methodType, methodName, genericTypeArgs, isStatic) :> MemberInfo,
-                        HostExprType.InstanceZeroArityCallExpr
+                        (if isStatic then HostExprType.MethodExpr else HostExprType.InstanceZeroArityCallExpr)
                     else
                         memberInfo, HostExprType.FieldOrPropertyExpr
 
@@ -1593,8 +1593,8 @@ type Parser private () =
 
 
             else
-                // TODO: there are some real differences in the constructors in the oringal code.
-                // NEed to figure out if it matters in the new world order.
+                // TODO: there are some real differences in the constructors in the original code.
+                // Need to figure out if it matters in the new world order.
                 // Look at contructors for InstanceMethodExpr, StaticMethodExpr, InstanceFieldExpr, InstancePropertyExpr, etc.
                 let method =
                     match hintedSig with

@@ -1199,7 +1199,7 @@ let BasicInvokeTests =
               finally
                   Var.popThreadBindings () |> ignore
 
-          ftestCase "(instance? System.Int64 7 8), instance? mapped to Var in naemsspace (first arg not a Type Literal)  =>  regular invoke"
+          testCase "(instance? System.Int64 7 8), instance? mapped to Var in naemsspace (first arg not a Type Literal)  =>  regular invoke"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -1231,7 +1231,55 @@ let BasicInvokeTests =
               finally
                   Var.popThreadBindings () |> ignore
 
-        
+          // TODO: Tests for direct linking to Vars
 
+        ]
+
+// Class for testing QM resolution
+
+type QMTest(_x: int64) =
+
+    static member SF = 12  // static field
+    member _.IF = 12  // instance field
+
+    static member US0() = 12  // unique zero-arity static
+    static member US1(x: int64) = 12  // unique single-arity static
+    static member OS1(x: int64) = 12  // overloaded single-arity static
+    static member OS1(x: string) = 12  // overloaded single-arity static
+
+    member _.UI0() = 12  // unique zero-arity instance
+    member _.UI1(x: int64) = 12  // unique single-arity instance
+    member _.OI1(x: int64) = 12  // overloaded single-arity instance
+    member _.OI1(x: string) = 12  // overloaded single-arity instance
+
+
+[<Tests>]
+let BasicQMTests =
+    testList
+        "Basic QM Tests"
+        [ ftestCase "(|ParserTests+QMTest|/US0)  => zero-arity interop call"
+          <| fun _ ->
+                let ns1, ns2 = createTestNameSpaces ()
+                let cctx = CompilerEnv.Create(Expression)
+                let register = ObjXRegister(None)
+                let cctx = { cctx with ObjXRegister = Some register }
+
+                let form = ReadFromString "(|ParserTests+QMTest|/US0)"
+                let ast = Parser.Analyze(cctx, form)
+                compareInteropCalls (
+                    ast,
+                    (Expr.InteropCall(
+                        Env = cctx,
+                        Form = (RTSeq.first(form)),
+                        Type = MethodExpr,
+                        IsStatic = true,
+                        Tag = null,
+                        Target = None,
+                        TargetType = typeof<QMTest>,
+                        MemberName = "US0",
+                        TInfo = (typeof<QMTest>.GetMethod ("US0")),
+                        Args = null,
+                        TypeArgs = (ResizeArray<Type>()),
+                        SourceInfo = None )))
 
         ]
