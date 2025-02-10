@@ -1257,7 +1257,7 @@ type QMTest(_x: int64) =
 let BasicQMTests =
     testList
         "Basic QM Tests"
-        [ ftestCase "(|ParserTests+QMTest|/US0)  => zero-arity interop call"
+        [ testCase "(|ParserTests+QMTest|/US0)  => zero-arity static interop call"
           <| fun _ ->
                 let ns1, ns2 = createTestNameSpaces ()
                 let cctx = CompilerEnv.Create(Expression)
@@ -1281,5 +1281,188 @@ let BasicQMTests =
                         Args = null,
                         TypeArgs = (ResizeArray<Type>()),
                         SourceInfo = None )))
+
+          testCase "(|ParserTests+QMTest|/.UI0 7)  => zero-arity instance interop call"
+          <| fun _ ->
+                let ns1, ns2 = createTestNameSpaces ()
+                let cctx = CompilerEnv.Create(Expression)
+                let register = ObjXRegister(None)
+                let cctx = { cctx with ObjXRegister = Some register }
+
+                let form = ReadFromString "(|ParserTests+QMTest|/.UI0 7)"
+                let ast = Parser.Analyze(cctx, form)
+                compareInteropCalls (
+                    ast,
+                    (Expr.InteropCall(
+                        Env = cctx,
+                        Form = (RTSeq.first(form)),
+                        Type = InstanceZeroArityCallExpr,
+                        IsStatic = false,
+                        Tag = null,
+                        Target = (Some <| Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
+                        TargetType = typeof<QMTest>,
+                        MemberName = "UI0",
+                        TInfo = (typeof<QMTest>.GetMethod ("UI0")),
+                        Args = null,
+                        TypeArgs = (ResizeArray<Type>()),
+                        SourceInfo = None )))
+
+          testCase "(|ParserTests+QMTest|/Nope)  => zero-arity interop call throws (missing method)"
+          <| fun _ ->
+                let ns1, ns2 = createTestNameSpaces ()
+                let cctx = CompilerEnv.Create(Expression)
+                let register = ObjXRegister(None)
+                let cctx = { cctx with ObjXRegister = Some register }
+
+                let form = ReadFromString "(|ParserTests+QMTest|/Nope)"
+                Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw with missing method"
+
+
+          testCase "(|ParserTests+QMTest|/US1 7)  => positive-arity static interop call, method not found"
+          <| fun _ ->
+                let ns1, ns2 = createTestNameSpaces ()
+                let cctx = CompilerEnv.Create(Expression)
+                let register = ObjXRegister(None)
+                let cctx = { cctx with ObjXRegister = Some register }
+
+                let form = ReadFromString "(|ParserTests+QMTest|/US1 7)"
+                let ast = Parser.Analyze(cctx, form)
+
+                let args = ResizeArray<HostArg>()
+                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+
+                compareInteropCalls (
+                    ast,
+                    (Expr.InteropCall(
+                        Env = cctx,
+                        Form = (RTSeq.first(form)),
+                        Type = MethodExpr,
+                        IsStatic = true,
+                        Tag = null,
+                        Target = None,
+                        TargetType = typeof<QMTest>,
+                        MemberName = "US1",
+                        TInfo = null,
+                        Args = args,
+                        TypeArgs = (ResizeArray<Type>()),
+                        SourceInfo = None )))
+
+
+          testCase "(^[long] |ParserTests+QMTest|/US1 7)  => positive-arity static interop call, with params-tag, method found"
+          <| fun _ ->
+                let ns1, ns2 = createTestNameSpaces ()
+                let cctx = CompilerEnv.Create(Expression)
+                let register = ObjXRegister(None)
+                let cctx = { cctx with ObjXRegister = Some register }
+
+                let form = ReadFromString "(^[long] |ParserTests+QMTest|/US1 7)"
+                let ast = Parser.Analyze(cctx, form)
+
+                let args = ResizeArray<HostArg>()
+                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+
+                compareInteropCalls (
+                    ast,
+                    (Expr.InteropCall(
+                        Env = cctx,
+                        Form = (RTSeq.first(form)),
+                        Type = MethodExpr,
+                        IsStatic = true,
+                        Tag = null,
+                        Target = None,
+                        TargetType = typeof<QMTest>,
+                        MemberName = "US1",
+                        TInfo = (typeof<QMTest>.GetMethod ("US1")),
+                        Args = args,
+                        TypeArgs = (ResizeArray<Type>()),
+                        SourceInfo = None )))
+
+
+          testCase "(^[long] |ParserTests+QMTest|/.UI1 7)  => positive-arity instance interop call, with params-tag, method found"
+          <| fun _ ->
+                let ns1, ns2 = createTestNameSpaces ()
+                let cctx = CompilerEnv.Create(Expression)
+                let register = ObjXRegister(None)
+                let cctx = { cctx with ObjXRegister = Some register }
+
+                let form = ReadFromString "(^[long] |ParserTests+QMTest|/.UI1 7 7)"
+                let ast = Parser.Analyze(cctx, form)
+
+                let args = ResizeArray<HostArg>()
+                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+
+                compareInteropCalls (
+                    ast,
+                    (Expr.InteropCall(
+                        Env = cctx,
+                        Form = (RTSeq.first(form)),
+                        Type = MethodExpr,
+                        IsStatic = false,
+                        Tag = null,
+                        Target = (Some <| Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
+                        TargetType = typeof<QMTest>,
+                        MemberName = "UI1",
+                        TInfo = (typeof<QMTest>.GetMethod ("UI1")),
+                        Args = args,
+                        TypeArgs = (ResizeArray<Type>()),
+                        SourceInfo = None )))
+
+          testCase "(^[long] |ParserTests+QMTest|/OS1 7)  => positive-arity static interop call, with params-tag, overloaded method found"
+          <| fun _ ->
+                let ns1, ns2 = createTestNameSpaces ()
+                let cctx = CompilerEnv.Create(Expression)
+                let register = ObjXRegister(None)
+                let cctx = { cctx with ObjXRegister = Some register }
+
+                let form = ReadFromString "(^[long] |ParserTests+QMTest|/OS1 7)"
+                let ast = Parser.Analyze(cctx, form)
+
+                let args = ResizeArray<HostArg>()
+                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+
+                let method = (typeof<QMTest>.GetMethod ("OS1", [| typeof<int64> |]))
+
+                compareInteropCalls (
+                    ast,
+                    (Expr.InteropCall(
+                        Env = cctx,
+                        Form = (RTSeq.first(form)),
+                        Type = MethodExpr,
+                        IsStatic = true,
+                        Tag = null,
+                        Target = None,
+                        TargetType = typeof<QMTest>,
+                        MemberName = "OS1",
+                        TInfo = method,
+                        Args = args,
+                        TypeArgs = (ResizeArray<Type>()),
+                        SourceInfo = None )))
+
+          testCase "(^[long] |ParserTests+QMTest|/new 7)  => constructor call (Expr.New)"
+          <| fun _ ->
+                let ns1, ns2 = createTestNameSpaces ()
+                let cctx = CompilerEnv.Create(Expression)
+                let register = ObjXRegister(None)
+                let cctx = { cctx with ObjXRegister = Some register }
+
+                let form = ReadFromString "(^[long] |ParserTests+QMTest|/new 7)"
+                let ast = Parser.Analyze(cctx, form)
+
+                let args = ResizeArray<HostArg>()
+                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+
+                let method = (typeof<QMTest>.GetMethod ("OS1", [| typeof<int64> |]))
+
+                compareNewExprs (
+                    ast,
+                    (Expr.New(
+                        Env = cctx,
+                        Form = (RTSeq.first(form)),
+                        Type = typeof<QMTest>,
+                        Constructor = typeof<QMTest>.GetConstructor([| typeof<int64> |]),                        
+                        Args = args,
+                        IsNoArgValueTypeCtor = false,
+                        SourceInfo = None )))
+
 
         ]

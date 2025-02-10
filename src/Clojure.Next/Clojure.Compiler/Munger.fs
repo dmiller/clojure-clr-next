@@ -60,8 +60,6 @@ type Munger private () =
 
         m
 
-    static member val DemungePattern = Munger.CreateDemungePattern()
-
     // DEMUNGE_PATTERN searches for the first of any occurrence of
     // the strings that are keys of DEMUNGE_MAP.
     // Note: Regex matching rules mean that #"_|_COLON_" "_COLON_"
@@ -87,6 +85,9 @@ type Munger private () =
             sb.Append(Regex.Escape(Regex.Escape(mungeStrs[i] :?> string))) |> ignore
 
         new Regex(sb.ToString())
+
+    static member val DemungePattern = Munger.CreateDemungePattern()
+
 
     static member Munge(name: string) =
         let sb = StringBuilder()

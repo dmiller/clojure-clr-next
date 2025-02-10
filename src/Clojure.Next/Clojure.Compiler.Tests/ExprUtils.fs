@@ -108,3 +108,31 @@ let compareQualifiedMethods(a: Expr, b:Expr) =
         Expect.equal akind bkind "Kind should be equal"
         Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
     | _ -> failwith "Not a QualifiedMethod"
+
+
+let compareNewExprs (a: Expr, b: Expr) =
+    match a, b with
+    | Expr.New(
+        Env = aenv
+        Form = aform
+        Type = atype
+        Constructor = aconstructor
+        Args = aargs
+        IsNoArgValueTypeCtor = aisnoargvaluetypector
+        SourceInfo = asourceinfo),
+      Expr.New(
+          Env = benv
+          Form = bform
+          Type = btype
+          Constructor = bconstructor
+          Args = bargs
+          IsNoArgValueTypeCtor = bIsNoArgValueTypeCtor
+          SourceInfo = bsourceinfo) ->
+        Expect.equal aenv benv "Env should be equal"
+        Expect.equal aform bform "Form should be equal"
+        Expect.equal atype btype "Type should be equal"
+        Expect.equal aconstructor bconstructor "Constructor should be equal"
+        compareGenericLists (aargs, bargs)
+        Expect.equal aisnoargvaluetypector bIsNoArgValueTypeCtor "IsNoArgValueTypeCtor should be equal"
+        Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
+    | _ -> failwith "Not an InteropCall"
