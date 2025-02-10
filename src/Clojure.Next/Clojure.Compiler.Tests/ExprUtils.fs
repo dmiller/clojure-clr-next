@@ -138,6 +138,14 @@ let compareNewExprs (a: Expr, b: Expr) =
         Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
     | _ -> failwith "Not an InteropCall"
 
+let compareBodies(a: Expr, b: Expr) = 
+    match a,b with
+    | Expr.Body(aenv, aform, abody),
+      Expr.Body(benv, bform, bbody) ->
+        Expect.equal aenv benv "Env should be equal"
+        Expect.equal aform bform "Form should be equal"
+        compareGenericLists (abody, bbody)
+
 
 let withLocals(cenv: CompilerEnv, localNames: string array) =
 

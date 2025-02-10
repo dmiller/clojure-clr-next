@@ -1927,7 +1927,7 @@ type Parser private () =
                     sym
                 else
                     raise
-                    <| new InvalidOperationException($"Unable to resolve symbol: {sym} int this context")
+                    <| new InvalidOperationException($"Unable to resolve symbol: {sym} in this context")
             | _ as o -> o
 
 

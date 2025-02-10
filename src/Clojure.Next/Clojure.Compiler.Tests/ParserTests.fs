@@ -265,8 +265,8 @@ let abcSym = Symbol.intern ("abc")
 let defSym = Symbol.intern ("def")
 let pqrSym = Symbol.intern ("pqr")
 let impSym = Symbol.intern ("importedType")
-let macroSym = Symbol.intern("macroV")
-let constSym = Symbol.intern("constV")
+let macroSym = Symbol.intern ("macroV")
+let constSym = Symbol.intern ("constV")
 let privateSym = Symbol.intern ("private")
 let ns2Sym = Symbol.intern ("ns2")
 
@@ -278,14 +278,17 @@ let createTestNameSpaces () =
     ns1.addAlias (ns2Sym, ns2)
     ns1.intern (abcSym) |> ignore
     ns1.intern (defSym) |> ignore
-    ns1.reference(RTVar.InstanceVar.Name, RTVar.InstanceVar) |> ignore
-    ns1.importClass(impSym, typeof<System.Text.StringBuilder>) |> ignore
+    ns1.reference (RTVar.InstanceVar.Name, RTVar.InstanceVar) |> ignore
+    ns1.importClass (impSym, typeof<System.Text.StringBuilder>) |> ignore
 
-    let mv = ns1.intern(macroSym)
-    mv.setMacro()
+    let mv = ns1.intern (macroSym)
+    mv.setMacro ()
 
-    let mc = ns1.intern(constSym)
-    (mc :> IReference).resetMeta( (mc :> IMeta).meta().assoc(Keyword.intern (null, "const"),true)) |> ignore
+    let mc = ns1.intern (constSym)
+
+    (mc :> IReference)
+        .resetMeta ((mc :> IMeta).meta().assoc (Keyword.intern (null, "const"), true))
+    |> ignore
 
     ns2.intern (pqrSym) |> ignore
     Var.internPrivate (ns2Name, "private") |> ignore
@@ -303,7 +306,7 @@ let ResolveTests =
               let other = ns1.lookupAlias (ns2Sym)
               Expect.equal other ns2 "SHould find ns2 under alias"
 
-              let abc = ns1.getMapping (abcSym)              
+              let abc = ns1.getMapping (abcSym)
               Expect.isNotNull abc "Should find abc in ns1"
               Expect.isTrue (abc :? Var) "should map to Var"
 
@@ -313,7 +316,7 @@ let ResolveTests =
 
               let imp = ns1.getMapping (impSym)
               Expect.isNotNull imp "Should find importedType in ns1"
-              Expect.isTrue (imp :? Type) "should map to a Type" 
+              Expect.isTrue (imp :? Type) "should map to a Type"
 
               let mac = ns1.getMapping (macroSym)
               Expect.isNotNull mac "Should find macroV in ns1"
@@ -323,9 +326,12 @@ let ResolveTests =
               let con = ns1.getMapping (constSym)
               Expect.isNotNull con "should find constV in ns1"
               Expect.isTrue (con :? Var) "should map to a Var"
-              Expect.isTrue (RT0.booleanCast((con :?> IMeta).meta().valAt(Keyword.intern(null,"const")))) "Should have :const true"
-              
-              let pqr = ns2.getMapping(pqrSym)
+
+              Expect.isTrue
+                  (RT0.booleanCast ((con :?> IMeta).meta().valAt (Keyword.intern (null, "const"))))
+                  "Should have :const true"
+
+              let pqr = ns2.getMapping (pqrSym)
               Expect.isNotNull pqr "Should find pqr in ns2"
               Expect.isTrue (pqr :? Var) "Should map to a Var"
 
@@ -334,9 +340,9 @@ let ResolveTests =
               Expect.isTrue (privateVar :? Var) "Should be a Var"
               Expect.isFalse ((privateVar :?> Var).isPublic) "Should not be public"
 
-              let inst = ns1.getMapping(RTVar.InstanceVar.Name)
+              let inst = ns1.getMapping (RTVar.InstanceVar.Name)
               Expect.isNotNull inst "Should find instance? in ns2"
-              Expect.equal inst RTVar.InstanceVar"Should map to a Var(instance?)"
+              Expect.equal inst RTVar.InstanceVar "Should map to a Var(instance?)"
 
           testCase "Namespace alias, var not found => throws"
           <| fun _ ->
@@ -501,7 +507,8 @@ let LookupVarTests =
               let v = Parser.LookupVar(cctx, sym, false)
               Expect.isNull v "Should not find var not in named namespace"
 
-          testCase "Sym /w namespace, does not exist in that namespace, namespace is current nameespace, internNew = true  => creates Var, returns var"
+          testCase
+              "Sym /w namespace, does not exist in that namespace, namespace is current nameespace, internNew = true  => creates Var, returns var"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -509,15 +516,19 @@ let LookupVarTests =
               let sym = Symbol.intern (ns1.Name.Name, "fred")
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let v = Parser.LookupVar(cctx, sym, true)
                   Expect.isNotNull v "Should find var not in named namespace"
-                  Expect.isNotNull (ns1.findInternedVar(Symbol.intern(null,"fred"))) "Should have created var in current namespace"
+
+                  Expect.isNotNull
+                      (ns1.findInternedVar (Symbol.intern (null, "fred")))
+                      "Should have created var in current namespace"
               finally
                   Var.popThreadBindings () |> ignore
 
-          testCase "Sym /w namespace, does not exist in that namespace, namespace is current nameespace, internNew = false  => null"
+          testCase
+              "Sym /w namespace, does not exist in that namespace, namespace is current nameespace, internNew = false  => null"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -525,8 +536,8 @@ let LookupVarTests =
               let sym = Symbol.intern (ns1.Name.Name, "fred")
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let v = Parser.LookupVar(cctx, sym, false)
                   Expect.isNull v "Should not find var not in named namespace"
               finally
@@ -537,7 +548,7 @@ let LookupVarTests =
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
 
-              let v1 = Parser.LookupVar(cctx,RTVar.NsSym, false)
+              let v1 = Parser.LookupVar(cctx, RTVar.NsSym, false)
               Expect.equal v1 RTVar.NsVar "Should find ns var"
 
               let v2 = Parser.LookupVar(cctx, RTVar.InNsSym, false)
@@ -551,8 +562,8 @@ let LookupVarTests =
               let sym = Symbol.intern (null, "fred")
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let v = Parser.LookupVar(cctx, sym, false)
                   Expect.isNull v "Should not find var not in current namespace"
               finally
@@ -567,11 +578,11 @@ let LookupVarTests =
               let sym = Symbol.intern (null, "fred")
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let v = Parser.LookupVar(cctx, sym, true)
                   Expect.isNotNull v "Should find var not in current namespace"
-                  Expect.isNotNull (ns1.findInternedVar(sym)) "Should have created var in current namespace"
+                  Expect.isNotNull (ns1.findInternedVar (sym)) "Should have created var in current namespace"
               finally
                   Var.popThreadBindings () |> ignore
 
@@ -582,8 +593,8 @@ let LookupVarTests =
               let cctx = CompilerEnv.Create(Expression)
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let v = Parser.LookupVar(cctx, abcSym, true)
                   Expect.isNotNull v "Should find var not in current namespace"
               finally
@@ -595,9 +606,11 @@ let LookupVarTests =
               let cctx = CompilerEnv.Create(Expression)
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
-                  Expect.throwsT<InvalidOperationException> (fun _ ->  Parser.LookupVar(cctx, impSym, true) |> ignore) "Should throw with non-var in current ns"
+
+              try
+                  Expect.throwsT<InvalidOperationException>
+                      (fun _ -> Parser.LookupVar(cctx, impSym, true) |> ignore)
+                      "Should throw with non-var in current ns"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -610,10 +623,10 @@ let LookupVarTests =
               let cctx = { cctx with ObjXRegister = Some register }
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let v = Parser.LookupVar(cctx, abcSym, true)
-                  Expect.isTrue (register.Vars.containsKey(v)) "Should register var"
+                  Expect.isTrue (register.Vars.containsKey (v)) "Should register var"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -626,10 +639,10 @@ let LookupVarTests =
               let cctx = { cctx with ObjXRegister = Some register }
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let v = Parser.LookupVar(cctx, macroSym, true, false)
-                  Expect.isFalse (register.Vars.containsKey(v)) "Should not register var"
+                  Expect.isFalse (register.Vars.containsKey (v)) "Should not register var"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -642,17 +655,17 @@ let LookupVarTests =
               let cctx = { cctx with ObjXRegister = Some register }
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let v = Parser.LookupVar(cctx, macroSym, true, true)
-                  Expect.isTrue (register.Vars.containsKey(v)) "Should register var"
+                  Expect.isTrue (register.Vars.containsKey (v)) "Should register var"
 
               finally
                   Var.popThreadBindings () |> ignore
 
 
-    
-            ]
+
+          ]
 
 [<Tests>]
 let SymbolTests =
@@ -915,9 +928,12 @@ let SymbolTests =
 
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-              try 
 
-                Expect.throwsT<CompilerException>(fun _ -> Parser.Analyze(cctx, macroSym) |> ignore) "Should throw with non-local, non-Type, resolves to Var, is macro"
+              try
+
+                  Expect.throwsT<CompilerException>
+                      (fun _ -> Parser.Analyze(cctx, macroSym) |> ignore)
+                      "Should throw with non-local, non-Type, resolves to Var, is macro"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -929,12 +945,16 @@ let SymbolTests =
 
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-              try 
 
-                let constVar = ns1.findInternedVar(constSym)
-                let ast = Parser.Analyze(cctx, constSym)
+              try
 
-                Expect.equal ast (Expr.Literal(Env = cctx, Form = constVar, Value = constVar, Type = OtherType)) "Should return a Literal"
+                  let constVar = ns1.findInternedVar (constSym)
+                  let ast = Parser.Analyze(cctx, constSym)
+
+                  Expect.equal
+                      ast
+                      (Expr.Literal(Env = cctx, Form = constVar, Value = constVar, Type = OtherType))
+                      "Should return a Literal"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -947,12 +967,16 @@ let SymbolTests =
 
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-              try 
 
-                let abcVar = ns1.findInternedVar(abcSym)
-                let ast = Parser.Analyze(cctx, abcSym)
+              try
 
-                Expect.equal ast (Expr.Var(Env = cctx, Form = abcSym, Var = abcVar, Tag = null)) "Should return an Expr.Var"
+                  let abcVar = ns1.findInternedVar (abcSym)
+                  let ast = Parser.Analyze(cctx, abcSym)
+
+                  Expect.equal
+                      ast
+                      (Expr.Var(Env = cctx, Form = abcSym, Var = abcVar, Tag = null))
+                      "Should return an Expr.Var"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -965,12 +989,16 @@ let SymbolTests =
 
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1, RTVar.AllowUnresolvedVarsVar, true))
-              try 
 
-                let sym = Symbol.intern(null, "fred")
-                let ast = Parser.Analyze(cctx, sym)
+              try
 
-                Expect.equal ast (Expr.UnresolvedVar(Env = cctx, Form = sym, Sym = sym)) "Should return an UnresolvedVar"
+                  let sym = Symbol.intern (null, "fred")
+                  let ast = Parser.Analyze(cctx, sym)
+
+                  Expect.equal
+                      ast
+                      (Expr.UnresolvedVar(Env = cctx, Form = sym, Sym = sym))
+                      "Should return an UnresolvedVar"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -984,16 +1012,20 @@ let SymbolTests =
 
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1, RTVar.AllowUnresolvedVarsVar, false))
-              try 
 
-                let sym = Symbol.intern(null, "fred")
-                Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, sym) |> ignore) "Should throw with non-local, non-Type, resolves to symbol (allow-unresolved = false)"
+              try
+
+                  let sym = Symbol.intern (null, "fred")
+
+                  Expect.throwsT<CompilerException>
+                      (fun _ -> Parser.Analyze(cctx, sym) |> ignore)
+                      "Should throw with non-local, non-Type, resolves to symbol (allow-unresolved = false)"
 
               finally
                   Var.popThreadBindings () |> ignore
 
           ]
-          
+
 
 [<Tests>]
 let BasicInvokeTests =
@@ -1003,7 +1035,10 @@ let BasicInvokeTests =
           <| fun _ ->
               let form = ReadFromString "(nil 7 8)"
               let cctx = CompilerEnv.Create(Expression)
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw with nil as fexpr"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw with nil as fexpr"
 
           testCase "(:keyword x)  (Just one arg + Register exists) => Expr.KeywordInvoke, callsite registered"
           <| fun _ ->
@@ -1014,30 +1049,36 @@ let BasicInvokeTests =
               let cctx = { cctx with ObjXRegister = Some register }
 
               let ast = Parser.Analyze(cctx, form)
-              Expect.equal ast (Expr.KeywordInvoke(Env = cctx, 
-                Form = form, 
-                KwExpr = (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType)), 
-                Target = (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)), 
-                Tag = null,
-                SiteIndex = 0,
-                SourceInfo = None)) "Should return a KeywordInvoke"
-              // Had to debug what was wrong with my test.  For reference.  (I had the wrong value for SiteIndex)
-              //match ast with
-              //| Expr.KeywordInvoke(Env = kiEnv; Form = kiForm; KwExpr = kwExpr; Target = target; Tag = tag; SiteIndex = index; SourceInfo = si) as ki ->
 
-              //      Expect.equal kiEnv cctx "Should have the expected env"
-              //      Expect.equal kiForm form "Should have the expected form"
-              //      Expect.isTrue (kwExpr.IsLiteral) "KwExpr should be a Literal"
-              //      Expect.equal kwExpr  (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "KwExpr should be a Literal"
-    
-              //      Expect.isTrue (target.IsLiteral) "Target should be a Literal"
-              //      Expect.equal target  (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)) "Target should be a Literal"
-    
-              //      Expect.isNull tag "Tag should be null"
-              //      Expect.equal index 0 "SiteIndex should be 0"
-              //      Expect.isNone si "SourceInfo should be None"
-              //| _ -> failtest "Should be a KeywordInvoke"
-    
+              Expect.equal
+                  ast
+                  (Expr.KeywordInvoke(
+                      Env = cctx,
+                      Form = form,
+                      KwExpr = (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType)),
+                      Target = (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
+                      Tag = null,
+                      SiteIndex = 0,
+                      SourceInfo = None
+                  ))
+                  "Should return a KeywordInvoke"
+          // Had to debug what was wrong with my test.  For reference.  (I had the wrong value for SiteIndex)
+          //match ast with
+          //| Expr.KeywordInvoke(Env = kiEnv; Form = kiForm; KwExpr = kwExpr; Target = target; Tag = tag; SiteIndex = index; SourceInfo = si) as ki ->
+
+          //      Expect.equal kiEnv cctx "Should have the expected env"
+          //      Expect.equal kiForm form "Should have the expected form"
+          //      Expect.isTrue (kwExpr.IsLiteral) "KwExpr should be a Literal"
+          //      Expect.equal kwExpr  (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "KwExpr should be a Literal"
+
+          //      Expect.isTrue (target.IsLiteral) "Target should be a Literal"
+          //      Expect.equal target  (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)) "Target should be a Literal"
+
+          //      Expect.isNull tag "Tag should be null"
+          //      Expect.equal index 0 "SiteIndex should be 0"
+          //      Expect.isNone si "SourceInfo should be None"
+          //| _ -> failtest "Should be a KeywordInvoke"
+
           testCase "(:keyword x)  (Wrong number of args + Register exists) => Should not be KeywordInvoke"
           <| fun _ ->
               let kw = Keyword.intern (null, "kw")
@@ -1048,23 +1089,27 @@ let BasicInvokeTests =
 
               let ast = Parser.Analyze(cctx, form)
 
-              match ast with 
+              match ast with
               | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
-    
-                    Expect.equal iEnv cctx "Should have the expected env"
-                    Expect.equal iForm form "Should have the expected form"
-                    Expect.equal fexpr  (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "Fexpr should be a keyword Literal"
 
-                    let expectedArgs = ResizeArray<Expr>()
-                    expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
-                    expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
-                    compareGenericLists(args, expectedArgs)   
-     
-                    Expect.isNull tag "Tag should be null"
-                    Expect.isNone si "SourceInfo should be None"
+                  Expect.equal iEnv cctx "Should have the expected env"
+                  Expect.equal iForm form "Should have the expected form"
+
+                  Expect.equal
+                      fexpr
+                      (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType))
+                      "Fexpr should be a keyword Literal"
+
+                  let expectedArgs = ResizeArray<Expr>()
+                  expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                  expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                  compareGenericLists (args, expectedArgs)
+
+                  Expect.isNull tag "Tag should be null"
+                  Expect.isNone si "SourceInfo should be None"
               | _ -> failtest "Should be an Invoke"
 
-    
+
           testCase "(:keyword x)  (Just one arg + Register does not exist) => Should not be KeywordInvoke"
           <| fun _ ->
               let kw = Keyword.intern (null, "kw")
@@ -1073,22 +1118,26 @@ let BasicInvokeTests =
 
               let ast = Parser.Analyze(cctx, form)
 
-              match ast with 
+              match ast with
               | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
-    
-                    Expect.equal iEnv cctx "Should have the expected env"
-                    Expect.equal iForm form "Should have the expected form"
-                    Expect.equal fexpr  (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "Fexpr should be a keyword Literal"
 
-                    let expectedArgs = ResizeArray<Expr>()
-                    expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
-                    compareGenericLists(args, expectedArgs)
-      
-                    Expect.isNull tag "Tag should be null"
-                    Expect.isNone si "SourceInfo should be None"
+                  Expect.equal iEnv cctx "Should have the expected env"
+                  Expect.equal iForm form "Should have the expected form"
+
+                  Expect.equal
+                      fexpr
+                      (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType))
+                      "Fexpr should be a keyword Literal"
+
+                  let expectedArgs = ResizeArray<Expr>()
+                  expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                  compareGenericLists (args, expectedArgs)
+
+                  Expect.isNull tag "Tag should be null"
+                  Expect.isNone si "SourceInfo should be None"
               | _ -> failtest "Should be an Invoke"
 
-    
+
           testCase "(staticFieldOrProperty)   =>  same as staticFieldOrProperty -- almost deprecated, not recommended"
           <| fun _ ->
               let form = ReadFromString "(System.Int64/MaxValue)"
@@ -1100,7 +1149,7 @@ let BasicInvokeTests =
 
               Expect.equal ast astFexpr "Should be the same as fexpr"
 
-      
+
           testCase "(abc 7), abc bound to Var in namespace, not special   => basic invoke expr"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
@@ -1109,31 +1158,36 @@ let BasicInvokeTests =
               let cctx = { cctx with ObjXRegister = Some register }
 
               let form = ReadFromString "(abc 7)"
-              let abcVar = ns1.findInternedVar(abcSym)
+              let abcVar = ns1.findInternedVar (abcSym)
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
-                  let ast = Parser.Analyze(cctx, form)
-                  match ast with 
-                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
-    
-                        Expect.equal iEnv cctx "Should have the expected env"
-                        Expect.equal iForm form "Should have the expected form"
-                        Expect.equal fexpr  (Expr.Var(Env = cctx, Form=abcSym, Var = abcVar, Tag = null))  "Fexpr should be an Expr.Var"
 
-                        let expectedArgs = ResizeArray<Expr>()
-                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
-                        compareGenericLists(args, expectedArgs)
-      
-                        Expect.isNull tag "Tag should be null"
-                        Expect.isNone si "SourceInfo should be None"
+              try
+                  let ast = Parser.Analyze(cctx, form)
+
+                  match ast with
+                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+
+                      Expect.equal iEnv cctx "Should have the expected env"
+                      Expect.equal iForm form "Should have the expected form"
+
+                      Expect.equal
+                          fexpr
+                          (Expr.Var(Env = cctx, Form = abcSym, Var = abcVar, Tag = null))
+                          "Fexpr should be an Expr.Var"
+
+                      let expectedArgs = ResizeArray<Expr>()
+                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                      compareGenericLists (args, expectedArgs)
+
+                      Expect.isNull tag "Tag should be null"
+                      Expect.isNone si "SourceInfo should be None"
                   | _ -> failtest "Should be an Invoke"
 
               finally
                   Var.popThreadBindings () |> ignore
 
-                        
+
           testCase "(fred 7), fred not bound to Var in namespace, not special   => trhows"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
@@ -1144,8 +1198,8 @@ let BasicInvokeTests =
               let form = ReadFromString "(fred 7)"
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "should throw"
 
               finally
@@ -1161,14 +1215,25 @@ let BasicInvokeTests =
               let form = ReadFromString "(instance? System.Int64 7)"
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
+
+              try
                   let ast = Parser.Analyze(cctx, form)
-                  Expect.equal ast (Expr.InstanceOf(Env = cctx, Form = form, Type = typeof<int64>, Expr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType), SourceInfo=None))  "Should be an InstanceOf"
+
+                  Expect.equal
+                      ast
+                      (Expr.InstanceOf(
+                          Env = cctx,
+                          Form = form,
+                          Type = typeof<int64>,
+                          Expr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                          SourceInfo = None
+                      ))
+                      "Should be an InstanceOf"
               finally
                   Var.popThreadBindings () |> ignore
 
-          testCase "(instance? 8 7), instance? mapped to Var in naemsspace (first arg not a Type Literal)  =>  regular invoke"
+          testCase
+              "(instance? 8 7), instance? mapped to Var in naemsspace (first arg not a Type Literal)  =>  regular invoke"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -1178,28 +1243,34 @@ let BasicInvokeTests =
               let form = ReadFromString "(instance? 8 7)"
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
-                  let ast = Parser.Analyze(cctx, form)
-                  match ast with 
-                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
-    
-                        Expect.equal iEnv cctx "Should have the expected env"
-                        Expect.equal iForm form "Should have the expected form"
-                        Expect.equal fexpr  (Expr.Var(Env = cctx, Form=RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))  "Fexpr should be an Expr.Var"
 
-                        let expectedArgs = ResizeArray<Expr>()
-                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
-                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
-                        compareGenericLists(args, expectedArgs)
-      
-                        Expect.isNull tag "Tag should be null"
-                        Expect.isNone si "SourceInfo should be None"
-                  | _ -> failtest "Should be an Invoke"              
+              try
+                  let ast = Parser.Analyze(cctx, form)
+
+                  match ast with
+                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+
+                      Expect.equal iEnv cctx "Should have the expected env"
+                      Expect.equal iForm form "Should have the expected form"
+
+                      Expect.equal
+                          fexpr
+                          (Expr.Var(Env = cctx, Form = RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))
+                          "Fexpr should be an Expr.Var"
+
+                      let expectedArgs = ResizeArray<Expr>()
+                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                      compareGenericLists (args, expectedArgs)
+
+                      Expect.isNull tag "Tag should be null"
+                      Expect.isNone si "SourceInfo should be None"
+                  | _ -> failtest "Should be an Invoke"
               finally
                   Var.popThreadBindings () |> ignore
 
-          testCase "(instance? System.Int64 7 8), instance? mapped to Var in naemsspace (first arg not a Type Literal)  =>  regular invoke"
+          testCase
+              "(instance? System.Int64 7 8), instance? mapped to Var in naemsspace (first arg not a Type Literal)  =>  regular invoke"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -1209,48 +1280,62 @@ let BasicInvokeTests =
               let form = ReadFromString "(instance? System.Int64 8 7)"
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
-               
-              try 
-                  let ast = Parser.Analyze(cctx, form)
-                  match ast with 
-                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
-    
-                        Expect.equal iEnv cctx "Should have the expected env"
-                        Expect.equal iForm form "Should have the expected form"
-                        Expect.equal fexpr  (Expr.Var(Env = cctx, Form=RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))  "Fexpr should be an Expr.Var"
 
-                        let expectedArgs = ResizeArray<Expr>()
-                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = Symbol.intern("System.Int64"), Value = typeof<int64>, Type = OtherType))
-                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
-                        expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
-                        compareGenericLists(args, expectedArgs)
-      
-                        Expect.isNull tag "Tag should be null"
-                        Expect.isNone si "SourceInfo should be None"
-                  | _ -> failtest "Should be an Invoke"              
+              try
+                  let ast = Parser.Analyze(cctx, form)
+
+                  match ast with
+                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+
+                      Expect.equal iEnv cctx "Should have the expected env"
+                      Expect.equal iForm form "Should have the expected form"
+
+                      Expect.equal
+                          fexpr
+                          (Expr.Var(Env = cctx, Form = RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))
+                          "Fexpr should be an Expr.Var"
+
+                      let expectedArgs = ResizeArray<Expr>()
+
+                      expectedArgs.Add(
+                          Expr.Literal(
+                              Env = cctx,
+                              Form = Symbol.intern ("System.Int64"),
+                              Value = typeof<int64>,
+                              Type = OtherType
+                          )
+                      )
+
+                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                      compareGenericLists (args, expectedArgs)
+
+                      Expect.isNull tag "Tag should be null"
+                      Expect.isNone si "SourceInfo should be None"
+                  | _ -> failtest "Should be an Invoke"
               finally
                   Var.popThreadBindings () |> ignore
 
           // TODO: Tests for direct linking to Vars
 
-        ]
+          ]
 
 // Class for testing QM resolution
 
 type QMTest(_x: int64) =
 
-    static member SF = 12  // static field
-    member _.IF = 12  // instance field
+    static member SF = 12 // static field
+    member _.IF = 12 // instance field
 
-    static member US0() = 12  // unique zero-arity static
-    static member US1(x: int64) = 12  // unique single-arity static
-    static member OS1(x: int64) = 12  // overloaded single-arity static
-    static member OS1(x: string) = 12  // overloaded single-arity static
+    static member US0() = 12 // unique zero-arity static
+    static member US1(x: int64) = 12 // unique single-arity static
+    static member OS1(x: int64) = 12 // overloaded single-arity static
+    static member OS1(x: string) = 12 // overloaded single-arity static
 
-    member _.UI0() = 12  // unique zero-arity instance
-    member _.UI1(x: int64) = 12  // unique single-arity instance
-    member _.OI1(x: int64) = 12  // overloaded single-arity instance
-    member _.OI1(x: string) = 12  // overloaded single-arity instance
+    member _.UI0() = 12 // unique zero-arity instance
+    member _.UI1(x: int64) = 12 // unique single-arity instance
+    member _.OI1(x: int64) = 12 // overloaded single-arity instance
+    member _.OI1(x: string) = 12 // overloaded single-arity instance
 
 
 [<Tests>]
@@ -1259,280 +1344,750 @@ let BasicQMTests =
         "Basic QM Tests"
         [ testCase "(|ParserTests+QMTest|/US0)  => zero-arity static interop call"
           <| fun _ ->
-                let ns1, ns2 = createTestNameSpaces ()
-                let cctx = CompilerEnv.Create(Expression)
-                let register = ObjXRegister(None)
-                let cctx = { cctx with ObjXRegister = Some register }
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
-                let form = ReadFromString "(|ParserTests+QMTest|/US0)"
-                let ast = Parser.Analyze(cctx, form)
-                compareInteropCalls (
-                    ast,
-                    (Expr.InteropCall(
-                        Env = cctx,
-                        Form = (RTSeq.first(form)),
-                        Type = MethodExpr,
-                        IsStatic = true,
-                        Tag = null,
-                        Target = None,
-                        TargetType = typeof<QMTest>,
-                        MemberName = "US0",
-                        TInfo = (typeof<QMTest>.GetMethod ("US0")),
-                        Args = null,
-                        TypeArgs = (ResizeArray<Type>()),
-                        SourceInfo = None )))
+              let form = ReadFromString "(|ParserTests+QMTest|/US0)"
+              let ast = Parser.Analyze(cctx, form)
+
+              compareInteropCalls (
+                  ast,
+                  (Expr.InteropCall(
+                      Env = cctx,
+                      Form = (RTSeq.first (form)),
+                      Type = MethodExpr,
+                      IsStatic = true,
+                      Tag = null,
+                      Target = None,
+                      TargetType = typeof<QMTest>,
+                      MemberName = "US0",
+                      TInfo = (typeof<QMTest>.GetMethod ("US0")),
+                      Args = null,
+                      TypeArgs = (ResizeArray<Type>()),
+                      SourceInfo = None
+                  ))
+              )
 
           testCase "(|ParserTests+QMTest|/.UI0 7)  => zero-arity instance interop call"
           <| fun _ ->
-                let ns1, ns2 = createTestNameSpaces ()
-                let cctx = CompilerEnv.Create(Expression)
-                let register = ObjXRegister(None)
-                let cctx = { cctx with ObjXRegister = Some register }
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
-                let form = ReadFromString "(|ParserTests+QMTest|/.UI0 7)"
-                let ast = Parser.Analyze(cctx, form)
-                compareInteropCalls (
-                    ast,
-                    (Expr.InteropCall(
-                        Env = cctx,
-                        Form = (RTSeq.first(form)),
-                        Type = InstanceZeroArityCallExpr,
-                        IsStatic = false,
-                        Tag = null,
-                        Target = (Some <| Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
-                        TargetType = typeof<QMTest>,
-                        MemberName = "UI0",
-                        TInfo = (typeof<QMTest>.GetMethod ("UI0")),
-                        Args = null,
-                        TypeArgs = (ResizeArray<Type>()),
-                        SourceInfo = None )))
+              let form = ReadFromString "(|ParserTests+QMTest|/.UI0 7)"
+              let ast = Parser.Analyze(cctx, form)
+
+              compareInteropCalls (
+                  ast,
+                  (Expr.InteropCall(
+                      Env = cctx,
+                      Form = (RTSeq.first (form)),
+                      Type = InstanceZeroArityCallExpr,
+                      IsStatic = false,
+                      Tag = null,
+                      Target = (Some <| Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
+                      TargetType = typeof<QMTest>,
+                      MemberName = "UI0",
+                      TInfo = (typeof<QMTest>.GetMethod ("UI0")),
+                      Args = null,
+                      TypeArgs = (ResizeArray<Type>()),
+                      SourceInfo = None
+                  ))
+              )
 
           testCase "(|ParserTests+QMTest|/Nope)  => zero-arity interop call throws (missing method)"
           <| fun _ ->
-                let ns1, ns2 = createTestNameSpaces ()
-                let cctx = CompilerEnv.Create(Expression)
-                let register = ObjXRegister(None)
-                let cctx = { cctx with ObjXRegister = Some register }
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
-                let form = ReadFromString "(|ParserTests+QMTest|/Nope)"
-                Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw with missing method"
+              let form = ReadFromString "(|ParserTests+QMTest|/Nope)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw with missing method"
 
 
           testCase "(|ParserTests+QMTest|/US1 7)  => positive-arity static interop call, method not found"
           <| fun _ ->
-                let ns1, ns2 = createTestNameSpaces ()
-                let cctx = CompilerEnv.Create(Expression)
-                let register = ObjXRegister(None)
-                let cctx = { cctx with ObjXRegister = Some register }
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
-                let form = ReadFromString "(|ParserTests+QMTest|/US1 7)"
-                let ast = Parser.Analyze(cctx, form)
+              let form = ReadFromString "(|ParserTests+QMTest|/US1 7)"
+              let ast = Parser.Analyze(cctx, form)
 
-                let args = ResizeArray<HostArg>()
-                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+              let args = ResizeArray<HostArg>()
 
-                compareInteropCalls (
-                    ast,
-                    (Expr.InteropCall(
-                        Env = cctx,
-                        Form = (RTSeq.first(form)),
-                        Type = MethodExpr,
-                        IsStatic = true,
-                        Tag = null,
-                        Target = None,
-                        TargetType = typeof<QMTest>,
-                        MemberName = "US1",
-                        TInfo = null,
-                        Args = args,
-                        TypeArgs = (ResizeArray<Type>()),
-                        SourceInfo = None )))
+              args.Add(
+                  { HostArg.ParamType = Standard
+                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    LocalBinding = None }
+              )
+
+              compareInteropCalls (
+                  ast,
+                  (Expr.InteropCall(
+                      Env = cctx,
+                      Form = (RTSeq.first (form)),
+                      Type = MethodExpr,
+                      IsStatic = true,
+                      Tag = null,
+                      Target = None,
+                      TargetType = typeof<QMTest>,
+                      MemberName = "US1",
+                      TInfo = null,
+                      Args = args,
+                      TypeArgs = (ResizeArray<Type>()),
+                      SourceInfo = None
+                  ))
+              )
 
 
-          testCase "(^[long] |ParserTests+QMTest|/US1 7)  => positive-arity static interop call, with params-tag, method found"
+          testCase
+              "(^[long] |ParserTests+QMTest|/US1 7)  => positive-arity static interop call, with params-tag, method found"
           <| fun _ ->
-                let ns1, ns2 = createTestNameSpaces ()
-                let cctx = CompilerEnv.Create(Expression)
-                let register = ObjXRegister(None)
-                let cctx = { cctx with ObjXRegister = Some register }
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
-                let form = ReadFromString "(^[long] |ParserTests+QMTest|/US1 7)"
-                let ast = Parser.Analyze(cctx, form)
+              let form = ReadFromString "(^[long] |ParserTests+QMTest|/US1 7)"
+              let ast = Parser.Analyze(cctx, form)
 
-                let args = ResizeArray<HostArg>()
-                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+              let args = ResizeArray<HostArg>()
 
-                compareInteropCalls (
-                    ast,
-                    (Expr.InteropCall(
-                        Env = cctx,
-                        Form = (RTSeq.first(form)),
-                        Type = MethodExpr,
-                        IsStatic = true,
-                        Tag = null,
-                        Target = None,
-                        TargetType = typeof<QMTest>,
-                        MemberName = "US1",
-                        TInfo = (typeof<QMTest>.GetMethod ("US1")),
-                        Args = args,
-                        TypeArgs = (ResizeArray<Type>()),
-                        SourceInfo = None )))
+              args.Add(
+                  { HostArg.ParamType = Standard
+                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    LocalBinding = None }
+              )
+
+              compareInteropCalls (
+                  ast,
+                  (Expr.InteropCall(
+                      Env = cctx,
+                      Form = (RTSeq.first (form)),
+                      Type = MethodExpr,
+                      IsStatic = true,
+                      Tag = null,
+                      Target = None,
+                      TargetType = typeof<QMTest>,
+                      MemberName = "US1",
+                      TInfo = (typeof<QMTest>.GetMethod ("US1")),
+                      Args = args,
+                      TypeArgs = (ResizeArray<Type>()),
+                      SourceInfo = None
+                  ))
+              )
 
 
-          testCase "(^[long] |ParserTests+QMTest|/.UI1 7)  => positive-arity instance interop call, with params-tag, method found"
+          testCase
+              "(^[long] |ParserTests+QMTest|/.UI1 7)  => positive-arity instance interop call, with params-tag, method found"
           <| fun _ ->
-                let ns1, ns2 = createTestNameSpaces ()
-                let cctx = CompilerEnv.Create(Expression)
-                let register = ObjXRegister(None)
-                let cctx = { cctx with ObjXRegister = Some register }
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
-                let form = ReadFromString "(^[long] |ParserTests+QMTest|/.UI1 7 7)"
-                let ast = Parser.Analyze(cctx, form)
+              let form = ReadFromString "(^[long] |ParserTests+QMTest|/.UI1 7 7)"
+              let ast = Parser.Analyze(cctx, form)
 
-                let args = ResizeArray<HostArg>()
-                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+              let args = ResizeArray<HostArg>()
 
-                compareInteropCalls (
-                    ast,
-                    (Expr.InteropCall(
-                        Env = cctx,
-                        Form = (RTSeq.first(form)),
-                        Type = MethodExpr,
-                        IsStatic = false,
-                        Tag = null,
-                        Target = (Some <| Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
-                        TargetType = typeof<QMTest>,
-                        MemberName = "UI1",
-                        TInfo = (typeof<QMTest>.GetMethod ("UI1")),
-                        Args = args,
-                        TypeArgs = (ResizeArray<Type>()),
-                        SourceInfo = None )))
+              args.Add(
+                  { HostArg.ParamType = Standard
+                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    LocalBinding = None }
+              )
 
-          testCase "(^[long] |ParserTests+QMTest|/OS1 7)  => positive-arity static interop call, with params-tag, overloaded method found"
+              compareInteropCalls (
+                  ast,
+                  (Expr.InteropCall(
+                      Env = cctx,
+                      Form = (RTSeq.first (form)),
+                      Type = MethodExpr,
+                      IsStatic = false,
+                      Tag = null,
+                      Target = (Some <| Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
+                      TargetType = typeof<QMTest>,
+                      MemberName = "UI1",
+                      TInfo = (typeof<QMTest>.GetMethod ("UI1")),
+                      Args = args,
+                      TypeArgs = (ResizeArray<Type>()),
+                      SourceInfo = None
+                  ))
+              )
+
+          testCase
+              "(^[long] |ParserTests+QMTest|/OS1 7)  => positive-arity static interop call, with params-tag, overloaded method found"
           <| fun _ ->
-                let ns1, ns2 = createTestNameSpaces ()
-                let cctx = CompilerEnv.Create(Expression)
-                let register = ObjXRegister(None)
-                let cctx = { cctx with ObjXRegister = Some register }
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
-                let form = ReadFromString "(^[long] |ParserTests+QMTest|/OS1 7)"
-                let ast = Parser.Analyze(cctx, form)
+              let form = ReadFromString "(^[long] |ParserTests+QMTest|/OS1 7)"
+              let ast = Parser.Analyze(cctx, form)
 
-                let args = ResizeArray<HostArg>()
-                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+              let args = ResizeArray<HostArg>()
 
-                let method = (typeof<QMTest>.GetMethod ("OS1", [| typeof<int64> |]))
+              args.Add(
+                  { HostArg.ParamType = Standard
+                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    LocalBinding = None }
+              )
 
-                compareInteropCalls (
-                    ast,
-                    (Expr.InteropCall(
-                        Env = cctx,
-                        Form = (RTSeq.first(form)),
-                        Type = MethodExpr,
-                        IsStatic = true,
-                        Tag = null,
-                        Target = None,
-                        TargetType = typeof<QMTest>,
-                        MemberName = "OS1",
-                        TInfo = method,
-                        Args = args,
-                        TypeArgs = (ResizeArray<Type>()),
-                        SourceInfo = None )))
+              let method = (typeof<QMTest>.GetMethod ("OS1", [| typeof<int64> |]))
+
+              compareInteropCalls (
+                  ast,
+                  (Expr.InteropCall(
+                      Env = cctx,
+                      Form = (RTSeq.first (form)),
+                      Type = MethodExpr,
+                      IsStatic = true,
+                      Tag = null,
+                      Target = None,
+                      TargetType = typeof<QMTest>,
+                      MemberName = "OS1",
+                      TInfo = method,
+                      Args = args,
+                      TypeArgs = (ResizeArray<Type>()),
+                      SourceInfo = None
+                  ))
+              )
 
           testCase "(^[long] |ParserTests+QMTest|/new 7)  => constructor call (Expr.New)"
           <| fun _ ->
-                let ns1, ns2 = createTestNameSpaces ()
-                let cctx = CompilerEnv.Create(Expression)
-                let register = ObjXRegister(None)
-                let cctx = { cctx with ObjXRegister = Some register }
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
 
-                let form = ReadFromString "(^[long] |ParserTests+QMTest|/new 7)"
-                let ast = Parser.Analyze(cctx, form)
+              let form = ReadFromString "(^[long] |ParserTests+QMTest|/new 7)"
+              let ast = Parser.Analyze(cctx, form)
 
-                let args = ResizeArray<HostArg>()
-                args.Add({HostArg.ParamType = Standard; ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType); LocalBinding = None})
+              let args = ResizeArray<HostArg>()
 
-                let method = (typeof<QMTest>.GetMethod ("OS1", [| typeof<int64> |]))
+              args.Add(
+                  { HostArg.ParamType = Standard
+                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    LocalBinding = None }
+              )
 
-                compareNewExprs (
-                    ast,
-                    (Expr.New(
-                        Env = cctx,
-                        Form = (RTSeq.first(form)),
-                        Type = typeof<QMTest>,
-                        Constructor = typeof<QMTest>.GetConstructor([| typeof<int64> |]),                        
-                        Args = args,
-                        IsNoArgValueTypeCtor = false,
-                        SourceInfo = None )))
-        ]
+              let method = (typeof<QMTest>.GetMethod ("OS1", [| typeof<int64> |]))
+
+              compareNewExprs (
+                  ast,
+                  (Expr.New(
+                      Env = cctx,
+                      Form = (RTSeq.first (form)),
+                      Type = typeof<QMTest>,
+                      Constructor = typeof<QMTest>.GetConstructor ([| typeof<int64> |]),
+                      Args = args,
+                      IsNoArgValueTypeCtor = false,
+                      SourceInfo = None
+                  ))
+              ) ]
 
 
 [<Tests>]
 let SimpleSpecialOpTests =
     testList
         "Simple Special Op Tests"
-        [ ftestCase "(monitor-enter x)  => Untyped:MonitorEnter"
+        [ testCase "(monitor-enter x)  => Untyped:MonitorEnter"
           <| fun _ ->
 
-            let ns1, ns2 = createTestNameSpaces ()
-            let cctx = CompilerEnv.Create(Expression)
-            let register = ObjXRegister(None)
-            let cctx = { cctx with ObjXRegister = Some register }
-            let cctx = withLocals(cctx, [| "x"; "y" |])
-            let cctx, method, register, internals = withMethod(cctx)
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
 
-            let form = ReadFromString "(monitor-enter x)"
-            let ast = Parser.Analyze(cctx, form)
+              let form = ReadFromString "(monitor-enter x)"
+              let ast = Parser.Analyze(cctx, form)
 
-            let target = Expr.LocalBinding(Env = cctx, Form = Symbol.intern("x"), Binding = (cctx.Locals.valAt (Symbol.intern("x")) :?> LocalBinding), Tag = null)
-            Expect.equal ast (Expr.Untyped(Env = cctx, Form = form, Type=MonitorEnter, Target = Some target)) "Should return a Untyped"
+              let target =
+                  Expr.LocalBinding(
+                      Env = cctx,
+                      Form = Symbol.intern ("x"),
+                      Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
+                      Tag = null
+                  )
 
-          ftestCase "(monitor-exit x)  => Untyped:MonitorExit"
+              Expect.equal
+                  ast
+                  (Expr.Untyped(Env = cctx, Form = form, Type = MonitorEnter, Target = Some target))
+                  "Should return a Untyped"
+
+          testCase "(monitor-exit x)  => Untyped:MonitorExit"
           <| fun _ ->
 
-            let ns1, ns2 = createTestNameSpaces ()
-            let cctx = CompilerEnv.Create(Expression)
-            let register = ObjXRegister(None)
-            let cctx = { cctx with ObjXRegister = Some register }
-            let cctx = withLocals(cctx, [| "x"; "y" |])
-            let cctx, method, register, internals = withMethod(cctx)
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
 
-            let form = ReadFromString "(monitor-exit x)"
-            let ast = Parser.Analyze(cctx, form)
+              let form = ReadFromString "(monitor-exit x)"
+              let ast = Parser.Analyze(cctx, form)
 
-            let target = Expr.LocalBinding(Env = cctx, Form = Symbol.intern("x"), Binding = (cctx.Locals.valAt (Symbol.intern("x")) :?> LocalBinding), Tag = null)
-            Expect.equal ast (Expr.Untyped(Env = cctx, Form = form, Type=MonitorExit, Target = Some target)) "Should return a Untyped"
+              let target =
+                  Expr.LocalBinding(
+                      Env = cctx,
+                      Form = Symbol.intern ("x"),
+                      Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
+                      Tag = null
+                  )
+
+              Expect.equal
+                  ast
+                  (Expr.Untyped(Env = cctx, Form = form, Type = MonitorExit, Target = Some target))
+                  "Should return a Untyped"
 
 
-          ftestCase "(throw x)  => Untyped:Throw"
+          testCase "(throw x)  => Untyped:Throw"
           <| fun _ ->
 
-            let ns1, ns2 = createTestNameSpaces ()
-            let cctx = CompilerEnv.Create(Expression)
-            let register = ObjXRegister(None)
-            let cctx = { cctx with ObjXRegister = Some register }
-            let cctx = withLocals(cctx, [| "x"; "y" |])
-            let cctx, method, register, internals = withMethod(cctx)
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
 
-            let form = ReadFromString "(throw x)"
-            let ast = Parser.Analyze(cctx, form)
+              let form = ReadFromString "(throw x)"
+              let ast = Parser.Analyze(cctx, form)
 
-            let target = Expr.LocalBinding(Env = cctx, Form = Symbol.intern("x"), Binding = (cctx.Locals.valAt (Symbol.intern("x")) :?> LocalBinding), Tag = null)
-            Expect.equal ast (Expr.Untyped(Env = cctx, Form = form, Type=Throw, Target = Some target)) "Should return a Untyped"
+              let target =
+                  Expr.LocalBinding(
+                      Env = cctx,
+                      Form = Symbol.intern ("x"),
+                      Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
+                      Tag = null
+                  )
+
+              Expect.equal
+                  ast
+                  (Expr.Untyped(Env = cctx, Form = form, Type = Throw, Target = Some target))
+                  "Should return a Untyped"
 
 
-          ftestCase "(throw x y)  => error (wrong number of arguments)"
+          testCase "(throw x y)  => error (wrong number of arguments)"
           <| fun _ ->
 
-            let ns1, ns2 = createTestNameSpaces ()
-            let cctx = CompilerEnv.Create(Expression)
-            let register = ObjXRegister(None)
-            let cctx = { cctx with ObjXRegister = Some register }
-            let cctx = withLocals(cctx, [| "x"; "y" |])
-            let cctx, method, register, internals = withMethod(cctx)
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
 
-            let form = ReadFromString "(throw x y)"
-            Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw with wrong number of arguments"
+              let form = ReadFromString "(throw x y)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw with wrong number of arguments"
+
+          testCase "(if x 7 8)  => Expr.If"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
+
+              let form = ReadFromString "(if x 7 8)"
+              let ast = Parser.Analyze(cctx, form)
+
+              let test =
+                  Expr.LocalBinding(
+                      Env = cctx,
+                      Form = Symbol.intern ("x"),
+                      Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
+                      Tag = null
+                  )
+
+              Expect.equal
+                  ast
+                  (Expr.If(
+                      Env = cctx,
+                      Form = form,
+                      Test = test,
+                      Then = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      Else = Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType),
+                      SourceInfo = None
+                  ))
+                  "Should return an Expr.If"
+
+          testCase "(if x 7)  => Expr.If"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
+
+              let form = ReadFromString "(if x 7)"
+              let ast = Parser.Analyze(cctx, form)
+
+              let test =
+                  Expr.LocalBinding(
+                      Env = cctx,
+                      Form = Symbol.intern ("x"),
+                      Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
+                      Tag = null
+                  )
+
+              Expect.equal
+                  ast
+                  (Expr.If(
+                      Env = cctx,
+                      Form = form,
+                      Test = test,
+                      Then = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      Else = Parser.NilExprInstance,
+                      SourceInfo = None
+                  ))
+                  "Should return an Expr.If"
+
+          testCase "(if x)  or (if x 7 8 9)   => throws"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
+
+              let form = ReadFromString "(if x)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw with wrong number of arguments"
+
+              let form = ReadFromString "(if x 7 8 9)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw with wrong number of arguments"
+
+          testCase "#'abc => Expr.TheVar expression"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "#'abc"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  let ast = Parser.Analyze(cctx, form)
+
+                  Expect.equal
+                      ast
+                      (Expr.TheVar(Env = cctx, Form = form, Var = ns1.findInternedVar (abcSym)))
+                      "Should be a TheVar expression"
+
+              finally
+                  Var.popThreadBindings () |> ignore
 
 
+          testCase "#'fred => throws on unbound"
+          <| fun _ ->
 
-    ]
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "#'fred"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  Expect.throwsT<CompilerException>
+                      (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                      "Should throw with unbound var"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+          testCase "#'(x) => throws on non-Symbol"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "#'(x)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  Expect.throwsT<CompilerException>
+                      (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                      "Should throw on non-Symbol"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "(do 7 8) => Expr.Body expression"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "(do 7 8)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  let ast = Parser.Analyze(cctx, form)
+
+                  let bodyExprs = ResizeArray<Expr>()
+
+                  bodyExprs.Add(
+                      Expr.Literal(
+                          Env = cctx.WithParserContext(Statement),
+                          Form = 7L,
+                          Value = 7L,
+                          Type = PrimNumericType
+                      )
+                  )
+
+                  bodyExprs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+
+                  compareBodies (ast, Expr.Body(Env = cctx, Form = RTSeq.next (form), Exprs = bodyExprs))
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+          testCase "(set! abc 7) => set of Var"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "(set! abc 7)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  let ast = Parser.Analyze(cctx, form)
+
+                  Expect.equal
+                      ast
+                      (Expr.Assign(
+                          Env = cctx,
+                          Form = form,
+                          Target =
+                              (Expr.Var(
+                                  Env =
+                                      { cctx with
+                                          Pctx = Expression
+                                          IsAssignContext = true },
+                                  Form = abcSym,
+                                  Var = ns1.findInternedVar (abcSym),
+                                  Tag = null
+                              )),
+                          Value =
+                              (Expr.Literal(
+                                  Env = cctx.WithParserContext(Expression),
+                                  Form = 7L,
+                                  Value = 7L,
+                                  Type = PrimNumericType
+                              ))
+                      ))
+                      "Should return Expr.Assign"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "(set! x 7) => set of local"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
+
+              let form = ReadFromString "(set! x 7)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  let ast = Parser.Analyze(cctx, form)
+
+                  let expected =
+                      (Expr.Assign(
+                          Env = cctx,
+                          Form = form,
+                          Target =
+                              (Expr.LocalBinding(
+                                  Env =
+                                      { cctx with
+                                          Pctx = Expression
+                                          IsAssignContext = true },
+                                  Form = Symbol.intern "x",
+                                  Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
+                                  Tag = null
+                              )),
+                          Value =
+                              (Expr.Literal(
+                                  Env = cctx.WithParserContext(Expression),
+                                  Form = 7L,
+                                  Value = 7L,
+                                  Type = PrimNumericType
+                              ))
+                      ))
+
+                  Expect.equal ast expected "Should return Expr.Assign"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "(set! Int64/MaxValue  7) => set of FieldOrPropertyExpr"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+              let cctx = withLocals (cctx, [| "x"; "y" |])
+              let cctx, method, register, internals = withMethod (cctx)
+
+              let form = ReadFromString "(set! Int64/MaxValue 7)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  let ast = Parser.Analyze(cctx, form)
+                  let expectedTarget = Expr.InteropCall(
+                                  Env =
+                                      { cctx with
+                                          Pctx = Expression
+                                          IsAssignContext = true },
+                                  Form = Symbol.intern "Int64/MaxValue",
+                                  Type = FieldOrPropertyExpr,
+                                  IsStatic = true,
+                                  Tag = null,
+                                  Target = None,
+                                  TargetType = typeof<Int64>,
+                                  MemberName = "MaxValue",
+                                  TInfo = (typeof<Int64>.GetField ("MaxValue")),
+                                  Args = null,
+                                  TypeArgs = (ResizeArray<Type>()),
+                                  SourceInfo = None )
+                  let expectedValue = Expr.Literal(
+                                  Env = cctx.WithParserContext(Expression),
+                                  Form = 7L,
+                                  Value = 7L,
+                                  Type = PrimNumericType
+                              )
+
+                  //let expected =
+                  //    (Expr.Assign(
+                  //        Env = cctx,
+                  //        Form = form,
+                  //        Target = expectedTarget,
+                  //        Value = expectedValue))
+
+                  // Because interop calls are problematic to compare, we have to do this in pieces
+                  match ast with
+                  | Expr.Assign(Env = aEnv; Form = aForm; Target = aTarget; Value = aValue) ->
+    
+                        Expect.equal aEnv cctx "Should have the expected env"
+                        Expect.equal aForm form "Should have the expected form"
+    
+                        compareInteropCalls (aTarget, expectedTarget)
+                        Expect.equal aValue expectedValue "Should have the expected value"
+
+                  | _ -> failtest "Should be an Assign"
+
+            
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+          testCase "(set! 7 7) => set of non-assignable expression throws"
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString "(set! 7 7)"
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw"
+
+            
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          ftestCase """(clojure.core/import* "SomeType") => creates Expr.Import"""
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString """(clojure.core/import* "SomeType")"""
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  let ast = Parser.Analyze(cctx, form)
+                  Expect.equal ast (Expr.Import(Env = cctx, Form = form, Typename = "SomeType")) "Should be an Import"
+              finally
+                  Var.popThreadBindings() |> ignore
+
+          ftestCase """(clojure.core/import* 7) => Throws on non-string"""
+          <| fun _ ->
+
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+              let register = ObjXRegister(None)
+              let cctx = { cctx with ObjXRegister = Some register }
+
+              let form = ReadFromString """(clojure.core/import* 7)"""
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw"
+              finally
+                  Var.popThreadBindings() |> ignore
+
+
+          ]
