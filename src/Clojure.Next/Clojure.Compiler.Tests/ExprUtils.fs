@@ -2,6 +2,7 @@
 
 open Expecto
 open Clojure.Compiler
+open Clojure.Collections
 
 
 let compareGenericLists (a: ResizeArray<'T>, b: ResizeArray<'T>) =
@@ -136,3 +137,51 @@ let compareNewExprs (a: Expr, b: Expr) =
         Expect.equal aisnoargvaluetypector bIsNoArgValueTypeCtor "IsNoArgValueTypeCtor should be equal"
         Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
     | _ -> failwith "Not an InteropCall"
+
+
+let withLocals(cenv: CompilerEnv, localNames: string array) =
+
+    let mutable bindings = PersistentHashMap.Empty :> IPersistentMap
+
+    for name in localNames do
+        let sym = Symbol.intern name
+        let binding =
+            { Sym = sym
+              Tag = null
+              Init = None
+              Name = name
+              IsArg = false
+              IsByRef = false
+              IsRecur = false
+              IsThis = false
+              Index = 20 }
+        bindings <- RTMap.assoc(bindings, sym, binding) :?> IPersistentMap
+
+
+    { cenv with Locals = bindings }
+
+let withMethod(cenv: CompilerEnv ) = 
+
+    let register = ObjXRegister(None)
+    let internals = ObjXInternals()
+
+    let objx =
+        Expr.Obj(
+            Env = cenv,
+            Form = null,
+            Type = ObjXType.Fn,
+            Internals = internals,
+            Register = register,
+            SourceInfo = None
+        )
+
+    let method = ObjMethod(ObjXType.Fn, objx, internals, register, None)
+
+    let cenv =
+        { cenv with
+            Method = Some method
+            ObjXRegister = Some register }
+
+    cenv, method, register, internals
+
+

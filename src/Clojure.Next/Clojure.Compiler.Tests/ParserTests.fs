@@ -1463,6 +1463,76 @@ let BasicQMTests =
                         Args = args,
                         IsNoArgValueTypeCtor = false,
                         SourceInfo = None )))
-
-
         ]
+
+
+[<Tests>]
+let SimpleSpecialOpTests =
+    testList
+        "Simple Special Op Tests"
+        [ ftestCase "(monitor-enter x)  => Untyped:MonitorEnter"
+          <| fun _ ->
+
+            let ns1, ns2 = createTestNameSpaces ()
+            let cctx = CompilerEnv.Create(Expression)
+            let register = ObjXRegister(None)
+            let cctx = { cctx with ObjXRegister = Some register }
+            let cctx = withLocals(cctx, [| "x"; "y" |])
+            let cctx, method, register, internals = withMethod(cctx)
+
+            let form = ReadFromString "(monitor-enter x)"
+            let ast = Parser.Analyze(cctx, form)
+
+            let target = Expr.LocalBinding(Env = cctx, Form = Symbol.intern("x"), Binding = (cctx.Locals.valAt (Symbol.intern("x")) :?> LocalBinding), Tag = null)
+            Expect.equal ast (Expr.Untyped(Env = cctx, Form = form, Type=MonitorEnter, Target = Some target)) "Should return a Untyped"
+
+          ftestCase "(monitor-exit x)  => Untyped:MonitorExit"
+          <| fun _ ->
+
+            let ns1, ns2 = createTestNameSpaces ()
+            let cctx = CompilerEnv.Create(Expression)
+            let register = ObjXRegister(None)
+            let cctx = { cctx with ObjXRegister = Some register }
+            let cctx = withLocals(cctx, [| "x"; "y" |])
+            let cctx, method, register, internals = withMethod(cctx)
+
+            let form = ReadFromString "(monitor-exit x)"
+            let ast = Parser.Analyze(cctx, form)
+
+            let target = Expr.LocalBinding(Env = cctx, Form = Symbol.intern("x"), Binding = (cctx.Locals.valAt (Symbol.intern("x")) :?> LocalBinding), Tag = null)
+            Expect.equal ast (Expr.Untyped(Env = cctx, Form = form, Type=MonitorExit, Target = Some target)) "Should return a Untyped"
+
+
+          ftestCase "(throw x)  => Untyped:Throw"
+          <| fun _ ->
+
+            let ns1, ns2 = createTestNameSpaces ()
+            let cctx = CompilerEnv.Create(Expression)
+            let register = ObjXRegister(None)
+            let cctx = { cctx with ObjXRegister = Some register }
+            let cctx = withLocals(cctx, [| "x"; "y" |])
+            let cctx, method, register, internals = withMethod(cctx)
+
+            let form = ReadFromString "(throw x)"
+            let ast = Parser.Analyze(cctx, form)
+
+            let target = Expr.LocalBinding(Env = cctx, Form = Symbol.intern("x"), Binding = (cctx.Locals.valAt (Symbol.intern("x")) :?> LocalBinding), Tag = null)
+            Expect.equal ast (Expr.Untyped(Env = cctx, Form = form, Type=Throw, Target = Some target)) "Should return a Untyped"
+
+
+          ftestCase "(throw x y)  => error (wrong number of arguments)"
+          <| fun _ ->
+
+            let ns1, ns2 = createTestNameSpaces ()
+            let cctx = CompilerEnv.Create(Expression)
+            let register = ObjXRegister(None)
+            let cctx = { cctx with ObjXRegister = Some register }
+            let cctx = withLocals(cctx, [| "x"; "y" |])
+            let cctx, method, register, internals = withMethod(cctx)
+
+            let form = ReadFromString "(throw x y)"
+            Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw with wrong number of arguments"
+
+
+
+    ]
