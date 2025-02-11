@@ -2442,3 +2442,70 @@ let LetTests =
               | _ -> failtest "Should be a Let"
 
           ]
+
+
+[<Tests>]
+let RecurTests =
+    testList
+        "Recur Tests"
+        [ testCase "recur not in a loop -- throws"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(let* [x 7] (recur 12))"
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when not in recur context"
+
+          testCase "recur not in return context -- throws"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(loop* [x 7] (recur 12) 7)"
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when not in recur context"
+
+              let form = ReadFromString "(loop* [x 7] (if (recur 12) 7 8))"
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when not in recur context"
+
+
+          testCase "recur with arg count mismatch -- throws"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(loop* [x 7] (recur 12 14))"
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw on arg count mismatch"
+
+          // TODO: Uncomment this after we have Expr.Try working
+          //ftestCase "recur across try -- throws"
+          //<| fun _ ->
+            
+          //    let cctx = CompilerEnv.Create(Expression)
+
+          //    let form = ReadFromString "(loop* [x 7] (try (recur 12 14)))"
+          //    Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw on recur across try"
+
+
+          testCase "recur works"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(loop* [x 7] (recur 12))"
+              let ast = Parser.Analyze(cctx, form)
+
+              match ast with
+              | Expr.Let(Body = body) ->
+                 match body with
+                 | Expr.Body(Exprs = exprs) ->
+                      Expect.equal exprs.Count 1 "Should have one expression"
+                      match exprs[0] with
+                      | Expr.Recur(LoopLocals = loopLocals;  Args = args) ->
+                            Expect.equal loopLocals.Count 1 "Should have one loop local"
+                            Expect.equal args.Count 1 "Should have one arg"
+                      | _ -> failtest "Should be a Recur"
+                 | _ -> failtest "Should be a Body"
+              | _ -> failtest "Should be a Let"
+
+
+        ]
