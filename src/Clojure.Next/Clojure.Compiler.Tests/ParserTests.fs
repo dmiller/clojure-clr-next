@@ -2476,14 +2476,13 @@ let RecurTests =
               let form = ReadFromString "(loop* [x 7] (recur 12 14))"
               Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw on arg count mismatch"
 
-          // TODO: Uncomment this after we have Expr.Try working
-          //ftestCase "recur across try -- throws"
-          //<| fun _ ->
+          testCase "recur across try -- throws"
+          <| fun _ ->
             
-          //    let cctx = CompilerEnv.Create(Expression)
+              let cctx = CompilerEnv.Create(Expression)
 
-          //    let form = ReadFromString "(loop* [x 7] (try (recur 12 14)))"
-          //    Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw on recur across try"
+              let form = ReadFromString "(loop* [x 7] (try (recur 12 14)))"
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw on recur across try"
 
 
           testCase "recur works"
@@ -2509,3 +2508,63 @@ let RecurTests =
 
 
         ]
+
+
+
+[<Tests>]
+let TryTests =
+    testList
+        "Try Tests"
+        [ testCase "try with no catch/finally => returns a body expression"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Return)
+
+              let form = ReadFromString "(try 7)"
+              let ast = Parser.Analyze(cctx, form)
+
+              Expect.isTrue (ast.IsBody) "Should be a body expression"
+
+          testCase "try with no finally not last in body => throws"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Return)
+
+              let form = ReadFromString "(try 7 (finally 7) 7)"
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when finally not terminal"
+
+          testCase "catch with bad exception type => throws"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Return)
+
+              let form = ReadFromString "(try 7 (catch Fred x 7))"
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when catch clause has non-type for exception"
+
+
+          testCase "catch with bad local variable type => throws"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Return)
+
+              let form = ReadFromString "(try 7 (catch Exception x/y 7))"
+              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when catch clause has bad local var"
+
+          testCase "valid try expression"
+          <| fun _ ->
+            
+              let cctx = CompilerEnv.Create(Return)
+
+              let form = ReadFromString "(try 7 (catch ArgumentException x 7) (catch Exception y 12) (finally 7))"
+              let ast = Parser.Analyze(cctx, form) 
+
+              match ast with 
+              | Expr.Try(Env = env; TryExpr = tryExpr; Catches = catches; Finally = finallyExpr) ->
+                Expect.isTrue tryExpr.IsBody "Should be a body expression"
+                Expect.equal catches.Count 2 "Should have one catches"
+                Expect.isTrue finallyExpr.IsSome "Should have a finally expression"
+              | _ -> failtest "Should be a Try"
+                    
+
+        ]
+

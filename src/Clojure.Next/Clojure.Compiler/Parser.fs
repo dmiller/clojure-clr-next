@@ -549,7 +549,7 @@ type Parser private () =
     //
     //  Parser for binding forms: let*, letfn*, loop* + recur
     //
-    ////////////////////////////////   
+    ////////////////////////////////
 
     // Cranking up the difficulty level.
     // let*, letfn*, loop*  all introduce new bindings, causing us to augment the compiler environment as we go
@@ -1164,9 +1164,7 @@ type Parser private () =
     //
     ////////////////////////////////
 
-    static member TryExprParser(cenv: CompilerEnv, form: obj) : Expr =
-        let form = form :?> ISeq
-
+    static member TryExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
 
         if cenv.Pctx <> ParserContext.Return then
             // I'm not sure why we do this.
@@ -1195,78 +1193,82 @@ type Parser private () =
                     InCatchFinally = true }
 
             let rec loop (fs: ISeq) =
-                let f = fs.first ()
 
-                let op =
-                    match f with
-                    | :? ISeq as fseq -> fseq.first ()
-                    | _ -> null
-
-                if
-                    not <| Util.equals (op, RTVar.CatchSym)
-                    && not <| Util.equals (op, RTVar.FinallySym)
-                then
-                    if caught then
-                        raise <| ParseException("Only catch or finally can follow catch")
-
-                    body.Add(f)
+                if isNull fs then
+                    ()
                 else
-                    // We have either a catch or finally.  Process accordingly
+                    let f = fs.first ()
 
-                    if bodyExpr.IsNone then
-                        // We are on our first catch or finally.
-                        // All body forms are collected, so build the expression for the body
-                        let bodyEnv = { cenv with NoRecur = true }
-                        bodyExpr <- Some(Parser.BodyExprParser(bodyEnv, RT0.seq (body)))
+                    let op =
+                        match f with
+                        | :? ISeq as fseq -> fseq.first ()
+                        | _ -> null
 
+                    if
+                        not <| Util.equals (op, RTVar.CatchSym)
+                        && not <| Util.equals (op, RTVar.FinallySym)
+                    then
+                        if caught then
+                            raise <| ParseException("Only catch or finally can follow catch")
 
-                    if Util.equals (op, RTVar.CatchSym) then
-                        let second = RTSeq.second (f)
-                        let t = TypeUtils.MaybeType(catchEnv, second, false)
-
-                        if isNull t then
-                            raise <| ParseException($"Unable to resolve classname: {RTSeq.second (f)}")
-
-                        match RTSeq.third (f) with
-                        | :? Symbol as sym ->
-                            if not <| isNull sym.Namespace then
-                                raise <| ParseException($"Can't bind qualified name: {sym}")
-
-                            // Everything is looking good, let's parse the catch clause
-                            let clauseTag =
-                                match second with
-                                | :? Symbol as sym -> sym
-                                | _ -> null
-
-                            let boundEnv, lb =
-                                catchEnv.RegisterLocal(sym, clauseTag, None, typeof<Object>, false)
-
-                            let handler =
-                                Parser.BodyExprParser(boundEnv, RTSeq.next (RTSeq.next (RTSeq.next (f))))
-
-                            catches.Add(
-                                { CaughtType = t
-                                  LocalBinding = lb
-                                  Handler = handler }
-                            )
-
-                        | _ as third -> raise <| ParseException($"Bad binding form, expected Symbol, got: {third}")
-
+                        body.Add(f)
                     else
-                        // finally clause
-                        if not <| isNull (fs.next ()) then
-                            raise
-                            <| InvalidOperationException("finally clause must be last in try expression")
+                        // We have either a catch or finally.  Process accordingly
 
-                        let finallyEnv =
-                            { cenv with
-                                Pctx = Statement
-                                IsAssignContext = false
-                                InCatchFinally = true }
+                        if bodyExpr.IsNone then
+                            // We are on our first catch or finally.
+                            // All body forms are collected, so build the expression for the body
+                            let bodyEnv = { cenv with NoRecur = true }
+                            bodyExpr <- Some(Parser.BodyExprParser(bodyEnv, RT0.seq (body)))
 
-                        finallyExpr <- Some(Parser.BodyExprParser(finallyEnv, RTSeq.next (f)))
 
-                loop (fs.next ())
+                        if Util.equals (op, RTVar.CatchSym) then
+                            let second = RTSeq.second (f)
+                            let t = TypeUtils.MaybeType(catchEnv, second, false)
+
+                            if isNull t then
+                                raise <| ParseException($"Unable to resolve classname: {RTSeq.second (f)}")
+
+                            match RTSeq.third (f) with
+                            | :? Symbol as sym ->
+                                if not <| isNull sym.Namespace then
+                                    raise <| ParseException($"Can't bind qualified name: {sym}")
+
+                                // Everything is looking good, let's parse the catch clause
+                                let clauseTag =
+                                    match second with
+                                    | :? Symbol as sym -> sym
+                                    | _ -> null
+
+                                let boundEnv, lb =
+                                    catchEnv.RegisterLocal(sym, clauseTag, None, typeof<Object>, false)
+
+                                let handler =
+                                    Parser.BodyExprParser(boundEnv, RTSeq.next (RTSeq.next (RTSeq.next (f))))
+
+                                catches.Add(
+                                    { CaughtType = t
+                                      LocalBinding = lb
+                                      Handler = handler }
+                                )
+
+                            | _ as third -> raise <| ParseException($"Bad binding form, expected Symbol, got: {third}")
+
+                        else
+                            // finally clause
+                            if not <| isNull (fs.next ()) then
+                                raise
+                                <| InvalidOperationException("finally clause must be last in try expression")
+
+                            let finallyEnv =
+                                { cenv with
+                                    Pctx = Statement
+                                    IsAssignContext = false
+                                    InCatchFinally = true }
+
+                            finallyExpr <- Some(Parser.BodyExprParser(finallyEnv, RTSeq.next (f)))
+
+                    loop (fs.next ())
 
             loop (form.next ())
 
@@ -1376,7 +1378,7 @@ type Parser private () =
             match fexpr with
             | Expr.Var(Env = e; Form = f; Var = v; Tag = t) -> Parser.MaybeParseVarInvoke(cenv, fexpr, form, v)
             | Expr.Literal(Type = KeywordType; Value = kw) as kwExpr when
-                RT0.count (form) = 2 && cenv.ObjXRegister.IsSome  
+                RT0.count (form) = 2 && cenv.ObjXRegister.IsSome
                 ->
                 let target = Parser.Analyze(cenv, RTSeq.second (form))
                 let siteIndex = cenv.RegisterKeywordCallSite(kw :?> Keyword)
@@ -1557,7 +1559,10 @@ type Parser private () =
                 let memberInfo, hostExprType =
                     if isNull memberInfo then
                         Reflector.GetArityZeroMethod(methodType, methodName, genericTypeArgs, isStatic) :> MemberInfo,
-                        (if isStatic then HostExprType.MethodExpr else HostExprType.InstanceZeroArityCallExpr)
+                        (if isStatic then
+                             HostExprType.MethodExpr
+                         else
+                             HostExprType.InstanceZeroArityCallExpr)
                     else
                         memberInfo, HostExprType.FieldOrPropertyExpr
 
@@ -1964,18 +1969,19 @@ type Parser private () =
 
 
     static member IsMacro(cenv: CompilerEnv, op: obj) : Var =
-        let v = 
+        let v =
             match op with
             | :? Var as v -> v
             | :? Symbol as s ->
                 match cenv.ReferenceLocal(s) with
-                | Some _ -> null  // if there is local reference, it is not a macro, so return null
+                | Some _ -> null // if there is local reference, it is not a macro, so return null
                 | _ -> Parser.LookupVar(cenv, s, false)
             | _ -> null
 
         if not <| isNull v && v.isMacro then
             if v.Namespace = RTVar.getCurrentNamespace () && not v.isPublic then
                 raise <| new InvalidOperationException($"Var: {v} is not public")
+
             v
         else
             null
@@ -2323,4 +2329,3 @@ type Parser private () =
             TagClass = tagClass,
             SourceInfo = None
         ) // TODO: source info)
-
