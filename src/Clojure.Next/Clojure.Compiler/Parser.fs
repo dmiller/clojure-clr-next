@@ -668,8 +668,8 @@ type Parser private () =
         if cenv.Pctx <> Return || isNull loopLocals then
             raise <| ParseException("Can only recur from tail position")
 
-        if not <| cenv.IsRecurContext then
-            raise <| ParseException("Can only recur across try")
+        if cenv.NoRecur then
+            raise <| ParseException("Cannot recur across try")
 
         let args = ResizeArray<Expr>()
 

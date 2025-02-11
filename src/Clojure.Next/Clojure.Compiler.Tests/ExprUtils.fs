@@ -5,6 +5,16 @@ open Clojure.Compiler
 open Clojure.Collections
 
 
+let honk(x: obj, y: obj) = 
+
+    let result = x.Equals(y)
+
+    if not result then
+        printfn "x: %A" x
+        printfn "y: %A" y
+
+    result
+
 let compareGenericLists (a: ResizeArray<'T>, b: ResizeArray<'T>) =
     if isNull a then
         Expect.isTrue (isNull b) "First list is null, second list is not"
@@ -14,7 +24,7 @@ let compareGenericLists (a: ResizeArray<'T>, b: ResizeArray<'T>) =
         let comp =
             a
             |> Seq.zip b
-            |> Seq.forall (fun (x, y) -> if isNull x then isNull y else x.Equals(y))
+            |> Seq.forall (fun (x, y) -> if isNull x then isNull y else honk(x,y))
 
         Expect.isTrue comp "Expect same list"
 
@@ -194,18 +204,18 @@ let withMethod(cenv: CompilerEnv ) =
     cenv, method, register, internals
 
 
-let createBinding(sym: Symbol, init: Expr option, index: int) =
+let createBinding(sym: Symbol, init: Expr option, index: int, isRecur: bool) =
     { Sym = sym
       Tag = null
       Init = None
       Name = sym.Name
       IsArg = false
       IsByRef = false
-      IsRecur = false
+      IsRecur = isRecur
       IsThis = false
       Index = index }
 
-let createBindingInit(sym: Symbol, init: Expr, index: int) =
+let createBindingInit(sym: Symbol, init: Expr, index: int, isRecur: bool) =
     let lb = 
         { Sym = sym
           Tag = null
@@ -213,7 +223,7 @@ let createBindingInit(sym: Symbol, init: Expr, index: int) =
           Name = sym.Name
           IsArg = false
           IsByRef = false
-          IsRecur = false
+          IsRecur = isRecur
           IsThis = false
           Index = index }
 

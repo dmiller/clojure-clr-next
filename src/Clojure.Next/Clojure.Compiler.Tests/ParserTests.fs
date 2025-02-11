@@ -2215,7 +2215,8 @@ let LetTests =
                   createBindingInit (
                       xSym,
                       Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
-                      0
+                      0,
+                      false
                   )
 
               let firstBinding = firstBindingInit.Binding
@@ -2267,7 +2268,8 @@ let LetTests =
                   createBindingInit (
                       xSym,
                       Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
-                      0
+                      0,
+                      false
                   )
 
               let firstBinding = firstBindingInit.Binding
@@ -2279,7 +2281,8 @@ let LetTests =
                   createBindingInit (
                       ySym,
                       Expr.Literal(Env = secondCctx, Form = 8L, Value = 8L, Type = PrimNumericType),
-                      1
+                      1,
+                      false
                   )
 
               let thirdCctx =
@@ -2329,19 +2332,21 @@ let LetTests =
                   createBindingInit (
                       xSym,
                       Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
-                      0
+                      0,
+                      false
                   )
 
               let firstBinding = firstBindingInit.Binding
               expectedBindings.Add(firstBindingInit)
 
-              let secondCctx = { cctx with Locals = cctx.Locals.assoc (xSym, firstBinding) }
+              let secondCctx = { firstCctx with Locals = cctx.Locals.assoc (xSym, firstBinding) }
 
               let secondBindingInit =
                   createBindingInit (
                       ySym,
                       Expr.LocalBinding(Env = secondCctx, Form = xSym, Binding = firstBinding, Tag = null),
-                      1
+                      1,
+                      false
                   )
 
               let secondBinding = secondBindingInit.Binding
@@ -2370,13 +2375,58 @@ let LetTests =
                   compareGenericLists (bindings, expectedBindings)
               | _ -> failtest "Should be a Let"
 
-          ftestCase "loop with two bindings, local ref in body -- check for loop id and loop locals"
+          testCase "loop with two bindings, local ref in body -- check for loop id and loop locals"
           <| fun _ ->
 
               let cctx = CompilerEnv.Create(Expression)
 
-              let form = ReadFromString "(loop* [x 7 y 8] x)"
+              let form = ReadFromString "(loop* [x 7 y x] x)"
               let ast = Parser.Analyze(cctx, form)
+
+              let xSym = Symbol.intern ("x")
+              let ySym = Symbol.intern ("y")
+
+              let expectedBindings = ResizeArray<BindingInit>()
+
+              // Need to dig out the stupid loop id so we can do direct comparisons
+              let loopId = 
+                match ast with
+                | Expr.Let(LoopId=id) -> id
+                | _ -> failtest "Should be a Let"
+
+
+              let firstCctx =
+                  { cctx with
+                      Pctx = Expression
+                      IsAssignContext = false
+                      LoopId = loopId }
+
+              let firstBindingInit =
+                  createBindingInit (
+                      xSym,
+                      Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      0,
+                      true
+                  )
+
+              let firstBinding = firstBindingInit.Binding
+              expectedBindings.Add(firstBindingInit)
+
+              let secondCctx = { firstCctx with Locals = cctx.Locals.assoc (xSym, firstBinding) }
+
+              let secondBindingInit =
+                  createBindingInit (
+                      ySym,
+                      Expr.LocalBinding(Env = secondCctx, Form = xSym, Binding = firstBinding, Tag = null),
+                      1,
+                      true
+                  )
+
+              let secondBinding = secondBindingInit.Binding
+
+              let expectedLoopLocals = ResizeArray<LocalBinding>()
+              expectedLoopLocals.Add(firstBinding)
+              expectedLoopLocals.Add(secondBinding)
 
               match ast with
               | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
@@ -2387,6 +2437,7 @@ let LetTests =
                     let loopLocals = benv.LoopLocals
                     Expect.isNotNull loopLocals "Should have loop locals"
                     Expect.equal (loopLocals.Count) 2 "Should have two loop locals"
+                    compareGenericLists (loopLocals, expectedLoopLocals)
                 | _ -> failtest "Should be a Body"
               | _ -> failtest "Should be a Let"
 
