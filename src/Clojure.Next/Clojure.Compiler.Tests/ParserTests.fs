@@ -1988,28 +1988,33 @@ let SimpleSpecialOpTests =
 
               try
                   let ast = Parser.Analyze(cctx, form)
-                  let expectedTarget = Expr.InteropCall(
-                                  Env =
-                                      { cctx with
-                                          Pctx = Expression
-                                          IsAssignContext = true },
-                                  Form = Symbol.intern "Int64/MaxValue",
-                                  Type = FieldOrPropertyExpr,
-                                  IsStatic = true,
-                                  Tag = null,
-                                  Target = None,
-                                  TargetType = typeof<Int64>,
-                                  MemberName = "MaxValue",
-                                  TInfo = (typeof<Int64>.GetField ("MaxValue")),
-                                  Args = null,
-                                  TypeArgs = (ResizeArray<Type>()),
-                                  SourceInfo = None )
-                  let expectedValue = Expr.Literal(
-                                  Env = cctx.WithParserContext(Expression),
-                                  Form = 7L,
-                                  Value = 7L,
-                                  Type = PrimNumericType
-                              )
+
+                  let expectedTarget =
+                      Expr.InteropCall(
+                          Env =
+                              { cctx with
+                                  Pctx = Expression
+                                  IsAssignContext = true },
+                          Form = Symbol.intern "Int64/MaxValue",
+                          Type = FieldOrPropertyExpr,
+                          IsStatic = true,
+                          Tag = null,
+                          Target = None,
+                          TargetType = typeof<Int64>,
+                          MemberName = "MaxValue",
+                          TInfo = (typeof<Int64>.GetField ("MaxValue")),
+                          Args = null,
+                          TypeArgs = (ResizeArray<Type>()),
+                          SourceInfo = None
+                      )
+
+                  let expectedValue =
+                      Expr.Literal(
+                          Env = cctx.WithParserContext(Expression),
+                          Form = 7L,
+                          Value = 7L,
+                          Type = PrimNumericType
+                      )
 
                   //let expected =
                   //    (Expr.Assign(
@@ -2021,16 +2026,16 @@ let SimpleSpecialOpTests =
                   // Because interop calls are problematic to compare, we have to do this in pieces
                   match ast with
                   | Expr.Assign(Env = aEnv; Form = aForm; Target = aTarget; Value = aValue) ->
-    
-                        Expect.equal aEnv cctx "Should have the expected env"
-                        Expect.equal aForm form "Should have the expected form"
-    
-                        compareInteropCalls (aTarget, expectedTarget)
-                        Expect.equal aValue expectedValue "Should have the expected value"
+
+                      Expect.equal aEnv cctx "Should have the expected env"
+                      Expect.equal aForm form "Should have the expected form"
+
+                      compareInteropCalls (aTarget, expectedTarget)
+                      Expect.equal aValue expectedValue "Should have the expected value"
 
                   | _ -> failtest "Should be an Assign"
 
-            
+
               finally
                   Var.popThreadBindings () |> ignore
 
@@ -2048,13 +2053,13 @@ let SimpleSpecialOpTests =
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
               try
-                  Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw"
+                  Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "Should throw"
 
-            
+
               finally
                   Var.popThreadBindings () |> ignore
 
-          ftestCase """(clojure.core/import* "SomeType") => creates Expr.Import"""
+          testCase """(clojure.core/import* "SomeType") => creates Expr.Import"""
           <| fun _ ->
 
               let ns1, ns2 = createTestNameSpaces ()
@@ -2070,9 +2075,9 @@ let SimpleSpecialOpTests =
                   let ast = Parser.Analyze(cctx, form)
                   Expect.equal ast (Expr.Import(Env = cctx, Form = form, Typename = "SomeType")) "Should be an Import"
               finally
-                  Var.popThreadBindings() |> ignore
+                  Var.popThreadBindings () |> ignore
 
-          ftestCase """(clojure.core/import* 7) => Throws on non-string"""
+          testCase """(clojure.core/import* 7) => Throws on non-string"""
           <| fun _ ->
 
               let ns1, ns2 = createTestNameSpaces ()
@@ -2085,9 +2090,304 @@ let SimpleSpecialOpTests =
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
               try
-                  Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw"
+                  Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "Should throw"
               finally
-                  Var.popThreadBindings() |> ignore
+                  Var.popThreadBindings () |> ignore
 
+
+          testCase "Don't quote me"
+          <| fun _ ->
+
+              // I don't think we need six or seven separate tests for this.
+              let cctx = CompilerEnv.Create(Expression)
+
+
+              let form = ReadFromString("'nil")
+              let ast = Parser.Analyze(cctx, form)
+              Expect.equal ast Parser.NilExprInstance "'nil is nil expr"
+
+              let form = ReadFromString("'true")
+              let ast = Parser.Analyze(cctx, form)
+              Expect.equal ast Parser.TrueExprInstance "'true is true expr"
+
+              let form = ReadFromString("'false")
+              let ast = Parser.Analyze(cctx, form)
+              Expect.equal ast Parser.FalseExprInstance "'false is false expr"
+
+              let form = ReadFromString("'7")
+              let ast = Parser.Analyze(cctx, form)
+              Expect.equal ast (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)) "'7 is 7"
+
+              let form = ReadFromString("'\"abc\"")
+              let ast = Parser.Analyze(cctx, form)
+
+              Expect.equal
+                  ast
+                  (Expr.Literal(Env = cctx, Form = "abc", Value = "abc", Type = StringType))
+                  "'\"abc\" is \"abc\""
+
+              let form = ReadFromString("'[]")
+              let ast = Parser.Analyze(cctx, form)
+
+              Expect.equal
+                  ast
+                  (Expr.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = EmptyType))
+                  "'[] is EmptyType]"
+
+              let form = ReadFromString("'[1 2 3]")
+              let ast = Parser.Analyze(cctx, form)
+
+              Expect.equal
+                  ast
+                  (Expr.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
+                  "'[1 2 3] is not EmptyType"
+
+              let form = ReadFromString("' ^:kw [ 1 2 3]")
+              let ast = Parser.Analyze(cctx, form)
+
+              Expect.equal
+                  ast
+                  (Expr.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
+                  "'collection with meta is not EmptyType"
+
+              let form = ReadFromString("'x")
+              let ast = Parser.Analyze(cctx, form)
+
+              Expect.equal
+                  ast
+                  (Expr.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
+                  "quote anything else is OtherType"
+
+          ]
+
+[<Tests>]
+let LetTests =
+    testList
+        "Let Tests"
+        [ testCase "let with bad binding forms"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(let* x 7)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Thows - bad binding form"
+
+              let form = ReadFromString "(let* [x y z] 7)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Thows - odd number of elements in binding form"
+
+              let form = ReadFromString "(let* [x/y 7] 7)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Thows - qualified symbol for local"
+
+              let form = ReadFromString "(let* [7 7] 7)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Thows - non-symbol for local"
+
+          testCase "let with one binding, local ref in body"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(let* [x 7] x)"
+              let ast = Parser.Analyze(cctx, form)
+
+              let xSym = Symbol.intern ("x")
+
+              let expectedBindings = ResizeArray<BindingInit>()
+
+              let firstCctx =
+                  { cctx with
+                      Pctx = Expression
+                      IsAssignContext = false
+                      LoopId = None }
+
+              let firstBindingInit =
+                  createBindingInit (
+                      xSym,
+                      Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      0
+                  )
+
+              let firstBinding = firstBindingInit.Binding
+              expectedBindings.Add(firstBindingInit)
+
+              let secondCctx = { cctx with Locals = cctx.Locals.assoc (xSym, firstBinding) }
+
+              let bodyCctx =
+                  { secondCctx with
+                      Pctx = Expression
+                      IsRecurContext = false
+                      LoopLocals = null }
+
+              let expectedBodyForms = ResizeArray<Expr>()
+              expectedBodyForms.Add(Expr.LocalBinding(Env = bodyCctx, Form = xSym, Binding = firstBinding, Tag = null))
+
+              let expectedBody =
+                  Expr.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
+
+              match ast with
+              | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
+                  Expect.equal eenv cctx "Should have the expected env"
+                  Expect.equal eform form "Should have the expected form"
+                  Expect.equal mode LetExprMode.Let "Should be a Let"
+                  compareBodies (body, expectedBody)
+                  compareGenericLists (bindings, expectedBindings)
+              | _ -> failtest "Should be a Let"
+
+          testCase "let with two bindings, local ref in body"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(let* [x 7 y 8] x)"
+              let ast = Parser.Analyze(cctx, form)
+
+              let xSym = Symbol.intern ("x")
+              let ySym = Symbol.intern ("y")
+
+              let expectedBindings = ResizeArray<BindingInit>()
+
+              let firstCctx =
+                  { cctx with
+                      Pctx = Expression
+                      IsAssignContext = false
+                      LoopId = None }
+
+              let firstBindingInit =
+                  createBindingInit (
+                      xSym,
+                      Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      0
+                  )
+
+              let firstBinding = firstBindingInit.Binding
+              expectedBindings.Add(firstBindingInit)
+
+              let secondCctx = { cctx with Locals = cctx.Locals.assoc (xSym, firstBinding) }
+
+              let secondBindingInit =
+                  createBindingInit (
+                      ySym,
+                      Expr.Literal(Env = secondCctx, Form = 8L, Value = 8L, Type = PrimNumericType),
+                      1
+                  )
+
+              let thirdCctx =
+                  { secondCctx with Locals = secondCctx.Locals.assoc (ySym, secondBindingInit.Binding) }
+
+              let bodyCctx =
+                  { thirdCctx with
+                      Pctx = Expression
+                      IsRecurContext = false
+                      LoopLocals = null }
+
+              let expectedBodyForms = ResizeArray<Expr>()
+              expectedBodyForms.Add(Expr.LocalBinding(Env = bodyCctx, Form = xSym, Binding = firstBinding, Tag = null))
+
+              let expectedBody =
+                  Expr.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
+
+              match ast with
+              | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
+                  Expect.equal eenv cctx "Should have the expected env"
+                  Expect.equal eform form "Should have the expected form"
+                  Expect.equal mode LetExprMode.Let "Should be a Let"
+                  compareBodies (body, expectedBody)
+                  compareGenericLists (bindings, expectedBindings)
+              | _ -> failtest "Should be a Let"
+
+          testCase "let with two bindings, local ref in second init and body"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(let* [x 7 y x] y)"
+              let ast = Parser.Analyze(cctx, form)
+
+              let xSym = Symbol.intern ("x")
+              let ySym = Symbol.intern ("y")
+
+              let expectedBindings = ResizeArray<BindingInit>()
+
+              let firstCctx =
+                  { cctx with
+                      Pctx = Expression
+                      IsAssignContext = false
+                      LoopId = None }
+
+              let firstBindingInit =
+                  createBindingInit (
+                      xSym,
+                      Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      0
+                  )
+
+              let firstBinding = firstBindingInit.Binding
+              expectedBindings.Add(firstBindingInit)
+
+              let secondCctx = { cctx with Locals = cctx.Locals.assoc (xSym, firstBinding) }
+
+              let secondBindingInit =
+                  createBindingInit (
+                      ySym,
+                      Expr.LocalBinding(Env = secondCctx, Form = xSym, Binding = firstBinding, Tag = null),
+                      1
+                  )
+
+              let secondBinding = secondBindingInit.Binding
+
+              let thirdCctx =
+                  { secondCctx with Locals = secondCctx.Locals.assoc (ySym, secondBindingInit.Binding) }
+
+              let bodyCctx =
+                  { thirdCctx with
+                      Pctx = Expression
+                      IsRecurContext = false
+                      LoopLocals = null }
+
+              let expectedBodyForms = ResizeArray<Expr>()
+              expectedBodyForms.Add(Expr.LocalBinding(Env = bodyCctx, Form = ySym, Binding = secondBinding, Tag = null))
+
+              let expectedBody =
+                  Expr.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
+
+              match ast with
+              | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
+                  Expect.equal eenv cctx "Should have the expected env"
+                  Expect.equal eform form "Should have the expected form"
+                  Expect.equal mode LetExprMode.Let "Should be a Let"
+                  compareBodies (body, expectedBody)
+                  compareGenericLists (bindings, expectedBindings)
+              | _ -> failtest "Should be a Let"
+
+          ftestCase "loop with two bindings, local ref in body -- check for loop id and loop locals"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(loop* [x 7 y 8] x)"
+              let ast = Parser.Analyze(cctx, form)
+
+              match ast with
+              | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
+                Expect.equal mode LetExprMode.Loop "Should be a loop"
+                match body with
+                | Expr.Body(Env = benv) ->
+                    Expect.isTrue (benv.LoopId.IsSome) "Should have a loop id"
+                    let loopLocals = benv.LoopLocals
+                    Expect.isNotNull loopLocals "Should have loop locals"
+                    Expect.equal (loopLocals.Count) 2 "Should have two loop locals"
+                | _ -> failtest "Should be a Body"
+              | _ -> failtest "Should be a Let"
 
           ]

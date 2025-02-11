@@ -145,6 +145,7 @@ let compareBodies(a: Expr, b: Expr) =
         Expect.equal aenv benv "Env should be equal"
         Expect.equal aform bform "Form should be equal"
         compareGenericLists (abody, bbody)
+    | _ -> failwith "Not a Body"
 
 
 let withLocals(cenv: CompilerEnv, localNames: string array) =
@@ -193,3 +194,27 @@ let withMethod(cenv: CompilerEnv ) =
     cenv, method, register, internals
 
 
+let createBinding(sym: Symbol, init: Expr option, index: int) =
+    { Sym = sym
+      Tag = null
+      Init = None
+      Name = sym.Name
+      IsArg = false
+      IsByRef = false
+      IsRecur = false
+      IsThis = false
+      Index = index }
+
+let createBindingInit(sym: Symbol, init: Expr, index: int) =
+    let lb = 
+        { Sym = sym
+          Tag = null
+          Init = Some init
+          Name = sym.Name
+          IsArg = false
+          IsByRef = false
+          IsRecur = false
+          IsThis = false
+          Index = index }
+
+    {BindingInit.Binding = lb; Init = init }

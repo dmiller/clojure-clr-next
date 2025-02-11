@@ -367,7 +367,7 @@ and CompilerEnv =
                 this.CloseOver(lb, m)
 
                 Some lb
-            | _ -> None
+            | _ -> Some lb   // TODO: ofiginal code here would have Null. However, this requires a let*, etc. to have a method installed.  TODO:  Can we fake a local context wihtout a method?
         | _ -> None
 
     member this.ContainsBindingForSym(sym: Symbol) =
