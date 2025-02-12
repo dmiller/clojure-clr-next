@@ -272,8 +272,8 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _objxInternals : ObjXInternals, _obj
     member _.ObjxInternals = _objxInternals
 
     member val RestParam: obj option = None with get, set
-    member _.ReqParams: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
-    member _.ArgLocals: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
+    member val ReqParams: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
+    member val ArgLocals: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
     member _.Name: string = ""
     member val RetType: Type = typeof<Object> with get, set
 

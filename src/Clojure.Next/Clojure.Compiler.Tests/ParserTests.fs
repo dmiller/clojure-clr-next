@@ -2826,7 +2826,7 @@ let DefTests =
               finally
                   Var.popThreadBindings () |> ignore
 
-          ftestCase "def notes shadowsCoreMapping"
+          testCase "def notes shadowsCoreMapping"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -2865,3 +2865,53 @@ let DefTests =
           // TODO: Test for eliding metadata on def
 
           ]
+
+
+[<Tests>]
+let FnTests =
+    testList
+        "Fn Tests"
+        [ testCase "(fn* [] 7) same as (fn* ([] 7)) -- normalize form"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form1 = ReadFromString "(fn* [] 7)"
+              let ast1 = Parser.Analyze(cctx,form1)
+
+              let form2 = ReadFromString "(fn* ([] 7))"
+              let ast2 = Parser.Analyze(cctx,form2)
+                
+              compareObjExprs (ast1, ast2)
+
+          ftestCase "parameter errors"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(fn* ([x y] 7) ([x y] 8))"
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "two methods with same arity => throws"
+
+              let form = ReadFromString "(fn* ([x & y] 7) ([x & y] 8))"
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "more than one variadic method => throws"
+
+              let form = ReadFromString "(fn* ([x y z] 7) ([x & y] 8))"
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "fixed with greater arity than variadic required => throws"
+
+              let form = ReadFromString "(fn* ([x y & z w] 7) ([x y] 8))"
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "more than one parameter after & => throws"
+
+              let form = ReadFromString "(fn* ([x/y z] 7))"
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "qualified sym as parameter => throws"               
+             
+              let form = ReadFromString "(fn* ([x 7] 7))"
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "non-Symbol for parameter => throws"      
+
+              let form = ReadFromString "(fn* ([x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 ] 7))"
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "too many locals => throws"        
+
+              let form = ReadFromString "(fn* ([x & ^int y] 7))"
+              Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "type hint on variadic param => throws"
+
+
+        ]
