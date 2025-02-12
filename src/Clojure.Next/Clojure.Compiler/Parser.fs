@@ -811,7 +811,7 @@ type Parser private () =
                 raise
                 <| ParseException($"Can't create defs outside of current namespace: {sym}")
 
-        let mm = RT0.meta (form)
+        let mm = RT0.meta (sym)
         let isDynamic = RT0.booleanCast (RT0.get (mm, RTVar.DynamicKeyword))
 
         if isDynamic then
@@ -831,6 +831,7 @@ type Parser private () =
                 RTMap.assoc (
                     (var :> IMeta).meta (),
                     RTVar.ArglistsKeyword,
+                    // drop quote
                     RTSeq.second (mm.valAt (RTVar.ArglistsKeyword))
                 )
 

@@ -2389,10 +2389,10 @@ let LetTests =
               let expectedBindings = ResizeArray<BindingInit>()
 
               // Need to dig out the stupid loop id so we can do direct comparisons
-              let loopId = 
-                match ast with
-                | Expr.Let(LoopId=id) -> id
-                | _ -> failtest "Should be a Let"
+              let loopId =
+                  match ast with
+                  | Expr.Let(LoopId = id) -> id
+                  | _ -> failtest "Should be a Let"
 
 
               let firstCctx =
@@ -2430,15 +2430,16 @@ let LetTests =
 
               match ast with
               | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
-                Expect.equal mode LetExprMode.Loop "Should be a loop"
-                match body with
-                | Expr.Body(Env = benv) ->
-                    Expect.isTrue (benv.LoopId.IsSome) "Should have a loop id"
-                    let loopLocals = benv.LoopLocals
-                    Expect.isNotNull loopLocals "Should have loop locals"
-                    Expect.equal (loopLocals.Count) 2 "Should have two loop locals"
-                    compareGenericLists (loopLocals, expectedLoopLocals)
-                | _ -> failtest "Should be a Body"
+                  Expect.equal mode LetExprMode.Loop "Should be a loop"
+
+                  match body with
+                  | Expr.Body(Env = benv) ->
+                      Expect.isTrue (benv.LoopId.IsSome) "Should have a loop id"
+                      let loopLocals = benv.LoopLocals
+                      Expect.isNotNull loopLocals "Should have loop locals"
+                      Expect.equal (loopLocals.Count) 2 "Should have two loop locals"
+                      compareGenericLists (loopLocals, expectedLoopLocals)
+                  | _ -> failtest "Should be a Body"
               | _ -> failtest "Should be a Let"
 
           ]
@@ -2450,44 +2451,59 @@ let RecurTests =
         "Recur Tests"
         [ testCase "recur not in a loop -- throws"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Expression)
 
               let form = ReadFromString "(let* [x 7] (recur 12))"
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when not in recur context"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when not in recur context"
 
           testCase "recur not in return context -- throws"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Expression)
 
               let form = ReadFromString "(loop* [x 7] (recur 12) 7)"
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when not in recur context"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when not in recur context"
 
               let form = ReadFromString "(loop* [x 7] (if (recur 12) 7 8))"
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when not in recur context"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when not in recur context"
 
 
           testCase "recur with arg count mismatch -- throws"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Expression)
 
               let form = ReadFromString "(loop* [x 7] (recur 12 14))"
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw on arg count mismatch"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw on arg count mismatch"
 
           testCase "recur across try -- throws"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Expression)
 
               let form = ReadFromString "(loop* [x 7] (try (recur 12 14)))"
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw on recur across try"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw on recur across try"
 
 
           testCase "recur works"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Expression)
 
               let form = ReadFromString "(loop* [x 7] (recur 12))"
@@ -2495,19 +2511,20 @@ let RecurTests =
 
               match ast with
               | Expr.Let(Body = body) ->
-                 match body with
-                 | Expr.Body(Exprs = exprs) ->
+                  match body with
+                  | Expr.Body(Exprs = exprs) ->
                       Expect.equal exprs.Count 1 "Should have one expression"
+
                       match exprs[0] with
-                      | Expr.Recur(LoopLocals = loopLocals;  Args = args) ->
-                            Expect.equal loopLocals.Count 1 "Should have one loop local"
-                            Expect.equal args.Count 1 "Should have one arg"
+                      | Expr.Recur(LoopLocals = loopLocals; Args = args) ->
+                          Expect.equal loopLocals.Count 1 "Should have one loop local"
+                          Expect.equal args.Count 1 "Should have one arg"
                       | _ -> failtest "Should be a Recur"
-                 | _ -> failtest "Should be a Body"
+                  | _ -> failtest "Should be a Body"
               | _ -> failtest "Should be a Let"
 
 
-        ]
+          ]
 
 
 
@@ -2517,7 +2534,7 @@ let TryTests =
         "Try Tests"
         [ testCase "try with no catch/finally => returns a body expression"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Return)
 
               let form = ReadFromString "(try 7)"
@@ -2527,44 +2544,324 @@ let TryTests =
 
           testCase "try with no finally not last in body => throws"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Return)
 
               let form = ReadFromString "(try 7 (finally 7) 7)"
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when finally not terminal"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when finally not terminal"
 
           testCase "catch with bad exception type => throws"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Return)
 
               let form = ReadFromString "(try 7 (catch Fred x 7))"
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when catch clause has non-type for exception"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when catch clause has non-type for exception"
 
 
           testCase "catch with bad local variable type => throws"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Return)
 
               let form = ReadFromString "(try 7 (catch Exception x/y 7))"
-              Expect.throwsT<CompilerException> (fun _ ->  Parser.Analyze(cctx, form) |> ignore) "Should throw when catch clause has bad local var"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when catch clause has bad local var"
 
           testCase "valid try expression"
           <| fun _ ->
-            
+
               let cctx = CompilerEnv.Create(Return)
 
-              let form = ReadFromString "(try 7 (catch ArgumentException x 7) (catch Exception y 12) (finally 7))"
-              let ast = Parser.Analyze(cctx, form) 
+              let form =
+                  ReadFromString "(try 7 (catch ArgumentException x 7) (catch Exception y 12) (finally 7))"
 
-              match ast with 
+              let ast = Parser.Analyze(cctx, form)
+
+              match ast with
               | Expr.Try(Env = env; TryExpr = tryExpr; Catches = catches; Finally = finallyExpr) ->
-                Expect.isTrue tryExpr.IsBody "Should be a body expression"
-                Expect.equal catches.Count 2 "Should have one catches"
-                Expect.isTrue finallyExpr.IsSome "Should have a finally expression"
+                  Expect.isTrue tryExpr.IsBody "Should be a body expression"
+                  Expect.equal catches.Count 2 "Should have one catches"
+                  Expect.isTrue finallyExpr.IsSome "Should have a finally expression"
               | _ -> failtest "Should be a Try"
-                    
 
-        ]
 
+          ]
+
+
+[<Tests>]
+let DefTests =
+    testList
+        "Def Tests"
+        [ testCase "def without sufficient args or non-symbol as first arg => throws"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(def)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when not enough args"
+
+              let form = ReadFromString "(def x y z)"
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when too many args"
+
+              let form = ReadFromString """(def x "abc" y z)"""
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when too many args"
+
+              let form = ReadFromString """(def 7 12)"""
+
+              Expect.throwsT<CompilerException>
+                  (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                  "Should throw when non-Symbol as first arg"
+
+          testCase "def with bad first arg => throws"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(def ns2/not-there 7)"
+
+                  Expect.throwsT<CompilerException>
+                      (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                      "try to def var in other namespace, var not found"
+
+                  let form = ReadFromString "(def missing/not-there 7)"
+
+                  Expect.throwsT<CompilerException>
+                      (fun _ -> Parser.Analyze(cctx, form) |> ignore)
+                      "try to def var, missing namespace"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+          testCase "basic def (no docstring, no init) works"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(def v)"
+                  let ast = Parser.Analyze(cctx, form)
+                  let vSym = Symbol.intern "v"
+                  let vVar = ns1.findInternedVar (vSym)
+
+                  Expect.equal
+                      ast
+                      (Expr.Def(
+                          Env = cctx,
+                          Form = form,
+                          Var = vVar,
+                          Init = Parser.NilExprInstance,
+                          InitProvided = false,
+                          IsDynamic = false,
+                          ShadowsCoreMapping = false,
+                          Meta = None,
+                          SourceInfo = None
+                      ))
+                      "Should be a def"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "basic def with init (no docstring) works"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(def v 7)"
+                  let ast = Parser.Analyze(cctx, form)
+                  let vSym = Symbol.intern "v"
+                  let vVar = ns1.findInternedVar (vSym)
+
+                  Expect.equal
+                      ast
+                      (Expr.Def(
+                          Env = cctx,
+                          Form = form,
+                          Var = vVar,
+                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          InitProvided = true,
+                          IsDynamic = false,
+                          ShadowsCoreMapping = false,
+                          Meta = None,
+                          SourceInfo = None
+                      ))
+                      "Should be a def"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+
+          testCase "def : docstring in metadata"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(def ^{:doc \"something\"} v 7)"
+                  let ast = Parser.Analyze(cctx, form)
+                  let vSym = Symbol.intern "v"
+                  let vVar = ns1.findInternedVar (vSym)
+                  let metaMap = ReadFromString "{:doc \"something\"}"
+                  let metaExpr = Expr.Literal(Env=cctx, Form=metaMap, Value=metaMap, Type=OtherType)
+
+                  Expect.equal
+                      ast
+                      (Expr.Def(
+                          Env = cctx,
+                          Form = form,
+                          Var = vVar,
+                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          InitProvided = true,
+                          IsDynamic = false,
+                          ShadowsCoreMapping = false,
+                          Meta = Some(metaExpr),
+                          SourceInfo = None
+                      ))
+                      "Should be a def"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "def transfers :dynamic true to Var"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(def ^{:dynamic true} v 7)"
+                  let ast = Parser.Analyze(cctx, form)
+                  let vSym = Symbol.intern "v"
+                  let vVar = ns1.findInternedVar (vSym)
+                  let metaMap = ReadFromString "{:dynamic true}"
+                  let metaExpr = Expr.Literal(Env=cctx, Form=metaMap, Value=metaMap, Type=OtherType)
+
+                  Expect.equal
+                      ast
+                      (Expr.Def(
+                          Env = cctx,
+                          Form = form,
+                          Var = vVar,
+                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          InitProvided = true,
+                          IsDynamic = true,
+                          ShadowsCoreMapping = false,
+                          Meta = Some(metaExpr),
+                          SourceInfo = None
+                      ))
+                      "Should be a def"
+                  Expect.isTrue (RT0.booleanCast(vVar.isDynamic)) "Should be dynamic"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          testCase "def transfers :arglists value to Var"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(def ^{:arglists '([x])} v 7)"
+                  let ast = Parser.Analyze(cctx, form)
+                  let vSym = Symbol.intern "v"
+                  let vVar = ns1.findInternedVar (vSym)
+                  let metaMapForm = ReadFromString "{:arglists '([x])}"
+                  let metaMap = ReadFromString "{:arglists ([x])}" :?> IPersistentMap
+                  let metaExpr = Expr.Literal(Env=cctx, Form=metaMapForm, Value=metaMap, Type=OtherType)
+
+                  Expect.equal
+                      ast
+                      (Expr.Def(
+                          Env = cctx,
+                          Form = form,
+                          Var = vVar,
+                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          InitProvided = true,
+                          IsDynamic = false,
+                          ShadowsCoreMapping = false,
+                          Meta = Some(metaExpr),
+                          SourceInfo = None
+                      ))
+                      "Should be a def"
+                  let arglistskw = Keyword.intern "arglists"
+                  Expect.equal ((vVar :> IMeta).meta().valAt(arglistskw)) (metaMap.valAt(arglistskw)) "Should have arglists"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          ftestCase "def notes shadowsCoreMapping"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let pqrVar = ns2.findInternedVar pqrSym
+                  let fredSym = Symbol.intern "fred"
+                  ns1.reference(fredSym, pqrVar) |> ignore
+
+                  let form = ReadFromString "(def fred 7)"
+                  let ast = Parser.Analyze(cctx, form)
+                  let fredVar = ns1.findInternedVar (fredSym)
+
+                  Expect.equal
+                      ast
+                      (Expr.Def(
+                          Env = cctx,
+                          Form = form,
+                          Var = fredVar,
+                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          InitProvided = true,
+                          IsDynamic = false,
+                          ShadowsCoreMapping = true,
+                          Meta = None,
+                          SourceInfo = None
+                      ))
+                      "Should be a def"
+
+              finally
+                  Var.popThreadBindings () |> ignore
+
+          // TODO: Test for printing warning for def of *dynamic*
+          // TODO: Test for eliding metadata on def
+
+          ]
