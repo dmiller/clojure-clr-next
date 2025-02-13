@@ -914,13 +914,13 @@ type Parser private () =
             | null -> false
             | _ as m -> RT0.booleanCast (RT0.get (m, RTVar.OnceOnlyKeyword))
 
+        let name, internalName = Parser.ComputeFnNames(cenv, form, name)
+
         //arglist might be preceded by symbol naming this fn
         let nm, form =
             match RTSeq.second (form) with
-            | :? Symbol as sym -> sym, (RTSeq.cons (RTVar.FnSym, RTSeq.next (form)))
+            | :? Symbol as sym -> sym, (RTSeq.cons (RTVar.FnSym, RTSeq.next (RTSeq.next (form))))
             | _ -> null, form
-
-        let name, internalName = Parser.ComputeFnNames(cenv, form, name)
 
         let register = ObjXRegister(cenv.ObjXRegister)
 

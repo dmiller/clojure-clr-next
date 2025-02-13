@@ -2884,7 +2884,7 @@ let FnTests =
                 
               compareObjExprs (ast1, ast2)
 
-          ftestCase "parameter errors"
+          testCase "parameter errors"
           <| fun _ ->
 
               let cctx = CompilerEnv.Create(Expression)
@@ -2912,6 +2912,175 @@ let FnTests =
 
               let form = ReadFromString "(fn* ([x & ^int y] 7))"
               Expect.throwsT<CompilerException> (fun _ -> Parser.Analyze(cctx, form) |> ignore) "type hint on variadic param => throws"
+
+          testCase "fn* basic data - with name, with :once, parameter reference in method"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "(^:once fn* fred ([x] x))"
+              let ast = Parser.Analyze(cctx,form)
+
+              match ast with
+              | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  Expect.equal env cctx "Should have the expected env"
+                  Expect.equal form form "Should have the expected form"
+                  Expect.isTrue (internals.OnceOnly) "Should be once only"
+                  Expect.isTrue (internals.Name.StartsWith("clojure.core$fred__"))  "Name should have proper prefix"
+                  Expect.isTrue (internals.InternalName.StartsWith("clojure/core$fred__"))  "InternalName should have proper prefix"
+                  Expect.isFalse (internals.HasEnclosingMethod) "Should not have enclosing method"
+                  Expect.equal internals.Methods.Count 1 "Should have one method"
+                  Expect.isTrue (internals.VariadicMethod.IsNone) "Should not have a variadic method"
+                  Expect.isNull (internals.Tag) "Should not have a tag"
+                  Expect.isTrue (register.Parent.IsNone) "Should not have a parent"
+                  Expect.equal (register.Closes.count()) 0 "Should not have any Closes"
+                  Expect.equal (register.Constants.count()) 0 "Should not have any Constants"
+                  Expect.equal register.ConstantIds.Count 0 "Should not have any ConstantIds"
+                  Expect.equal (register.Keywords.count()) 0 "Should not have any Keywords"
+                  Expect.equal (register.Vars.count()) 0 "Should not have any Vars"
+                  Expect.equal (register.KeywordCallsites.count()) 0 "Should not have any KeywordCallsites"
+                  Expect.equal (register.ProtocolCallsites.count()) 0 "Should not have any ProtocolCallsites"
+                  Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
+                  let method0 = internals.Methods[0]
+                  Expect.equal method0.Type Fn "Should be of type Fn"
+                  Expect.isTrue (Object.ReferenceEquals(method0.ObjxRegister, register)) "Should have the expected register"
+                  Expect.isTrue (Object.ReferenceEquals(method0.ObjxInternals, internals)) "Should have the expected internals"
+                  Expect.isFalse method0.UsesThis "Does not use this"
+                  Expect.isTrue method0.RestParam.IsNone "Should not have a rest param"
+                  Expect.equal method0.ReqParams.Count 1 "Should have one required param"
+                  Expect.equal method0.ArgLocals.Count 1 "Should have one arg local"
+                  Expect.equal method0.MethodName "invoke" "Should have the expected method name"
+                  Expect.equal method0.RetType typeof<Object> "Should have Object return type"
+                  Expect.isFalse method0.IsVariadic "Should not be variadic"
+                  Expect.equal method0.NumParams 1 "Should have one param"
+                  match method0.Body with
+                  | Expr.Body(Exprs=exprs) -> 
+                    Expect.equal exprs.Count 1 "should have one form in the body"
+                    let e0 = exprs[0]
+                    Expect.isTrue e0.IsLocalBinding "should be a local binding"
+                  | _ -> failtest "Expected body form to be a Body"
+              | _ -> failtest "Should be an Obj"
+
+          testCase "fn* basic data - without name, without :once, var reference in method"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let ns1Name = ns1.Name.Name
+              let abcVar = ns1.findInternedVar abcSym
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+                  let form = ReadFromString "(fn* ([x] (abc 7)))"
+                  let ast = Parser.Analyze(cctx,form)
+
+                  match ast with
+                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                      Expect.isFalse (internals.OnceOnly) "Should be once only"
+                      Expect.isTrue (internals.Name.StartsWith($"{ns1Name}$fn__"))  "Name should have proper prefix"
+                      Expect.isTrue (internals.InternalName.StartsWith($"{ns1Name}$fn__"))  "InternalName should have proper prefix"
+                      Expect.isFalse (internals.HasEnclosingMethod) "Should not have enclosing method"
+                      Expect.equal (register.Closes.count()) 0 "Should not have any Closes"
+                      Expect.equal (register.Constants.count()) 1 "Should have one Constant"
+                      let const0 = register.Constants.nth(0)
+                      Expect.equal const0 abcVar "Should be the expected Var"
+                      Expect.equal register.ConstantIds.Count 1 "Should have one ConstantId"
+                      Expect.equal (register.Keywords.count()) 0 "Should not have any Keywords"
+                      Expect.equal (register.Vars.count()) 1 "Should not have any Vars"
+                      let v0 = register.Vars.containsKey abcVar
+                      Expect.equal (register.KeywordCallsites.count()) 0 "Should not have any KeywordCallsites"
+                      Expect.equal (register.ProtocolCallsites.count()) 0 "Should not have any ProtocolCallsites"
+                      Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
+                      let method0 = internals.Methods[0]
+                      match method0.Body with
+                      | Expr.Body(Exprs=exprs) -> 
+                        Expect.equal exprs.Count 1 "should have one form in the body"
+                        let e0 = exprs[0]
+                        Expect.isTrue e0.IsInvoke "should be a local binding"
+                      | _ -> failtest "Expected body form to be a Body"
+                  | _ -> failtest "Should be an Obj"
+              finally
+                Var.popThreadBindings() |> ignore
+
+
+          testCase "fn* with name, uses this, has keyword reference"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let ns1Name = ns1.Name.Name
+              let abcVar = ns1.findInternedVar abcSym
+
+              let cctx = CompilerEnv.Create(Expression)
+
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(fn* fred ([x] (abc fred :kw)))"
+                  let ast = Parser.Analyze(cctx,form)
+
+                  match ast with
+                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+
+                      Expect.equal (register.Closes.count()) 0 "Should not have any Closes"
+                      Expect.equal (register.Constants.count()) 2 "Should have two Constants"
+                      Expect.equal register.ConstantIds.Count 2 "Should  have two ConstantIds"
+                      Expect.equal (register.Keywords.count()) 1 "Should have one Keywords"
+                      Expect.equal (register.Vars.count()) 1 "Should have one Vars"
+                      Expect.equal (register.KeywordCallsites.count()) 0 "Should not have any KeywordCallsites"
+                      Expect.equal (register.ProtocolCallsites.count()) 0 "Should not have any ProtocolCallsites"
+                      Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
+                      let method0 = internals.Methods[0]
+                      Expect.isTrue method0.UsesThis "Does use this"
+                      match method0.Body with
+                      | Expr.Body(Exprs=exprs) -> 
+                        Expect.equal exprs.Count 1 "should have one form in the body"
+                        let e0 = exprs[0]
+                        Expect.isTrue e0.IsInvoke "should be an invocation"
+                      | _ -> failtest "Expected body form to be a Body"
+                  | _ -> failtest "Should be an Obj"
+
+              finally
+                Var.popThreadBindings() |> ignore
+
+          ftestCase "fn* has keyword callsite"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let ns1Name = ns1.Name.Name
+              let abcVar = ns1.findInternedVar abcSym
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(fn* fred ([x] (:kw x)))"
+                  let ast = Parser.Analyze(cctx,form)
+
+                  match ast with
+                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+
+                      Expect.equal (register.Closes.count()) 0 "Should not have any Closes"
+                      Expect.equal (register.Constants.count()) 1 "Should have one Constants"
+                      Expect.equal register.ConstantIds.Count 1 "Should  have one ConstantIds"
+                      Expect.equal (register.Keywords.count()) 1 "Should have one Keywords"
+                      Expect.equal (register.Vars.count()) 0 "Should have no Vars"
+                      Expect.equal (register.KeywordCallsites.count()) 1 "Should have one KeywordCallsites"
+                      Expect.equal (register.ProtocolCallsites.count()) 0 "Should not have any ProtocolCallsites"
+                      Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
+                      let method0 = internals.Methods[0]
+                      match method0.Body with
+                      | Expr.Body(Exprs=exprs) -> 
+                        Expect.equal exprs.Count 1 "should have one form in the body"
+                        let e0 = exprs[0]
+                        Expect.isTrue e0.IsKeywordInvoke "should be an KeywordInvoke"
+                      | _ -> failtest "Expected body form to be a Body"
+                  | _ -> failtest "Should be an Obj"
+
+              finally
+                Var.popThreadBindings() |> ignore
 
 
         ]
