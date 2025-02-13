@@ -884,7 +884,10 @@ type Parser private () =
 
         let baseName =
             match enclosingMethod with
-            | Some m -> m.Name
+            | Some m ->
+                match m.Objx with
+                | Expr.Obj(_, _, _, internals, _, _) -> internals.Name
+                | _ -> raise <| InvalidOperationException("No Objx found on method")
             | None -> Munger.Munge(RTVar.getCurrentNamespace().Name.Name + "$")
 
         let newName =
@@ -1071,7 +1074,7 @@ type Parser private () =
         method.RetType <-
             TypeUtils.TagType(
                 cenv,
-                match TypeUtils.TagOf(cenv, parameters) with
+                match TypeUtils.TagOf(parameters) with
                 | null -> symRetTag
                 | _ as tag -> tag
             )

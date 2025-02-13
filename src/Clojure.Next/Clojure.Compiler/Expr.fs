@@ -274,7 +274,7 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _objxInternals : ObjXInternals, _obj
     member val RestParam: obj option = None with get, set
     member val ReqParams: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
     member val ArgLocals: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
-    member _.Name: string = ""
+    member val Name: string = "" with get, set  // Used by NewInstanceExprParser only, Fns do not have names
     member val RetType: Type = typeof<Object> with get, set
 
     member _.GetAndIncLocalNum() =

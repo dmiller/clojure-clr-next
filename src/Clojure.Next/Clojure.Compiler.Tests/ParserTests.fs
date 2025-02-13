@@ -347,7 +347,7 @@ let ResolveTests =
           testCase "Namespace alias, var not found => throws"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
-              let sym = Symbol.intern (ns2Sym.Name, "fred")
+              let sym = Symbol.intern (ns2Sym.Name, "fred1")
               let cctx = CompilerEnv.Create(Expression)
 
               Expect.throwsT<InvalidOperationException>
@@ -503,7 +503,7 @@ let LookupVarTests =
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
 
-              let sym = Symbol.intern (ns1.Name.Name, "fred")
+              let sym = Symbol.intern (ns1.Name.Name, "fred2")
               let v = Parser.LookupVar(cctx, sym, false)
               Expect.isNull v "Should not find var not in named namespace"
 
@@ -513,7 +513,7 @@ let LookupVarTests =
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
 
-              let sym = Symbol.intern (ns1.Name.Name, "fred")
+              let sym = Symbol.intern (ns1.Name.Name, "fred3")
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
@@ -522,7 +522,7 @@ let LookupVarTests =
                   Expect.isNotNull v "Should find var not in named namespace"
 
                   Expect.isNotNull
-                      (ns1.findInternedVar (Symbol.intern (null, "fred")))
+                      (ns1.findInternedVar (Symbol.intern (null, "fred3")))
                       "Should have created var in current namespace"
               finally
                   Var.popThreadBindings () |> ignore
@@ -533,7 +533,7 @@ let LookupVarTests =
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
 
-              let sym = Symbol.intern (ns1.Name.Name, "fred")
+              let sym = Symbol.intern (ns1.Name.Name, "fred4")
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
@@ -559,7 +559,7 @@ let LookupVarTests =
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
 
-              let sym = Symbol.intern (null, "fred")
+              let sym = Symbol.intern (null, "fred5")
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
@@ -575,7 +575,7 @@ let LookupVarTests =
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
 
-              let sym = Symbol.intern (null, "fred")
+              let sym = Symbol.intern (null, "fred6")
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
@@ -866,6 +866,8 @@ let SymbolTests =
 
               let newLocals = RTMap.assoc (locals, pqrsSym, lbPqrs) :?> IPersistentMap
               let cctx = { cctx with Locals = newLocals }
+              
+              // this test was designed before we had debugged FnExprParser, so we faked the environment.
 
               let register = ObjXRegister(None)
               let internals = ObjXInternals()
@@ -992,7 +994,7 @@ let SymbolTests =
 
               try
 
-                  let sym = Symbol.intern (null, "fred")
+                  let sym = Symbol.intern (null, "fred7")
                   let ast = Parser.Analyze(cctx, sym)
 
                   Expect.equal
@@ -1015,7 +1017,7 @@ let SymbolTests =
 
               try
 
-                  let sym = Symbol.intern (null, "fred")
+                  let sym = Symbol.intern (null, "fred8")
 
                   Expect.throwsT<CompilerException>
                       (fun _ -> Parser.Analyze(cctx, sym) |> ignore)
@@ -1188,14 +1190,14 @@ let BasicInvokeTests =
                   Var.popThreadBindings () |> ignore
 
 
-          testCase "(fred 7), fred not bound to Var in namespace, not special   => trhows"
+          testCase "(fred9 7), fred not bound to Var in namespace, not special   => trhows"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
               let register = ObjXRegister(None)
               let cctx = { cctx with ObjXRegister = Some register }
 
-              let form = ReadFromString "(fred 7)"
+              let form = ReadFromString "(fred9 7)"
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
@@ -1809,7 +1811,7 @@ let SimpleSpecialOpTests =
                   Var.popThreadBindings () |> ignore
 
 
-          testCase "#'fred => throws on unbound"
+          testCase "#'fred10 => throws on unbound"
           <| fun _ ->
 
               let ns1, ns2 = createTestNameSpaces ()
@@ -1817,7 +1819,7 @@ let SimpleSpecialOpTests =
               let register = ObjXRegister(None)
               let cctx = { cctx with ObjXRegister = Some register }
 
-              let form = ReadFromString "#'fred"
+              let form = ReadFromString "#'fred10"
 
               Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
@@ -2836,10 +2838,10 @@ let DefTests =
               try
 
                   let pqrVar = ns2.findInternedVar pqrSym
-                  let fredSym = Symbol.intern "fred"
+                  let fredSym = Symbol.intern "fred11"
                   ns1.reference(fredSym, pqrVar) |> ignore
 
-                  let form = ReadFromString "(def fred 7)"
+                  let form = ReadFromString "(def fred11 7)"
                   let ast = Parser.Analyze(cctx, form)
                   let fredVar = ns1.findInternedVar (fredSym)
 
@@ -2915,51 +2917,59 @@ let FnTests =
 
           testCase "fn* basic data - with name, with :once, parameter reference in method"
           <| fun _ ->
-
+              let ns1, ns2 = createTestNameSpaces ()
+              let ns1Name = ns1.Name.Name
               let cctx = CompilerEnv.Create(Expression)
 
-              let form = ReadFromString "(^:once fn* fred ([x] x))"
-              let ast = Parser.Analyze(cctx,form)
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
 
-              match ast with
-              | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
-                  Expect.equal env cctx "Should have the expected env"
-                  Expect.equal form form "Should have the expected form"
-                  Expect.isTrue (internals.OnceOnly) "Should be once only"
-                  Expect.isTrue (internals.Name.StartsWith("clojure.core$fred__"))  "Name should have proper prefix"
-                  Expect.isTrue (internals.InternalName.StartsWith("clojure/core$fred__"))  "InternalName should have proper prefix"
-                  Expect.isFalse (internals.HasEnclosingMethod) "Should not have enclosing method"
-                  Expect.equal internals.Methods.Count 1 "Should have one method"
-                  Expect.isTrue (internals.VariadicMethod.IsNone) "Should not have a variadic method"
-                  Expect.isNull (internals.Tag) "Should not have a tag"
-                  Expect.isTrue (register.Parent.IsNone) "Should not have a parent"
-                  Expect.equal (register.Closes.count()) 0 "Should not have any Closes"
-                  Expect.equal (register.Constants.count()) 0 "Should not have any Constants"
-                  Expect.equal register.ConstantIds.Count 0 "Should not have any ConstantIds"
-                  Expect.equal (register.Keywords.count()) 0 "Should not have any Keywords"
-                  Expect.equal (register.Vars.count()) 0 "Should not have any Vars"
-                  Expect.equal (register.KeywordCallsites.count()) 0 "Should not have any KeywordCallsites"
-                  Expect.equal (register.ProtocolCallsites.count()) 0 "Should not have any ProtocolCallsites"
-                  Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
-                  let method0 = internals.Methods[0]
-                  Expect.equal method0.Type Fn "Should be of type Fn"
-                  Expect.isTrue (Object.ReferenceEquals(method0.ObjxRegister, register)) "Should have the expected register"
-                  Expect.isTrue (Object.ReferenceEquals(method0.ObjxInternals, internals)) "Should have the expected internals"
-                  Expect.isFalse method0.UsesThis "Does not use this"
-                  Expect.isTrue method0.RestParam.IsNone "Should not have a rest param"
-                  Expect.equal method0.ReqParams.Count 1 "Should have one required param"
-                  Expect.equal method0.ArgLocals.Count 1 "Should have one arg local"
-                  Expect.equal method0.MethodName "invoke" "Should have the expected method name"
-                  Expect.equal method0.RetType typeof<Object> "Should have Object return type"
-                  Expect.isFalse method0.IsVariadic "Should not be variadic"
-                  Expect.equal method0.NumParams 1 "Should have one param"
-                  match method0.Body with
-                  | Expr.Body(Exprs=exprs) -> 
-                    Expect.equal exprs.Count 1 "should have one form in the body"
-                    let e0 = exprs[0]
-                    Expect.isTrue e0.IsLocalBinding "should be a local binding"
-                  | _ -> failtest "Expected body form to be a Body"
-              | _ -> failtest "Should be an Obj"
+              try 
+
+                  let form = ReadFromString "(^:once fn* fred99 ([x] x))"
+                  let ast = Parser.Analyze(cctx,form)
+
+                  match ast with
+                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                      Expect.equal env cctx "Should have the expected env"
+                      Expect.equal form form "Should have the expected form"
+                      Expect.isTrue (internals.OnceOnly) "Should be once only"
+                      Expect.isTrue (internals.Name.StartsWith($"{ns1Name}$fred99__"))  "Name should have proper prefix"
+                      Expect.isTrue (internals.InternalName.StartsWith($"{ns1Name}$fred99__"))  "InternalName should have proper prefix"
+                      Expect.isFalse (internals.HasEnclosingMethod) "Should not have enclosing method"
+                      Expect.equal internals.Methods.Count 1 "Should have one method"
+                      Expect.isTrue (internals.VariadicMethod.IsNone) "Should not have a variadic method"
+                      Expect.isNull (internals.Tag) "Should not have a tag"
+                      Expect.isTrue (register.Parent.IsNone) "Should not have a parent"
+                      Expect.equal (register.Closes.count()) 0 "Should not have any Closes"
+                      Expect.equal (register.Constants.count()) 0 "Should not have any Constants"
+                      Expect.equal register.ConstantIds.Count 0 "Should not have any ConstantIds"
+                      Expect.equal (register.Keywords.count()) 0 "Should not have any Keywords"
+                      Expect.equal (register.Vars.count()) 0 "Should not have any Vars"
+                      Expect.equal (register.KeywordCallsites.count()) 0 "Should not have any KeywordCallsites"
+                      Expect.equal (register.ProtocolCallsites.count()) 0 "Should not have any ProtocolCallsites"
+                      Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
+                      let method0 = internals.Methods[0]
+                      Expect.equal method0.Type Fn "Should be of type Fn"
+                      Expect.isTrue (Object.ReferenceEquals(method0.ObjxRegister, register)) "Should have the expected register"
+                      Expect.isTrue (Object.ReferenceEquals(method0.ObjxInternals, internals)) "Should have the expected internals"
+                      Expect.isFalse method0.UsesThis "Does not use this"
+                      Expect.isTrue method0.RestParam.IsNone "Should not have a rest param"
+                      Expect.equal method0.ReqParams.Count 1 "Should have one required param"
+                      Expect.equal method0.ArgLocals.Count 1 "Should have one arg local"
+                      Expect.equal method0.MethodName "invoke" "Should have the expected method name"
+                      Expect.equal method0.RetType typeof<Object> "Should have Object return type"
+                      Expect.isFalse method0.IsVariadic "Should not be variadic"
+                      Expect.equal method0.NumParams 1 "Should have one param"
+                      match method0.Body with
+                      | Expr.Body(Exprs=exprs) -> 
+                        Expect.equal exprs.Count 1 "should have one form in the body"
+                        let e0 = exprs[0]
+                        Expect.isTrue e0.IsLocalBinding "should be a local binding"
+                      | _ -> failtest "Expected body form to be a Body"
+                  | _ -> failtest "Should be an Obj"
+              
+              finally 
+                Var.popThreadBindings() |> ignore
 
           testCase "fn* basic data - without name, without :once, var reference in method"
           <| fun _ ->
@@ -3017,7 +3027,7 @@ let FnTests =
 
               try
 
-                  let form = ReadFromString "(fn* fred ([x] (abc fred :kw)))"
+                  let form = ReadFromString "(fn* fred77 ([x] (abc fred77 :kw)))"
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
@@ -3044,7 +3054,7 @@ let FnTests =
               finally
                 Var.popThreadBindings() |> ignore
 
-          ftestCase "fn* has keyword callsite"
+          testCase "fn* has keyword callsite"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let ns1Name = ns1.Name.Name
@@ -3056,7 +3066,7 @@ let FnTests =
 
               try
 
-                  let form = ReadFromString "(fn* fred ([x] (:kw x)))"
+                  let form = ReadFromString "(fn* ([x] (:kw x)))"
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
@@ -3082,5 +3092,218 @@ let FnTests =
               finally
                 Var.popThreadBindings() |> ignore
 
+          testCase "fn* propagates :rettag, detects variadic "
+          <| fun _ ->
 
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "^{:rettag int :tag double} ( fn* ([x & y] x))"  // normally defn would move :tag to :rettag, but we can test both pieces here
+              let ast = Parser.Analyze(cctx,form)
+
+              match ast with
+              | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  Expect.equal internals.Methods.Count 1 "Should have one method"
+                  Expect.isTrue (internals.VariadicMethod.IsSome) "Should  have a variadic method"
+                  Expect.isNotNull (internals.Tag) "Should have a tag"
+                  Expect.equal internals.Tag (Symbol.intern("double")) "Should have double tag"
+                  let method0 = internals.Methods[0]
+                  Expect.equal method0.Type Fn "Should be of type Fn"
+                  Expect.isFalse method0.UsesThis "Does not use this"
+                  Expect.isTrue method0.RestParam.IsSome "Should not have a rest param"
+                  Expect.equal method0.ReqParams.Count 1 "Should have one required param"
+                  Expect.equal method0.ArgLocals.Count 2 "Should have two arg local"
+                  Expect.equal method0.RetType typeof<int32> "Should have int32 return type"
+                  Expect.isTrue method0.IsVariadic "Should be variadic"
+                  Expect.equal method0.NumParams 2 "Should have two param"
+              | _ -> failtest "Should be an Obj"
+
+
+          testCase " :tag on parameter list overrides :rettag"
+          <| fun _ ->
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let form = ReadFromString "^{:rettag int} ( fn* ( ^double [x & y] x))"  // normally defn would move :tag to :rettag, but we can test both pieces here
+              let ast = Parser.Analyze(cctx,form)
+
+              match ast with
+              | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  Expect.isNull (internals.Tag) "Should not have a tag"
+                  let method0 = internals.Methods[0]
+                  Expect.equal method0.RetType typeof<double> "Should have int32 return type"
+              | _ -> failtest "Should be an Obj"
+
+
+          testCase "fn* has closed-over locals"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let ns1Name = ns1.Name.Name
+              let abcVar = ns1.findInternedVar abcSym
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let pqrsSym = Symbol.intern ("pqrs")
+
+              let lbPqrs =
+                  { Sym = pqrsSym
+                    Tag = null
+                    Init = None
+                    Name = pqrsSym.Name
+                    IsArg = false
+                    IsByRef = false
+                    IsRecur = false
+                    IsThis = false
+                    Index = 20 }
+
+              let newLocals = RTMap.assoc (cctx.Locals, pqrsSym, lbPqrs) :?> IPersistentMap
+              let cctx = { cctx with Locals = newLocals }
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(fn* ([x] (abc pqrs)))"
+                  let ast = Parser.Analyze(cctx,form)
+
+                  match ast with
+                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+
+                      Expect.equal (register.Closes.count()) 1 "Should have one Closes"
+                      let keys = RTMap.keys(register.Closes)
+                      let key0 = RTSeq.first(keys) :?> LocalBinding
+                      Expect.equal key0.Sym pqrsSym "Should have pqrs in closes"
+                      Expect.equal (register.Constants.count()) 1 "Should have one Constants"
+                      Expect.equal register.ConstantIds.Count 1 "Should  have one ConstantIds"
+                      Expect.equal (register.Keywords.count()) 0 "Should have no Keywords"
+                      Expect.equal (register.Vars.count()) 1 "Should have one Vars"
+                      Expect.equal (register.KeywordCallsites.count()) 0 "Should have no KeywordCallsites"
+                      Expect.equal (register.ProtocolCallsites.count()) 0 "Should not have any ProtocolCallsites"
+                      Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
+                      let method0 = internals.Methods[0]
+                      match method0.Body with
+                      | Expr.Body(Exprs=exprs) -> 
+                        Expect.equal exprs.Count 1 "should have one form in the body"
+                        let e0 = exprs[0]
+                        Expect.isTrue e0.IsInvoke "should be an Invoke"
+                      | _ -> failtest "Expected body form to be a Body"
+                  | _ -> failtest "Should be an Obj"
+
+              finally
+                Var.popThreadBindings() |> ignore
+
+          testCase "closed-overs should propagate to parent"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let ns1Name = ns1.Name.Name
+              let abcVar = ns1.findInternedVar abcSym
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let pqrsSym = Symbol.intern ("pqrs")
+
+              let lbPqrs =
+                  { Sym = pqrsSym
+                    Tag = null
+                    Init = None
+                    Name = pqrsSym.Name
+                    IsArg = false
+                    IsByRef = false
+                    IsRecur = false
+                    IsThis = false
+                    Index = 20 }
+
+              let newLocals = RTMap.assoc (cctx.Locals, pqrsSym, lbPqrs) :?> IPersistentMap
+              let cctx = { cctx with Locals = newLocals }
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(fn* ([x] (fn* [y] (abc pqrs))))"
+                  let ast = Parser.Analyze(cctx,form)
+
+                  match ast with
+                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+
+                      Expect.equal (register.Closes.count()) 1 "Should have one Closes"
+                      let keys = RTMap.keys(register.Closes)
+                      let key0 = RTSeq.first(keys) :?> LocalBinding
+                      Expect.equal key0.Sym pqrsSym "Should have pqrs in closes"
+                      Expect.equal (register.Constants.count()) 0 "Should have no Constants"
+                      Expect.equal register.ConstantIds.Count 0 "Should  have no ConstantIds"
+                      Expect.equal (register.Keywords.count()) 0 "Should have no Keywords"
+                      Expect.equal (register.Vars.count()) 0 "Should have no Vars"
+                      Expect.equal (register.KeywordCallsites.count()) 0 "Should have no KeywordCallsites"
+                      Expect.equal (register.ProtocolCallsites.count()) 0 "Should not have any ProtocolCallsites"
+                      Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
+                      let method0 = internals.Methods[0]
+                      match method0.Body with
+                      | Expr.Body(Exprs=exprs) -> 
+                        Expect.equal exprs.Count 1 "should have one form in the body"
+                        let e0 = exprs[0]
+                        Expect.isTrue e0.IsObj "should be an Obj (fn)"
+                      | _ -> failtest "Expected body form to be a Body"
+                  | _ -> failtest "Should be an Obj"
+
+              finally
+                Var.popThreadBindings() |> ignore
+
+          testCase "inner method should see closed-over from parent local"
+          <| fun _ ->
+              let ns1, ns2 = createTestNameSpaces ()
+              let ns1Name = ns1.Name.Name
+              let abcVar = ns1.findInternedVar abcSym
+
+              let cctx = CompilerEnv.Create(Expression)
+
+              let pqrsSym = Symbol.intern ("pqrs")
+
+              Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+              try
+
+                  let form = ReadFromString "(fn* ([pqrs] (fn* [y] (abc pqrs))))"
+                  let ast = Parser.Analyze(cctx,form)
+
+                  match ast with
+                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                      Expect.equal (register.Closes.count()) 0 "Should have no Closes"
+                      let method0 = internals.Methods[0]
+                      match method0.Body with
+                      | Expr.Body(Exprs=exprs) -> 
+                        Expect.equal exprs.Count 1 "should have one form in the body"
+                        match exprs[0] with
+                        | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                            Expect.isTrue internals.HasEnclosingMethod "Inner has enclosing method"
+                            Expect.equal (register.Closes.count()) 1 "Internal should have one close"
+                            let keys = RTMap.keys(register.Closes)
+                            let key0 = RTSeq.first(keys) :?> LocalBinding
+                            Expect.equal key0.Sym pqrsSym "Should have pqrs in closes"
+                        | _ -> failtest "Expected form to be an Fn (Obj)"
+                      | _ -> failtest "Expected body form to be a Body"
+                  | _ -> failtest "Should be an Obj"
+
+              finally
+                Var.popThreadBindings() |> ignore
+
+
+(*
+
+              let pqrsSym = Symbol.intern ("pqrs")
+
+              let lbPqrs =
+                  { Sym = pqrsSym
+                    Tag = null
+                    Init = None
+                    Name = pqrsSym.Name
+                    IsArg = false
+                    IsByRef = false
+                    IsRecur = false
+                    IsThis = false
+                    Index = 20 }
+
+              let newLocals = RTMap.assoc (locals, pqrsSym, lbPqrs) :?> IPersistentMap
+              let cctx = { cctx with Locals = newLocals }
+              
+*)
         ]
