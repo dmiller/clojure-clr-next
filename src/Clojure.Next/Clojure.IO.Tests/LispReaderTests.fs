@@ -1269,7 +1269,7 @@ let SyntaxQuoteTests =
             Expect.throwsT<ArgumentException> (fun _ -> ReadFromString("`~@x") |> ignore) "Should throw if unquote-splice not in list"
 
           
-          ftestCase "SQ on unquote-splice splices"
+          testCase "SQ on unquote-splice splices"
           <| fun _ ->
 
             let o = ReadFromString("`(a ~@b)")
@@ -1458,7 +1458,7 @@ let FnReaderTests =
         "function and arg readers"
         [ 
         
-          ftestCase "#(...) with no args generates a no-arg function"
+          testCase "#(...) with no args generates a no-arg function"
           <| fun _ ->
             let o = ReadFromString("#(+ 1 2)")
 
@@ -1467,7 +1467,7 @@ let FnReaderTests =
             Expect.equal o expected "should generate no-arg function"
             ExpectFunctionMatch o ((expected :?> Seqable).seq())
 
-          ftestCase "#(...) with args generates function with enough args"
+          testCase "#(...) with args generates function with enough args"
           <| fun _ ->
             let o = ReadFromString("#(+ %2 2)")
 
@@ -1476,7 +1476,7 @@ let FnReaderTests =
             ExpectFunctionMatch o ((expected :?> Seqable).seq())
 
 
-          ftestCase "#(...) with anon arg generates function with one arg"
+          testCase "#(...) with anon arg generates function with one arg"
           <| fun _ ->
             let o = ReadFromString("#(+ % 2)")
 
@@ -1484,7 +1484,7 @@ let FnReaderTests =
             
             ExpectFunctionMatch o ((expected :?> Seqable).seq())
 
-          ftestCase "#(...) with anon arg and non-anon arg generates function with enough args"
+          testCase "#(...) with anon arg and non-anon arg generates function with enough args"
           <| fun _ ->
             let o = ReadFromString("#(+ % %3)")
 
@@ -1492,14 +1492,14 @@ let FnReaderTests =
             
             ExpectFunctionMatch o ((expected :?> Seqable).seq())
 
-          ftestCase "Arg reader outside #(...) returns symbol as is"
+          testCase "Arg reader outside #(...) returns symbol as is"
           <| fun _ ->
             let o = ReadFromString("%2")
 
             ExpectIsInstanceOf o typeof<Symbol>
             Expect.equal (o :?> Symbol).Name "%2" "Should be the same"
 
-          ftestCase "Arg reader followed by non-digit fails"
+          testCase "Arg reader followed by non-digit fails"
           <| fun _ ->
             Expect.throwsT<ArgumentException>(fun _ -> ReadFromString("#(+ %a 2)") |> ignore) "Should throw"
 

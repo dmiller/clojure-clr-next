@@ -4,76 +4,49 @@ open System
 open Clojure.Numerics
 open Clojure.Numerics.Hashing
 
-[<Serializable; Sealed; AllowNullLiteral>]
-type Symbol private (meta: IPersistentMap, ns: string, name: string) =
+[<Sealed; AllowNullLiteral>]
+type Symbol private (_meta: IPersistentMap, _ns: string, _name: string) =
     inherit AFn()
 
-    let mutable hasheq: int option = None
+    // cached hashcode value, lazy
+    let mutable hasheq = 0
 
-    [<NonSerialized>]
+    // cached string representation, lazy
     let mutable _str: string = null
 
-    [<NonSerialized>]
-    let mutable _strEsc: string = null
-
-    member this.Namespace = ns
-    member this.Name = name
-
     private new(ns, name) = Symbol(null, ns, name)
+
+    // accessors for the data
+    member this.Namespace = _ns
+    member this.Name = _name
 
     // Object overrides
 
     override this.Equals(obj) =
         match obj with
         | _ when Object.ReferenceEquals(this, obj) -> true
-        | :? Symbol as sym -> Util.equals (ns, sym.Namespace) && name.Equals(sym.Name)
+        | :? Symbol as sym -> Util.equals (_ns, sym.Namespace) && _name.Equals(sym.Name)
         | _ -> false
 
     override this.GetHashCode() =
-        match hasheq with
-        | Some h -> h
-        | None ->
-            let hc =
-                hashCombine (Murmur3.HashString(if isNull ns then "" else ns), Murmur3.HashString(name))
-
-            hasheq <- Some hc
-            hc
-
-    interface IHashEq with
-        member this.hasheq() = this.GetHashCode()
+        if hasheq = 0 then
+            hasheq <- hashCombine (Murmur3.HashString(if isNull _ns then "" else _ns), Murmur3.HashString(_name))
+        hasheq
 
     override this.ToString() =
         if isNull _str then
             _str <-
-                match ns with
-                | null -> name
-                | _ -> ns + "/" + name
-
+                match _ns with
+                | null -> _name
+                | _ -> $"{_ns}/{_name}"
         _str
 
-    // TODO: simplify this
-    interface IComparable with
-        member this.CompareTo(obj) =
-            match obj with
-            | :? Symbol as sym ->
-                if this.Equals(sym) then
-                    0
-                elif isNull ns && not (isNull sym.Namespace) then
-                    -1
-                elif not (isNull ns) then
-                    if sym.Namespace = null then
-                        1
-                    else
-                        let nsc = ns.CompareTo(sym.Namespace)
-                        if nsc <> 0 then nsc else name.CompareTo(sym.Name)
-                else
-                    name.CompareTo(sym.Name)
-            | _ -> invalidArg "obj" "Must compare to non-null Symbol"
-
-    // Intern a symbol with the given name  and namespace-name
+    // factory methods
+        
+    /// Intern a symbol with the given name  and namespace-name
     static member intern(ns: string, name: string) = Symbol(null, ns, name)
 
-    // Intern a symbol with the given name (extracting the namespace if name is of the form ns/name)
+    /// Intern a symbol with the given name (extracting the namespace if name is of the form ns/name)
     static member intern(nsname: string) =
         let i = nsname.IndexOf('/')
 
@@ -82,143 +55,36 @@ type Symbol private (meta: IPersistentMap, ns: string, name: string) =
         else
             Symbol(nsname.Substring(0, i), nsname.Substring(i + 1))
 
+    // interface implementations
+
+    interface IHashEq with
+        member this.hasheq() = this.GetHashCode()
+
+    interface IComparable with
+        member this.CompareTo(obj) =
+            match obj with
+            | :? Symbol as sym ->
+                let nsc = 
+                    match _ns with
+                    | null -> if isNull sym.Namespace then 0 else -1
+                    | _ -> if isNull sym.Namespace then 1 else _ns.CompareTo(sym.Namespace)
+                if nsc <> 0 then nsc else _name.CompareTo(sym.Name)
+            | _ -> invalidArg "obj" "Must compare to non-null Symbol"
 
     interface IObj with
         override this.withMeta(m) =
-            if Object.ReferenceEquals(meta, m) then
+            if Object.ReferenceEquals(_meta, m) then
                 this
             else
-                Symbol(m, ns, name)
-
+                Symbol(m, _ns, _name)
 
     interface IMeta with
-        override _.meta() = meta
+        override _.meta() = _meta
 
     interface Named with
-        member _.getNamespace() = ns
-        member _.getName() = name
-
+        member _.getNamespace() = _ns
+        member _.getName() = _name
 
     interface IFn with
         member this.invoke(arg1) = RT0.get (arg1, this)
         member this.invoke(arg1, arg2) = RT0.get (arg1, this, arg2)
-
-
-(*
-        
-Do we need any of these?
-
-        /// <summary>
-        /// Construct a Symbol during deserialization.
-        /// </summary>
-        /// <param name="info"></param>
-        /// <param name="context"></param>
-        protected Symbol (SerializationInfo info, StreamingContext context)
-        {
-            _name = String.Intern(info.GetString("_name"));
-
-            string nsStr = info.GetString("_ns");
-            _ns = nsStr == null ? null : String.Intern(nsStr);
-        }
-
-        #endregion
-
-
-        private static string NameMaybeEscaped(string s)
-        {
-            return LispReader.NameRequiresEscaping(s) ? LispReader.VbarEscape(s) : s;
-        }
-
-        public string ToStringEscaped()
-        {
-            if (_strEsc == null)
-            {
-                if (_ns != null)
-                    _strEsc = NameMaybeEscaped(_ns) + "/" + NameMaybeEscaped(_name);
-                else
-                    _strEsc = NameMaybeEscaped(_name);
-
-            }
-            return _strEsc;
-        }
-
-
-        #endregion
-
-
-
-
-        #endregion
-
-        #region operator overloads
-
-        public static bool operator ==(Symbol x, Symbol y)
-        {
-            if (ReferenceEquals(x, y))
-                return true;
-
-            if ((x is null) || (y is null))
-                return false;
-
-            return x.CompareTo(y) == 0;
-        }
-
-        public static bool operator !=(Symbol x, Symbol y)
-        {
-            if (ReferenceEquals(x,y))
-                return false;
-
-            if ((x is null) || (y is null))
-                return true;
-
-            return x.CompareTo(y) != 0;
-        }
-
-        public static bool operator <(Symbol x, Symbol y)
-        {
-            if (ReferenceEquals(x, y))
-                return false; 
-            
-            if (x is null)
-                throw new ArgumentNullException("x");
-
-            return x.CompareTo(y) < 0;
-        }
-
-        public static bool operator >(Symbol x, Symbol y)
-        {
-            if (ReferenceEquals(x, y))
-                return false;
-
-            if (x is null)
-                throw new ArgumentNullException("x");
-
-            return x.CompareTo(y) > 0;
-        }
-
-        #endregion
-
-        #region Other
-
-        ///// <summary>
-        ///// Create a copy of this symbol.
-        ///// </summary>
-        ///// <returns>A copy of this symbol.</returns>
-        //private object readResolve()
-        //{
-        //    return intern(_ns, _name);
-        //}
-
-        #endregion
-
-        #region ISerializable Members
-
-        [System.Security.SecurityCritical]
-        public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("_name",_name);
-            info.AddValue("_ns", _ns);
-        }
-
-       
-        *)
