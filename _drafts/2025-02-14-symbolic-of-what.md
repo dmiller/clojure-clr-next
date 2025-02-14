@@ -159,7 +159,8 @@ mlnn/something   ; => 7
 `Int64           ; => System.Int64
 ```
 
-[NB: I discovered that the current version of ClojureCLR did not do the last line correctly.  For the last 15 years.  By the time you read this, the fix will be in.]
+[NB: I discovered that the current version of ClojureCLR did not do the last line correctly.  For the last 15 years.  
+By the time you read this, the fix will be in.]
 
 These operations require interpretation of symbols in the context of namespace aliases and type mappings.
 The first step on the road to interpretation begins with namespaces.
@@ -171,6 +172,98 @@ Best to go read up on [namespaces](https://clojure.org/reference/namespaces).
 > Namespaces are mappings from simple (unqualified) symbols to Vars and/or Classes. Vars can be interned in a namespace, using def or any of its variants, in which case they have a simple symbol for a name and a reference to their containing namespace, and the namespace maps that symbol to the same var. A namespace can also contain mappings from symbols to vars interned in other namespaces by using refer or use, or from symbols to Class objects by using import. 
 
 
+The code for `Namespace` is considerably longer than that for `Symbol`.  But the data structure itelf is simple enough.
+
+```F#
+type Namespace(_name: Symbol) =
+    inherit AReference((_name :> IMeta).meta ())
+
+    // variable-to-value map
+    let mappings: AtomicReference<IPersistentMap> =
+        AtomicReference(DefaultImports.imports)
+
+    // variable-to-namespace alias map
+    let aliases: AtomicReference<IPersistentMap> =
+        AtomicReference(PersistentArrayMap.Empty)
+
+    // All namespaces, keyed by Symbol
+    static let namespaces = ConcurrentDictionary<Symbol, Namespace>()
+
+    static let clojureNamespace = Namespace.findOrCreate (Symbol.intern "clojure.core")
+
+    // Some accessors
+    member _.Name = _name
+    member _.Aliases = aliases.Get()
+    member _.Mappings = mappings.Get()
+```
+
+We automatically create a namespace for `clojure.core` when the `Namespace` type is initialized.
+The two maps are set in `AtomicReference`s to allow for multithreaded access.  
+In particular, updates to these maps are potentially occasions for race conditions to occur.
+That is dealt with in the updating code.  There are a lot of rules and special cases in the code for adding mapping and aliases.
+For our purposes here, we can ignore that.  What _is_ important here is finding what a symbol 'means' relative to a namespace.
+The entry points for that are the following.
+
+```F#
+
+    // Get the value a symbol maps to.  Typically a Var or a Type.
+    member this.getMapping(sym: Symbol) = this.Mappings.valAt (sym)
+
+    // Find the Var mapped to a Symbol.  When we want only a Var.
+    member this.findInternedVar(sym: Symbol) =
+        match this.Mappings.valAt (sym) with
+        | :? Var as v when Object.ReferenceEquals(v.Namespace, this) -> v
+        | _ -> null
+
+    // Find a Namespace aliased by a Symbol.
+    member this.lookupAlias(alias: Symbol) =
+        this.Aliases.valAt (alias) :?> Namespace        
+```
+
+## Evaluation
+
+Most interpretation of symbols is done during evaluation/compilation. Looking at the traditional phases of interpreters/compilers,
+the lisp reader performs the role of lexical analysis and partial parsing.  
+The reader does more than just tokenizing, in the sense of producing a linear stream of tokens.
+It has already organized that into the nesting of lists, vectors, and other structural elements.
+This is handed to the evaluator/compiler, which does the rest of the parsing, type checking, and code generation.
+Most of the work of symbol interpretation is done during the parsing phase, which produces an abstract syntax tree (AST).
+
+Let us contemplate the following situation. 
+
+```Clojure
+(ns big.deal.namespace)
+
+(defn g [z] (inc z))
+(defn h [x] (g x))
+```
+
+(ns ns1 
+  (:use [big.deal.namespace :as ns2 :only [g]])
+  (:import [System String]))   ; unnecessary in real life because this import is done automatically
+
+(defn f [x y z] [z y x])
+```
+
+Now consider the situation where we have read the following code and are evaluating it when `ns1` is the current namespace.
+
+```Clojure
+(fn* [x] 
+  (let* [y  7]
+    (f (ns2/g ^System.Int64 y) 
+       (String/ToUpper ^String x)
+       (big.deal.namespace/h 7))))
+```
+(Note: the parser would see `fn*` instead of `fn` -- the latter is macro that expands to the former. Similarly for `let*.)
+
+The reader has the easy job.  No backquoting in there, so symbols are just symbols to it.  The parse will do the heavy lifting.
+
+Looking at the call to `f` only, we are interpreting that form in a lexical binding scope where `x` and `y` are bound.
+We need to interpret each symbol in that form:
+
+```Clojure
+f  x  y  ns2/g  big.deal.namespace/h  System.Int64 String  String/ToUpper 
+```
 
 
 
