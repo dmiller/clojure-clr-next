@@ -37,9 +37,9 @@ type RTReader() =
                 if sym.Name.IndexOf('.') >= 0 || sym.Name[sym.Name.Length-1] = ']' then  // TODO: Make sure this is still correct -- i think it is array detection
                     RTType.ClassForName(sym.Name)
                 else
-                    let o = RTVar.getCurrentNamespace().getMapping(sym)
-                    if o :? Type then o :?> Type
-                    else
+                    match RTVar.getCurrentNamespace().getMapping(sym) with
+                    | :? Type as t -> t
+                    | _ ->
                         try
                             RTType.ClassForName(sym.Name)
                         with 
@@ -134,7 +134,7 @@ type RTReader() =
 
             match currentNS.getMapping (sym) with
             | null -> Symbol.intern (currentNS.Name.Name, sym.Name)
-            | :? Type as ot -> Symbol.intern (null, Util.nameForType (ot))
+            | :? Type as ot -> Symbol.intern (null, ot.FullName)
             | :? Var as v -> Symbol.intern (v.Namespace.Name.Name, v.Symbol.Name)
             | _ -> null
 

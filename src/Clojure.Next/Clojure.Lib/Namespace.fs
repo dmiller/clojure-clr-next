@@ -55,8 +55,8 @@ module DefaultImports =
 // A namespace can also refer to another namespace by an alias.
 
 [<Sealed; AllowNullLiteral>]
-type Namespace(name: Symbol) =
-    inherit AReference((name :> IMeta).meta ())
+type Namespace(_name: Symbol) =
+    inherit AReference((_name :> IMeta).meta ())
 
     // variable-to-value map
     let mappings: AtomicReference<IPersistentMap> =
@@ -72,13 +72,13 @@ type Namespace(name: Symbol) =
     static let clojureNamespace = Namespace.findOrCreate (Symbol.intern "clojure.core")
 
     // Some accessors
-    member _.Name = name
+    member _.Name = _name
     member _.Aliases = aliases.Get()
     member _.Mappings = mappings.Get()
 
     static member ClojureNamespace = clojureNamespace
 
-    override _.ToString() = name.ToString()
+    override _.ToString() = _name.ToString()
 
     ///////////////////////////////////////////
     //
@@ -195,7 +195,7 @@ type Namespace(name: Symbol) =
             RTVar
                 .errPrintWriter()
                 .WriteLine(
-                    $"WARNING: {sym} already refers to: {oldVal} in namespace: {name}, being replaced by: {newVal}"
+                    $"WARNING: {sym} already refers to: {oldVal} in namespace: {_name}, being replaced by: {newVal}"
                 )
 
             RTVar.errPrintWriter().Flush()
@@ -215,7 +215,7 @@ type Namespace(name: Symbol) =
                     RTVar
                         .errPrintWriter()
                         .WriteLine(
-                            $"REJECTED: attempt to replace interned var {oldVal} with {newVal} in {name}, you must ns-unmap first"
+                            $"REJECTED: attempt to replace interned var {oldVal} with {newVal} in {_name}, you must ns-unmap first"
                         )
 
                     RTVar.errPrintWriter().Flush()
@@ -287,7 +287,7 @@ type Namespace(name: Symbol) =
 
         if not <| Object.ReferenceEquals(c, value) then
             raise
-            <| InvalidOperationException(sprintf "%A already refers to: %A in namespace: %A" sym c name)
+            <| InvalidOperationException(sprintf "%A already refers to: %A in namespace: %A" sym c _name)
 
         c
 
@@ -350,7 +350,7 @@ type Namespace(name: Symbol) =
         if not <| Object.ReferenceEquals(map.valAt (alias), ns) then
             raise
             <| InvalidOperationException(
-                $"Alias {alias} already exists in namespace {name}, aliasing {map.valAt (alias)}"
+                $"Alias {alias} already exists in namespace {_name}, aliasing {map.valAt (alias)}"
             )
 
     // Remove an alias.
@@ -370,7 +370,7 @@ type Namespace(name: Symbol) =
     ///////////////////////////////////////////
 
     // Get the namespace name.
-    member this.getName() = name
+    member this.getName() = _name
 
     // Get the mappings of the namespace.
     member this.getMappings() = this.Mappings
