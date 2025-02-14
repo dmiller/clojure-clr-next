@@ -1707,7 +1707,7 @@ type Parser private () =
 
         let instance =
             if isNull staticType then
-                Some <| Parser.Analyze({ cenv with Pctx = Expression }, RTSeq.second (form))
+                Some <| Parser.Analyze({ cenv with Pctx = Expression }, target)
             else
                 None
 
