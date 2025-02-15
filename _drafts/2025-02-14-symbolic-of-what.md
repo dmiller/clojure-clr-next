@@ -236,11 +236,9 @@ Let us contemplate the following situation.
 
 (defn g [z] (inc z))
 (defn h [x] (g x))
-```
 
 (ns ns1 
-  (:use [big.deal.namespace :as ns2 :only [g]])
-  (:import [System String]))   ; unnecessary in real life because this import is done automatically
+  (:require [big.deal.namespace :as ns2]))   ; unnecessary in real life because this import is done automatically
 
 (defn f [x y z] [z y x])
 ```
@@ -250,8 +248,8 @@ Now consider the situation where we have read the following code and are evaluat
 ```Clojure
 (fn* [x] 
   (let* [y  7]
-    (f (ns2/g ^System.Int64 y) 
-       (String/ToUpper ^String x)
+    (f (ns2/g Int64/MaxValue y) 
+       (String/.ToUpper x)
        (big.deal.namespace/h 7))))
 ```
 (Note: the parser would see `fn*` instead of `fn` -- the latter is macro that expands to the former. Similarly for `let*.)
@@ -265,5 +263,62 @@ We need to interpret each symbol in that form:
 f  x  y  ns2/g  big.deal.namespace/h  System.Int64 String  String/ToUpper 
 ```
 
+`x` and `y` are easy.  They do not have a namespace, so the first step is look to see if they are currently bound in the lexical scope.
+They are, so they resolve to local bindings expressions.
+
+`f` also does not have namespace.  However, it not bound in the current lexical scope.  
+It does not have a namespace, so it does not refer to directly or indirectly (via an alias) to a namespace.
+The remaining option is that it has a mapping in the current namespace.  It does, to a `Var` and that is what we use.
+
+`ns2/g` is a bit more complicated.  It has a namespace, so it won't be a local.  We need to determine what namespace `ns2` stands for.
+The `NamespaceFor` method is used:
+
+```F#
+    static member NamespaceFor(inns: Namespace, sym: Symbol) : Namespace =
+        //note, presumes non-nil sym.ns
+        // first check against currentNS' aliases...
+        let nsSym = Symbol.intern (sym.Namespace)
+
+        match inns.lookupAlias (nsSym) with
+        | null -> Namespace.find (nsSym)
+        | _ as ns -> ns
+```
+
+In this context, the current namespace is `ns1` and `ns1` is an alias for `big.deal.namespace`.  So we look up `g` in `big.deal.namspace`, finding a `Var`.
+
+Next up is `Int64/MaxValue`. It does have a namespace, so it won't be a local.  
+When we call `NamespaceFor` on `Int64`, no namespace is found. (`null` is returned.)
+If you were to try to find a type `Int64`, you would fail.  There is a type named `System.Int64`.
+Fortunately, all namespaces are set up with a mappings from unqualified names of types to their types.
+Thus, there is a mapping from `Int64` to `System.Int64` in the `ns1` namespace.
+When we have something of the form `Type/Member`, we look for the `Member` in as a property or field in that type.  
+In this case, there is a property `MaxValue` in `System.Int64`, so we turn this into a static method call node.
+
+`String/.ToUpper` is similar.  In this case, because this symbol appears in the functional position of function invocation, 
+given that `String` maps to `System.String`, we look for methods also. Beacause the name starts with a period, we look for an instance method, and find one.
 
 
+
+
+
+
+
+```Clojure
+Fn ns1$fn__1
+  invoke [ x ]     
+    Let:   [
+        y 
+        Literal: PrimNumeric = 7
+      ]          
+          Invoke: 
+              Var: #'ns1/f
+              Invoke: 
+                  Var: #'big.deal.namespace/g
+                  InteropCall: FieldOrProperty: System.Int64.MaxValue Static
+                  <y>
+              InteropCall: Method: System.String.ToUpper Instance
+                  <x>
+              Invoke: 
+                  Var: #'big.deal.namespace/h
+                  Literal: PrimNumeric = 7
+```
