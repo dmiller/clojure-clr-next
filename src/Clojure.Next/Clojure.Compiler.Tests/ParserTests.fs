@@ -691,8 +691,8 @@ let SymbolTests =
                       TargetType = typeof<Int64>,
                       MemberName = "MaxValue",
                       TInfo = (typeof<Int64>.GetField ("MaxValue")),
-                      Args = null,
-                      TypeArgs = (ResizeArray<Type>()),
+                      Args = ResizeArray<HostArg>(),
+                      TypeArgs = ResizeArray<Type>(),
                       SourceInfo = None
                   ))
               )
@@ -1151,7 +1151,24 @@ let BasicInvokeTests =
               let ast = Parser.Analyze(cctx, form)
               let astFexpr = Parser.Analyze(cctx, fexpr)
 
-              Expect.equal ast astFexpr "Should be the same as fexpr"
+              //Expect.equal ast astFexpr "Should be the same as fexpr"
+
+              match ast, astFexpr with
+              | Expr.InteropCall(Env = iEnv; Form = iForm; Type = iType; IsStatic = iIsStatic; Tag = iTag; Target = iTarget; TargetType = iTargetType; MemberName = iMemberName; TInfo = iTInfo; Args = iArgs; TypeArgs = iTypeArgs; SourceInfo = iSi),
+                Expr.InteropCall(Env = fEnv; Form = fForm; Type = fType; IsStatic = fIsStatic; Tag = fTag; Target = fTarget; TargetType = fTargetType; MemberName = fMemberName; TInfo = fTInfo; Args = fArgs; TypeArgs = fTypeArgs; SourceInfo = fSi) ->
+                  Expect.equal iEnv cctx "Should have the expected env"
+                  // Note: forms will not be equal
+                  Expect.equal iType fType "Should be Int64"
+                  Expect.equal iIsStatic fIsStatic "Should be static"
+                  Expect.equal iTag fTag "Tag should be null"
+                  Expect.equal iSi fSi "SourceInfo should be None"
+                  Expect.equal iTarget fTarget "Target should be None"
+                  Expect.equal iTargetType fTargetType "TargetType should be None"
+                  Expect.equal iMemberName fMemberName "MemberName should be MaxValue"
+                  Expect.equal iTInfo fTInfo "TInfo should be the field info for MaxValue"
+                  compareGenericLists (iArgs, fArgs) 
+                  compareGenericLists (iTypeArgs, fTypeArgs) 
+              | _ -> failtest "Should be an InteropCall"
 
 
           testCase "(abc 7), abc bound to Var in namespace, not special   => basic invoke expr"
@@ -1368,7 +1385,7 @@ let BasicQMTests =
                       TargetType = typeof<QMTest>,
                       MemberName = "US0",
                       TInfo = (typeof<QMTest>.GetMethod ("US0")),
-                      Args = null,
+                      Args = ResizeArray<HostArg>(),
                       TypeArgs = (ResizeArray<Type>()),
                       SourceInfo = None
                   ))
@@ -1396,7 +1413,7 @@ let BasicQMTests =
                       TargetType = typeof<QMTest>,
                       MemberName = "UI0",
                       TInfo = (typeof<QMTest>.GetMethod ("UI0")),
-                      Args = null,
+                      Args = ResizeArray<HostArg>(),
                       TypeArgs = (ResizeArray<Type>()),
                       SourceInfo = None
                   ))
@@ -2007,8 +2024,8 @@ let SimpleSpecialOpTests =
                           TargetType = typeof<Int64>,
                           MemberName = "MaxValue",
                           TInfo = (typeof<Int64>.GetField ("MaxValue")),
-                          Args = null,
-                          TypeArgs = (ResizeArray<Type>()),
+                          Args = ResizeArray<HostArg>(),
+                          TypeArgs = ResizeArray<Type>(),
                           SourceInfo = None
                       )
 
@@ -3288,7 +3305,7 @@ let FnTests =
               finally
                 Var.popThreadBindings() |> ignore
 
-          ftestCase "this test case was used in a blog post explaining symbol interpretation"
+          testCase "this test case was used in a blog post explaining symbol interpretation"
           <| fun _ ->    
             let ns1Name = "ns1"
             let ns2Name = "big.deal.namespace"
