@@ -579,22 +579,21 @@ type ExprUtils private () =
 
     static member DebugPrint(tw: System.IO.TextWriter, expr: Expr, indent: int, doNewLine: bool) = 
 
-        let mutable onNewLine = doNewLine
-
         let dp(expr: Expr, indent: int) =
             ExprUtils.DebugPrint(tw, expr, indent, false)
 
         let dpnl(expr: Expr, indent: int) =
             ExprUtils.DebugPrint(tw, expr, indent, true)
 
-        let startNewLine() =
-            if onNewLine then
-                tw.WriteLine()
-                for i = 0 to indent - 1 do
-                    tw.Write(" ")
+        let writeSpaces(n: int) =
+            for i = 0 to n - 1 do
+                tw.Write(" ")
 
-        startNewLine()
-        onNewLine <- true
+        let startNewLine() =
+            tw.WriteLine()
+            writeSpaces(indent)
+
+        if doNewLine then startNewLine()
 
         match expr with
         | Expr.Assign(Target = target; Value = value) ->
@@ -626,7 +625,7 @@ type ExprUtils private () =
             tw.Write($"InstanceOf: {t.FullName}" )
             dpnl(expr, indent + 4)
         | Expr.InteropCall(Type = heType; Target = target; Args = args; IsStatic = isStatic; TargetType = targetType; MemberName = memberName; TypeArgs = typeArgs) ->
-            tw.Write($"InteropCall: {target}" )
+            tw.Write($"InteropCall: " )
             
             let heTypeStr =
                 match heType with
@@ -646,6 +645,10 @@ type ExprUtils private () =
                 for t in typeArgs do
                     tw.Write($"{t.FullName} " )
 
+            match target with
+            | Some t -> dpnl(t, indent + 4)
+            | None -> ()
+
             for a in args do
                 dpnl(a.ArgExpr, indent + 4)
         | Expr.Invoke(Fexpr = fexpr; Args = args) ->
@@ -663,26 +666,34 @@ type ExprUtils private () =
                 | LetExprMode.Let -> "Let"
                 | LetExprMode.Loop -> "Loop"
                 | LetExprMode.LetFn -> "LetFn"
-            tw.Write($"{modeStr}: " )
-            tw.Write("  [")
+            let prefix = $"{modeStr} [ " 
+            let prefixLen = prefix.Length
+
+            tw.Write(prefix)
+            let mutable firstTime = true
+
             for b in bindingInits do
-                startNewLine()
-                tw.Write($"    {b.Binding.Sym} " )
-                dpnl(b.Init, indent + 4)
-            startNewLine()
+                let sym = b.Binding.Sym
+                let symStr = sym.ToString()
+                if not firstTime then 
+                    startNewLine()
+                    writeSpaces(prefixLen)
+                firstTime <- false
+                tw.Write(symStr)
+                dpnl(b.Init, prefixLen+symStr.Length+4)
             tw.Write("  ]")
-            dpnl(body, indent + 6)
+            dpnl(body, indent + 2)
         | Expr.Literal(Type = litType; Value = value) ->
             let typeStr = 
                 match litType with
-                | LiteralType.NilType -> "Nil"
-                | LiteralType.BoolType -> "Bool"
-                | LiteralType.StringType -> "String"
-                | LiteralType.PrimNumericType -> "PrimNumeric"
-                | LiteralType.KeywordType -> "Keyword"
-                | LiteralType.EmptyType -> "Empty"
-                | LiteralType.OtherType -> "Other"
-            tw.Write($"Literal: {typeStr} = {value}" )
+                | NilType -> "Nil"
+                | BoolType -> "Bool"
+                | StringType -> "String"
+                | PrimNumericType -> "PrimNumeric"
+                | KeywordType -> "Keyword"
+                | EmptyType -> "Empty"
+                | OtherType -> "Other"
+            tw.Write($"= {value} ({typeStr})" )
         | Expr.LocalBinding(Binding = binding) ->
             tw.Write($"<{binding.Sym}>" )
         | Expr.Meta(Target = target; Meta = meta) ->

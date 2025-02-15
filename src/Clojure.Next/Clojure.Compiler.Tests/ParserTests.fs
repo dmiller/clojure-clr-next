@@ -252,6 +252,8 @@ let CollectionTests =
                   (Expr.Literal(Env = cctx, Form = form, Value = form, Type = OtherType))
                   "Should return a Literal"
 
+          // TODO: non-constant collections
+
           ]
 
 
@@ -449,7 +451,7 @@ let ResolveTests =
                   (fun _ -> Parser.ResolveIn(cctx, ns1, pqrSym, true) |> ignore)
                   "should throw on unmapped var with unresolved vars not allows"
 
-          testCase "no namespace sym, not mapped, unresolved vars allowd => just return the s"
+          testCase "no namespace sym, not mapped, unresolved vars allowd => just return the sym"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -3317,8 +3319,8 @@ let FnTests =
                 let form = ReadFromString "(fn* [x] 
                                               (let* [y  7]
                                                 (f (ns2/g Int64/MaxValue y) 
-                                                   (String/ToUpper x)
-                                                   (big.deal.namespace/h 7))))"
+                                                   (String/.ToUpper x)
+                                                   (big.deal.namespace/h System.Text.StringBuilder))))"
                 let ast = Parser.Analyze(CompilerEnv.Create(Expression), form)
                 Expect.isTrue ast.IsObj "Should have an AST"
 
