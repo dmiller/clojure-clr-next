@@ -159,7 +159,7 @@ type Expr =
 
     | Meta of Env: CompilerEnv * Form: obj * Target: Expr * Meta: Expr
 
-    | Method of Env: CompilerEnv * Form: obj * Args: ResizeArray<HostArg>
+    //| Method of Env: CompilerEnv * Form: obj * Args: ResizeArray<HostArg>
 
     | New of
         Env: CompilerEnv *
@@ -271,7 +271,7 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _objxInternals : ObjXInternals, _obj
     member _.ObjxRegister = _objXRegsiter
     member _.ObjxInternals = _objxInternals
 
-    member val RestParam: obj option = None with get, set
+    member val RestParam: LocalBinding option = None with get, set
     member val ReqParams: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
     member val ArgLocals: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
     member val Name: string = "" with get, set  // Used by NewInstanceExprParser only, Fns do not have names
@@ -574,6 +574,191 @@ type ExprUtils private () =
         | Expr.Literal(Value = value) -> value
         | _ -> failwith "Not a literal expression"
 
+    static member DebugPrint(tw: System.IO.TextWriter, expr: Expr) =
+        ExprUtils.DebugPrint(tw, expr, 0, true)
+
+    static member DebugPrint(tw: System.IO.TextWriter, expr: Expr, indent: int, doNewLine: bool) = 
+
+        let mutable onNewLine = doNewLine
+
+        let dp(expr: Expr, indent: int) =
+            ExprUtils.DebugPrint(tw, expr, indent, false)
+
+        let dpnl(expr: Expr, indent: int) =
+            ExprUtils.DebugPrint(tw, expr, indent, true)
+
+        let startNewLine() =
+            if onNewLine then
+                tw.WriteLine()
+                for i = 0 to indent - 1 do
+                    tw.Write(" ")
+
+        startNewLine()
+        onNewLine <- true
+
+        match expr with
+        | Expr.Assign(Target = target; Value = value) ->
+            tw.Write($"Assign: " )
+            dp(target, indent + 8)
+            dpnl(value, indent + 8)
+        | Expr.Body(Exprs = exprs) ->
+            for e in exprs do
+                dpnl(e, indent)
+        | Expr.Case(Expr = expr; DefaultExpr = defaultExpr; Tests = tests; Thens = thens) ->
+            tw.Write($"Case: N/A " )
+        | Expr.Collection(Value = value) ->
+            tw.Write($"Coll: {value}" )
+        | Expr.Def(Var = v; Init = init) ->
+            tw.Write($"Def: {v.ToString()} " )
+            dpnl(init, indent + 5)
+        | Expr.If(Test = test; Then = thenExpr; Else = elseExpr) ->
+            tw.Write($"If: " )
+            dp(test, indent + 6)
+            startNewLine()
+            tw.Write($"  Then: ")
+            dpnl(thenExpr, indent + 10)
+            startNewLine()
+            tw.Write($"  Else: ")
+            dpnl(elseExpr, indent + 10)
+        | Expr.Import(Typename = typename) ->
+            tw.Write($"Import: {typename}")
+        | Expr.InstanceOf(Expr = expr; Type = t) ->
+            tw.Write($"InstanceOf: {t.FullName}" )
+            dpnl(expr, indent + 4)
+        | Expr.InteropCall(Type = heType; Target = target; Args = args; IsStatic = isStatic; TargetType = targetType; MemberName = memberName; TypeArgs = typeArgs) ->
+            tw.Write($"InteropCall: {target}" )
+            
+            let heTypeStr =
+                match heType with
+                | HostExprType.FieldOrPropertyExpr -> "FieldOrProperty"
+                | HostExprType.MethodExpr -> "Method"
+                | HostExprType.InstanceZeroArityCallExpr -> "InstanceZeroArityCall"
+            tw.Write($"{heTypeStr}: {targetType}.{memberName}" )
+
+            if isStatic then
+                tw.Write($" Static" )
+            else
+                tw.Write($" Instance" )
+
+            if typeArgs.Count > 0 then
+                startNewLine()
+                tw.Write($"    TypeArgs: " )
+                for t in typeArgs do
+                    tw.Write($"{t.FullName} " )
+
+            for a in args do
+                dpnl(a.ArgExpr, indent + 4)
+        | Expr.Invoke(Fexpr = fexpr; Args = args) ->
+            tw.Write($"Invoke: " )
+            dpnl(fexpr, indent + 4)
+            for a in args do
+                dpnl(a, indent + 4)
+        | Expr.KeywordInvoke(KwExpr = kwExpr; Target = target; SiteIndex = siteIndex) ->
+            let kw = ExprUtils.GetLiteralValue(kwExpr) :?> Keyword
+            tw.Write($"KeywordInvoke: {kw}" )
+            dpnl(target, indent + 4)
+        | Expr.Let( Body = body; Mode = mode; BindingInits = bindingInits) ->
+            let modeStr =
+                match mode with
+                | LetExprMode.Let -> "Let"
+                | LetExprMode.Loop -> "Loop"
+                | LetExprMode.LetFn -> "LetFn"
+            tw.Write($"{modeStr}: " )
+            tw.Write("  [")
+            for b in bindingInits do
+                startNewLine()
+                tw.Write($"    {b.Binding.Sym} " )
+                dpnl(b.Init, indent + 4)
+            startNewLine()
+            tw.Write("  ]")
+            dpnl(body, indent + 6)
+        | Expr.Literal(Type = litType; Value = value) ->
+            let typeStr = 
+                match litType with
+                | LiteralType.NilType -> "Nil"
+                | LiteralType.BoolType -> "Bool"
+                | LiteralType.StringType -> "String"
+                | LiteralType.PrimNumericType -> "PrimNumeric"
+                | LiteralType.KeywordType -> "Keyword"
+                | LiteralType.EmptyType -> "Empty"
+                | LiteralType.OtherType -> "Other"
+            tw.Write($"Literal: {typeStr} = {value}" )
+        | Expr.LocalBinding(Binding = binding) ->
+            tw.Write($"<{binding.Sym}>" )
+        | Expr.Meta(Target = target; Meta = meta) ->
+            tw.Write($"Meta: " )
+            dpnl(target, indent + 4)
+            dpnl(meta, indent + 4)
+        | Expr.New(Type = cType; Args = args) ->
+            tw.Write($"New: {cType.FullName}" )
+            for a in args do
+                dpnl(a.ArgExpr, indent + 4)
+        | Expr.Obj(Type = oType; Internals = internals; Register = register; ) ->
+            let typeStr = 
+                match oType with
+                | ObjXType.Fn -> "Fn"
+                | ObjXType.NewInstance -> "NewInstance"
+            tw.Write($"{typeStr}" )
+            tw.Write($" {internals.Name}" )
+            startNewLine()
+            for m in internals.Methods do
+                tw.Write($"  {m.MethodName} [ " )
+                for a in m.ReqParams do
+                    tw.Write($"{a.Sym} " )
+                match m.RestParam with
+                | Some r -> tw.Write($"& {r.Sym} " )
+                | None -> ()
+                tw.Write($"] " )
+                dpnl(m.Body, indent + 4)
+        | Expr.QualifiedMethod(MethodName = methodName; Kind = kind; MethodType = methodType) ->
+            let kindStr =
+                match kind with
+                | QMMethodKind.Static -> "Static"
+                | QMMethodKind.Instance -> "Instance"
+                | QMMethodKind.Ctor -> "Ctor"
+            tw.Write($"QualifiedMethod: {methodName} {kindStr} {methodType.FullName}" )
+        | Expr.Recur(Args = args) ->
+            tw.Write($"Recur: " )
+            for a in args do
+                dpnl(a, indent + 4)
+        | Expr.StaticInvoke(Target = target; Method = method; Args = args) ->
+            tw.Write($"StaticInvoke: {target.FullName} " )
+            tw.Write($"{method.Name}" )
+            for a in args do
+                dpnl(a, indent + 4)
+        | Expr.TheVar(Var = v) ->
+            tw.Write($"TheVar: {v.ToString()}" )
+        | Expr.Try(TryExpr = tryExpr; Catches = catches; Finally = finallyExpr) ->
+            tw.Write($"Try: " )
+            dpnl(tryExpr, indent + 4)
+            for c in catches do
+                startNewLine()
+                tw.Write($"Catch: {c.CaughtType.FullName} " )
+                dpnl(c.Handler, indent + 4)
+            match finallyExpr with 
+            | Some f -> 
+                startNewLine()
+                tw.Write($"Finally: " )
+                dp(f, indent + 4)
+            | None -> ()
+        | Expr.UnresolvedVar(Sym = sym) ->
+            tw.Write($"UnresolvedVar: {sym.ToString()}" )
+        | Expr.Var(Var = v) ->
+            tw.Write($"Var: {v.ToString()}" )
+        | Expr.Untyped(Type = uType; Target = target) ->
+            let typeStr = 
+                match uType with
+                | UntypedExprType.MonitorEnter -> "MonitorEnter"
+                | UntypedExprType.MonitorExit -> "MonitorExit"
+                | UntypedExprType.Throw -> "Throw"
+            tw.Write($"Untyped: {typeStr}" )
+            match target with
+            | Some t -> dpnl(t, indent + 4)
+            | None -> ()
+
+
+
+           
 
 [<AbstractClass; Sealed>]
 type TypeUtils private () =

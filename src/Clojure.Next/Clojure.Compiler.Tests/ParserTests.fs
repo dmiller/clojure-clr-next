@@ -3286,24 +3286,50 @@ let FnTests =
               finally
                 Var.popThreadBindings() |> ignore
 
+          ftestCase "this test case was used in a blog post explaining symbol interpretation"
+          <| fun _ ->    
+            let ns1Name = "ns1"
+            let ns2Name = "big.deal.namespace"
 
-(*
+            let ns1 = Namespace.findOrCreate (Symbol.intern (ns1Name))
+            let ns2 = Namespace.findOrCreate (Symbol.intern (ns2Name))
 
-              let pqrsSym = Symbol.intern ("pqrs")
+            let ns2Sym = Symbol.intern "ns2"
+            ns1.addAlias(ns2Sym, ns2)
+            
+            let fSym = Symbol.intern "f"
+            let gSym = Symbol.intern "g"
+            let hSym = Symbol.intern "h"
 
-              let lbPqrs =
-                  { Sym = pqrsSym
-                    Tag = null
-                    Init = None
-                    Name = pqrsSym.Name
-                    IsArg = false
-                    IsByRef = false
-                    IsRecur = false
-                    IsThis = false
-                    Index = 20 }
+            ns1.intern (fSym) |> ignore
+            ns2.intern (gSym) |> ignore
+            ns2.intern (hSym) |> ignore
 
-              let newLocals = RTMap.assoc (locals, pqrsSym, lbPqrs) :?> IPersistentMap
-              let cctx = { cctx with Locals = newLocals }
-              
-*)
+
+
+            let stringSym = Symbol.intern "String"
+            ns1.importClass (stringSym, typeof<System.String>) |> ignore
+
+            Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+            try
+
+                let form = ReadFromString "(fn* [x] 
+                                              (let* [y  7]
+                                                (f (ns2/g Int64/MaxValue y) 
+                                                   (String/ToUpper x)
+                                                   (big.deal.namespace/h 7))))"
+                let ast = Parser.Analyze(CompilerEnv.Create(Expression), form)
+                Expect.isTrue ast.IsObj "Should have an AST"
+
+                let tw = new System.IO.StringWriter()
+                ExprUtils.DebugPrint(tw, ast)
+                let s = tw.ToString()
+                Expect.isNotNull s "Should have a string"
+
+            finally
+                Var.popThreadBindings() |> ignore
+
+
+
         ]

@@ -1595,7 +1595,7 @@ type Parser private () =
                         TargetType = methodType,
                         MemberName = methodName,
                         TInfo = memberInfo,
-                        Args = null,
+                        Args = ResizeArray<HostArg>(),
                         TypeArgs = genericTypeArgs,
                         SourceInfo = None
                     ) // TODO: source info
@@ -1788,7 +1788,7 @@ type Parser private () =
             TargetType = staticType,
             MemberName = memberName,
             TInfo = null,
-            Args = null,
+            Args = ResizeArray<HostArg>(),
             TypeArgs = typeArgs,
             SourceInfo = None
         ) // TODO: source info
@@ -1873,7 +1873,7 @@ type Parser private () =
             TargetType = t,
             MemberName = memberName,
             TInfo = info,
-            Args = null,
+            Args = ResizeArray<HostArg>(),
             TypeArgs = TypeUtils.EmptyTypeList,
             SourceInfo = None
         )
