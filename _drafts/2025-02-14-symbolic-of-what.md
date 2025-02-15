@@ -247,12 +247,12 @@ Now consider the situation where we have read the following code and are evaluat
 
 ```Clojure
 (fn* [x] 
-  (let* [y  7]
-    (f (ns2/g Int64/MaxValue y) 
-       (String/.ToUpper x)
-       (big.deal.namespace/h 7))))
+   (let* [y  7]
+      (f (ns2/g Int64/MaxValue y) 
+         (String/.ToUpper x)
+         (big.deal.namespace/h System.Text.StringBuilder))))
 ```
-(Note: the parser would see `fn*` instead of `fn` -- the latter is macro that expands to the former. Similarly for `let*.)
+(Note: the parser would see `fn*` instead of `fn` -- the latter is macro that expands to the former. Similarly for `let*`.)
 
 The reader has the easy job.  No backquoting in there, so symbols are just symbols to it.  The parse will do the heavy lifting.
 
@@ -260,7 +260,7 @@ Looking at the call to `f` only, we are interpreting that form in a lexical bind
 We need to interpret each symbol in that form:
 
 ```Clojure
-f  x  y  ns2/g  big.deal.namespace/h  System.Int64 String  String/ToUpper 
+f  x  y  ns2/g  big.deal.namespace/h  System.Int64  String/ToUpper System.Text.StringBuilder
 ```
 
 `x` and `y` are easy.  They do not have a namespace, so the first step is look to see if they are currently bound in the lexical scope.
@@ -297,28 +297,122 @@ In this case, there is a property `MaxValue` in `System.Int64`, so we turn this 
 `String/.ToUpper` is similar.  In this case, because this symbol appears in the functional position of function invocation, 
 given that `String` maps to `System.String`, we look for methods also. Beacause the name starts with a period, we look for an instance method, and find one.
 
+Finally, we have `System.Text.StringBuilder`.  When we have a symbol with no namespace and periods in the name, we look for a type.
+In this case, we do find a type.  If it didn't name a type, we would go on and treat the same as a symbol with no periods.
 
 
-
-
-
+I wrote a debug printer for ASTs.  Here is the output of parsing the form above.
 
 ```Clojure
 Fn ns1$fn__1
-  invoke [ x ]     
-    Let:   [
-        y 
-        Literal: PrimNumeric = 7
-      ]          
+  invoke [ x ] 
+    
+    Let [ y
+           = 7 (PrimNumeric)  ]
+      
+      Invoke: 
+          Var: #'ns1/f
           Invoke: 
-              Var: #'ns1/f
-              Invoke: 
-                  Var: #'big.deal.namespace/g
-                  InteropCall: FieldOrProperty: System.Int64.MaxValue Static
-                  <y>
-              InteropCall: Method: System.String.ToUpper Instance
-                  <x>
-              Invoke: 
-                  Var: #'big.deal.namespace/h
-                  Literal: PrimNumeric = 7
+              Var: #'big.deal.namespace/g
+              InteropCall: FieldOrProperty: System.Int64.MaxValue Static
+              <y>
+          InteropCall: InstanceZeroArityCall: System.String.ToUpper Instance
+              <x>
+          Invoke: 
+              Var: #'big.deal.namespace/h
+              = System.Text.StringBuilder (Other)
+```
+
+## There's more
+
+There are a lot more rules and special cases.  The test suite for the parse has almost 60 tests for symbol interpretation. 
+This includes tests for looking up / resolving symbols in the context of namespaces and aliases and types, 
+plus tests for the various AST nodes that can be created from symbols.
+
+Here is a sample of test descriptions.  
+The first two lists are for symbol lookup and resolution, used in parsing, 
+but not looking at what AST node would be created.
+Do you know all of these rules?
+
+These are when the symbol has namespace:
+
+- ns/name, ns is namespace alias, no var found for name (throws)
+- ns/name, ns is namespace alias, not current namespace, var found, var is private, privates not allows (throws)
+- ns/name, ns is namespace alias, not current namespace, var found, var is private, privates allowed (var returned)
+- ns/name, ns is namespace alias, not current namespace, var found, var is public (var returned)
+- ns/digit, but ns is not a type (throws)  -- this is something like `BadType/7`
+- ns/digit, ns is a type (return array type)  -- this is something like `String/1`
+
+These are when the symbol does not have a namespace:
+
+- name has . in it, names type (return type) 
+- name has . in it, does not resolve to a type (throws)  -- note that in the parser, we catch the exception and move on
+- `in-ns` -- treated as a special case -- always found
+- `ns` -- treated as a special case -- always found
+- name found in current namespace (return var)  (there are variants in the resolve/lookup code that will create the `Var` if not found)
+
+Several kinds of AST nodes can be created from symbols.  The details of node types is bit beyond where we can go here,
+but perhaps you can get the gist:
+
+- ns/name, ns names a `Type`, that type has a field or property with the given name  => InteropCall, type = FieldOrProperty, static
+- ns/name ns names a `Type`, no field or property found, name does not start with a period  => QualifiedMethod, Static 
+- ns/.name ns names a `Type`, no field or property found, name starts with a period  => QualifiedMethod, Instance 
+- ^NotAType TypeName/FieldName, FieldName not in type TypeName => throws because the tag is not a type
+- ^IsAType TypeName/FieldName, FieldName not in type TypeName => QualifiedMethod, Static, IsAType set as tag.
+- ^[...types...] TypeName/FieldName, FieldName not in type TypeName => QualifiedMethod, Static, SignatureHint set
+
+Without a namespace:
+
+- name - has a local binding => Expr.LocalBinding
+- not local, not a type, resolves to a Var, Var is macro => throws
+- not local, not a type, resolves to a Var, Var is has `:sonst true` metadata  => Expr.Literal with Var as value
+- not local, not a type, resolves to a Var, Var is not macro, not const => Expr.Var
+- not local, not a type, does not resolve, allow-unresolved = true => Expr.UnresolvedVar
+- not local, not a type, does not resolve, allow-unresolved = false => throws
+
+You may thank me for not including the code that implements this.
+Or even the tests.
+
+
+## Creating the example
+
+At the time of writing, ClojureCLR.Next cannot read and evaluate code.  It has the reader and it has the parser.
+I set up the example as a unit test.  I didn't bother actually defining the functions `f`, `g`, and `h`; 
+all that's needed is that those symbols map to `Var`s in their namespaces.  
+The structure has to be created by hand by calling methods on the underlying data structures.
+Here's what it looks like:
+
+```F#
+let ns1Name = "ns1"
+let ns2Name = "big.deal.namespace"
+
+let ns1 = Namespace.findOrCreate (Symbol.intern (ns1Name))
+let ns2 = Namespace.findOrCreate (Symbol.intern (ns2Name))
+
+let ns2Sym = Symbol.intern "ns2"
+ns1.addAlias(ns2Sym, ns2)
+
+let fSym = Symbol.intern "f"
+let gSym = Symbol.intern "g"
+let hSym = Symbol.intern "h"
+
+ns1.intern (fSym) |> ignore
+ns2.intern (gSym) |> ignore
+ns2.intern (hSym) |> ignore
+
+// Set the current namespace by binding *ns* 
+Var.pushThreadBindings (RTMap.map (RTVar.CurrentNSVar, ns1))
+
+try
+
+    let form = ReadFromString "(fn* [x] 
+                                    (let* [y  7]
+                                    (f (ns2/g Int64/MaxValue y) 
+                                        (String/.ToUpper x)
+                                        (big.deal.namespace/h System.Text.StringBuilder))))"
+    let ast = Parser.Analyze(CompilerEnv.Create(Expression), form)
+
+    // tests would go here.  I also printed the AST to a string so I could grab it in the debugger.
+Finally
+    Var.popThreadBindings()
 ```
