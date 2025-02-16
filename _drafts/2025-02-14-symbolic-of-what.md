@@ -9,18 +9,29 @@ An exercise in symbology.
 
 
 ## Introduction 
+ 
+Symbols in Clojure are a simple construct, viewed purely as a data structure.
+But symbols but are given meaning by a complex web of interactions among the Lisp reader, 
+namespaces, the Clojure compiler, and the Clojure runtime.
 
-I remember trying to figure out symbols when I first learned Lisp.  
-My predecessor languages (Fortran, Basic, Pascal) had not prepared me.  
-(You might guess from that list that my first encounter was some years ago.)  
-I was in good shape with symbols across multiple dialects of Lisp over the years, 
-though certainly there was non-trivial variation. 
+My recent work on ClojureCLR.Next has been on namespaces, the reader, and the parsing phase of the compiler.
+I'll write more about the parser later.  It's been a challenge because the original (JVM/CLR) Clojure code
+mashes together a lot of syntactic and semantic analysis.  I've been trying to separate these phases for multiple reasons:
 
-Clojure forced yet another re-calibration.  
-Symbols are a simple construct, but are given meaning by a complex web of interactions
-among the Lisp reader, namespaces, the Clojure compiler and the Clojure runtime.
-I hope to document here where meaning arises.
+- to make the code more modular and easier to understand
+- to enhance writing tests, for example, separate tests for parsing versus type analysis
+- to make debugging easier, for example, by having a simple AST versus a typed AST versus inspectable IL code 
+- to get rid of circular references so that the code can be split into multiple files.  (The Compiler.java file has 8,500 source lines of code and pretty much no comments.  It is _dense_.)
 
+One source of complexity in parsing is dealing with the interpretation of symbols.
+(I'm trying to avoid so many jokes here.)
+Nothing like implementation to make one appreciate how complicated this can be.
+If you just write code, you likely don't think about it much -- you know what works.
+Writing the code to make it work is another matter.
+
+The code for resolving symbols and translating them in context into nodes in the abstract syntax tree (AST) is complex.
+There are appear to be some reduncancies that could be eliminated, along with a few other simplifications.
+But for that, I needed more clarity on the rules for symbol interpretation.  What follows is not complete, by any means, but it is a starting point.
 
 
 ## Background
@@ -37,8 +48,6 @@ Apparently that is not enough for some.
 - [The Relationship Between Clojure Functions, Symbols, Vars, and Namespaces](https://8thlight.com/insights/the-relationship-between-clojure-functions-symbols-vars-and-namespaces) by Aaron Lahey.  (Kudos for the Oxford comma.)
 - [What are symbols in Clojure?](https://www.reddit.com/r/Clojure/comments/j3b5hc/what_are_symbols_in_clojure/?rdt=63497)
 - [Explain Clojure Symbols](https://stackoverflow.com/questions/1175920/explain-clojure-symbols)
-
-The first article is especially releveant. 
 
 So much for preparation.
 
@@ -115,8 +124,8 @@ The reader looks at the next character in the input and decides what to do.
    but also `"` (read a string) and `\` (read a character) -- then call the special reader for that thing.
 - otherwise, we have a _token_.
 
-For tokens, we accummulate characters until we hit the end of the input or a charact that can't be in a token.
-Characters that can't be in a token are whitespace  or terminating macro character (that includes characters like `(` and `)`)`).
+For tokens, we accummulate characters until we hit the end of the input or a character that can't be in a token.
+Characters that can't be in a token are whitespace  or terminating macro character (that includes characters like `(` and `)`).
 For the JVM version of the reader, that is entirely the definition of a token.
 On the CLR, we added `|`-escaping to make it possible to enter CLR typenames that have otherwise unacceptable (terminating) characters; 
 this complicates token reading just a bit.
@@ -134,14 +143,14 @@ And that's it.  Almost.
 Some of the specialized reader methods must go further and _interpret_ symbols that are encountered during their processing.
 One thinks of _interpretation_ typically as the domain of the evaluator/compiler, not the reader.  But in the Clojure reader,
 it cannot be avoided.  The Clojure(JVM) and ClojureCLR code for the reader makes this quite apparent;
-there are calls to methods defined over in the `Compiler` and `HostExpr` classes. 
+there are calls to methods defined over in the classes defining the compiler. 
 For ClojureCLR.Next, I wanted the reader to be defined before I got around to the compiler.  
 In particular, because of F# circularity restrictions, 
-I didn't want to have put the reader and at least the parser pass of the compiler into one massive file.
+I didn't want to have put the reader and (at least the parser pass of) the compiler into one massive file.
 I ended up duplicating the compiler methods used by the reader in the reader code itself.
 These duplicates could be simplified -- they don't have to deal with some compiler-specific issues such as local binding scopes.
 
-Where does symbol interpretation arise in the reader?  Primarily in [syntax quote](https://clojure.org/reference/reader#syntax-quote)
+Where does symbol interpretation arise in the reader?  Primarily in [syntax quote](https://clojure.org/reference/reader#syntax-quote).
 
 > For Symbols, syntax-quote _resolves_ the symbol in the current context, yielding a fully-qualified symbol (i.e. namespace/name or fully.qualified.Classname). If a symbol is non-namespace-qualified and ends with '#', it is resolved to a generated symbol with the same name to which '_' and a unique id have been appended. e.g. x# will resolve to x_123. All references to that symbol within a syntax-quoted expression resolve to the same generated symbol.
 
@@ -160,7 +169,7 @@ mlnn/something   ; => 7
 ```
 
 [NB: I discovered that the current version of ClojureCLR did not do the last line correctly.  For the last 15 years.  
-By the time you read this, the fix will be in.]
+By the time you read this, the fix will be in. So to speak.]
 
 These operations require interpretation of symbols in the context of namespace aliases and type mappings.
 The first step on the road to interpretation begins with namespaces.
@@ -205,7 +214,6 @@ For our purposes here, we can ignore that.  What _is_ important here is finding 
 The entry points for that are the following.
 
 ```F#
-
     // Get the value a symbol maps to.  Typically a Var or a Type.
     member this.getMapping(sym: Symbol) = this.Mappings.valAt (sym)
 
@@ -305,11 +313,9 @@ I wrote a debug printer for ASTs.  Here is the output of parsing the form above.
 
 ```Clojure
 Fn ns1$fn__1
-  invoke [ x ] 
-    
+  invoke [ x ]     
     Let [ y
-           = 7 (PrimNumeric)  ]
-      
+           = 7 (PrimNumeric)  ]      
       Invoke: 
           Var: #'ns1/f
           Invoke: 
@@ -355,8 +361,8 @@ Several kinds of AST nodes can be created from symbols.  The details of node typ
 but perhaps you can get the gist:
 
 - ns/name, ns names a `Type`, that type has a field or property with the given name  => InteropCall, type = FieldOrProperty, static
-- ns/name ns names a `Type`, no field or property found, name does not start with a period  => QualifiedMethod, Static 
-- ns/.name ns names a `Type`, no field or property found, name starts with a period  => QualifiedMethod, Instance 
+- ns/name, ns names a `Type`, no field or property found, name does not start with a period  => QualifiedMethod, Static 
+- ns/.name, ns names a `Type`, no field or property found, name starts with a period  => QualifiedMethod, Instance 
 - ^NotAType TypeName/FieldName, FieldName not in type TypeName => throws because the tag is not a type
 - ^IsAType TypeName/FieldName, FieldName not in type TypeName => QualifiedMethod, Static, IsAType set as tag.
 - ^[...types...] TypeName/FieldName, FieldName not in type TypeName => QualifiedMethod, Static, SignatureHint set
@@ -365,7 +371,7 @@ Without a namespace:
 
 - name - has a local binding => Expr.LocalBinding
 - not local, not a type, resolves to a Var, Var is macro => throws
-- not local, not a type, resolves to a Var, Var is has `:sonst true` metadata  => Expr.Literal with Var as value
+- not local, not a type, resolves to a Var, Var is has `:const true` metadata  => Expr.Literal with Var as value
 - not local, not a type, resolves to a Var, Var is not macro, not const => Expr.Var
 - not local, not a type, does not resolve, allow-unresolved = true => Expr.UnresolvedVar
 - not local, not a type, does not resolve, allow-unresolved = false => throws
