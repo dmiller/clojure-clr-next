@@ -2,14 +2,15 @@
 
 open System
 
-
+/// Abstract base class for objects that can have metadata.
+/// method withMeta should be implemented in derived classes.
 [<AbstractClass; AllowNullLiteral>]
-type Obj(meta: IPersistentMap) =
+type Obj(_meta: IPersistentMap) =
 
     new() = Obj(null)
 
     interface IMeta with
-        member _.meta() = meta
+        member _.meta() = _meta
 
     interface IObj with
         member _.withMeta(m) =
@@ -17,11 +18,9 @@ type Obj(meta: IPersistentMap) =
             <| NotImplementedException("You must implement withMeta in derived classes")
 
 
-
-// Needs to appear before the defintion of RT.IsReduced, wherever that ends up
-
+/// Holds a reduced value.
 [<Sealed>]
-type Reduced(value) =
+type Reduced(_value: obj) =
 
     interface IDeref with
-        member _.deref() = value
+        member _.deref() = _value
