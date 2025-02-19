@@ -10,13 +10,20 @@ open System.Text.RegularExpressions
 
 
 
+// We have a major circularity problem.
+// Our default printer cannot call ToString on the collections -- the ToString methods on collection will be calling the methods here.
+// However, we _can_ call ToString on items in a collection.
+//
+// As part of the initializtion for ClojureCLR as a whole, we will need to set the printFn to a function that can handle the collections.
+// Note that this bootstrapping is also done in Clojure(JVM) and ClojureCLR(Classic).
+
+/// Signature for a printer function
 type TPrintFn = (obj * TextWriter) -> unit
 
+/// The current printer function
+/// To be reset to an actual value during initialization
 let mutable internal printFn: TPrintFn option = None
 
-
-// Note that our default printer cannot call ToString on the collections -- those methods will be calling this.  Circularity city.
-// However, it can call ToString on items in a collection.
 
 
 // TODO: figure out how to properly incorporate 'readably' into this interface.
@@ -26,7 +33,8 @@ let mutable internal printFn: TPrintFn option = None
 // This was originally in LispReader.
 // Copied here so we can use it.
 
-let vbarEscape(s:String) :string =
+/// Escapes vertical bars.  For use in typenames.
+let private vbarEscape(s:String) :string =
     let sb = StringBuilder()
     sb.Append('|')  |> ignore
     for c in s do
@@ -35,18 +43,22 @@ let vbarEscape(s:String) :string =
     sb.Append('|') |> ignore
     sb.ToString()
 
-
-let rec baseMetaPrinter (x: obj, w: TextWriter) : unit =
+/// Print the metadata of an object with the #^ syntax.
+let rec private baseMetaPrinter (x: obj, w: TextWriter) : unit =
     match x with
     | :? IMeta as xo -> // original code has Obj here, but not sure why this is correct.  We only need an IMeta to have metadata.
-        let meta = xo.meta () // the real version will check for a meta with count=1 and just a tag key and special case that.
+        let meta = xo.meta ()
+        // the real version will check for a meta with count=1 and just a tag key and special case that.
+        // However, we don't have keywords yet, so we can't do that here.
         if meta.count() > 0 then
             w.Write("#^")
             print (meta, w)
             w.Write(' ')
     | _ -> ()
 
-and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
+///  the basic printer.  Handles many kinds of objects.
+and private printBasic(readably:bool, x:obj, w:TextWriter) : unit =
+
     let printInnerSeq readably (s: ISeq) (w: TextWriter) =
         let rec loop (s: ISeq) =
             if not (isNull s) then 
@@ -135,7 +147,7 @@ and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
         w.Write('}')
     | :? Char as ch -> baseCharPrinter readably ch w
     | :? Type as t ->
-        // in the original code, this checked LispReade.NameRequiresEscaping (tname)
+        // in the original code, this checked LispReader.NameRequiresEscaping (tname)
         // That requires a lot reader-specific knowledge I don't feel like embedding
         // I think that can wait until the real print system is initiailized.
         let tname = vbarEscape(t.AssemblyQualifiedName)
@@ -152,6 +164,7 @@ and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
         w.Write("BIGINT");     
     // The following is in the original -- ignore for now, let the real printer handle this after Var is defined.
     // Or maybe we need a static mutable binding to hold a Var-printer that can be set later.
+    // TODO: make sure we handle this
     //| :? Var as v ->
     //    w.Write($"#=(var {v.Namespace.Name}/{v.Symbol}")
     | :? Regex as r ->
@@ -172,13 +185,13 @@ and printBasic(readably:bool, x:obj, w:TextWriter) : unit =
    
 
 
-
+/// Print an object to a TextWriter
 and  print (x: obj, w: TextWriter) =
     match printFn with
     | Some f -> f (x, w)
     | None -> printBasic (true, x, w)
 
-
+/// Print an object to a string
 let printString (x: obj) =
     use sw = new StringWriter()
     print (x, sw)
