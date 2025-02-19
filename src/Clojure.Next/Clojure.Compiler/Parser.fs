@@ -2079,10 +2079,10 @@ type Parser private () =
             // This simple test is used in the JVM:   if (e.Name.Equals(munge(v.ns.Name.Name) + "$" + munge(v.sym.Name)))
             // Does not work for us because have to append a __1234 to the type name for functions in order to avoid name collisiions in the eval assembly.
             // So we have to see if the name is of the form   namespace$name__xxxx  where the __xxxx can be repeated.
-            let reducedName = Parser.RemoveFnSuffix(e.name)
+            let reducedName = Parser.RemoveFnSuffix(e.Name)
 
             if reducedName.Equals($"{Munger.Munge(v.Namespace.Name.Name)}${Munger.Munge(v.Symbol.Name)}") then
-                raise <| new ArityException(e.actual - 2, e.name)
+                raise <| new ArityException(e.Actual - 2, e.Name)
             else
                 reraise ()
         | :? CompilerException -> reraise ()

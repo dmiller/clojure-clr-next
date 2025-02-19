@@ -5,25 +5,33 @@ open System
 
 
 // In ClojureJVM, this would also implement Callable and Runnable -- no exact equivalent here -- shoule we look at Func<>? ThreadDelegate?
+
+/// Supports checking whether an arity is supported.
 [<AllowNullLiteral>]
 type IFnArity =
     abstract hasArity: arity: int -> bool
 
-type ArityException(actual0: int, name0: string, cause0: Exception) =
-    inherit ArgumentException((sprintf "Wrong number of args(%i) passed to: %s" actual0 name0), cause0) // TODO: Should use Compiler.demunge(name) in sprintf
-    member val name = name0
-    member val actual = actual0
+/// Exception thrown when the wrong number of arguments are passed to a function.
+type ArityException(actual: int, name: string, cause: Exception) =
+    inherit ArgumentException((sprintf "Wrong number of args(%i) passed to: %s" actual name), cause) // TODO: Should use Compiler.demunge(name) in sprintf
+
+    member val Name = name
+    member val Actual = actual
+
     new() = ArityException(-1, "<Unknown>", null)
     new(actual: int, name: string) = ArityException(actual, name, null)
 
 
+/// Base class for supporting the IFn interface.
+/// Provides default (exception-throwing) implementations for all the IFn.invoke overloads, IFn.applyTo, and IFnArity.hasArity.
 [<AbstractClass; AllowNullLiteral>]
 type AFn() =
+
     interface IFnArity with
         member _.hasArity(arity: int) : bool = false
 
     // This was in RT.  But only used in AFn and RestFn, so moving to here.
-    static member boundedLength(list: ISeq, limit: int) : int =
+    static member private boundedLength(list: ISeq, limit: int) : int =
         let rec loop (c: ISeq) i =
             if not (isNull c) && i <= limit then
                 loop (c.next ()) (i + 1)
@@ -32,7 +40,6 @@ type AFn() =
 
         loop list 0
 
-
     // This was in RT.  Should be in Helpers.  TODO: Maybe split Helpers?  It is used in a few other places in the code
     static member seqLength(list: ISeq) : int =
         let rec loop (c: ISeq) i =
@@ -40,16 +47,15 @@ type AFn() =
 
         loop list 0
 
-
     // This was in RT.  But only used in RestFn, so moving to here.
     static member seqToArray<'a>(xs: ISeq) : 'a array =
-        if  isNull xs then
+        if isNull xs then
             Array.zeroCreate (0)
         else
             let a = Array.zeroCreate<'a> (AFn.seqLength xs)
 
             let rec loop (s: ISeq) i =
-                if  not (isNull s) then
+                if not (isNull s) then
                     a.[i] <- downcast s.first ()
                     loop (s.next ()) (i + 1)
                 else
@@ -60,7 +66,6 @@ type AFn() =
 
     member this.WrongArityException(reqArity: int) : ArityException =
         ArityException(reqArity, this.GetType().FullName)
-
 
     interface IFn with
         member this.invoke() = raise <| this.WrongArityException(0)
@@ -127,7 +132,7 @@ type AFn() =
             ) =
             raise <| this.WrongArityException(21)
 
-        member this.applyTo(argList: ISeq) : obj = AFn.applyToHelper(this, argList)
+        member this.applyTo(argList: ISeq) : obj = AFn.applyToHelper (this, argList)
 
     // TODO: Check to see if the original use of Util1.Ret is necessary.
 
@@ -394,7 +399,6 @@ type AFn() =
                 n().first (),
                 AFn.seqToArray (al.next ())
             )
-
 
 
 
