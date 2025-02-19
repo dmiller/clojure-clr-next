@@ -4,14 +4,15 @@ open System
 open System.Collections
 open System.Collections.Generic
 
-
+// Implements enumerations over ISeqs (anything RT0.seq works on).
 type TypedSeqEnumerator<'T when 'T: not struct>(o: obj) =
-    let mutable orig = o
-    let mutable seqOption: ISeq option = None
+
+    let mutable _orig = o
+    let mutable _seqOption: ISeq option = None
 
     interface IEnumerator<'T> with
         member _.Current =
-            match seqOption with
+            match _seqOption with
             | Some s when not <| isNull s -> s.first () :?> 'T
             | _ -> raise <| InvalidOperationException("No current value")
 
@@ -24,33 +25,34 @@ type TypedSeqEnumerator<'T when 'T: not struct>(o: obj) =
             raise <| NotSupportedException("Reset not supported on EnumeratorSeq")
 
         member _.MoveNext() =
-            match seqOption with
+            match _seqOption with
             | Some s when isNull s -> false
             | Some s ->
                 let next = s.next ()
-                seqOption <- Some next
+                _seqOption <- Some next
                 not <| isNull next
             | None ->
                 let next = RT0.seq (o)
-                orig <- null
-                seqOption <- Some next
+                _orig <- null
+                _seqOption <- Some next
                 not <| isNull next
 
         member this.Current = (this :> IEnumerator<'T>).Current :> obj
 
     member _.Dispose disposing =
         if disposing then
-            orig <- null
-            seqOption <- None
+            _orig <- null
+            _seqOption <- None
 
     interface IDisposable with
         member this.Dispose() =
             this.Dispose(true)
             GC.SuppressFinalize(this)
 
-
+/// Enumerator for ISeqs of objects.
 type SeqEnumerator(s: ISeq) =
     inherit TypedSeqEnumerator<obj>(s)
 
+/// Enumerator for ISeqs of IMapEntry objects.
 type IMapEntrySeqEnumerator(s: ISeq) =
     inherit TypedSeqEnumerator<IMapEntry>(s)
