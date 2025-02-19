@@ -1386,7 +1386,7 @@ type LispReader() =
                 true
             | :? ISeq
             | :? IPersistentList ->
-                match RT0.seq (form) with
+                match RTSeq.seq (form) with
                 | null -> RTSeq.cons (RTVar.ListSym, null), true
                 | _ as seq -> RTSeq.list (RTVar.SeqSym, RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(seq))), true
             | _ -> raise <| new ArgumentException("Unknown collection type")
@@ -1535,7 +1535,7 @@ type LispReader() =
                 let kvs1 = kvs.cons(e.key ()).cons (e.value ())
                 loop (s.next ()) kvs1
 
-        loop (RT0.seq (form)) PersistentVector.Empty
+        loop (RTSeq.seq (form)) PersistentVector.Empty
 
 
     static member IsUnquote(form: obj) =
@@ -1658,7 +1658,7 @@ type LispReader() =
                         let kv = s.first () :?> IMapEntry
                         loop (s.next ()) (RTMap.assoc (ometa, kv.key (), kv.value ()))
 
-                loop (RT0.seq (metaAsMap)) (RT0.meta (o))
+                loop (RTSeq.seq (metaAsMap)) (RT0.meta (o))
 
         | _ -> raise <| new ArgumentException("Metadata can only be applied to IMetas")
 

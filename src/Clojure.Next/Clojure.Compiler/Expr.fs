@@ -888,7 +888,7 @@ type TypeUtils private () =
                     loop (s.next())
 
         let arglists = RT0.get(RT0.meta(v), RTVar.ArglistsKeyword)
-        loop (RT0.seq(arglists))
+        loop (RTSeq.seq(arglists))
 
 
     static member CreateTypeArgList(cenv: CompilerEnv, targs: ISeq) =

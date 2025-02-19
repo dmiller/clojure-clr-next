@@ -27,7 +27,7 @@ type private PQSeq(meta: IPersistentMap, front: ISeq, rear: ISeq) =
         override this.first() = front.first()
         override this.next() =
             match front.next() with
-            | null -> if isNull rear then null else PQSeq(meta, RT0.seq(rear), null)
+            | null -> if isNull rear then null else PQSeq(meta, RTSeq.seq(rear), null)
             | f1 -> PQSeq(meta, f1, rear)
 
 
@@ -47,7 +47,7 @@ type PersistentQueue(meta: IPersistentMap, cnt: int, front: ISeq, rear: IPersist
     override this.Equals(obj) =
         match obj with
         | :? Sequential as s ->
-            let ms = RT0.seq(obj)
+            let ms = RTSeq.seq(obj)
             let rec loop(s: ISeq, ms: ISeq) =
                 match s with
                 | null -> isNull ms
@@ -89,7 +89,7 @@ type PersistentQueue(meta: IPersistentMap, cnt: int, front: ISeq, rear: IPersist
             else
                 let f1 = RTSeq.next(front)
                 if isNull f1 then
-                    PersistentQueue(meta, cnt-1, RT0.seq(rear), null)
+                    PersistentQueue(meta, cnt-1, RTSeq.seq(rear), null)
                 else
                     PersistentQueue(meta, cnt - 1, f1, rear)
     
@@ -107,7 +107,7 @@ type PersistentQueue(meta: IPersistentMap, cnt: int, front: ISeq, rear: IPersist
         member this.equiv(o) =
             match o with
             | :? Sequential as s ->
-                let ms = RT0.seq(o)
+                let ms = RTSeq.seq(o)
                 let rec loop(s: ISeq, ms: ISeq) =
                     match s with
                     | null -> isNull ms

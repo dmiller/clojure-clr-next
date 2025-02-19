@@ -167,7 +167,7 @@ type [<AllowNullLiteral>] APersistentVector() =
                 false
             else
                 plEquals (0, v, ilist)
-        | :? Sequential -> seqEquals (0, v, RT0.seq (o))
+        | :? Sequential -> seqEquals (0, v, RTSeq.seq (o))
         | _ -> false
 
     override this.GetHashCode() =
@@ -259,7 +259,7 @@ type [<AllowNullLiteral>] APersistentVector() =
                 false
             else
                 plEquiv (0, v, ilist)
-        | :? Sequential -> seqEquiv (0, v, RT0.seq (o))
+        | :? Sequential -> seqEquiv (0, v, RTSeq.seq (o))
         | _ -> false
 
     interface ILookup with

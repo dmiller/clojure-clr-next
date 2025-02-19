@@ -24,7 +24,7 @@ type RTMap() =
     static member keys( coll: obj) =
         match coll with
         | :? IPersistentMap as ipm -> KeySeq.createFromMap(ipm)
-        | _ -> KeySeq.create(RT0.seq(coll))
+        | _ -> KeySeq.create(RTSeq.seq(coll))
 
     static member set( [<ParamArray>] init: obj array) : IPersistentSet =
         PersistentHashSet.createWithCheck init

@@ -160,7 +160,7 @@ type APersistentMap() =
                         let me = s.first () :?> IMapEntry
                         loop (s.next ()) (m.assoc (me.key (), me.value ()))
 
-                loop (RT0.seq (o)) this
+                loop (RTSeq.seq (o)) this
 
     interface IFn with
         override this.invoke(a1) = (this :> ILookup).valAt (a1)
@@ -388,7 +388,7 @@ type ATransientMap() =
                     let nextRet = ret.assoc (me.key (), me.value ())
                     loop nextRet (s.next ())
 
-            loop this (RT0.seq (o))
+            loop this (RTSeq.seq (o))
 
 
 ////////////////////////////////////

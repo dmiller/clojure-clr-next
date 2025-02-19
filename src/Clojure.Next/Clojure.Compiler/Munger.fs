@@ -56,7 +56,7 @@ type Munger private () =
                 let me = s.first() :?> IMapEntry
                 m <- m.assoc(me.value(), me.key())
                 loop(s.next())
-        loop(RT0.seq(Munger._charMap))
+        loop(RTSeq.seq(Munger._charMap))
 
         m
 

@@ -64,7 +64,7 @@ and [<AbstractClass;Sealed>]  RTSeq() =
         match coll with
         | null -> upcast PersistentList(x)
         | :? ISeq as s -> upcast Cons(x, s)
-        | _ -> upcast Cons(x, RT0.seq (coll))
+        | _ -> upcast Cons(x, RTSeq.seq (coll))
 
     static member meta (x:obj) = 
         match x with
@@ -80,7 +80,7 @@ and [<AbstractClass;Sealed>]  RTSeq() =
         let seq =
             match x with
             | :? ISeq as s -> s
-            | _ -> RT0.seq(x)
+            | _ -> RTSeq.seq(x)
         match seq with
         | null -> null
         | _ -> seq.next()
@@ -98,7 +98,7 @@ and [<AbstractClass;Sealed>]  RTSeq() =
         let seq =
             match x with
             | :? ISeq as s -> s
-            | _ -> RT0.seq(x)
+            | _ -> RTSeq.seq(x)
 
         match seq with
         | null -> null
@@ -174,7 +174,7 @@ and [<Sealed; AllowNullLiteral>] LazySeq private (m1, fn1, s1) =
     override this.Equals(o: obj) =
         match (this :> ISeq).seq (), o with
         | null, :? Sequential
-        | null, :? IList -> RT0.seq (o) = null
+        | null, :? IList -> RTSeq.seq (o) = null
         | null, _ -> false
         | s, _ -> s.Equals(o)
 
@@ -211,7 +211,7 @@ and [<Sealed; AllowNullLiteral>] LazySeq private (m1, fn1, s1) =
 
                 let ls = sv
                 sv <- null
-                s <- RT0.seq (getNext ls)
+                s <- RTSeq.seq (getNext ls)
 
             s
 
@@ -233,7 +233,7 @@ and [<Sealed; AllowNullLiteral>] LazySeq private (m1, fn1, s1) =
             | null ->
                 match o with
                 | :? IList
-                | :? Sequential -> RT0.seq (o) = null
+                | :? Sequential -> RTSeq.seq (o) = null
                 | _ -> false
             | s -> s.equiv (o)
 

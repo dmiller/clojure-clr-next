@@ -123,7 +123,7 @@ type Parser private () =
                 match form with
                 | :? LazySeq as ls ->
                     let realized =
-                        match RT0.seq (ls) with
+                        match RTSeq.seq (ls) with
                         | null -> PersistentList.Empty :> obj
                         | _ as s -> s
 
@@ -240,7 +240,7 @@ type Parser private () =
 
                 loop (s.next ())
 
-        loop (RT0.seq (form))
+        loop (RTSeq.seq (form))
 
         let ret = Expr.Collection(Env = cenv, Form = form, Value = keyvals)
 
@@ -1223,7 +1223,7 @@ type Parser private () =
                             // We are on our first catch or finally.
                             // All body forms are collected, so build the expression for the body
                             let bodyEnv = { cenv with NoRecur = true }
-                            bodyExpr <- Some(Parser.BodyExprParser(bodyEnv, RT0.seq (body)))
+                            bodyExpr <- Some(Parser.BodyExprParser(bodyEnv, RTSeq.seq (body)))
 
 
                         if Util.equals (op, RTVar.CatchSym) then
@@ -1280,7 +1280,7 @@ type Parser private () =
 
                 // the only way this happens if there were catch or finally clauses.
                 // We can return just the body expression itself.
-                Parser.BodyExprParser(cenv, RT0.seq (body))
+                Parser.BodyExprParser(cenv, RTSeq.seq (body))
 
             else
                 Expr.Try(Env = cenv, Form = form, TryExpr = bodyExpr.Value, Catches = catches, Finally = finallyExpr) // TODO: source info)
@@ -1415,7 +1415,7 @@ type Parser private () =
                     args.Add(Parser.Analyze(cenv, s.first ()))
                     loop (s.next ())
 
-            loop (RT0.seq (form.next ()))
+            loop (RTSeq.seq (form.next ()))
 
             // TODO: The constructor would work on protocol details here.
             // Move to later pass?
@@ -1471,7 +1471,7 @@ type Parser private () =
                         argExprs.Add(Parser.Analyze({ cenv with Pctx = Expression }, s.first ()))
                         loop (s.next ())
 
-                loop (RT0.seq (args))
+                loop (RTSeq.seq (args))
 
                 Some
                 <| Expr.StaticInvoke(
