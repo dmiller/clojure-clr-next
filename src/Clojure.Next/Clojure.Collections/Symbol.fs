@@ -4,20 +4,25 @@ open System
 open Clojure.Numerics
 open Clojure.Numerics.Hashing
 
+/// The Symbol datatype.
+/// Classic Lisp with Clojure flavor.
 [<Sealed; AllowNullLiteral>]
 type Symbol private (_meta: IPersistentMap, _ns: string, _name: string) =
     inherit AFn()
 
-    // cached hashcode value, lazy
-    let mutable hasheq = 0
+    /// cached hashcode value, lazy
+    let mutable _hasheq = 0
 
-    // cached string representation, lazy
+    /// cached string representation, lazy
     let mutable _str: string = null
 
+    /// private constructor, default to null metadata
     private new(ns, name) = Symbol(null, ns, name)
 
-    // accessors for the data
+    // Get the namespace of the symbol
     member this.Namespace = _ns
+
+    // Get the name of the symbol
     member this.Name = _name
 
     // Object overrides
@@ -29,9 +34,10 @@ type Symbol private (_meta: IPersistentMap, _ns: string, _name: string) =
         | _ -> false
 
     override this.GetHashCode() =
-        if hasheq = 0 then
-            hasheq <- hashCombine (Murmur3.HashString(if isNull _ns then "" else _ns), Murmur3.HashString(_name))
-        hasheq
+        if _hasheq = 0 then
+            _hasheq <- hashCombine (Murmur3.HashString(if isNull _ns then "" else _ns), Murmur3.HashString(_name))
+
+        _hasheq
 
     override this.ToString() =
         if isNull _str then
@@ -39,11 +45,13 @@ type Symbol private (_meta: IPersistentMap, _ns: string, _name: string) =
                 match _ns with
                 | null -> _name
                 | _ -> $"{_ns}/{_name}"
+
         _str
 
+
     // factory methods
-        
-    /// Intern a symbol with the given name  and namespace-name
+
+    /// Intern a symbol with the given namespace-name and name (strings)
     static member intern(ns: string, name: string) = Symbol(null, ns, name)
 
     /// Intern a symbol with the given name (extracting the namespace if name is of the form ns/name)
@@ -55,6 +63,7 @@ type Symbol private (_meta: IPersistentMap, _ns: string, _name: string) =
         else
             Symbol(nsname.Substring(0, i), nsname.Substring(i + 1))
 
+
     // interface implementations
 
     interface IHashEq with
@@ -64,10 +73,15 @@ type Symbol private (_meta: IPersistentMap, _ns: string, _name: string) =
         member this.CompareTo(obj) =
             match obj with
             | :? Symbol as sym ->
-                let nsc = 
+                let nsc =
                     match _ns with
                     | null -> if isNull sym.Namespace then 0 else -1
-                    | _ -> if isNull sym.Namespace then 1 else _ns.CompareTo(sym.Namespace)
+                    | _ ->
+                        if isNull sym.Namespace then
+                            1
+                        else
+                            _ns.CompareTo(sym.Namespace)
+
                 if nsc <> 0 then nsc else _name.CompareTo(sym.Name)
             | _ -> invalidArg "obj" "Must compare to non-null Symbol"
 
@@ -86,5 +100,5 @@ type Symbol private (_meta: IPersistentMap, _ns: string, _name: string) =
         member _.getName() = _name
 
     interface IFn with
-        member this.invoke(arg1) = RT0.get (arg1, this)
-        member this.invoke(arg1, arg2) = RT0.get (arg1, this, arg2)
+        override this.invoke(arg1) = RT0.get (arg1, this)
+        override this.invoke(arg1, arg2) = RT0.get (arg1, this, arg2)
