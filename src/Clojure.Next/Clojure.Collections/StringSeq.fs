@@ -1,11 +1,10 @@
 ﻿namespace Clojure.Collections
 
+/// An ISeq iterating over the characters of a string.
 [<AllowNullLiteral>]
-type StringSeq(meta: IPersistentMap, s: string, index: int) =
+type StringSeq(meta: IPersistentMap, _string: string, _index: int) =
     inherit ASeq(meta)
 
-    member this.S = s
-    member this.I = index
 
     static member create(s: string) =
         if isNull s || s.Length = 0 then
@@ -14,39 +13,45 @@ type StringSeq(meta: IPersistentMap, s: string, index: int) =
             StringSeq(null, s, 0)
 
     interface ISeq with
-        override _.first() = s[index]
+        override _.first() = _string[_index]
 
         override _.next() =
-            if index + 1 < s.Length then
-                StringSeq(meta, s, index + 1)
+            if _index + 1 < _string.Length then
+                StringSeq(meta, _string, _index + 1)
             else
                 null
 
     interface Counted with
         override _.count() =
-            if index < s.Length then s.Length-index else 0
+            if _index < _string.Length then
+                _string.Length - _index
+            else
+                0
 
     interface IObj with
-        override this.withMeta(m) = if m = meta then this else StringSeq(m,s,index)
+        override this.withMeta(m) =
+            if m = meta then this else StringSeq(m, _string, _index)
 
     interface IndexedSeq with
-        member _.index() = index
+        member _.index() = _index
 
     interface IDrop with
         member _.drop(n) =
-            let ii = index+n
-            if ii < s.Length then
-                StringSeq(meta,s,ii)
+            let ii = _index + n
+
+            if ii < _string.Length then
+                StringSeq(meta, _string, ii)
             else
                 null
 
     interface IReduceInit with
-        member _.reduce(f,start) =
-            let rec loop (acc:obj) (i:int) =
-                if i >= s.Length then
+        member _.reduce(f, start) =
+            let rec loop (acc: obj) (i: int) =
+                if i >= _string.Length then
                     acc
                 else
-                   match f.invoke(acc,s[i]) with
-                   | :? Reduced as red -> (red:>IDeref).deref()
-                   | nextAcc -> loop nextAcc (i+1)
-            loop start index
+                    match f.invoke (acc, _string[i]) with
+                    | :? Reduced as red -> (red :> IDeref).deref ()
+                    | nextAcc -> loop nextAcc (i + 1)
+
+            loop start _index
