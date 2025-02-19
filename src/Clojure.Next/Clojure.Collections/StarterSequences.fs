@@ -6,17 +6,20 @@ open System.Collections.Generic
 open Clojure.Numerics
 open System.Linq
 
-
+/// Abstract base class for Clojure sequences.
 [<AbstractClass; AllowNullLiteral>]
 type ASeq(m) =
     inherit Obj(m)
 
+    /// Cached hash code for the sequence.
+    /// Lazily computed.
     [<NonSerialized>]
-    let mutable hasheq: int option = None
+    let mutable _hasheq: int option = None
 
     new() = ASeq(null)
 
-    static member doCount(s: ISeq) =
+    /// Helper function to count the number of elements in a sequence.
+    static member private doCount(s: ISeq) =
         let rec loop (s: ISeq) cnt =
             match s with
             | null -> cnt
@@ -24,6 +27,9 @@ type ASeq(m) =
             | _ -> loop (s.next ()) (cnt + 1)
 
         loop s 0
+
+
+    // Object overrides
 
     override this.ToString() = RTPrint.printString (this)
 
@@ -48,10 +54,10 @@ type ASeq(m) =
 
     interface IHashEq with
         member this.hasheq() =
-            match hasheq with
+            match _hasheq with
             | None ->
                 let h = Hashing.hashOrdered (this)
-                hasheq <- Some h
+                _hasheq <- Some h
                 h
             | Some h -> h
 
@@ -74,11 +80,15 @@ type ASeq(m) =
         member this.cons(o) = Cons(o, this) :> ISeq
 
 
-    static member  countsMismatch(o1:obj, o2:obj) = 
-        (o1 :? Counted) && (o2 :? Counted) && (o1:?>Counted).count() <> (o2:?>Counted).count()
+    static member private countsMismatch(o1: obj, o2: obj) =
+        match o1, o2 with
+        | (:? Counted as c1), (:? Counted as c2) -> c1.count () <> c2.count ()
+        | _ -> false
 
-    member this.DoCount() = (this :> IPersistentCollection).count()
- 
+    /// Version of IPersistentCollection.count() accessible to derived classes.
+    member this.DoCount() =
+        (this :> IPersistentCollection).count ()
+
     interface IPersistentCollection with
         member this.cons(o) =
             (this :> ISeq).cons (o) :> IPersistentCollection
@@ -99,10 +109,10 @@ type ASeq(m) =
                     | _, null -> false
                     | null, _ -> false
                     | _ -> Util.equiv (s1.first (), s2.first ()) && loop (s1.next ()) (s2.next ())
-                
-                if ASeq.countsMismatch(this,o) then
+
+                if ASeq.countsMismatch (this, o) then
                     false
-                else 
+                else
                     loop this (RT0.seq (o))
             | _ -> false
 
@@ -171,24 +181,27 @@ type ASeq(m) =
         (this: IEnumerable<obj>).GetEnumerator()
 
     interface IEnumerable<obj> with
-        member x.GetEnumerator() = new SeqEnumerator(x) :> IEnumerator<obj>
+        member this.GetEnumerator() =
+            new SeqEnumerator(this) :> IEnumerator<obj>
 
     interface IEnumerable with
-        member x.GetEnumerator() = new SeqEnumerator(x) :> IEnumerator
+        member this.GetEnumerator() = new SeqEnumerator(this) :> IEnumerator
 
     interface ICollection<obj> with
         member this.Count = (this :> IPersistentCollection).count ()
         member _.IsReadOnly = true
+
         member _.Add(_) =
             raise <| InvalidOperationException("Cannot modify an immutable sequence")
+
         member _.Clear() =
             raise <| InvalidOperationException("Cannot modify an immutable sequence")
-        member _.Remove(_) = 
-            raise <| InvalidOperationException("Cannot modify an immutable sequence")
-        member this.Contains(x) = (this:>IList).Contains(x)
-        member this.CopyTo(arr,idx) = (this:>ICollection).CopyTo(arr,idx)
-        
 
+        member _.Remove(_) =
+            raise <| InvalidOperationException("Cannot modify an immutable sequence")
+
+        member this.Contains(x) = (this :> IList).Contains(x)
+        member this.CopyTo(arr, idx) = (this :> ICollection).CopyTo(arr, idx)
 
     interface ICollection with
         member this.Count = (this :> IPersistentCollection).count ()
@@ -218,12 +231,12 @@ type ASeq(m) =
 
             loop idx (this :> ISeq)
 
-and [<Sealed>] Cons(meta, f: obj, m: ISeq) =
+/// Implementation of a cons cell.
+/// Classic Lisp with a Clojure flavor.
+and [<Sealed>] Cons(meta, _first: obj, _more: ISeq) =
     inherit ASeq(meta)
 
-    let first: obj = f
-    let more: ISeq = m
-
+    /// Construct a Cons with null metadata
     new(f: obj, m: ISeq) = Cons(null, f, m)
 
     interface IObj with
@@ -231,26 +244,27 @@ and [<Sealed>] Cons(meta, f: obj, m: ISeq) =
             if LanguagePrimitives.PhysicalEquality m meta then
                 (this :> IObj)
             else
-                Cons(m, first, more) :> IObj
+                Cons(m, _first, _more) :> IObj
 
     interface ISeq with
-        override _.first() = first
+        override _.first() = _first
         override this.next() = (this :> ISeq).more().seq ()
 
         override _.more() =
-            match more with
+            match _more with
             | null -> upcast EmptyList.Empty
-            | _ -> more
+            | _ -> _more
 
     interface IPersistentCollection with
-        override _.count() = 1 + RT0.count (more)
+        override _.count() = 1 + RT0.count (_more)
 
+/// The empty list.
 and [<Sealed>] EmptyList(m) =
     inherit Obj(m)
 
     new() = EmptyList(null)
 
-    static member hasheq = Hashing.hashOrdered (Enumerable.Empty<Object>())
+    static member val _hasheq = Hashing.hashOrdered (Enumerable.Empty<Object>())
 
     static member val Empty: EmptyList = EmptyList()
 
@@ -300,7 +314,7 @@ and [<Sealed>] EmptyList(m) =
     interface IPersistentList
 
     interface IHashEq with
-        override _.hasheq() = EmptyList.hasheq
+        override _.hasheq() = EmptyList._hasheq
 
     interface ICollection with
         override _.CopyTo(a: Array, idx: int) = () // no-op
@@ -339,16 +353,17 @@ and [<Sealed>] EmptyList(m) =
         override _.IndexOf(v) = -1
         override _.Contains(v) = false
 
-and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
-    inherit ASeq(m1)
-    let first: obj = f1
-    let rest: IPersistentList = r1
-    let count = c1
+/// Implementation of a persistent list.
+and [<AllowNullLiteral>] PersistentList private (meta: IPersistentMap, _first: obj, _rest: IPersistentList, _count: int) =
+    inherit ASeq(meta)
+
+    /// Construct a PersistentList of one item with null metadata
     new(first: obj) = PersistentList(null, first, null, 1)
 
     // for backwards compatability
     static member val Empty = EmptyList.Empty
 
+    /// Construct a PersistentList from an IList
     static member create(init: IList) =
         let mutable r = EmptyList.Empty :> IPersistentList
 
@@ -357,11 +372,11 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
 
         r
 
-
-    static member create(init: obj list) =
+    /// Construct a PersistentList from a List<obj>
+    static member create(init: ResizeArray<obj>) =
         let mutable r = EmptyList.Empty :> IPersistentList
 
-        for i = init.Length - 1 downto 0 do
+        for i = init.Count - 1 downto 0 do
             r <- downcast r.cons (init.[i])
 
         r
@@ -371,28 +386,30 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
             if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this :> IObj
             else
-                PersistentList(m, first, rest, count) :> IObj
+                PersistentList(m, _first, _rest, _count) :> IObj
 
     interface ISeq with
-        override _.first() = first
-        override _.next() = if count = 1 then null else rest.seq ()
+        override _.first() = _first
+
+        override _.next() =
+            if _count = 1 then null else _rest.seq ()
 
         override this.cons(o) =
-            PersistentList((this :> IObj).meta (), o, (this :> IPersistentList), count + 1) :> ISeq
+            PersistentList((this :> IObj).meta (), o, (this :> IPersistentList), _count + 1) :> ISeq
 
     interface IPersistentCollection with
-        override _.count() = count
+        override _.count() = _count
 
         override this.empty() =
             (EmptyList.Empty :> IObj).withMeta ((this :> IMeta).meta ()) :?> IPersistentCollection
 
     interface IPersistentStack with
-        override _.peek() = first
+        override _.peek() = _first
 
         override this.pop() =
-            match rest with
+            match _rest with
             | null -> (EmptyList.Empty :> IObj).withMeta ((this :> IMeta).meta ()) :?> IPersistentStack
-            | _ -> rest :> IPersistentStack
+            | _ -> _rest :> IPersistentStack
 
     interface IPersistentList
 
@@ -427,4 +444,3 @@ and [<AllowNullLiteral>] PersistentList(m1, f1, r1, c1) =
                     | _ -> loop (s.next ()) nextVal
 
             loop ((this :> ISeq).next ()) ((this :> ISeq).first ())
-
