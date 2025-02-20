@@ -8,7 +8,7 @@ type RTMap() =
     static member map( [<ParamArray>] init: obj array) : IPersistentMap =
         if isNull init || init.Length = 0 then
             PersistentArrayMap.Empty
-        elif init.Length <= PersistentArrayMap.hashtableThreshold then
+        elif init.Length <= PersistentArrayMap.HashtableThreshold then
             PersistentArrayMap.createWithCheck init
         else
             PersistentHashMap.createWithCheck init
@@ -16,7 +16,7 @@ type RTMap() =
     static member mapUniqueKeys( [<ParamArray>] init: obj array) : IPersistentMap =
         if isNull init then
             PersistentArrayMap.Empty
-        elif init.Length <= PersistentArrayMap.hashtableThreshold then
+        elif init.Length <= PersistentArrayMap.HashtableThreshold then
             PersistentArrayMap(init)
         else
             PersistentHashMap.create init
