@@ -5,18 +5,20 @@ open System.Collections
 open System.Collections.Generic
 open Clojure.Numerics
 
+/// Signature for a function that checks if a value is within bounds.
 type BoundsChecker = obj -> bool
 
+/// An iterator for a range of numeric values.
 type Range
     private
     (
         m: IPersistentMap,
-        startV: obj,
-        endV: obj,
-        step: obj,
-        boundsCheck: BoundsChecker,
-        ichunk: IChunk,
-        ichunkNext: ISeq
+        _start: obj,
+        _end: obj,
+        _step: obj,
+        _boundsCheck: BoundsChecker,
+        chunk: IChunk,
+        chunkNext: ISeq
     ) =
     inherit ASeq(m)
 
@@ -24,25 +26,31 @@ type Range
     //   assert(start != end && step != 0)
 
     [<VolatileField>]
-    let mutable chunk = ichunk // lazy
+    let mutable _chunk = chunk // lazy
 
     [<VolatileField>]
-    let mutable chunkNext = ichunkNext // lazy
+    let mutable _chinkNext = chunkNext // lazy
 
     [<VolatileField>]
     let mutable next: ISeq = null // cached
 
-    static member val CHUNK_SIZE = 32
+    [<Literal>]
+    let _chunkSize = 32
 
+    /// Check for stopping when the step is positive.
     static member PositiveStepCheck(endV: obj) = (fun (v: obj) -> Numbers.gte (v, endV))
+
+    /// Check for stopping when the step is negative
     static member NegativeStepCheck(endV: obj) = (fun (v: obj) -> Numbers.lte (v, endV))
 
+    /// Create Range with null metadata and no chunks
     private new(startV, endV, step, boundsCheck) = Range(null, startV, endV, step, boundsCheck, null, null)
 
+    /// Create Range with null metatdata
     private new(startV, endV, step, boundsCheck, chunk, chunkNext) =
         Range(null, startV, endV, step, boundsCheck, chunk, chunkNext)
 
-
+    /// Create a Range given the start, end, and step values.
     static member create(startV: obj, endV: obj, step: obj) : ISeq =
         if
             Numbers.isPos (step) && Numbers.gt (startV, endV)
@@ -63,8 +71,10 @@ type Range
                     Range.NegativeStepCheck(endV)
             )
 
+    /// Create a Range given the start and end values, with a step of 1.
     static member create(startV: obj, endV: obj) = Range.create (startV, endV, 1L)
 
+    /// Create a Range given the end value, with a start of 0 and a step of 1.
     static member create(endV: obj) : ISeq =
         if Numbers.isPos (endV) then
             Range(0L, endV, 1L, Range.PositiveStepCheck(endV))
@@ -73,48 +83,48 @@ type Range
 
 
     member _.forceChunk() =
-        match chunk with
+        match _chunk with
         | null ->
             let rec fillArray (v: obj) (arr: obj array) (idx: int) =
-                if boundsCheck (v) then
+                if _boundsCheck (v) then
                     v, idx
-                elif idx >= Range.CHUNK_SIZE then
+                elif idx >= _chunkSize then
                     v, idx
                 else
                     arr[idx] <- v
-                    fillArray (Numbers.addP (v, step)) arr (idx + 1)
+                    fillArray (Numbers.addP (v, _step)) arr (idx + 1)
 
-            let arr: obj array = Array.zeroCreate Range.CHUNK_SIZE
-            let lastV, n = fillArray startV arr 0
-            chunk <- ArrayChunk(arr, 0, n)
+            let arr: obj array = Array.zeroCreate _chunkSize
+            let lastV, n = fillArray _start arr 0
+            _chunk <- ArrayChunk(arr, 0, n)
 
-            if not <| boundsCheck (lastV) then
-                chunkNext <- Range(lastV, endV, step, boundsCheck)
+            if not <| _boundsCheck (lastV) then
+                _chinkNext <- Range(lastV, _end, _step, _boundsCheck)
             else
                 ()
         | _ -> ()
 
 
     interface ISeq with
-        override _.first() = startV
+        override _.first() = _start
 
         override this.next() =
             match next with
             | null ->
                 this.forceChunk ()
 
-                if chunk.count () > 1 then
-                    let smallerChunk = chunk.dropFirst ()
+                if _chunk.count () > 1 then
+                    let smallerChunk = _chunk.dropFirst ()
 
                     next <-
                         Range(
                             (this :> IMeta).meta (),
                             smallerChunk.nth (0),
-                            endV,
-                            step,
-                            boundsCheck,
+                            _end,
+                            _step,
+                            _boundsCheck,
                             smallerChunk,
-                            chunkNext
+                            _chinkNext
                         )
 
                     next
@@ -127,49 +137,53 @@ type Range
             if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this
             else
-                Range(m, startV, endV, step, boundsCheck, chunk, chunkNext)
+                Range(m, _start, _end, _step, _boundsCheck, _chunk, _chinkNext)
 
     interface IChunkedSeq with
         member this.chunkedFirst() =
             this.forceChunk ()
-            chunk
+            _chunk
 
         member this.chunkedNext() =
             (this :> IChunkedSeq).chunkedMore().seq ()
 
         member this.chunkedMore() =
             this.forceChunk ()
-            if isNull chunkNext then PersistentList.Empty else chunkNext
+
+            if isNull _chinkNext then
+                PersistentList.Empty
+            else
+                _chinkNext
 
     member this.reducer (f: IFn) (acc: obj) (v: obj) =
         let rec loop (acc: obj) (v: obj) =
-            if boundsCheck (v) then
+            if _boundsCheck (v) then
                 acc
             else
                 match f.invoke (acc, v) with
                 | :? Reduced as red -> (red :> IDeref).deref ()
-                | nextAcc -> loop nextAcc (Numbers.addP (v, step))
+                | nextAcc -> loop nextAcc (Numbers.addP (v, _step))
 
         loop acc v
 
     interface IReduce with
         member this.reduce(f) =
-            this.reducer f startV (Numbers.addP (startV, step))
+            this.reducer f _start (Numbers.addP (_start, _step))
 
 
     interface IReduceInit with
-        member this.reduce(f, start) = this.reducer f start startV
+        member this.reduce(f, start) = this.reducer f start _start
 
     interface IEnumerable<obj> with
 
         member this.GetEnumerator() =
             let generator (state: obj) : (obj * obj) option =
-                if boundsCheck (state) then
+                if _boundsCheck (state) then
                     None
                 else
-                    Some(state, (Numbers.addP (state, step)))
+                    Some(state, (Numbers.addP (state, _step)))
 
-            let s = Seq.unfold generator startV
+            let s = Seq.unfold generator _start
             s.GetEnumerator()
 
     interface IEnumerable with
@@ -177,6 +191,7 @@ type Range
         override this.GetEnumerator() =
             (this :> IEnumerable<obj>).GetEnumerator()
 
+/// Specialized chunk for use with LongRange
 type internal LongChunk(start: int64, step: int64, count: int) =
 
     member _.first() = start
@@ -210,8 +225,8 @@ type internal LongChunk(start: int64, step: int64, count: int) =
 
             loop init start 0
 
-
-type LongRange private (m: IPersistentMap, startV: int64, endV: int64, step: int64, count: int) =
+/// A range of long values.
+type LongRange private (m: IPersistentMap, _start: int64, _end: int64, _step: int64, _count: int) =
     inherit ASeq(m)
 
     // Invariants guarantee this is never an empty or infinite seq
@@ -276,22 +291,22 @@ type LongRange private (m: IPersistentMap, startV: int64, endV: int64, step: int
             if LanguagePrimitives.PhysicalEquality m ((this :> IMeta).meta ()) then
                 this
             else
-                LongRange(m, startV, endV, step, count)
+                LongRange(m, _start, _end, _step, _count)
 
     interface ISeq with
-        override _.first() = startV
+        override _.first() = _start
 
         override _.next() =
-            if count > 1 then
-                LongRange(startV + step, endV, step, count - 1)
+            if _count > 1 then
+                LongRange(_start + _step, _end, _step, _count - 1)
             else
                 null
 
     interface IPersistentCollection with
-        override _.count() = count
+        override _.count() = _count
 
     interface IChunkedSeq with
-        member _.chunkedFirst() = LongChunk(startV, step, count)
+        member _.chunkedFirst() = LongChunk(_start, _step, _count)
         member _.chunkedNext() = null
         member _.chunkedMore() = PersistentList.Empty
 
@@ -299,7 +314,7 @@ type LongRange private (m: IPersistentMap, startV: int64, endV: int64, step: int
         member this.drop(n) =
             match n with
             | _ when n <= 0 -> this
-            | _ when n < count -> LongRange(startV + (step * int64 (n)), endV, step, count - n)
+            | _ when n < _count -> LongRange(_start + (_step * int64 (n)), _end, _step, _count - n)
             | _ -> null
 
 
@@ -310,27 +325,27 @@ type LongRange private (m: IPersistentMap, startV: int64, endV: int64, step: int
             else
                 match f.invoke (acc, v) with
                 | :? Reduced as red -> (red :> IDeref).deref ()
-                | nextAcc -> loop nextAcc (v + step) (cnt - 1)
+                | nextAcc -> loop nextAcc (v + _step) (cnt - 1)
 
         loop acc v cnt
 
     interface IReduce with
         member this.reduce(f) =
-            this.reducer f startV (startV + step) (count - 1)
+            this.reducer f _start (_start + _step) (_count - 1)
 
     interface IReduceInit with
-        member this.reduce(f, start) = this.reducer f start startV count
+        member this.reduce(f, start) = this.reducer f start _start _count
 
 
     interface IEnumerable<obj> with
         override _.GetEnumerator() =
             let generator (next: int64, remaining: int64) : (obj * (int64 * int64)) option =
                 if remaining > 0 then
-                    Some(next, (next + step, remaining - 1L))
+                    Some(next, (next + _step, remaining - 1L))
                 else
                     None
 
-            let s = Seq.unfold generator (startV, count)
+            let s = Seq.unfold generator (_start, _count)
             s.GetEnumerator()
 
     interface IEnumerable with
