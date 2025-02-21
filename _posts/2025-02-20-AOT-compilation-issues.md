@@ -104,9 +104,24 @@ If the 'save it into a memory stream ... then load it back' sounds promising, um
 
 ## How to proceed
 
-The only solution I've come up with so far is doing all the code generation twice.  Syntactic and semantic analysis  -- the generation of the AST from which we do code generation -- need only be done once.  For each form, we then create two types, one in the `eval` dynamic assembly and one in the persisted assembly that we will save to file.  We generate code into each type and evaluate the one from the dynamic assembly.
+The only solution I've come up with so far is doing all the code generation twice.  
+Syntactic and semantic analysis  -- the generation of the AST from which we do code generation -- need only be done once.  
+For each form, we then create two types, one in the `eval` dynamic assembly and one in the persisted assembly that we will save to file.  
+We generate code into each type and evaluate the one from the dynamic assembly.
 
-It might work.  But there are complications I have not figured out yet.  For example, consider direct linking.  Without direct linking, the following code
+Even this is not as easy as it sounds. (If it sounds easy.)  The design of the current compiler has code generation happening _during_ syntactic analysis. 
+Specifically, those things that are 'functions' -- typically what you get from `defn`, `deftype`, raw uses of `fn`, etc. -- actually have their types generated and finalized during the first pass.
+It even goes a little further.  If you do something at the REPL (or in a source file) such as:
+
+```clojure
+(def x (let [y f(12)] (inc y)))
+```
+
+it so happens that 'naked' `let`s get wrapped with a `fn` -- don't ask -- so even in something as simple as this, we have a type generated during syntactic analysis.
+I _think_ that this very little effect at that point in the process -- but I might have to do double generation even during syntactic analysis.
+(Note: One of rationales for the ClojureCLR.Next project is cleaning up the compiler design.)
+
+Anyway.  Emitting twice, once for saving and once for progressive evaluation,  might work.  But there are complications I have not figured out yet.  For example, consider direct linking.  Without direct linking, the following code
 
 ```clojure
 (defn f [x] (inc x))
