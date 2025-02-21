@@ -1,17 +1,18 @@
 ﻿namespace Clojure.Lib
 
 open Clojure.Collections
-open System.Reflection
+
 open System
-open System.Collections.Generic
-open System.Linq
-open System.Text
 open System.Collections.Concurrent
+open System.Collections.Generic
 open System.IO
-open System.Threading
+open System.Linq
+open System.Reflection
 open System.Runtime.CompilerServices
+open System.Text
+open System.Threading
 
-
+/// Helpers to create a list of types to import.
 module DefaultImports =
 
     let getTypes (a: Assembly) =
@@ -47,36 +48,40 @@ module DefaultImports =
     let imports = createMap ()
 
 
-// A Namespace holds a map from symbols to references.
-// Symbol to reference mappings come in several flavors:
-//    Simple: Symbol
-//    Use/refer: Symbol to a Var that is homed in another namespace.
-//    Import: Symbol to a Type
-// A namespace can also refer to another namespace by an alias.
-
+/// A Namespace holds a map from symbols to references.
+/// Symbol to reference mappings come in several flavors:
+///    Simple: Symbol
+///    Use/refer: Symbol to a Var that is homed in another namespace.
+///    Import: Symbol to a Type
+/// A namespace can also refer to another namespace by an alias.
 [<Sealed; AllowNullLiteral>]
 type Namespace(_name: Symbol) =
     inherit AReference((_name :> IMeta).meta ())
 
     // variable-to-value map
-    let mappings: AtomicReference<IPersistentMap> =
+    let _mappings: AtomicReference<IPersistentMap> =
         AtomicReference(DefaultImports.imports)
 
     // variable-to-namespace alias map
-    let aliases: AtomicReference<IPersistentMap> =
+    let _aliases: AtomicReference<IPersistentMap> =
         AtomicReference(PersistentArrayMap.Empty)
 
     // All namespaces, keyed by Symbol
-    static let namespaces = ConcurrentDictionary<Symbol, Namespace>()
+    static let _namespaces = ConcurrentDictionary<Symbol, Namespace>()
 
-    static let clojureNamespace = Namespace.findOrCreate (Symbol.intern "clojure.core")
+    static let _clojureNamespace = Namespace.findOrCreate (Symbol.intern "clojure.core")
 
-    // Some accessors
+    /// The name of the namespace.
     member _.Name = _name
-    member _.Aliases = aliases.Get()
-    member _.Mappings = mappings.Get()
 
-    static member ClojureNamespace = clojureNamespace
+    /// The map of aliases in the namespace.
+    member _.Aliases = _aliases.Get()
+
+    /// The map of Symbols to values in the namespace.
+    member _.Mappings = _mappings.Get()
+
+    /// The clojure.core namespace.
+    static member ClojureNamespace = _clojureNamespace
 
     override _.ToString() = _name.ToString()
 
@@ -86,26 +91,27 @@ type Namespace(_name: Symbol) =
     //
     ///////////////////////////////////////////
 
-    static member All = namespaces.Values |> RTSeq.seq
+    /// An ISeq of all namespaces.
+    static member All = _namespaces.Values |> RTSeq.seq
 
-    // Find or create a namespace named by the symbol.
+    /// Find or create a namespace named by the symbol.
     static member findOrCreate(name: Symbol) =
-        namespaces.GetOrAdd(name, (fun _ -> new Namespace(name)))
+        _namespaces.GetOrAdd(name, (fun _ -> new Namespace(name)))
 
-    // Remove a namespace (by name)
-    // Return the removed namespace, or null if not found
-    // It's an error to try to remove the clojure.core namespace
+    /// Remove a namespace (by name)
+    /// Return the removed namespace, or null if not found
+    /// It's an error to try to remove the clojure.core namespace
     static member remove(name: Symbol) =
-        if name.Equals(clojureNamespace.Name) then
+        if name.Equals(_clojureNamespace.Name) then
             raise <| ArgumentException("Cannot remove clojure namespace")
         else
-            let (result, ns) = namespaces.TryRemove(name)
+            let (result, ns) = _namespaces.TryRemove(name)
             ns
 
-    // Find a namespace given a name.
-    // Return null if not found.
+    /// Find a namespace given a name.
+    /// Return null if not found.
     static member find(name: Symbol) =
-        let (result, ns) = namespaces.TryGetValue(name)
+        let (result, ns) = _namespaces.TryGetValue(name)
         ns
 
     ///////////////////////////////////////////
@@ -114,17 +120,17 @@ type Namespace(_name: Symbol) =
     //
     ///////////////////////////////////////////
 
-    // Determine if a mapping is interned
-    // An interned mapping is one where a var's ns matches the current ns and its sym matches the mapping key.
-    // Once established, interned mappings should never change.
+    /// Determine if a mapping is interned
+    /// An interned mapping is one where a var's ns matches the current ns and its sym matches the mapping key.
+    /// Once established, interned mappings should never change.
     member private this.isInternedMapping(sym: Symbol, o: obj) =
         match o with
         | :? Var as v -> Object.ReferenceEquals(v.Namespace, this) && v.Name.Equals(sym)
         | _ -> false
 
-    // Intern a Symbol in the namespace, with a (new) Var as its value.
-    // It is an error to intern a symbol with a namespace.
-    // This has to deal with other threads also interning.
+    /// Intern a Symbol in the namespace, with a (new) Var as its value.
+    /// It is an error to intern a symbol with a namespace.
+    /// This has to deal with other threads also interning.
     member this.intern(sym: Symbol) =
         if not <| isNull sym.Namespace then
             raise <| ArgumentException("Can't intern namespace-qualified symbol")
@@ -153,7 +159,7 @@ type Namespace(_name: Symbol) =
                 v <- Var.createInternal (this, sym)
 
             let newMap = map.assoc (sym, v)
-            mappings.CompareAndSet(map, newMap) |> ignore
+            _mappings.CompareAndSet(map, newMap) |> ignore
             map <- this.Mappings
             o <- map.valAt (sym)
 
@@ -172,7 +178,7 @@ type Namespace(_name: Symbol) =
             // make sure we can replace the existing value with the new one.
             if (this.checkReplacement (sym, o, v)) then
                 // replacement ok.  keep going until we get the new value in.
-                while not <| mappings.CompareAndSet(map, map.assoc (sym, v)) do
+                while not <| _mappings.CompareAndSet(map, map.assoc (sym, v)) do
                     map <- this.Mappings
 
                 v
@@ -227,8 +233,8 @@ type Namespace(_name: Symbol) =
         | _ -> defaultResponse ()
 
 
-    // Intern a symbol with a specified value.
-    // Returns the value that is associated.
+    /// Intern a symbol with a specified value.
+    /// Returns the value that is associated.
     member this.reference(sym: Symbol, value: obj) =
         if not <| isNull sym.Namespace then
             raise <| ArgumentException("Can't intern a namespace-qualified symbol")
@@ -239,20 +245,20 @@ type Namespace(_name: Symbol) =
         // race condition
         while (isNull o) do
             let newMap = map.assoc (sym, value)
-            mappings.CompareAndSet(map, newMap) |> ignore
+            _mappings.CompareAndSet(map, newMap) |> ignore
             map <- this.Mappings
             o <- map.valAt (sym)
 
         if not <| Object.ReferenceEquals(o, value) && this.checkReplacement (sym, o, value) then
-            while not <| mappings.CompareAndSet(map, map.assoc (sym, value)) do
+            while not <| _mappings.CompareAndSet(map, map.assoc (sym, value)) do
                 map <- this.Mappings
 
             value
         else
             o
 
-    // Remove a symbol from the namespace
-    // It is illegal to remove a namespace-qualified symbol.
+    /// Remove a symbol from the namespace
+    /// It is illegal to remove a namespace-qualified symbol.
     member this.unmap(sym: Symbol) =
         if not <| isNull sym.Namespace then
             raise <| ArgumentException("Can't unintern a namespace-qualified symbol")
@@ -261,7 +267,7 @@ type Namespace(_name: Symbol) =
 
         while map.containsKey (sym) do
             let newMap = map.without (sym)
-            mappings.CompareAndSet(map, newMap) |> ignore
+            _mappings.CompareAndSet(map, newMap) |> ignore
             map <- this.Mappings
 
     // This comes from the Java verion.
@@ -281,7 +287,7 @@ type Namespace(_name: Symbol) =
 
         while (isNull c || Namespace.areDifferentInstancesOfSameClassName (c, value)) do
             let newMap = map.assoc (sym, value)
-            mappings.CompareAndSet(map, newMap) |> ignore
+            _mappings.CompareAndSet(map, newMap) |> ignore
             map <- this.Mappings
             c <- map.valAt (sym) :?> Type
 
@@ -292,16 +298,16 @@ type Namespace(_name: Symbol) =
         c
 
 
-    // Map a symbol to a Type (import)
-    // Named import instead of ImportType for core.clj compatibility.
+    /// Map a symbol to a Type (import)
+    /// Named import instead of ImportType for core.clj compatibility.
     member this.importClass(sym: Symbol, t: Type) = this.referenceClass (sym, t)
 
-    // Mape a symbol to a Type (import) using the type name for the symbol name.
-    // Named import instead of ImportType for core.clj compatibility.
+    /// Map a symbol to a Type (import) using the type name for the symbol name.
+    /// Named importClass instead of ImportType for core.clj compatibility.
     member this.importClass(t: Type) =
         this.importClass (Symbol.intern (Util.nameForType (t)), t)
 
-    // Add a symbol to Var reference.
+    /// Add a symbol to Var reference.
     member this.refer(sym: Symbol, v: Var) = this.reference (sym, v) :?> Var
 
     ///////////////////////////////////////////
@@ -310,10 +316,10 @@ type Namespace(_name: Symbol) =
     //
     ///////////////////////////////////////////
 
-    // Get the value mapped to a symbol.
+    /// Get the value mapped to a symbol.
     member this.getMapping(sym: Symbol) = this.Mappings.valAt (sym)
 
-    // Find the Var mapped to a Symbol.
+    /// Find the Var mapped to a Symbol.
     member this.findInternedVar(sym: Symbol) =
         match this.Mappings.valAt (sym) with
         | :? Var as v when Object.ReferenceEquals(v.Namespace, this) -> v
@@ -325,11 +331,11 @@ type Namespace(_name: Symbol) =
     //
     ///////////////////////////////////////////
 
-    // Find a Namespace aliased by a Symbol.
+    /// Find a Namespace aliased by a Symbol.
     member this.lookupAlias(alias: Symbol) =
         this.Aliases.valAt (alias) :?> Namespace
 
-    // Add an alias for a namespace.
+    /// Add an alias for a namespace.
     member this.addAlias(alias: Symbol, ns: Namespace) =
         if isNull alias then
             raise <| ArgumentNullException("alias", "Expecting Symbol + Namespace")
@@ -342,7 +348,7 @@ type Namespace(_name: Symbol) =
 
         while not <| map.containsKey (alias) do
             let newMap = map.assoc (alias, ns)
-            aliases.CompareAndSet(map, newMap) |> ignore
+            _aliases.CompareAndSet(map, newMap) |> ignore
             map <- this.Aliases
 
         // you can rebind an alias, but only to the initially-aliased namespace
@@ -353,14 +359,14 @@ type Namespace(_name: Symbol) =
                 $"Alias {alias} already exists in namespace {_name}, aliasing {map.valAt (alias)}"
             )
 
-    // Remove an alias.
-    // Race condition
+    /// Remove an alias.
     member this.removeAlias(alias: Symbol) =
         let mutable map = this.Aliases
 
+        // Race condition
         while map.containsKey (alias) do
             let newMap = map.without (alias)
-            aliases.CompareAndSet(map, newMap) |> ignore
+            _aliases.CompareAndSet(map, newMap) |> ignore
             map <- this.Aliases
 
     ///////////////////////////////////////////
@@ -369,71 +375,85 @@ type Namespace(_name: Symbol) =
     //
     ///////////////////////////////////////////
 
-    // Get the namespace name.
+    /// Get the namespace name.
     member this.getName() = _name
 
-    // Get the mappings of the namespace.
+    /// Get the mappings of the namespace.
     member this.getMappings() = this.Mappings
 
-    // Get the aliases.
+    /// Get the aliases.
     member this.getAliases() = this.Aliases
 
-and [<AllowNullLiteral>] private Frame(bindings: Associative, prev: Frame) =
+/// A frame in the binding stack of Var values in a thread.
+and [<AllowNullLiteral>] private Frame(_bindings: Associative, _prev: Frame) =
 
-    member _.Bindings = bindings
+    /// The binding in the frame (map from Var to TBox).
+    member _.Bindings = _bindings
 
     interface ICloneable with
-        member this.Clone() = Frame(bindings, null)
+        member this.Clone() = Frame(_bindings, null)
 
+    /// The base frame in the stack.
     static member val Top: Frame = Frame(PersistentHashMap.Empty, null)
 
+/// A box for a thread-bound value of a Var.
+and [<Sealed; AllowNullLiteral>] TBox(_thread: Thread, v: obj) =
 
-and [<Sealed; AllowNullLiteral>] TBox(thread: Thread, v: obj) =
-
+    /// The value in the box.
     [<VolatileField>]
-    let mutable value = v
+    let mutable _value = v
 
+    /// Get/set the value in the box.
     member _.Value
-        with get () = value
-        and set (v) = value <- v
+        with get () = _value
+        and set (v) = _value <- v
 
-    member _.Thread = thread
+    /// The thread that owns the box.
+    member _.Thread = _thread
 
+/// The Var datatype
 and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     inherit ARef(PersistentHashMap.Empty)
 
-    // revision counter
+    /// revision counter
     [<VolatileField>]
-    let mutable rev: int = 0
+    let mutable _rev: int = 0
 
-    // If true, supports dynamic binding
+    /// Supports dynamic binding or not
     [<VolatileField>]
-    let mutable dynamic = false
+    let mutable _dynamic = false
 
-    // The root value
+    /// The root value
     [<VolatileField>]
-    let mutable root = null
+    let mutable _root = null
 
     // Whether the Var has a thread-bound value
-    let threadBound = AtomicBoolean(false)
+    let _threadBound = AtomicBoolean(false)
 
+    /// The current frame in the binding stack for this Var.
     [<DefaultValue; ThreadStatic>]
-    static val mutable private currentFrame: Frame
+    static val mutable private _currentFrame: Frame
 
+    /// The name of the var (Symbol)
     member _.Symbol = _sym
 
+    /// Get/set the current frame
     static member CurrentFrame
         with private get () =
-            if isNull Var.currentFrame then
-                Var.currentFrame <- Frame.Top
+            if isNull Var._currentFrame then
+                Var._currentFrame <- Frame.Top
 
-            Var.currentFrame
-        and private set (v) = Var.currentFrame <- v
+            Var._currentFrame
+        and private set (v) = Var._currentFrame <- v
 
+    /// Increment the revision counter.
+    member _.incrementRev() = _rev <- _rev + 1
 
-    member _.incrementRev() = rev <- rev + 1
-    member _.setRoot(newValue: obj) = root <- newValue
-    member _.setThreadBound(b: bool) = threadBound.Set(b)
+    /// Set the root value
+    member _.setRoot(newValue: obj) = _root <- newValue
+
+    /// Set the indicator of whether the Var is thread-bound.
+    member _.setThreadBound(b: bool) = _threadBound.Set(b)
 
     override _.ToString() =
         match _ns with
@@ -454,7 +474,10 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
         v.incrementRev ()
         v
 
+    /// The namespace of the Var.
     member _.Namespace = _ns
+
+    /// The name of the Var.
     member _.Name = _sym
 
 
@@ -464,12 +487,12 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     //
     ////////////////////////////////
 
-    static member val private privateKey = Keyword.intern (null, "private")
-    static member val private privateMeta = PersistentArrayMap([| Var.privateKey; true |])
-    static member val private macroKey = Keyword.intern (null, "macro")
-    static member val private nameKey = Keyword.intern (null, "name")
-    static member val private nsKey = Keyword.intern (null, "ns")
-    static member val private tagKey = Keyword.intern (null, "tag")
+    static member val private _privateKey = Keyword.intern (null, "private")
+    static member val private _privateMeta = PersistentArrayMap([| Var._privateKey; true |])
+    static member val private _macroKey = Keyword.intern (null, "macro")
+    static member val private _nameKey = Keyword.intern (null, "name")
+    static member val private _nsKey = Keyword.intern (null, "ns")
+    static member val private _tagKey = Keyword.intern (null, "tag")
 
     static member val private dissocFn =
         { new AFn() with
@@ -489,16 +512,16 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     //
     ////////////////////////////////
 
-    // Intern a named var in a namespace.
+    /// Intern a named var in a namespace.
     static member intern(ns: Namespace, sym: Symbol) = ns.intern (sym)
 
 
-    // Intern a named var in a namespace (creating the namespece if necessary).
+    /// Intern a named var in a namespace (creating the namespece if necessary).
     static member intern(nsName: Symbol, sym: Symbol) =
         let ns = Namespace.findOrCreate (nsName)
         Var.intern (ns, sym)
 
-    // Intern a named var in a namespace, with given value (if has a root value already, then change only if replaceRoot is true).
+    /// Intern a named var in a namespace, with given value (if has a root value already, then change only if replaceRoot is true).
     static member intern(ns: Namespace, sym: Symbol, root: obj, replaceRoot: bool) =
         let dvout = ns.intern (sym)
 
@@ -507,17 +530,20 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
 
         dvout
 
-    // Intern a named var in a namespace, with given value.
+    /// Intern a named var in a namespace, with given value.
     static member intern(ns: Namespace, sym: Symbol, root: obj) = Var.intern (ns, sym, root, true)
 
+    /// Intern a named var in a namespace, with given value, marked as private
     static member internPrivate(nsName: string, sym: string) =
         let ns = Namespace.findOrCreate (Symbol.intern nsName)
         let v = Var.intern (ns, Symbol.intern sym)
-        v.setMeta (Var.privateMeta)
+        v.setMeta (Var._privateMeta)
         v
 
-    // Create an uninterned Var.
+    // /Create an uninterned Var, null value
     static member create() = Var.createInternal (null, null)
+
+    // Create an uninterned Var, with a root value
     static member create(root: obj) = Var.createInternal (null, null, root)
 
     ////////////////////////////////
@@ -526,7 +552,7 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     //
     ////////////////////////////////
 
-    // Push a new frame of bindings onto the binding stack.
+    /// Push a new frame of bindings onto the binding stack.
     static member pushThreadBindings(bindings: Associative) =
         let f = Var.CurrentFrame
         let mutable bmap = f.Bindings
@@ -551,7 +577,7 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
 
         Var.CurrentFrame <- Frame(bmap, f)
 
-    // Pop the topmost binding frame from the stack.
+    /// Pop the topmost binding frame from the stack.
     static member popThreadBindings() =
         let f = Var.CurrentFrame
 
@@ -563,7 +589,7 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
         else
             Var.CurrentFrame = f
 
-    // Get the thread-local bindings of the top frame.
+    /// Get the thread-local bindings of the top frame.
     static member getThreadBindings() : Associative =
         let f = Var.CurrentFrame
 
@@ -578,9 +604,9 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
 
         loop (f.Bindings.seq ()) PersistentHashMap.Empty
 
-    // Get the box of the current binding on the stack for this var, or null if no binding.
+    /// Get the box of the current binding on the stack for this var, or null if no binding.
     member this.getThreadBinding() =
-        if threadBound.Get() then
+        if _threadBound.Get() then
             let e = Var.CurrentFrame.Bindings.entryAt (this)
 
             match e with
@@ -600,12 +626,15 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     // resetThreadBindingFrame
     // I'm not sure why they did it this way.
 
+    /// Get the crrent frame of the Var in this thread.
     static member getThreadBindingFrame() = Var.CurrentFrame :> obj
 
-    static member cloneThreadBindingFrame() =
+    /// Clone the current frame of the Var in this thread.
+    static member private cloneThreadBindingFrame() =
         (Var.CurrentFrame :> ICloneable).Clone()
 
-    static member resetThreadBindingFrame(f: obj) = Var.CurrentFrame <- (f :?> Frame)
+    /// Reset the current frame of the Var in this thread.
+    static member private resetThreadBindingFrame(f: obj) = Var.CurrentFrame <- (f :?> Frame)
 
     ////////////////////////////////
     //
@@ -613,30 +642,30 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     //
     ////////////////////////////////
 
-    // Set the metadata attached to this var.
-    // The metadata must contain entries for the namespace and name.
+    /// Set the metadata attached to this var.
+    /// The metadata must contain entries for the namespace and name.
     member this.setMeta(m: IPersistentMap) =
         (this :> IReference)
-            .resetMeta (m.assoc(Var.nameKey, _sym).assoc (Var.nsKey, _ns))
+            .resetMeta (m.assoc(Var._nameKey, _sym).assoc (Var._nsKey, _ns))
         |> ignore
 
-    // Add a macro=true flag to the metadata.
+    /// Add a macro=true flag to the metadata.
     member this.setMacro() =
-        (this :> IReference).alterMeta (Var.assocFn, RTSeq.list (Var.macroKey, true))
+        (this :> IReference).alterMeta (Var.assocFn, RTSeq.list (Var._macroKey, true))
         |> ignore
 
-    // Is the Var a macro?
-    member this.isMacro = RT0.booleanCast ((this :> IMeta).meta().valAt (Var.macroKey))
+    /// Is the Var a macro?
+    member this.isMacro = RT0.booleanCast ((this :> IMeta).meta().valAt (Var._macroKey))
 
-    // Is the var public?
+    /// Is the var public?
     member this.isPublic =
-        not <| RT0.booleanCast ((this :> IMeta).meta().valAt (Var.privateKey))
+        not <| RT0.booleanCast ((this :> IMeta).meta().valAt (Var._privateKey))
 
-    // Get the tag on the var.
+    /// Get the tag on the var.
     member this.tag
-        with get () = (this :> IMeta).meta().valAt (Var.tagKey)
+        with get () = (this :> IMeta).meta().valAt (Var._tagKey)
         and set (v) =
-            (this :> IReference).alterMeta (Var.assocFn, RTSeq.list (Var.tagKey, v))
+            (this :> IReference).alterMeta (Var.assocFn, RTSeq.list (Var._tagKey, v))
             |> ignore
 
     ////////////////////////////////
@@ -645,15 +674,18 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     //
     ////////////////////////////////
 
+    /// Mark the Var as dynamic.
     member this.setDynamic() =
-        dynamic <- true
+        _dynamic <- true
         this
 
+    /// Set the dynamic flag.
     member this.setDynamic(b: bool) =
-        dynamic <- b
+        _dynamic <- b
         this
 
-    member _.isDynamic = dynamic
+    /// Is the Var dynamic?
+    member _.isDynamic = _dynamic
 
 
     ////////////////////////////////
@@ -662,22 +694,22 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     //
     ////////////////////////////////
 
-    // Does the Var have a root value?
+    /// Does the Var have a root value?
     member _.hasRoot() =
-        match root with
+        match _root with
         | :? Unbound -> false
         | _ -> true
 
-    // Get the root value.
-    member _.getRawRoot() = root
+    /// Get the root value.
+    member _.getRawRoot() = _root
 
-    // Does the Var have a value? (root or  thread-bound)
+    /// Does the Var have a value? (root or  thread-bound)
     member this.isBound =
         this.hasRoot ()
-        || (threadBound.Get() && Var.CurrentFrame.Bindings.containsKey (this))
+        || (_threadBound.Get() && Var.CurrentFrame.Bindings.containsKey (this))
 
-    // Set the value of the var
-    // It is an error to set the root binding with this method
+    /// Set the value of the var
+    /// It is an error to set the root binding with this method
     member this.set(v: obj) =
         this.validate (v)
         let tbox = this.getThreadBinding ()
@@ -694,50 +726,50 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
             tbox.Value <- v
             v
 
-    // Change the root value.  (And clear the macro flag.)
+    /// Change the root value.  (And clear the macro flag.)
     [<MethodImpl(MethodImplOptions.Synchronized)>]
     member this.bindRoot(v: obj) =
         this.validate (v)
-        let oldRoot = root
+        let oldRoot = _root
         this.setRoot (v)
         this.incrementRev ()
 
-        (this :> IReference).alterMeta (Var.dissocFn, RTSeq.list (Var.macroKey))
+        (this :> IReference).alterMeta (Var.dissocFn, RTSeq.list (Var._macroKey))
         |> ignore
 
         this.notifyWatches (oldRoot, v)
 
-    // Change the root value.
+    /// Change the root value.
     [<MethodImpl(MethodImplOptions.Synchronized)>]
     member this.swapRoot(v: obj) =
         this.validate (v)
-        let oldRoot = root
+        let oldRoot = _root
         this.setRoot (v)
         this.incrementRev ()
         this.notifyWatches (oldRoot, v)
 
-    // Unbind the Var's root value
+    /// Unbind the Var's root value
     [<MethodImpl(MethodImplOptions.Synchronized)>]
     member this.unbindRoot() =
         this.setRoot (Unbound(this))
         this.incrementRev ()
 
-    // Set the Var's root to a computed value
+    /// Set the Var's root to a computed value
     [<MethodImpl(MethodImplOptions.Synchronized)>]
     member this.commuteRoot(fn: IFn) =
         let newRoot = fn.invoke
         this.validate (newRoot)
-        let oldRoot = root
+        let oldRoot = _root
         this.setRoot (newRoot)
         this.incrementRev ()
         this.notifyWatches (oldRoot, newRoot)
 
-    // Change the var's root to a computed value (based on current value and supplied arguments).
+    /// Change the var's root to a computed value (based on current value and supplied arguments).
     [<MethodImpl(MethodImplOptions.Synchronized)>]
     member this.alterRoot(fn: IFn, args: ISeq) =
-        let newRoot = fn.applyTo (RTSeq.cons (root, args))
+        let newRoot = fn.applyTo (RTSeq.cons (_root, args))
         this.validate (newRoot)
-        let oldRoot = root
+        let oldRoot = _root
         this.setRoot (newRoot)
         this.incrementRev ()
         this.notifyWatches (oldRoot, newRoot)
@@ -749,25 +781,26 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     //
     ////////////////////////////////
 
-    // Gets the value the Var is holding.
+
     // When IDeref was added and get() was renamed to deref(), this was put in.
     // Why?  Perhaps to void having to change calls to Var.get() all over the place.
 
+    /// The current value of the Var in this thread.
     member this.get() =
-        if threadBound.Get() then
+        if _threadBound.Get() then
             (this :> IDeref).deref ()
         else
-            root
+            _root
 
     interface IDeref with
         member this.deref() =
             let tbox = this.getThreadBinding ()
-            if not <| isNull tbox then tbox.Value else root
+            if not <| isNull tbox then tbox.Value else _root
 
     interface IRef with
         override this.setValidator(vf: IFn) =
             if this.hasRoot () then
-                ARef.validate (vf, root)
+                ARef.validate (vf, _root)
 
             this.setValidatorInternal (vf)
 
@@ -786,7 +819,7 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
     //
     ////////////////////////////////
 
-    // Find the var from a namespace-qualified symbol.
+    /// Find the var from a namespace-qualified symbol.
     static member find(nsQualifiedSym: Symbol) : Var =
         if isNull nsQualifiedSym.Namespace then
             raise
@@ -799,13 +832,13 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
 
         ns.findInternedVar (Symbol.intern (nsQualifiedSym.Name))
 
-    // The namespace this var is interned in.
+    /// The namespace this var is interned in.
     member _.ns = _ns
 
-    // The tag on the Var
+    /// The tag on the Var
     member this.getTag() = this.tag
 
-    // Set the tag on the var
+    /// Set the tag on the var
     member this.setTag(tag: obj) = this.tag <- tag
 
     ////////////////////////////////
@@ -1266,17 +1299,19 @@ and [<Sealed; AllowNullLiteral>] Var private (_ns: Namespace, _sym: Symbol) =
 
 
 
-
+/// A special value indicating that a Var is unbound.
 and [<Sealed>] private Unbound(v: Var) =
     inherit AFn()
 
     override _.ToString() : string = $"Unbound: {v.ToString}"
 
 
+/// Runtime support for Vars and Namespaces
 and [<Sealed; AbstractClass>] RTVar() =
 
+    /// The clojure.core namespace
     static member val ClojureNamespace = Namespace.findOrCreate (Symbol.intern "clojure.core")
-
+    // Note: the namespace will be created on initialization.
 
 
     // Used mostly by the LispReader
@@ -1547,6 +1582,8 @@ and [<Sealed; AbstractClass>] RTVar() =
 
 
     // original comment: duck typing stderr plays nice with e.g. swank
+
+    /// Retrieve the standard error TextWriter.
     static member errPrintWriter() : TextWriter =
         let w = (RTVar.ErrVar :> IDeref).deref ()
 
@@ -1555,12 +1592,13 @@ and [<Sealed; AbstractClass>] RTVar() =
         | :? Stream as s -> new StreamWriter(s)
         | _ -> failwith "Unknown type for *err*"
 
-
+    /// Create a Var with the given namespace and name, null root value, interned in the named namespace (create if necessary).
     static member var(nsString: string, nameString: string) : Var =
         let ns = Namespace.findOrCreate (Symbol.intern (null, nsString))
         let name = Symbol.intern (null, nameString)
         Var.intern (ns, name)
 
+    /// Create a Var with the given namespace, name, and initial value, interned in the named namespace (create if necessary).
     static member var(nsString: string, nameString: string, init: obj) : Var =
         let ns = Namespace.findOrCreate (Symbol.intern (null, nsString))
         let name = Symbol.intern (null, nameString)
