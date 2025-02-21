@@ -13,6 +13,7 @@ open System.Numerics
 open Clojure.BigArith
 open Clojure.Reflection
 
+/// Interface for a substitute symbol resolver (in place of using the current namespace).
 type ReaderResolver =
     abstract currentNS: unit -> Symbol
     abstract resolveClass: Symbol -> Symbol
@@ -27,52 +28,56 @@ type RTReader() =
     // This is for use in the LispReader only.
     // Cannot look for local shadowing as happens in the parsing phase of the compiler.
 
+    /// Try to resolve an object into a Type.
     static member internal MaybeType(form: obj, stringOk: bool) =
         match form with
         | :? Type as t -> t
         | :? Symbol as sym ->
-            // TODO: We'll need another version of this for the compiler that checks the CompileStubSymVar/CompileStubClassVar and the LocalEnvVar.
-            // This version will work for the LispReader, as the compiler will not be initiating reads.
             if isNull sym.Namespace then
-                if sym.Name.IndexOf('.') >= 0 || sym.Name[sym.Name.Length-1] = ']' then  // TODO: Make sure this is still correct -- i think it is array detection
+                if sym.Name.IndexOf('.') >= 0 || sym.Name[sym.Name.Length - 1] = ']' then // TODO: Make sure this is still correct -- i think it is array detection
                     RTType.ClassForName(sym.Name)
                 else
-                    match RTVar.getCurrentNamespace().getMapping(sym) with
+                    match RTVar.getCurrentNamespace().getMapping (sym) with
                     | :? Type as t -> t
                     | _ ->
                         try
                             RTType.ClassForName(sym.Name)
-                        with 
-                        | _ -> null
+                        with _ ->
+                            null
             else
                 null
 
         | :? string as s when stringOk -> RTType.ClassForNameE(s)
         | _ -> null
-        
+
     // This is a duplicate of Clojure.Compiler.TypeUtils.MaybeArrayType
     // This is for use in the LispReader only.
     // Cannot look for local shadowing as happens in the parsing phase of the compiler.
 
+    /// Resolve a symbol as an array type (or return null).
     static member internal MaybeArrayType(sym: Symbol) : Type =
         if isNull sym.Namespace || not <| RTType.IsPosDigit(sym.Name) then
             null
         else
             let dim = sym.Name[0] - '0' |> int
-            let componentTypeName = Symbol.intern(null,sym.Namespace)
+            let componentTypeName = Symbol.intern (null, sym.Namespace)
+
             let mutable (componentType: Type) =
                 match RTType.PrimType(componentTypeName) with
-                | null -> RTReader.MaybeType(componentTypeName, false);
+                | null -> RTReader.MaybeType(componentTypeName, false)
                 | _ as t -> t
 
-            match componentType with 
-            | null -> raise <| TypeNotFoundException($"Unable to resolve component typename: {componentTypeName}")
+            match componentType with
+            | null ->
+                raise
+                <| TypeNotFoundException($"Unable to resolve component typename: {componentTypeName}")
             | _ ->
-                for i = 0 to dim-1 do
+                for i = 0 to dim - 1 do
                     componentType <- componentType.MakeArrayType()
+
                 componentType
 
-
+    /// Determine what a symbol resolves to relative to a namespace.
     static member MaybeResolveIn(n: Namespace, sym: Symbol) : obj =
         // note: ns-qualified vars must already exist
         if not <| isNull sym.Namespace then
@@ -94,9 +99,11 @@ type RTReader() =
         else
             n.getMapping (sym)
 
+    /// Determine the 'real' namespace for a symbol, relative to the current namespace.  (Allows for aliasing.)
     static member NamespaceFor(sym: Symbol) : Namespace =
         RTReader.NamespaceFor(RTVar.getCurrentNamespace (), sym)
 
+    /// Determine the 'real' namespace for a symbol, relative to the given namespace.  (Allows for aliasing.)
     static member NamespaceFor(inns: Namespace, sym: Symbol) : Namespace =
         //note, presumes non-nil sym.ns
         // first check against currentNS' aliases...
@@ -106,8 +113,7 @@ type RTReader() =
         | null -> Namespace.find (nsSym)
         | _ as ns -> ns
 
-    // THere is some duplicate code here.  Can we consolidate?
-    // THis is also used to be in Compiler, but is only used in LispReader.
+    /// Resolve a symbol, relative to the current namespace, expanding namespace which is a type to the full type name.
     static member ResolveSymbol(sym: Symbol) =
         // already qualifed or classname?
         if sym.Name.IndexOf('.') > 0 then
@@ -138,6 +144,7 @@ type RTReader() =
             | :? Var as v -> Symbol.intern (v.Namespace.Name.Name, v.Symbol.Name)
             | _ -> null
 
+    /// Convert a Type to a symbol using the array type syntax (Type/digit).
     static member ArrayTypeToSymbol(t: Type) =
 
         let rec loop (t: Type) (dim: int) =
@@ -157,13 +164,14 @@ type RTReader() =
         else
             Symbol.intern (null, t.FullName)
 
+    /// Return true is the symbol's namespace is not an actual namespace, even with aliasing.
     static member NamesStaticMember(sym: Symbol) =
         not <| isNull sym.Namespace && isNull <| RTReader.NamespaceFor(sym)
 
-
+/// Signature for special character reader functions.
 type ReaderFunction = PushbackTextReader * char * obj * obj -> obj
 
-
+/// The Lisp reader
 [<AbstractClass; Sealed>]
 type LispReader() =
 
@@ -273,7 +281,8 @@ type LispReader() =
         | :? IPersistentMap as mopts ->
             match mopts.valAt (RTVar.OptFeaturesKeyword) with
             | null -> mopts.assoc (RTVar.OptFeaturesKeyword, LispReader.PlatformFeatureSet)
-            | :? IPersistentSet as features -> mopts.assoc (RTVar.OptFeaturesKeyword, RTSeq.conj (features, RTVar.PlatformKey))
+            | :? IPersistentSet as features ->
+                mopts.assoc (RTVar.OptFeaturesKeyword, RTSeq.conj (features, RTVar.PlatformKey))
             | _ -> raise <| invalidOp "LispReader: the value of :features must be a set"
         | _ -> raise <| invalidOp "LispReader options must be a map"
 
@@ -402,7 +411,7 @@ type LispReader() =
                 Some returnOnValue
             elif
                 Char.IsDigit(char ch)
-                || (  (ch = (int '+') || ch = (int '-')) && Char.IsDigit(char <| peekChar ()))
+                || ((ch = (int '+') || ch = (int '-')) && Char.IsDigit(char <| peekChar ()))
             then
                 Some <| LispReader.readNumber (r, (char ch))
             else
@@ -663,20 +672,20 @@ type LispReader() =
                     sbMask.Append('a') |> ignore
                     loop ()
             else // not raw mode
-                if
-                    ch = -1 || LispReader.isWhitespace (ch) || LispReader.isTerminatingMacro (ch)
-                then
-                    LispReader.unread (r, ch)
-                    false
-                elif ch = int '|' && allowSymEscape then
-                    rawMode <- true
-                    sbRaw.Append('|') |> ignore
-                    loop ()
-                else
-                    sbRaw.Append(char ch) |> ignore
-                    sbToken.Append(char ch) |> ignore
-                    sbMask.Append(char ch) |> ignore
-                    loop ()
+            if
+                ch = -1 || LispReader.isWhitespace (ch) || LispReader.isTerminatingMacro (ch)
+            then
+                LispReader.unread (r, ch)
+                false
+            elif ch = int '|' && allowSymEscape then
+                rawMode <- true
+                sbRaw.Append('|') |> ignore
+                loop ()
+            else
+                sbRaw.Append(char ch) |> ignore
+                sbToken.Append(char ch) |> ignore
+                sbMask.Append(char ch) |> ignore
+                loop ()
 
         let eofSeen = loop ()
         (sbRaw.ToString(), sbToken.ToString(), sbMask.ToString(), eofSeen)
@@ -1122,7 +1131,7 @@ type LispReader() =
 
     static member private mapReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
         let a =
-            LispReader.readDelimitedList('}', r, true, opts, LispReader.ensurePending (pendingForms))
+            LispReader.readDelimitedList ('}', r, true, opts, LispReader.ensurePending (pendingForms))
             |> Seq.toArray
 
         if (a.Length &&& 1) = 1 then
@@ -1132,13 +1141,13 @@ type LispReader() =
         RTMap.map (a)
 
     static member private setReader(r: PushbackTextReader, leftbrace: char, opts: obj, pendingForms: obj) : obj =
-        let a = 
-            LispReader.readDelimitedList('}', r, true, opts, LispReader.ensurePending (pendingForms))
+        let a =
+            LispReader.readDelimitedList ('}', r, true, opts, LispReader.ensurePending (pendingForms))
             |> Seq.toArray
 
         PersistentHashSet.createWithCheck (a)
-         
-        
+
+
 
     static member private unmatchedDelimiterReader
         (
@@ -1348,7 +1357,8 @@ type LispReader() =
         else
             ret
 
-    static member IsSpecial(sym: obj) = RTVar.CompilerSpecialSymbols.Contains(sym)
+    static member IsSpecial(sym: obj) =
+        RTVar.CompilerSpecialSymbols.Contains(sym)
 
     static member private AnalyzeSyntaxQuote(form: obj) : obj * bool =
         match form with
@@ -1367,7 +1377,10 @@ type LispReader() =
                 RTSeq.list (
                     RTVar.ApplySym,
                     RTVar.HashMapSym,
-                    RTSeq.list (RTVar.SeqSym, RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(keyvals.seq ())))
+                    RTSeq.list (
+                        RTVar.SeqSym,
+                        RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(keyvals.seq ()))
+                    )
                 ),
                 true
             | :? IPersistentVector as v ->
@@ -1388,7 +1401,8 @@ type LispReader() =
             | :? IPersistentList ->
                 match RTSeq.seq (form) with
                 | null -> RTSeq.cons (RTVar.ListSym, null), true
-                | _ as seq -> RTSeq.list (RTVar.SeqSym, RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(seq))), true
+                | _ as seq ->
+                    RTSeq.list (RTVar.SeqSym, RTSeq.cons (RTVar.ConcatSym, LispReader.SyntaxQuoteExpandList(seq))), true
             | _ -> raise <| new ArgumentException("Unknown collection type")
         | :? Keyword
         | :? Char
@@ -1620,13 +1634,11 @@ type LispReader() =
         | :? IMeta as im ->
 
             if startLine <> -1 && o :? ISeq then
-                 metaAsMap <-
-                    metaAsMap.assoc (RTVar.LineKeyword, RT0.get (metaAsMap, RTVar.LineKeyword, startLine))
+                metaAsMap <- metaAsMap.assoc (RTVar.LineKeyword, RT0.get (metaAsMap, RTVar.LineKeyword, startLine))
 
-                 metaAsMap <-
-                    metaAsMap.assoc (RTVar.ColumnKeyword, RT0.get (metaAsMap, RTVar.ColumnKeyword, startCol))
+                metaAsMap <- metaAsMap.assoc (RTVar.ColumnKeyword, RT0.get (metaAsMap, RTVar.ColumnKeyword, startCol))
 
-                 metaAsMap <-
+                metaAsMap <-
                     metaAsMap.assoc (
                         RTVar.SourceSpanKeyword,
                         RT0.get (
@@ -1651,7 +1663,7 @@ type LispReader() =
                 o
             | _ ->
 
-                let rec loop (s: ISeq) (ometa: Associative)=
+                let rec loop (s: ISeq) (ometa: Associative) =
                     match s with
                     | null -> (o :?> IObj).withMeta (ometa :?> IPersistentMap) :> obj
                     | _ ->
@@ -1833,7 +1845,9 @@ type LispReader() =
         match dataReader with
         | :? IFn as f -> f.invoke (o)
         | _ ->
-            let defaultDataReaders = (RTVar.DefaultDataReadersVar :> IDeref).deref () :?> ILookup
+            let defaultDataReaders =
+                (RTVar.DefaultDataReadersVar :> IDeref).deref () :?> ILookup
+
             let defaultDataReaderForTag = RT0.get (defaultDataReaders, tag)
 
             match defaultDataReaderForTag with
@@ -1944,7 +1958,9 @@ type LispReader() =
             if DefaultFeatureKeyword.Equals(feature) then
                 true
             else
-                let custom = (opts :?> IPersistentMap).valAt (RTVar.OptFeaturesKeyword) :?> IPersistentSet
+                let custom =
+                    (opts :?> IPersistentMap).valAt (RTVar.OptFeaturesKeyword) :?> IPersistentSet
+
                 not <| isNull custom && custom.contains (feature)
         | _ ->
             raise
@@ -2087,7 +2103,9 @@ type LispReader() =
             match opts with
             | :? IPersistentMap as m ->
                 let readCond = m.valAt (RTVar.OptReadCondKeyword)
-                RTVar.CondAllowKeyword.Equals(readCond) || RTVar.CondPreserveKeyword.Equals(readCond)
+
+                RTVar.CondAllowKeyword.Equals(readCond)
+                || RTVar.CondPreserveKeyword.Equals(readCond)
             | _ -> false
 
         if not allowed then

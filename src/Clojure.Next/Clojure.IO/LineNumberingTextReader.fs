@@ -3,89 +3,99 @@
 open System.IO
 open System.Text
 
+/// A TextReader that allows pushing back characters and tracks line and column numbers.
 [<AllowNullLiteral>]
-type LineNumberingTextReader(baseReader : TextReader, capacity: int) =
-    inherit PushbackTextReader(baseReader, capacity)
+type LineNumberingTextReader(_baseReader: TextReader, _capacity: int) =
+    inherit PushbackTextReader(_baseReader, _capacity)
 
-    let mutable lineNumber = 1
-    let mutable columnNumber = 1
-    let mutable prevColumnNumber = 1
-    let mutable prevLineStart = true
-    let mutable atLineStart = true
+    let mutable _lineNumber = 1
+    let mutable _columnNumber = 1
+    let mutable _prevColumnNumber = 1
+    let mutable _prevLineStart = true
+    let mutable _atLineStart = true
 
-    let mutable index = 0
-
-
-    let mutable sb : StringBuilder = null
-
-    let mutable disposed = false
-
-    new (baseReader) = new LineNumberingTextReader(baseReader, 1)
-
-    member _.LineNumber 
-        with get() = lineNumber
-        and set(value) = lineNumber <- value
-
-    member _.ColumnNumber = columnNumber
-    member _.AtLineStart = atLineStart
-    member _.Index = index
+    let mutable _index = 0
 
 
-    override this.Read() : int = 
+    let mutable _sb: StringBuilder = null
+
+    let mutable _disposed = false
+
+    /// Create a LineNumberingTextReader with pushback capacity of one character.
+    new(baseReader) = new LineNumberingTextReader(baseReader, 1)
+
+    member _.LineNumber
+        with get () = _lineNumber
+        and set (value) = _lineNumber <- value
+
+    member _.ColumnNumber = _columnNumber
+    member _.AtLineStart = _atLineStart
+    member _.Index = _index
+
+
+    override this.Read() : int =
 
         let mutable ch = base.Read()
 
-        prevLineStart <- atLineStart
-       
+        _prevLineStart <- _atLineStart
+
         if ch = -1 then
-            atLineStart <- true
+            _atLineStart <- true
         else
-            index <- index + 1
-            atLineStart <- false
-            columnNumber <- columnNumber + 1
-            if ch = ('\r' |> int) then 
+            _index <- _index + 1
+            _atLineStart <- false
+            _columnNumber <- _columnNumber + 1
+
+            if ch = ('\r' |> int) then
                 if this.Peek() = ('\n' |> int) then
-                    ch <- base.Read() 
-                    index <- index + 1
-                else 
+                    ch <- base.Read()
+                    _index <- _index + 1
+                else
                     this.NoteLineAdvance()
+
             if ch = ('\n' |> int) then
                 this.NoteLineAdvance()
-            if not <| isNull sb && ch <> -1 then
-                sb.Append(char ch) |> ignore
+
+            if not <| isNull _sb && ch <> -1 then
+                _sb.Append(char ch) |> ignore
+
         ch
 
     member _.NoteLineAdvance() =
-        atLineStart <- true
-        lineNumber <- lineNumber + 1
-        prevColumnNumber <- columnNumber - 1
-        columnNumber <- 1
+        _atLineStart <- true
+        _lineNumber <- _lineNumber + 1
+        _prevColumnNumber <- _columnNumber - 1
+        _columnNumber <- 1
 
 
-    override this.Unread (ch: int): unit = 
+    override this.Unread(ch: int) : unit =
         base.Unread(ch: int)
-        index <- index - 1
-        columnNumber <- columnNumber - 1
+        _index <- _index - 1
+        _columnNumber <- _columnNumber - 1
+
         if ch = ('\n' |> int) then
-            lineNumber <- lineNumber - 1
-            columnNumber <- prevColumnNumber
-            atLineStart <- prevLineStart
-        if not <| isNull sb then
-            sb.Remove(sb.Length - 1,1) |> ignore
+            _lineNumber <- _lineNumber - 1
+            _columnNumber <- _prevColumnNumber
+            _atLineStart <- _prevLineStart
 
-    member _.CaptureString() = sb <- StringBuilder()
+        if not <| isNull _sb then
+            _sb.Remove(_sb.Length - 1, 1) |> ignore
 
-    member _.GetString() = 
-        if isNull sb then
+    member _.CaptureString() = _sb <- StringBuilder()
+
+    member _.GetString() =
+        if isNull _sb then
             null
         else
-            let ret = sb.ToString()
-            sb <- null
+            let ret = _sb.ToString()
+            _sb <- null
             ret
 
-    override _.Dispose(disposing: bool) = 
-        if not disposed then
+    override _.Dispose(disposing: bool) =
+        if not _disposed then
             if disposing then
-                if not (isNull baseReader) then baseReader.Dispose()            
-            disposed <- true
+                if not (isNull _baseReader) then
+                    _baseReader.Dispose()
+
+            _disposed <- true
             base.Dispose(disposing)
