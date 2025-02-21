@@ -1,22 +1,28 @@
 ﻿namespace Clojure.Reflection
 
+open Clojure.Collections
+
 open System
 open System.Collections.Generic
-open System.Linq
 open System.Reflection
-open Clojure.Collections
-open Clojure.Lib
 
+
+/// Thrown when a type cannot be found.
 exception TypeNotFoundException of string
 
+/// Helper class for working with types.
 [<AbstractClass; Sealed>]
 type RTType private () =
 
 
     // TODO: do we still need this?
+    /// Returns true if the runtime is Mono.
     static member val IsRunningOnMono = not <| isNull (Type.GetType("Mono.Runtime"))
 
     // TODO: We need to rethink this completely.
+
+    /// Returns the type named by the string.
+    /// Returns null if no type can be found.
     static member ClassForName(p: string) : Type =
 
         // fastest path, will succeed for assembly qualified names (returned by Type.AssemblyQualifiedName)
@@ -47,6 +53,8 @@ type RTType private () =
                 else
                     null
 
+    /// Returns the type named by the string.
+    /// Throws a TypeNotFoundException if not found.
     static member ClassForNameE(p: string) : Type =
         let t = RTType.ClassForName(p)
         if isNull t then
@@ -54,12 +62,14 @@ type RTType private () =
         else
             t
 
+    /// Returns true if the string consists of just a single digit in the range '0'..'9'.
     static member IsPosDigit(s: string) =
         if s.Length <> 1 then false
         else
             let c = s[0]
             c >= '1' && c <= '9'
 
+    /// Returns the primitive type named by the symbol (or null if not the name of a primitive type).
     static member PrimType(sym: Symbol) = 
         if isNull sym then null
         else
@@ -80,6 +90,7 @@ type RTType private () =
             | "void" | "Void" | "System.Void" -> typeof<System.Void>
             | _ -> null
 
+    /// A map from primvite types to their Clojure special names.
     static member val private PrimTypeNamesMap = 
          System.Linq.Enumerable.ToDictionary(
              [ (typeof<int>, "int"); 
@@ -97,11 +108,13 @@ type RTType private () =
               fst,
               snd)
 
+    /// Returns the Clojure special name for the primitive type (string option).
     static member TryPrimTypeToName(t: Type) = 
         let ok, name = RTType.PrimTypeNamesMap.TryGetValue(t)
         if ok then Some name else None
 
 
+    /// Returns the corresponding type if the Symbol is the name of one of the special array types (or null if no match).
     static member MaybeSpecialTag(sym: Symbol) = 
         match RTType.PrimType(sym) with
         | null -> 
@@ -127,6 +140,7 @@ type RTType private () =
     // This code really belongs over in the compiler, but we need RTType for LispReader, so it's here.
     static member private FindDuplicateType(p: string) : Type = null
 
+    /// Returns the type named by the string, looking through all loaded assemblies.
     static member private FindTypeInAsssemblies(p: string) : Type = 
         let domain = AppDomain.CurrentDomain
         let assemblies = domain.GetAssemblies()
@@ -167,7 +181,7 @@ type RTType private () =
     static member val private _triggerTypeChars = [| '`'; ',' |]
     static member private HasTriggerCharacter(p: string) = p.IndexOfAny(RTType._triggerTypeChars) >= 0
 
-
+/// Sepcial return type for the ClrTypeSpec.Parse method for array types.
 and [<Sealed>] ClrArraySpec(_dimensions: int, _isBound: bool) =
 
     member internal _.Dimensions = _dimensions
