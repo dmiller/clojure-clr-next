@@ -411,7 +411,8 @@ type PersistentArrayMap private (_meta: IPersistentMap, _arr: obj array) =
 
     /// Create an empty array map with null metadata.
     new() = PersistentArrayMap(null, Array.zeroCreate 0)
-
+    
+    /// Size at which to switch from PersistentArrayMap to PersistentHashMap.
     static member val HashtableThreshold: int = 16
 
     /// An empty PersistentArrayMap with null metadata.
@@ -684,7 +685,7 @@ type PersistentArrayMap private (_meta: IPersistentMap, _arr: obj array) =
         // createWithCheck(), never modify init arg, and only
         // allocate memory if there are duplicate keys.
         //
-        // the original code used doubly-nexted for-loops with breaks.  Needed a bit of reworking for F#.
+        // the original code used doubly-nested for-loops with breaks.  Needed a bit of reworking for F#.
 
         let rec appearsFirstTime (kIndex: int) (j: int) =
             if j >= kIndex then
@@ -1712,7 +1713,7 @@ and [<Sealed>] private ArrayNode(_edit: AtomicBoolean, count: int, _array: INode
             let forked = fjfork.invoke (fjtask.invoke (fn))
             combinef.invoke (ArrayNode.foldTasks (halves[0], combinef, fjtask, fjfork, fjjoin), fjjoin.invoke (forked))
 
-
+/// ISeq for an array of INodes.
 and private ArrayNodeSeq(meta, nodes: INode[], i: int, s: ISeq) =
     inherit ASeq(meta)
 

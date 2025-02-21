@@ -6,11 +6,13 @@ open System.Collections.Generic
 open Clojure.Numerics
 
 /// A persistent Red-Black Tree implementation
-// See Okasake, Kahrs, Larsen, et al.
 [<AllowNullLiteral>]
 type PersistentTreeMap private (_meta: IPersistentMap, _comp: IComparer, _tree: Node, _count: int) =
     inherit APersistentMap()
 
+    // See Okasake, Kahrs, Larsen, et al.
+
+    /// An IComparer instance providing default comparison behavior
     static member val defaultComparer =
         { new Object() with
             override _.ToString() = "#<Default comparer>"
@@ -19,10 +21,16 @@ type PersistentTreeMap private (_meta: IPersistentMap, _comp: IComparer, _tree: 
               //member _.compare(x, y) = Util.compare(x,y) -- can't do this. needed for core.clj compatbility -- we can get around this when we get there
                }
 
+    /// An empty PersistentTreeMap
     static member val Empty = new PersistentTreeMap()
 
+    /// Create a PersistentTreeMap with supplied metatdata and comparator
     new(meta, comp) = PersistentTreeMap(meta, comp, null, 0)
+
+    /// Create a PersistentTreeMap with supplied comparator (and null metadata)
     new(comp) = PersistentTreeMap(null, comp)
+
+    /// Create a PersistentTreeMap with default comparator (and null metadata)
     new() = PersistentTreeMap(PersistentTreeMap.defaultComparer)
 
     /// Create a PersistentTreeMap from a dictionary
@@ -424,6 +432,7 @@ type PersistentTreeMap private (_meta: IPersistentMap, _comp: IComparer, _tree: 
         else
             BlackBranchVal(key, value, left, right)
 
+/// Abstract base class Nodes in a PersistentTreeMap
 and [<AbstractClass; AllowNullLiteral>] internal Node(_key: obj) =
     inherit AMapEntry()
 
@@ -479,6 +488,7 @@ and [<AbstractClass; AllowNullLiteral>] internal Node(_key: obj) =
 
             ret
 
+/// Black node in a PersistentTreeMap, base for specific black node types
 and [<AllowNullLiteral>] internal Black(_key: obj) =
     inherit Node(_key)
 
@@ -497,6 +507,7 @@ and [<AllowNullLiteral>] internal Black(_key: obj) =
     override this.Replace(key: obj, value: obj, left: Node, right: Node) : Node =
         PersistentTreeMap.MakeBlack(_key, value, left, right)
 
+/// Black node with value in a PersistentTreeMap
 and [<AllowNullLiteral>] internal BlackVal(_key: obj, _val: obj) =
     inherit Black(_key)
 
@@ -507,6 +518,7 @@ and [<AllowNullLiteral>] internal BlackVal(_key: obj, _val: obj) =
 
     override _.Redden() : Node = RedVal(_key, _val)
 
+/// Black branching node in a PersistentTreeMap
 and [<AllowNullLiteral>] internal BlackBranch(_key: obj, _left: Node, _right: Node) =
     inherit Black(_key)
 
@@ -515,6 +527,7 @@ and [<AllowNullLiteral>] internal BlackBranch(_key: obj, _left: Node, _right: No
 
     override _.Redden() = RedBranch(_key, _left, _right)
 
+/// Black branching node with value in a PersistentTreeMap
 and [<AllowNullLiteral>] internal BlackBranchVal(_key: obj, _val: obj, _left: Node, _right: Node) =
     inherit BlackBranch(_key, _left, _right)
 
@@ -525,6 +538,7 @@ and [<AllowNullLiteral>] internal BlackBranchVal(_key: obj, _val: obj, _left: No
 
     override _.Redden() : Node = RedBranchVal(_key, _val, _left, _right)
 
+/// Red node in a PersistentTreeMap, base for specific red node types
 and [<AllowNullLiteral>] internal Red(_key: obj) =
     inherit Node(_key)
 
@@ -548,6 +562,7 @@ and [<AllowNullLiteral>] internal Red(_key: obj) =
     override this.Replace(key: obj, value: obj, left: Node, right: Node) : Node =
         PersistentTreeMap.MakeRed(key, value, left, right)
 
+/// Red node with value in a PersistentTreeMap
 and [<AllowNullLiteral>] internal RedVal(_key: obj, _val: obj) =
     inherit Red(_key)
 
@@ -558,7 +573,7 @@ and [<AllowNullLiteral>] internal RedVal(_key: obj, _val: obj) =
 
     override _.Blacken() : Node = BlackVal(_key, _val)
 
-
+/// Red branching node in a PersistentTreeMap
 and [<AllowNullLiteral>] internal RedBranch(_key: obj, _left: Node, _right: Node) =
     inherit Red(_key)
 
@@ -603,6 +618,7 @@ and [<AllowNullLiteral>] internal RedBranch(_key: obj, _left: Node, _right: Node
         else
             base.BalanceRight(parent)
 
+/// Red branching node with value in a PersistentTreeMap
 and [<AllowNullLiteral>] internal RedBranchVal(_key: obj, _val: obj, _left: Node, _right: Node) =
     inherit RedBranch(_key, _left, _right)
 
@@ -614,6 +630,7 @@ and [<AllowNullLiteral>] internal RedBranchVal(_key: obj, _val: obj, _left: Node
     override _.Blacken() : Node =
         BlackBranchVal(_key, _val, _left, _right)
 
+/// Implements ISeq for PersistentTreeMap
 and [<AllowNullLiteral>] PersistentTreeMapSeq(_meta: IPersistentMap, _stack: ISeq, _asc: bool, _cnt: int) =
     inherit ASeq(_meta)
 
@@ -659,6 +676,7 @@ and [<AllowNullLiteral>] PersistentTreeMapSeq(_meta: IPersistentMap, _stack: ISe
 
         loop stack t
 
+/// Implements enumeration for PersistentTreeMap
 and [<AllowNullLiteral>] internal PersistentTreeMapNodeEnumerator(_startNode: Node, _asc: bool) =
 
     let _stack = new Stack<Node>()
