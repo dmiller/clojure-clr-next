@@ -9,12 +9,13 @@ A look at the issues involved in restoring AOT compilation to ClojureCLR.
 
 ## Background
 
-ClojureCLR initially was developed on what is now called .NET Framework, currently in some 4.8.x version.
-Under Framework, ClojureCLR was able to do ahead-of-time (AOT) compilation and save to disk DLL files containing compiled Clojure source code.  This allowed 
-the distribution of pre-compiled versions of all Clojure runtime supplied as Clojure source -- `core.clj` and the rest.
-Startup-times were significantly reduced by loading DLLs versus loading and compiling all the source files.
+ClojureCLR initially was developed on what is now called .NET Framework, currently in some 4.8.x version. 
+(The first version of ClojureCLR supported 3.5.)
+Under Framework, ClojureCLR was able to do ahead-of-time (AOT) compilation and save to disk DLL files containing compiled Clojure source code.  
+This allowed the distribution of pre-compiled versions of all Clojure runtime supplied as Clojure source -- `core.clj` and the rest.
+Startup-times were significantly reduced by loading DLLs versus loading the source files from scratch.
 
-When .Net Core was introduced, the saving dynamic assemblies to file was no longer supported.  The official reason:
+When .Net Core was introduced,  saving dynamic assemblies to file was no longer supported.  The official reason:
 
 > The `AssemblyBuilder.Save` API wasn't originally ported to .NET (Core) because the implementation depended heavily on Windows-specific native code that also wasn't ported. ([Source](https://learn.microsoft.com/en-us/dotnet/fundamentals/runtime-libraries/system-reflection-emit-persistedassemblybuilder))
 
@@ -26,7 +27,7 @@ Understanding the issues requires some knowlege of how ClojureCLR generates code
 
 ## Code generation in ClojureCLR
 
-In Clojure (JVM or CLR), the reading and evaluation of Clojure source code results in the analysis of that code and eventual generation of IL code (Java bytecodes on the JVM, MSIL on the CLR).  Whether that code is written to a file -- for the JVM, a `.class` files; for the CLR, an assembly -- depends on whether the `*compile-files*` flag is set.
+In Clojure (JVM or CLR), the reading and evaluation of Clojure source code results in the analysis of that code and eventual generation of IL code (Java bytecodes on the JVM, MSIL on the CLR).  Whether that code is written to a file -- for the JVM, in `.class` files; for the CLR, an assembly -- depends on whether the `*compile-files*` flag is set.
 
 If you working at the REPL, a form is read, analyzed and evaluated.  Leaving out some special case handling (more on that some other day), roughly the following happens.  Say you have read in the form:
 
@@ -40,7 +41,7 @@ This macroexpands to something like:
 (def f (fn* [x] (inc x)))
 ```
 
-The evaluation process for the `fn*` sub-form results in the creation of a type -- let's call it `My.F` -- that implements the `IFn` interface.  It will have an implement of `IFn.invoke(arg1)` that increments its argument by one.  
+The evaluation process for the `fn*` sub-form results in the creation of a type -- let's call it `My.F` -- that implements the `IFn` interface.  It will have an implementation of `IFn.invoke(arg1)` that returns its argument increased by one.  
 
 Ultimately, we then evaluate the `def` form.  This results in:
 
@@ -77,19 +78,19 @@ be in the classpath.
   lib)
   ```
 
-`load-one`  underlies `load` and `require`.  It calls some runtime code (defined in Java/C#) that does different things depending on whether `*compile-files*` is true or not.
+`load-one`  also underlies `load` and `require`.  It calls some runtime code (defined in Java/C#) that does different things depending on whether `*compile-files*` is true or not.
 
-Focusing on ClojureCLR and on .NET Framework,  when we compile a source file, we first generate a _saveable_ assembly to use in place of the `eval` assembly that we use for interactive work. We then go through essentially the same process as above.  Read a form, analyze it, create types as necessary and generate the appropriate IL code.  In addition, we create an _initialization_ type that contains a static method to which we write code that will do the same steps as the REPL loop. 
+Focusing on ClojureCLR and on .NET Framework,  when we compile a source file, we first generate a _saveable_ assembly -- the official terminology seems to be _persisted_ --  to use in place of the `eval` assembly that we use for interactive work. We then go through essentially the same process as above.  Read a form, analyze it, create types as necessary and generate the appropriate IL code.  In addition, we create an _initialization_ type that contains a static method to which we write code that will do the same steps as the REPL loop -- create `Var`s, map symbols to `Var`s, etc.
 
-At the end of the process, we save the assembly to disk. When we are loading a library and find a DLL file -- say we are trying to load load library `clojure.uuid` and we find `clojure.uuid.dll` -- we load the DLL and call the initialization method.  (You do _not_ want to see what that code looks like.)
+At the end of the process, we save the assembly to disk. When we are loading a library and find a DLL file -- say we are trying to load load library `clojure.uuid` and we find `clojure.uuid.dll` -- we load the DLL and call the initialization method.  
 
 ## The primary issue for AOT compilation in .NET 9
 
 The most important point in all of the above is the _progressive updating of the Clojure environment_: Each form _must_ be evaluated before the next form is read.  
 
-In .NET Framework, an assembly that be saved allows the dynamic usage of finalized types.  You can use the types before the save. 
+In .NET Framework, an assembly that can be saved allows the dynamic usage of finalized types.  You can use the types before the save. 
 
-This is not the case with the new `PersistedAssemblyBuilder`. We cannot use the types we have created until the entire assembly is written--to file or to string.  We'd then have to load it before using any of the types.  We cannot do progressive evaluation. This is a show-stopper for ClojureCLR.
+This is not the case with the new `PersistedAssemblyBuilder`. We cannot use the types we have created until the assembly as a whole is saved. And then you must load it it before using any of the types.  __We cannot do progressive evaluation.__ This is a show-stopper for ClojureCLR.
 
 The documentation does make this explicit, if you look hard enough.
 We find:
@@ -100,8 +101,6 @@ And:
 
 > New in .NET 9, the `PersistedAssemblyBuilder` class adds a fully managed `Reflection.Emit` implementation that supports saving. This implementation has no dependency on the pre-existing, runtime-specific `Reflection.Emit` implementation. That is, now there are two different implementations in .NET, runnable and persisted. To run the persisted assembly, first save it into a memory stream or a file, then load it back. ([Source](https://learn.microsoft.com/en-us/dotnet/fundamentals/runtime-libraries/system-reflection-emit-persistedassemblybuilder)).
 
-If the 'save it into a memory stream ... then load it back' sounds promising, um, no.  We'd need an assembly for each form.  And you thought one type per form was bad.
-
 ## How to proceed
 
 The only solution I've come up with so far is doing all the code generation twice.  
@@ -110,7 +109,7 @@ For each form, we then create two types, one in the `eval` dynamic assembly and 
 We generate code into each type and evaluate the one from the dynamic assembly.
 
 Even this is not as easy as it sounds. (If it sounds easy.)  The design of the current compiler has code generation happening _during_ syntactic analysis. 
-Specifically, those things that are 'functions' -- typically what you get from `defn`, `deftype`, raw uses of `fn`, etc. -- actually have their types generated and finalized during the first pass.
+Specifically, those things that are 'functions' -- typically what you get from `defn`, `deftype`, direct uses of `fn`, etc. -- actually have their types generated and finalized during the first pass.
 It even goes a little further.  If you do something at the REPL (or in a source file) such as:
 
 ```clojure
@@ -118,32 +117,12 @@ It even goes a little further.  If you do something at the REPL (or in a source 
 ```
 
 it so happens that 'naked' `let`s get wrapped with a `fn` -- don't ask -- so even in something as simple as this, we have a type generated during syntactic analysis.
-I _think_ that this very little effect at that point in the process -- but I might have to do double generation even during syntactic analysis.
-(Note: One of rationales for the ClojureCLR.Next project is cleaning up the compiler design.)
+I _think_ that this very little effect at that point in the process -- but most likely I will have to do double generation even during syntactic analysis.  
+ Emitting twice, once for saving and once for progressive evaluation,  might work.  But there are complications I have not figured out yet. 
 
-Anyway.  Emitting twice, once for saving and once for progressive evaluation,  might work.  But there are complications I have not figured out yet.  For example, consider direct linking.  Without direct linking, the following code
+ [Edit: The first version of this post had a digression on direct linking here.  I've moved that to a [separate post]({{site.baseurl}}{% post_url 2025-02-20-AOT-compilation-issues %}).]
 
-```clojure
-(defn f [x] (inc x))
-(defn g [x] (f x))
-```
-would have the call to `f` compile to the equivalent of
-
-```C#
-v.get().invoke(x)
-```
-
-where `v` has been initialized to be `#'my.ns/f`, the `Var` object for `f`.  With direct linking turned on, at compile time we look up the value of `#'my.ns/f`.  This is an instance of the type we compiled to represent `f'`s function.  We call `GetType()` on that value to get the underlying type -- we called it `My.F`.  If it has a static method named `invokeStatic` with the appropriate number of parameters (one parameter in this example), then we will code the call to 
-
-```C#   
-FType.invokeStatic(x)
-```
-
-This will be significantly faster than the dynamic call shown above.
-
-To do this, we can no longer look in the Clojue environment.  In the Clojure environment, if we go to `#'my.ns/f` and ask for its value, it will be an instance of the type we created for `f` _in the dynamic environment_.  This is not the type we just created for the persisted environment!  Where we do we find the type associated with `f` in the persisted environment?  Likely we will have to put some restrictions on when direct linking is possible -- e.g., direct linking will only work if `Var`s are associated with functions via _def_ forms (`defn`, `def`, etc.).  And we will then have to track the associations for the persistent environment.
-
-I'm not sure what other problems of this kind will arise.
+The biggest task to start is to go over line of code in the compiler to see if there is any chance that we could cross-reference from  dynamic (eval) assembly types to/from persisted assembly types.  Either direction, the code won't run.  (If the dynamic code references something in the persisteed assembly, we can't run it -- the persistent assembly type can't be run.  If the persisted code references a something in the eval assembly, we won't be able to save the assembly;  been there, done that, when first writing the compiler code.)
 
 ## Not so fast: platform dependence
 
