@@ -273,6 +273,41 @@ This has only been a problem for folks running ClojureCLR under Framework 4.x be
 
 ## Assembly proliferation and type lookup
 
-Why not get rid of the counter approach and the single eval assembly and go the Clojure(JVM) route by and generate assemblies like popcorn at a movie theater?  
+Why not get rid of the counter approach and the single eval assembly and go the Clojure(JVM) route by and generate assemblies like popcorn at a movie theater?  My disinclination was based on an unexamined hypothesis that that much assembly creation would be a detrimental.  But I never tested the hypothesis.
+
+I created a test project to run some numbers.  Uninhabited assemblies are actually fairly small -- memory usage per assembly allocation was roughly 850 bytes. (and some might have been garbage -- I was only looking at total bytes generated during the operation).  I generated several types in each assembly.  They average about 3.5K bytes each.  
+
+The price was paid more in type lookup.  There is a frequent need to look up a type given a name -- typically from the fully-qualified name, not the assembly-qualified name.  For example, looking up a type hint, checking the namespace of a symbol to see if it a type (`Int64/MaxValue`), etc. That lookup involves calls to `Type.GetType()`, looking up generated types, possibly running through all assemblies to ask each if it knows of the type, etc.
+The worst case is failure.
+
+I put some counters in `clojure.lang.RT.classForName()` to get some numbers from loading the core Clojure source during startup.
+
+|Lookup type  | Count | Description |
+|-------------|-------:|:-------------|
+| Direct find    | 5411 | Call to Type.GetType() succeedeed |
+| Duplicate find |  280 | Look up of dynamically generated type in a map |
+| Assembly find  |   97 |  Call to Assembly.GetType(), looping through all assemblies |
+| Failure        |  193 | None of the above succeeded |
+| Total          | 5981 | |
+
+In my test project, I did successful and failing lookups  (typenames "System.String" and "asdf.asdf" respectively).
+I timed lookup via `Type.GetType()` and `Assembly.GetType()` (looping through all assemblies).  Here are the resuts:
+
+| Type name | Type.GetType() | Assembly.GetType() |
+|-----------|----------------:|-------------------:|
+| "System.String" |  91 ms | 84 ms |
+| "asdf.asdf"     |  77 ms | 241 ms | 
+
+Oh, yeah.  That's for 100,000 iterations.  Now that was for the set of assemblies loaded at startup in the test project -- 11 in total.
+I then added 100 dynamic assemblies with 5 classes each.  The times for the same lookups were:
+
+| Type name | Type.GetType() | Assembly.GetType() |
+|-----------|----------------:|-------------------:|
+| "System.String" |  77 ms |  379 ms |
+| "asdf.asdf"     |  74 ms | 1748 ms | 
+
+Clearly, any slowdown due to more assemblies is negligible given the number of failed searches is 1/500 the number of iterations here.
+
+Still, can we do better?  Yes.  One way would be to create a map from strings to types.
 
 
