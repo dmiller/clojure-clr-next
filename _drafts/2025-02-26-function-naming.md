@@ -213,12 +213,66 @@ We see the opposite behavior.  Why?  There is only on `test.test$f.class` file t
 > One consequence of direct linking is that var redefinitions will not be seen by code that has been compiled with direct linking (because direct linking avoids dereferencing the var).   
 
 If you compile or load uncompiled with direct linking, `g` will be locked to the first definition of `f`.
-If you load compiled code, `g` will be locked to the second definition of `f`.  The behavior changes.  This is one of the meanings of
+If you load compiled code, `g` will be locked to the second definition of `f`.  The behavior changes. 
 
 > The Clojure compilation model preserves as much as possible the dynamic nature of Clojure, in spite of the code-reloading limitations of Java.
 
+There is a solution: selective disabling of direct linking.
+
+>  Vars marked as `^:dynamic` will never be direct linked. If you wish to mark a var as supporting redefinition (but not dynamic), mark it with `^:redef` to avoid direct linking.
+
+Keep that thought in mind.
+
+## CLR: the identity of types
+
+> To the runtime, a type doesn't exist outside the context of an assembly.
+
+Read all about it in [Assemblies in .NET](https://learn.microsoft.com/en-us/dotnet/standard/assembly/).
+
+One could concieve of a type in the JVM as pair of classloader + bytearray, the bytes coming from a classfile, say, or generated in memory by the compiler. In the CLR, a type inherently carries the assembly that defined it.  The assembly could have been read from a file or generated dynamically.
+For example,  the real name of a type is its fully-qualified name plus its assembly name:
+
+```clojure
+(.FullName (class 7))               ;; => "System.Int64"
+(.AssemblyQualifiedName (class 7))  ;; => "System.Int64, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e"
+```
+
+When I first started working on ClojureCLR, I was not sure I could proliferate internal assemblies at the same rate that Clojure(JMV) generated classloaders.  So I went with a design where one dynamic assembly was created to handle all code at the REPL. The 'eval' assembly was what we now call non-persisted.  I would spin up new persisted assemblies when we needed to save our work -- compiling, genclass, etc. 
+
+Redefinition of functions at the REPL was a problem.  A given typename can be used only once in an assembly.  The solution was to append a counter to the names of the types.  Let's run the first example above in ClojureCLR:
 
 
+```clojure
+(defn f [x] (inc x))    ;; =>  #'user/f
+(def f1 f)              ;; =>  #'user/f1
+(defn f [x] (dec x))    ;; =>  #'user/f
+(def f2 f)              ;; =>  #'user/f2
+(class f1)              ;; =>  user$f__24824
+(class f2)              ;; =>  user$f__24830
+(.AssemblyQualifiedName (class f1))   ;; => "user$f__24824, eval, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"
+(.AssemblyQualifiedName (class f2))   ;; => "user$f__24830, eval, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"
+```
 
+The same naming technique was used for either for the eval assembly or for persisted assemblies.  And all was good.  Until...
+
+## Direct linking enters the picture
+
+Direct linking challenged this approach.  A quick example can illustrate the problem.  Suppose we have AOT-compiled the clojure.core code.  (Working under the Framework 4.x version.)  As a result we have an assembly `clojure.core.clj.dll` -- I'll talk more about how ClojureClr names persisted assemblies below.  In that assembly, we have a class that implements the `assoc` function.  That type will be named something like `clojure.core$assoc__122_125`.   Now suppose you have a library which you have AOT-compiled with direct linking turned on.  In there is a function that calls `assoc`.  Direct linking will cause that call to be encoded as
+
+```C#
+clojure.core$assoc__122_125.invokeStatic(...args...)
+```
+
+Now suppose a new version of ClojureCLR is released.  Numbers change.  `assoc` is now `clojure.core$assoc__987_1248`.  The library is still calling `clojure.core$assoc__122_125`.  Your compiled code is broken.  You have no choice but to recompile.
+
+Okay, it's not the end of the world.  You can recompile.  But it's a pain.  And unnecessary -- if we could go without the counters and just compile the `assoc` implementation to a fixed type name -- `clojure.core$assoc`.  Which is possible _except_ for redefinitions.  
+
+This has only been a problem for folks running ClojureCLR under Framework 4.x because we have not had AOT-compilation under Core and later.  But as we move to re-enabling AOT-compilation under .NET 9, we can fix this.  
+
+> _If_ we are generating into a persisted assembly -- AOT-compiling -- _and_ the `Var` whose function we are compiling supports direct linking -- not marked as ^:dynamic or ^:redef (plus a few other conditions) -- _then_ we can generate the type name without the counter.  
+
+## Assembly proliferation and type lookup
+
+Why not get rid of the counter approach and the single eval assembly and go the Clojure(JVM) route by and generate assemblies like popcorn at a movie theater?  
 
 
