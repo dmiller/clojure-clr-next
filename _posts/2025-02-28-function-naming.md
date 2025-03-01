@@ -1,4 +1,4 @@
- ---
+---
 layout: post
 title: The function of naming; the naming of functions
 date: 2025-02-28 00:00:00 -0500

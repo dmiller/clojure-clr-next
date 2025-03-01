@@ -1,4 +1,4 @@
- ---
+---
 layout: post
 title: Are you my type?
 date: 2025-03-01 00:00:00 -0500
