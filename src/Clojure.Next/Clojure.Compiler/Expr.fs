@@ -67,104 +67,32 @@ type ProtocolDetails =
       SiteIndex: int }
 
 [<RequireQualifiedAccess; NoComparison>]
-type Expr =
+type AST =
+    | Assign of AssignExpr
+    | Body of BodyExpr
+    | Case of CaseExpr
+    | Collection of CollectionExpr // combines MapExpr, SetExpr, VectorExpr
+    | Def of DefExpr
+    | If of IfExpr
+    | Import of ImportExpr
+    | InstanceOf of InstanceOfExpr
+    | InteropCall of InteropCallExpr
+    | Invoke of InvokeExpr
+    | KeywordInvoke of KeywordInvokeExpr
+    | Let of LetExpr // combines LetExpr, LoopExpr, LetFnExpr
+    | Literal of LiteralExpr // Combines ConstExpr, NumberExpr, NilExpr, StringExpr, BoolExpr , KeywordExpr, EmptyExpr
 
-    | Assign of Env: CompilerEnv * Form: obj * Target: Expr * Value: Expr
-
-    | Body of Env: CompilerEnv * Form: obj * Exprs: ResizeArray<Expr>
-
-    | Case of
-        Env: CompilerEnv *
-        Form: obj *
-        Expr: Expr *
-        DefaultExpr: Expr *
-        Shift: int *
-        Mask: int *
-        Tests: SortedDictionary<int, Expr> *
-        Thens: SortedDictionary<int, Expr> *
-        SwitchType: Keyword *
-        TestType: Keyword *
-        SkipCheck: IPersistentSet *
-        ReturnType: Type
-
-    | Collection of  // combines MapExpr, SetExpr, VectorExpr
-        Env: CompilerEnv *
-        Form: obj *
-        Value: obj
-
-    | Def of
-        Env: CompilerEnv *
-        Form: obj *
-        Var: Var *
-        Init: Expr *
-        Meta: Expr option *
-        InitProvided: bool *
-        IsDynamic: bool *
-        ShadowsCoreMapping: bool *
-        SourceInfo: SourceInfo option
-
-    | If of Env: CompilerEnv * Form: obj * Test: Expr * Then: Expr * Else: Expr * SourceInfo: SourceInfo option
-
-    | Import of Env: CompilerEnv * Form: obj * Typename: string
-
-    | InstanceOf of Env: CompilerEnv * Form: obj * Expr: Expr * Type: Type * SourceInfo: SourceInfo option
-
-    | InteropCall of
-        Env: CompilerEnv *
-        Form: obj *
-        Type: HostExprType *
-        IsStatic: bool *
-        Tag: Symbol *
-        Target: Expr option *
-        TargetType: Type *
-        MemberName: string *
-        TInfo: MemberInfo *
-        Args: ResizeArray<HostArg> *
-        TypeArgs: ResizeArray<Type> *
-        SourceInfo: SourceInfo option
-
-    | Invoke of
-        Env: CompilerEnv *
-        Form: obj *
-        Fexpr: Expr *
-        Args: ResizeArray<Expr> *
-        Tag: obj *
-        SourceInfo: SourceInfo option
-
-    | KeywordInvoke of
-        Env: CompilerEnv *
-        Form: obj *
-        KwExpr: Expr *
-        Target: Expr *
-        Tag: obj *
-        SiteIndex: int *
-        SourceInfo: SourceInfo option
-
-    | Let of  // combines LetExpr, LoopExpr, LetFnExpr
-        Env: CompilerEnv *
-        Form: obj *
-        Mode: LetExprMode *
-        BindingInits: ResizeArray<BindingInit> *
-        Body: Expr *
-        LoopId: int option *
-        SourceInfo: SourceInfo option
-
-    | Literal of  // Combines ConstExpr, NumberExpr, NilExpr, StringExpr, BoolExpr , KeywordExpr, EmptyExpr
-        Env: CompilerEnv *
-        Form: obj *
-        Type: LiteralType *
-        Value: obj
 
     | LocalBinding of Env: CompilerEnv * Form: obj * Binding: LocalBinding * Tag: Symbol
 
-    | Meta of Env: CompilerEnv * Form: obj * Target: Expr * Meta: Expr
+    | Meta of Env: CompilerEnv * Form: obj * Target: AST * Meta: AST
 
     //| Method of Env: CompilerEnv * Form: obj * Args: ResizeArray<HostArg>
 
     | New of
         Env: CompilerEnv *
         Form: obj *
-        Constructor : MethodBase *
+        Constructor: MethodBase *
         Args: ResizeArray<HostArg> *
         Type: Type *
         IsNoArgValueTypeCtor: bool *
@@ -192,7 +120,7 @@ type Expr =
     | Recur of
         Env: CompilerEnv *
         Form: obj *
-        Args: ResizeArray<Expr> *
+        Args: ResizeArray<AST> *
         LoopLocals: ResizeArray<LocalBinding> *
         SourceInfo: SourceInfo option
 
@@ -202,13 +130,13 @@ type Expr =
         Target: Type *
         Method: MethodInfo *
         RetType: Type *
-        Args: ResizeArray<Expr> *
+        Args: ResizeArray<AST> *
         IsVariadic: bool *
         Tag: obj
 
     | TheVar of Env: CompilerEnv * Form: obj * Var: Var
 
-    | Try of Env: CompilerEnv * Form: obj * TryExpr: Expr * Catches: ResizeArray<CatchClause> * Finally: Expr option
+    | Try of Env: CompilerEnv * Form: obj * TryExpr: AST * Catches: ResizeArray<CatchClause> * Finally: AST option
 
     | UnresolvedVar of Env: CompilerEnv * Form: obj * Sym: Symbol
 
@@ -218,20 +146,144 @@ type Expr =
         Env: CompilerEnv *
         Form: obj *
         Type: UntypedExprType *
-        Target: Expr option
+        Target: AST option
 
-//and ObjBaseDetails =
-//    { RequiredArity: int
-//      RestArg: string option
-//      IsVariadic: bool
-//      PrePostMeta: ResizeArray<Expr> }
+and [<AbstractClass>] ExprBase(env: CompilerEnv, form: obj, sourceInfo: SourceInfo option) =
+    member val Env = env
+    member val Form = form
+    member val SourceInfo = sourceInfo
 
-and BindingInit = { Binding: LocalBinding; Init: Expr }
+and AssignExpr(env: CompilerEnv, form: obj, target: AST, value: AST, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Target = target
+    member val Value = value
+
+and BodyExpr(env: CompilerEnv, form: obj, exprs: ResizeArray<AST>, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Exprs = exprs
+
+and CaseExpr
+    (
+        env: CompilerEnv,
+        Form: obj,
+        Expr: AST,
+        DefaultExpr: AST,
+        Shift: int,
+        Mask: int,
+        Tests: SortedDictionary<int, AST>,
+        Thens: SortedDictionary<int, AST>,
+        SwitchType: Keyword,
+        TestType: Keyword,
+        SkipCheck: IPersistentSet,
+        ReturnType: Type,
+        SourceInfo: SourceInfo option
+    ) =
+    inherit ExprBase(env, Form, SourceInfo)
+    member val Expr = Expr
+    member val DefaultExpr = DefaultExpr
+    member val Shift = Shift
+    member val Mask = Mask
+    member val Tests = Tests
+    member val Thens = Thens
+    member val SwitchType = SwitchType
+    member val TestType = TestType
+    member val SkipCheck = SkipCheck
+    member val ReturnType = ReturnType
+
+and CollectionExpr(env: CompilerEnv, form: obj, value: obj) =
+    inherit ExprBase(env, form, None)
+    member val Value = value
+
+and DefExpr(env: CompilerEnv, form: obj, var: Var, init: AST, meta: AST option, initProvided: bool, isDynamic: bool, shadowsCoreMapping: bool, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Var = var
+    member val Init = init
+    member val Meta = meta
+    member val InitProvided = initProvided
+    member val IsDynamic = isDynamic
+    member val ShadowsCoreMapping = shadowsCoreMapping
+
+and IfExpr(env: CompilerEnv, form: obj, testExpr: AST, thenExpr: AST, elseExpr: AST, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Test = testExpr
+    member val Then = thenExpr
+    member val Else = elseExpr
+
+and ImportExpr(env: CompilerEnv, form: obj, typename: string, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Typename = typename
+
+and InstanceOfExpr(env: CompilerEnv, form: obj, expr: AST, t: Type, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Expr = expr
+    member val Type = t
+
+and InteropCallExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        hostExprType: HostExprType,
+        isStatic: bool,
+        tag: Symbol,
+        target: AST option,
+        targetType: Type,
+        memberName: string,
+        tInfo: MemberInfo,
+        args: ResizeArray<HostArg>,
+        typeArgs: ResizeArray<Type>,
+        sourceInfo: SourceInfo option
+    ) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val HostExprType = hostExprType
+    member val IsStatic = isStatic
+    member val Tag = tag
+    member val Target = target
+    member val TargetType = targetType
+    member val MemberName = memberName
+    member val TInfo = tInfo
+    member val Args = args
+    member val TypeArgs = typeArgs
+
+and InvokeExpr(env: CompilerEnv, form: obj, fexpr: AST, args: ResizeArray<AST>, tag: obj, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Fexpr = fexpr
+    member val Args = args
+    member val Tag = tag
+
+and KeywordInvokeExpr(env: CompilerEnv, form: obj, kwExpr: AST, target: AST, tag: Symbol, siteIndex: int, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val KwExpr = kwExpr
+    member val Target = target
+    member val Tag = tag
+    member val SiteIndex = siteIndex
+
+and LetExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        mode: LetExprMode,
+        bindingInits: ResizeArray<BindingInit>,
+        body: AST,
+        loopId: int option,
+        sourceInfo: SourceInfo option
+    ) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Mode = mode
+    member val BindingInits = bindingInits
+    member val Body = body
+    member val LoopId = loopId
+
+and LiteralExpr(env: CompilerEnv, form: obj, literalType: LiteralType, value: obj) =
+    inherit ExprBase(env, form, None)
+    member val Type = literalType
+    member val Value = value
+
+and BindingInit = { Binding: LocalBinding; Init: AST }
 
 and LocalBinding =
     { Sym: Symbol
       Tag: obj
-      mutable Init: Expr option // Needs to be mutable for LetFn -- we have to create all bindings, parse the inits, then go back and fill in the inits.
+      mutable Init: AST option // Needs to be mutable for LetFn -- we have to create all bindings, parse the inits, then go back and fill in the inits.
       Name: string
       IsArg: bool
       IsByRef: bool
@@ -242,22 +294,29 @@ and LocalBinding =
 and CatchClause =
     { CaughtType: Type
       LocalBinding: LocalBinding
-      Handler: Expr }
+      Handler: AST }
 
 and HostArg =
     { ParamType: ParameterType
-      ArgExpr: Expr
+      ArgExpr: AST
       LocalBinding: LocalBinding option }
 
-and ISignatureHint = 
+and ISignatureHint =
     abstract member GenericTypeArgs: ResizeArray<Type> option
     abstract member Args: ResizeArray<Type>
     abstract member ArgCount: int
     abstract member HasGenericTypeArgs: bool
 
-and ObjMethod(_type: ObjXType, _objx: Expr, _objxInternals : ObjXInternals, _objXRegsiter: ObjXRegister, _parent: ObjMethod option) =
+and ObjMethod
+    (
+        _type: ObjXType,
+        _objx: AST,
+        _objxInternals: ObjXInternals,
+        _objXRegsiter: ObjXRegister,
+        _parent: ObjMethod option
+    ) =
 
-    let mutable _body: Expr option = None // will get filled in later
+    let mutable _body: AST option = None // will get filled in later
 
     let mutable _localNum = 0
 
@@ -274,7 +333,7 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _objxInternals : ObjXInternals, _obj
     member val RestParam: LocalBinding option = None with get, set
     member val ReqParams: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
     member val ArgLocals: ResizeArray<LocalBinding> = ResizeArray<LocalBinding>()
-    member val Name: string = "" with get, set  // Used by NewInstanceExprParser only, Fns do not have names
+    member val Name: string = "" with get, set // Used by NewInstanceExprParser only, Fns do not have names
     member val RetType: Type = typeof<Object> with get, set
 
     member _.GetAndIncLocalNum() =
@@ -316,11 +375,16 @@ and ObjMethod(_type: ObjXType, _objx: Expr, _objxInternals : ObjXInternals, _obj
         | NewInstance -> this.Name
 
     member this.ReturnType = this.RetType // FNMethod had a check of prim here with typeof(Object) as default.
-//member _.ArgTypes =
+    //member _.ArgTypes =
 
     member this.AddLocal(lb: LocalBinding) =
-        this.Locals <- RTMap.assoc(this.Locals, lb, lb) :?> IPersistentMap
+        this.Locals <- RTMap.assoc (this.Locals, lb, lb) :?> IPersistentMap
 
+//and ObjBaseDetails =
+//    { RequiredArity: int
+//      RestArg: string option
+//      IsVariadic: bool
+//      PrePostMeta: ResizeArray<Expr> }
 and CompilerEnv =
     { Pctx: ParserContext
       Locals: IPersistentMap
@@ -364,10 +428,11 @@ and CompilerEnv =
             | Some m ->
                 if lb.Index = 0 then
                     m.UsesThis <- true
+
                 this.CloseOver(lb, m)
 
                 Some lb
-            | _ -> Some lb   // TODO: ofiginal code here would have Null. However, this requires a let*, etc. to have a method installed.  TODO:  Can we fake a local context wihtout a method?
+            | _ -> Some lb // TODO: ofiginal code here would have Null. However, this requires a let*, etc. to have a method installed.  TODO:  Can we fake a local context wihtout a method?
         | _ -> None
 
     member this.ContainsBindingForSym(sym: Symbol) =
@@ -391,17 +456,17 @@ and CompilerEnv =
                 this.CloseOver(b, method.Parent.Value)
 
     // Bindings and registrations
-    member this.RegisterLocalThis(sym: Symbol, tag: Symbol, init: Expr option) =
+    member this.RegisterLocalThis(sym: Symbol, tag: Symbol, init: AST option) =
         this.RegisterLocalInternal(sym, tag, init, typeof<Object>, true, false, false)
 
-    member this.RegisterLocal(sym: Symbol, tag: Symbol, init: Expr option, declaredType: Type, isArg: bool) =
+    member this.RegisterLocal(sym: Symbol, tag: Symbol, init: AST option, declaredType: Type, isArg: bool) =
         this.RegisterLocalInternal(sym, tag, init, declaredType, false, isArg, false)
 
     member this.RegisterLocal
         (
             sym: Symbol,
             tag: Symbol,
-            init: Expr option,
+            init: AST option,
             declaredType: Type,
             isArg: bool,
             isByRef: bool
@@ -412,14 +477,14 @@ and CompilerEnv =
         (
             sym: Symbol,
             tag: Symbol,
-            init: Expr option,
+            init: AST option,
             declaredType: Type,
             isThis: bool,
             isArg: bool,
             isByRef: bool
         ) =
 
-        let index = 
+        let index =
             match this.Method with
             | Some m -> m.GetAndIncLocalNum()
             | None -> -1 // I'm not sure we should ever call this when there is no method.
@@ -569,207 +634,207 @@ and ObjXRegister(parent: ObjXRegister option) =
 [<AbstractClass; Sealed>]
 type ExprUtils private () =
 
-    static member GetLiteralValue(e: Expr) =
+    static member GetLiteralValue(e: AST) =
         match e with
-        | Expr.Literal(Value = value) -> value
+        | AST.Literal(litExpr) -> litExpr.Value
         | _ -> failwith "Not a literal expression"
 
-    static member DebugPrint(tw: System.IO.TextWriter, expr: Expr) =
-        ExprUtils.DebugPrint(tw, expr, 0, true)
+//static member DebugPrint(tw: System.IO.TextWriter, expr: AST) =
+//    ExprUtils.DebugPrint(tw, expr, 0, true)
 
-    static member DebugPrint(tw: System.IO.TextWriter, expr: Expr, indent: int, doNewLine: bool) = 
+//static member DebugPrint(tw: System.IO.TextWriter, expr: AST, indent: int, doNewLine: bool) =
 
-        let dp(expr: Expr, indent: int) =
-            ExprUtils.DebugPrint(tw, expr, indent, false)
+//    let dp(expr: AST, indent: int) =
+//        ExprUtils.DebugPrint(tw, expr, indent, false)
 
-        let dpnl(expr: Expr, indent: int) =
-            ExprUtils.DebugPrint(tw, expr, indent, true)
+//    let dpnl(expr: AST, indent: int) =
+//        ExprUtils.DebugPrint(tw, expr, indent, true)
 
-        let writeSpaces(n: int) =
-            for i = 0 to n - 1 do
-                tw.Write(" ")
+//    let writeSpaces(n: int) =
+//        for i = 0 to n - 1 do
+//            tw.Write(" ")
 
-        let startNewLine() =
-            tw.WriteLine()
-            writeSpaces(indent)
+//    let startNewLine() =
+//        tw.WriteLine()
+//        writeSpaces(indent)
 
-        if doNewLine then startNewLine()
+//    if doNewLine then startNewLine()
 
-        match expr with
-        | Expr.Assign(Target = target; Value = value) ->
-            tw.Write($"Assign: " )
-            dp(target, indent + 8)
-            dpnl(value, indent + 8)
-        | Expr.Body(Exprs = exprs) ->
-            for e in exprs do
-                dpnl(e, indent)
-        | Expr.Case(Expr = expr; DefaultExpr = defaultExpr; Tests = tests; Thens = thens) ->
-            tw.Write($"Case: N/A " )
-        | Expr.Collection(Value = value) ->
-            tw.Write($"Coll: {value}" )
-        | Expr.Def(Var = v; Init = init) ->
-            tw.Write($"Def: {v.ToString()} " )
-            dpnl(init, indent + 5)
-        | Expr.If(Test = test; Then = thenExpr; Else = elseExpr) ->
-            tw.Write($"If: " )
-            dp(test, indent + 6)
-            startNewLine()
-            tw.Write($"  Then: ")
-            dpnl(thenExpr, indent + 10)
-            startNewLine()
-            tw.Write($"  Else: ")
-            dpnl(elseExpr, indent + 10)
-        | Expr.Import(Typename = typename) ->
-            tw.Write($"Import: {typename}")
-        | Expr.InstanceOf(Expr = expr; Type = t) ->
-            tw.Write($"InstanceOf: {t.FullName}" )
-            dpnl(expr, indent + 4)
-        | Expr.InteropCall(Type = heType; Target = target; Args = args; IsStatic = isStatic; TargetType = targetType; MemberName = memberName; TypeArgs = typeArgs) ->
-            tw.Write($"InteropCall: " )
-            
-            let heTypeStr =
-                match heType with
-                | HostExprType.FieldOrPropertyExpr -> "FieldOrProperty"
-                | HostExprType.MethodExpr -> "Method"
-                | HostExprType.InstanceZeroArityCallExpr -> "InstanceZeroArityCall"
-            tw.Write($"{heTypeStr}: {targetType}.{memberName}" )
+//    match expr with
+//    | AST.Assign(Target = target; Value = value) ->
+//        tw.Write($"Assign: " )
+//        dp(target, indent + 8)
+//        dpnl(value, indent + 8)
+//    | AST.Body(Exprs = exprs) ->
+//        for e in exprs do
+//            dpnl(e, indent)
+//    | AST.Case(Expr = expr; DefaultExpr = defaultExpr; Tests = tests; Thens = thens) ->
+//        tw.Write($"Case: N/A " )
+//    | AST.Collection(Value = value) ->
+//        tw.Write($"Coll: {value}" )
+//    | AST.Def(Var = v; Init = init) ->
+//        tw.Write($"Def: {v.ToString()} " )
+//        dpnl(init, indent + 5)
+//    | AST.If(Test = test; Then = thenExpr; Else = elseExpr) ->
+//        tw.Write($"If: " )
+//        dp(test, indent + 6)
+//        startNewLine()
+//        tw.Write($"  Then: ")
+//        dpnl(thenExpr, indent + 10)
+//        startNewLine()
+//        tw.Write($"  Else: ")
+//        dpnl(elseExpr, indent + 10)
+//    | AST.Import(Typename = typename) ->
+//        tw.Write($"Import: {typename}")
+//    | AST.InstanceOf(Expr = expr; Type = t) ->
+//        tw.Write($"InstanceOf: {t.FullName}" )
+//        dpnl(expr, indent + 4)
+//    | AST.InteropCall(Type = heType; Target = target; Args = args; IsStatic = isStatic; TargetType = targetType; MemberName = memberName; TypeArgs = typeArgs) ->
+//        tw.Write($"InteropCall: " )
 
-            if isStatic then
-                tw.Write($" Static" )
-            else
-                tw.Write($" Instance" )
+//        let heTypeStr =
+//            match heType with
+//            | HostExprType.FieldOrPropertyExpr -> "FieldOrProperty"
+//            | HostExprType.MethodExpr -> "Method"
+//            | HostExprType.InstanceZeroArityCallExpr -> "InstanceZeroArityCall"
+//        tw.Write($"{heTypeStr}: {targetType}.{memberName}" )
 
-            if typeArgs.Count > 0 then
-                startNewLine()
-                tw.Write($"    TypeArgs: " )
-                for t in typeArgs do
-                    tw.Write($"{t.FullName} " )
+//        if isStatic then
+//            tw.Write($" Static" )
+//        else
+//            tw.Write($" Instance" )
 
-            match target with
-            | Some t -> dpnl(t, indent + 4)
-            | None -> ()
+//        if typeArgs.Count > 0 then
+//            startNewLine()
+//            tw.Write($"    TypeArgs: " )
+//            for t in typeArgs do
+//                tw.Write($"{t.FullName} " )
 
-            for a in args do
-                dpnl(a.ArgExpr, indent + 4)
-        | Expr.Invoke(Fexpr = fexpr; Args = args) ->
-            tw.Write($"Invoke: " )
-            dpnl(fexpr, indent + 4)
-            for a in args do
-                dpnl(a, indent + 4)
-        | Expr.KeywordInvoke(KwExpr = kwExpr; Target = target; SiteIndex = siteIndex) ->
-            let kw = ExprUtils.GetLiteralValue(kwExpr) :?> Keyword
-            tw.Write($"KeywordInvoke: {kw}" )
-            dpnl(target, indent + 4)
-        | Expr.Let( Body = body; Mode = mode; BindingInits = bindingInits) ->
-            let modeStr =
-                match mode with
-                | LetExprMode.Let -> "Let"
-                | LetExprMode.Loop -> "Loop"
-                | LetExprMode.LetFn -> "LetFn"
-            let prefix = $"{modeStr} [ " 
-            let prefixLen = prefix.Length
+//        match target with
+//        | Some t -> dpnl(t, indent + 4)
+//        | None -> ()
 
-            tw.Write(prefix)
-            let mutable firstTime = true
+//        for a in args do
+//            dpnl(a.ArgExpr, indent + 4)
+//    | AST.Invoke(Fexpr = fexpr; Args = args) ->
+//        tw.Write($"Invoke: " )
+//        dpnl(fexpr, indent + 4)
+//        for a in args do
+//            dpnl(a, indent + 4)
+//    | AST.KeywordInvoke(KwExpr = kwExpr; Target = target; SiteIndex = siteIndex) ->
+//        let kw = ExprUtils.GetLiteralValue(kwExpr) :?> Keyword
+//        tw.Write($"KeywordInvoke: {kw}" )
+//        dpnl(target, indent + 4)
+//    | AST.Let( Body = body; Mode = mode; BindingInits = bindingInits) ->
+//        let modeStr =
+//            match mode with
+//            | LetExprMode.Let -> "Let"
+//            | LetExprMode.Loop -> "Loop"
+//            | LetExprMode.LetFn -> "LetFn"
+//        let prefix = $"{modeStr} [ "
+//        let prefixLen = prefix.Length
 
-            for b in bindingInits do
-                let sym = b.Binding.Sym
-                let symStr = sym.ToString()
-                if not firstTime then 
-                    startNewLine()
-                    writeSpaces(prefixLen)
-                firstTime <- false
-                tw.Write(symStr)
-                dpnl(b.Init, prefixLen+symStr.Length+4)
-            tw.Write("  ]")
-            dpnl(body, indent + 2)
-        | Expr.Literal(Type = litType; Value = value) ->
-            let typeStr = 
-                match litType with
-                | NilType -> "Nil"
-                | BoolType -> "Bool"
-                | StringType -> "String"
-                | PrimNumericType -> "PrimNumeric"
-                | KeywordType -> "Keyword"
-                | EmptyType -> "Empty"
-                | OtherType -> "Other"
-            tw.Write($"= {value} ({typeStr})" )
-        | Expr.LocalBinding(Binding = binding) ->
-            tw.Write($"<{binding.Sym}>" )
-        | Expr.Meta(Target = target; Meta = meta) ->
-            tw.Write($"Meta: " )
-            dpnl(target, indent + 4)
-            dpnl(meta, indent + 4)
-        | Expr.New(Type = cType; Args = args) ->
-            tw.Write($"New: {cType.FullName}" )
-            for a in args do
-                dpnl(a.ArgExpr, indent + 4)
-        | Expr.Obj(Type = oType; Internals = internals; Register = register; ) ->
-            let typeStr = 
-                match oType with
-                | ObjXType.Fn -> "Fn"
-                | ObjXType.NewInstance -> "NewInstance"
-            tw.Write($"{typeStr}" )
-            tw.Write($" {internals.Name}" )
-            startNewLine()
-            for m in internals.Methods do
-                tw.Write($"  {m.MethodName} [ " )
-                for a in m.ReqParams do
-                    tw.Write($"{a.Sym} " )
-                match m.RestParam with
-                | Some r -> tw.Write($"& {r.Sym} " )
-                | None -> ()
-                tw.Write($"] " )
-                dpnl(m.Body, indent + 4)
-        | Expr.QualifiedMethod(MethodName = methodName; Kind = kind; MethodType = methodType) ->
-            let kindStr =
-                match kind with
-                | QMMethodKind.Static -> "Static"
-                | QMMethodKind.Instance -> "Instance"
-                | QMMethodKind.Ctor -> "Ctor"
-            tw.Write($"QualifiedMethod: {methodName} {kindStr} {methodType.FullName}" )
-        | Expr.Recur(Args = args) ->
-            tw.Write($"Recur: " )
-            for a in args do
-                dpnl(a, indent + 4)
-        | Expr.StaticInvoke(Target = target; Method = method; Args = args) ->
-            tw.Write($"StaticInvoke: {target.FullName} " )
-            tw.Write($"{method.Name}" )
-            for a in args do
-                dpnl(a, indent + 4)
-        | Expr.TheVar(Var = v) ->
-            tw.Write($"TheVar: {v.ToString()}" )
-        | Expr.Try(TryExpr = tryExpr; Catches = catches; Finally = finallyExpr) ->
-            tw.Write($"Try: " )
-            dpnl(tryExpr, indent + 4)
-            for c in catches do
-                startNewLine()
-                tw.Write($"Catch: {c.CaughtType.FullName} " )
-                dpnl(c.Handler, indent + 4)
-            match finallyExpr with 
-            | Some f -> 
-                startNewLine()
-                tw.Write($"Finally: " )
-                dp(f, indent + 4)
-            | None -> ()
-        | Expr.UnresolvedVar(Sym = sym) ->
-            tw.Write($"UnresolvedVar: {sym.ToString()}" )
-        | Expr.Var(Var = v) ->
-            tw.Write($"Var: {v.ToString()}" )
-        | Expr.Untyped(Type = uType; Target = target) ->
-            let typeStr = 
-                match uType with
-                | UntypedExprType.MonitorEnter -> "MonitorEnter"
-                | UntypedExprType.MonitorExit -> "MonitorExit"
-                | UntypedExprType.Throw -> "Throw"
-            tw.Write($"Untyped: {typeStr}" )
-            match target with
-            | Some t -> dpnl(t, indent + 4)
-            | None -> ()
+//        tw.Write(prefix)
+//        let mutable firstTime = true
+
+//        for b in bindingInits do
+//            let sym = b.Binding.Sym
+//            let symStr = sym.ToString()
+//            if not firstTime then
+//                startNewLine()
+//                writeSpaces(prefixLen)
+//            firstTime <- false
+//            tw.Write(symStr)
+//            dpnl(b.Init, prefixLen+symStr.Length+4)
+//        tw.Write("  ]")
+//        dpnl(body, indent + 2)
+//    | AST.Literal(Type = litType; Value = value) ->
+//        let typeStr =
+//            match litType with
+//            | NilType -> "Nil"
+//            | BoolType -> "Bool"
+//            | StringType -> "String"
+//            | PrimNumericType -> "PrimNumeric"
+//            | KeywordType -> "Keyword"
+//            | EmptyType -> "Empty"
+//            | OtherType -> "Other"
+//        tw.Write($"= {value} ({typeStr})" )
+//    | AST.LocalBinding(Binding = binding) ->
+//        tw.Write($"<{binding.Sym}>" )
+//    | AST.Meta(Target = target; Meta = meta) ->
+//        tw.Write($"Meta: " )
+//        dpnl(target, indent + 4)
+//        dpnl(meta, indent + 4)
+//    | AST.New(Type = cType; Args = args) ->
+//        tw.Write($"New: {cType.FullName}" )
+//        for a in args do
+//            dpnl(a.ArgExpr, indent + 4)
+//    | AST.Obj(Type = oType; Internals = internals; Register = register; ) ->
+//        let typeStr =
+//            match oType with
+//            | ObjXType.Fn -> "Fn"
+//            | ObjXType.NewInstance -> "NewInstance"
+//        tw.Write($"{typeStr}" )
+//        tw.Write($" {internals.Name}" )
+//        startNewLine()
+//        for m in internals.Methods do
+//            tw.Write($"  {m.MethodName} [ " )
+//            for a in m.ReqParams do
+//                tw.Write($"{a.Sym} " )
+//            match m.RestParam with
+//            | Some r -> tw.Write($"& {r.Sym} " )
+//            | None -> ()
+//            tw.Write($"] " )
+//            dpnl(m.Body, indent + 4)
+//    | AST.QualifiedMethod(MethodName = methodName; Kind = kind; MethodType = methodType) ->
+//        let kindStr =
+//            match kind with
+//            | QMMethodKind.Static -> "Static"
+//            | QMMethodKind.Instance -> "Instance"
+//            | QMMethodKind.Ctor -> "Ctor"
+//        tw.Write($"QualifiedMethod: {methodName} {kindStr} {methodType.FullName}" )
+//    | AST.Recur(Args = args) ->
+//        tw.Write($"Recur: " )
+//        for a in args do
+//            dpnl(a, indent + 4)
+//    | AST.StaticInvoke(Target = target; Method = method; Args = args) ->
+//        tw.Write($"StaticInvoke: {target.FullName} " )
+//        tw.Write($"{method.Name}" )
+//        for a in args do
+//            dpnl(a, indent + 4)
+//    | AST.TheVar(Var = v) ->
+//        tw.Write($"TheVar: {v.ToString()}" )
+//    | AST.Try(TryExpr = tryExpr; Catches = catches; Finally = finallyExpr) ->
+//        tw.Write($"Try: " )
+//        dpnl(tryExpr, indent + 4)
+//        for c in catches do
+//            startNewLine()
+//            tw.Write($"Catch: {c.CaughtType.FullName} " )
+//            dpnl(c.Handler, indent + 4)
+//        match finallyExpr with
+//        | Some f ->
+//            startNewLine()
+//            tw.Write($"Finally: " )
+//            dp(f, indent + 4)
+//        | None -> ()
+//    | AST.UnresolvedVar(Sym = sym) ->
+//        tw.Write($"UnresolvedVar: {sym.ToString()}" )
+//    | AST.Var(Var = v) ->
+//        tw.Write($"Var: {v.ToString()}" )
+//    | AST.Untyped(Type = uType; Target = target) ->
+//        let typeStr =
+//            match uType with
+//            | UntypedExprType.MonitorEnter -> "MonitorEnter"
+//            | UntypedExprType.MonitorExit -> "MonitorExit"
+//            | UntypedExprType.Throw -> "Throw"
+//        tw.Write($"Untyped: {typeStr}" )
+//        match target with
+//        | Some t -> dpnl(t, indent + 4)
+//        | None -> ()
 
 
 
-           
+
 
 [<AbstractClass; Sealed>]
 type TypeUtils private () =
@@ -791,7 +856,7 @@ type TypeUtils private () =
         TypeToTagDict.Add(typeof<float>, Symbol.intern (null, "long"))
         TypeToTagDict.Add(typeof<decimal>, Symbol.intern (null, "decimal"))
 
-    static member TryGetTypeTag(t:Type) = TypeToTagDict.TryGetValue(t)
+    static member TryGetTypeTag(t: Type) = TypeToTagDict.TryGetValue(t)
 
     static member val EmptyTypeList = ResizeArray<Type>()
 
@@ -818,38 +883,47 @@ type TypeUtils private () =
             else
                 null
         | :? string as s when stringOk -> RTType.ClassForNameE(s)
-        | _ -> null        
+        | _ -> null
 
-    static member MaybeArrayType(cenv:CompilerEnv, sym: Symbol) : Type =
+    static member MaybeArrayType(cenv: CompilerEnv, sym: Symbol) : Type =
         if isNull sym.Namespace || not <| RTType.IsPosDigit(sym.Name) then
             null
         else
             let dim = sym.Name[0] - '0' |> int
-            let componentTypeName = Symbol.intern(null,sym.Namespace)
+            let componentTypeName = Symbol.intern (null, sym.Namespace)
+
             let mutable (componentType: Type) =
                 match RTType.PrimType(componentTypeName) with
-                | null -> TypeUtils.MaybeType(cenv, componentTypeName, false);
+                | null -> TypeUtils.MaybeType(cenv, componentTypeName, false)
                 | _ as t -> t
 
-            match componentType with 
-            | null -> raise <| TypeNotFoundException($"Unable to resolve component typename: {componentTypeName}")
+            match componentType with
+            | null ->
+                raise
+                <| TypeNotFoundException($"Unable to resolve component typename: {componentTypeName}")
             | _ ->
-                for i = 0 to dim-1 do
+                for i = 0 to dim - 1 do
                     componentType <- componentType.MakeArrayType()
+
                 componentType
-    
-    static member TagToType(cenv: CompilerEnv, tag: obj) = 
-        let t = 
-            match tag with 
+
+    static member TagToType(cenv: CompilerEnv, tag: obj) =
+        let t =
+            match tag with
             | :? Symbol as sym ->
                 let mutable t = null
+
                 if isNull sym.Namespace then
                     t <- RTType.MaybeSpecialTag(sym)
+
                 if isNull t then
                     t <- TypeUtils.MaybeArrayType(cenv, sym)
+
                 t
             | _ -> null
+
         let t = if isNull t then TypeUtils.MaybeType(cenv, tag, true) else t
+
         match t with
         | null -> raise <| ArgumentException($"Unable to resolve typename: {tag}")
         | _ -> t
@@ -875,60 +949,76 @@ type TypeUtils private () =
         | _ -> TypeUtils.TagToType(cenv, tag)
 
 
-    static member SigTag(argCount: int, v: Var) = 
+    static member SigTag(argCount: int, v: Var) =
 
-        let rec loop (s:ISeq) =
-            if isNull s then null
-            else 
-                let signature : APersistentVector = s.first() :?> APersistentVector
+        let rec loop (s: ISeq) =
+            if isNull s then
+                null
+            else
+                let signature: APersistentVector = s.first () :?> APersistentVector
                 let restOffset = (signature :> IList).IndexOf(RTVar.AmpersandSym)
-                if argCount = (signature :> Counted).count() || (restOffset >= 0 && argCount >= restOffset) then
+
+                if
+                    argCount = (signature :> Counted).count ()
+                    || (restOffset >= 0 && argCount >= restOffset)
+                then
                     TypeUtils.TagOf(signature)
                 else
-                    loop (s.next())
+                    loop (s.next ())
 
-        let arglists = RT0.get(RT0.meta(v), RTVar.ArglistsKeyword)
-        loop (RTSeq.seq(arglists))
+        let arglists = RT0.get (RT0.meta (v), RTVar.ArglistsKeyword)
+        loop (RTSeq.seq (arglists))
 
 
     static member CreateTypeArgList(cenv: CompilerEnv, targs: ISeq) =
         let types = ResizeArray<Type>()
 
-        let rec loop (s:ISeq) =
+        let rec loop (s: ISeq) =
             match s with
             | null -> ()
             | _ ->
-                let arg = s.first()
+                let arg = s.first ()
+
                 if not <| arg :? Symbol then
-                    raise <| ArgumentException("Malformed generic method designator: type arg must be a Symbol")
+                    raise
+                    <| ArgumentException("Malformed generic method designator: type arg must be a Symbol")
+
                 let t = TypeUtils.MaybeType(cenv, arg, false)
+
                 if isNull t then
-                    raise <| ArgumentException($"Malformed generic method designator: invalid type arg: {arg}")
-                types.Add(TypeUtils.MaybeType(cenv, s.first(), false))
-                loop (s.next())
+                    raise
+                    <| ArgumentException($"Malformed generic method designator: invalid type arg: {arg}")
+
+                types.Add(TypeUtils.MaybeType(cenv, s.first (), false))
+                loop (s.next ())
 
         loop targs
         types
 
     // calls TagToType on every element, unless it encounters _ which becomes null
     static member TagsToClasses(cenv: CompilerEnv, paramTags: ISeq) =
-        if isNull paramTags then null
+        if isNull paramTags then
+            null
         else
             let signature = ResizeArray<Type>()
-            let rec loop (s:ISeq) =
+
+            let rec loop (s: ISeq) =
                 match s with
                 | null -> ()
                 | _ ->
-                    let t = s.first()
+                    let t = s.first ()
+
                     if t.Equals(RTVar.ParamTagAnySym) then
                         signature.Add(null)
                     else
                         signature.Add(TypeUtils.TagToType(cenv, t))
-                    loop (s.next())
+
+                    loop (s.next ())
+
             loop paramTags
             signature
 
-                  
+
 and SignatureHint private (_genericTypeArgs: ResizeArray<Type> option, _args: ResizeArray<Type>) =
 
     interface ISignatureHint with
@@ -940,22 +1030,21 @@ and SignatureHint private (_genericTypeArgs: ResizeArray<Type> option, _args: Re
     static member private Create(cenv: CompilerEnv, tagV: IPersistentVector) =
         // tagV is not null (though I'll check anyway), but might be empty.
         // tagV == []  -> no type-args, zero-argument method or property or field.
-        if isNull tagV || tagV.count() = 0 then
+        if isNull tagV || tagV.count () = 0 then
             new SignatureHint(None, ResizeArray<Type>())
         else
 
-            let isTypeArgs(item: obj) =
+            let isTypeArgs (item: obj) =
                 match item with
-                | :? Symbol as sym  -> sym.Equals(RTVar.TypeArgsSym)
+                | :? Symbol as sym -> sym.Equals(RTVar.TypeArgsSym)
                 | _ -> false
 
-            match tagV.nth(0) with
-            | :? ISeq as firstItem when isTypeArgs(RTSeq.first(firstItem)) ->
-                let typeArgs = TypeUtils.CreateTypeArgList(cenv, RTSeq.next(firstItem))
-                let args = RTSeq.next(tagV)
+            match tagV.nth (0) with
+            | :? ISeq as firstItem when isTypeArgs (RTSeq.first (firstItem)) ->
+                let typeArgs = TypeUtils.CreateTypeArgList(cenv, RTSeq.next (firstItem))
+                let args = RTSeq.next (tagV)
                 new SignatureHint(Some typeArgs, TypeUtils.TagsToClasses(cenv, args))
-            | _ ->
-                new SignatureHint(None, TypeUtils.TagsToClasses(cenv, RTSeq.seq(tagV)))
+            | _ -> new SignatureHint(None, TypeUtils.TagsToClasses(cenv, RTSeq.seq (tagV)))
 
 
     static member MaybeCreate(cenv: CompilerEnv, tagV: IPersistentVector) =
@@ -969,86 +1058,120 @@ type QMHelpers private () =
 
     // Returns a list of methods or ctors matching the name and kind given.
     // Otherwise, will throw if the information provided results in no matches
-    static member private MethodsWithName(t:Type, methodName: string, kind: QMMethodKind) =
+    static member private MethodsWithName(t: Type, methodName: string, kind: QMMethodKind) =
         match kind with
         | Ctor ->
             let ctors = t.GetConstructors().Cast<MethodBase>().ToList()
+
             if ctors.Count = 0 then
                 raise <| QMHelpers.NoMethodWithNameException(t, methodName, QMMethodKind.Ctor)
+
             ctors
         | _ ->
             let isStatic = (kind = QMMethodKind.Static)
+
             let methods =
-                t.GetMethods()
+                t
+                    .GetMethods()
                     .Cast<MethodBase>()
                     .Where(fun m -> m.Name.Equals(methodName) && isStatic = m.IsStatic)
                     .ToList()
+
             if methods.Count = 0 then
-                raise <| QMHelpers.NoMethodWithNameException(t, methodName, QMMethodKind.Instance)
+                raise
+                <| QMHelpers.NoMethodWithNameException(t, methodName, QMMethodKind.Instance)
+
             methods
-       
-    static member ResolveHintedMethod(t:Type, methodName: string, kind: QMMethodKind, hint: ISignatureHint) = 
-        
-            let methods= QMHelpers.MethodsWithName(t, methodName, kind)
 
-            // If we have generic type args and the list is non-empty, we need to choose only methods that have the same number of generic type args, fully instantiated.
+    static member ResolveHintedMethod(t: Type, methodName: string, kind: QMMethodKind, hint: ISignatureHint) =
 
-            let methods = 
-                let gtaCount = if hint.GenericTypeArgs.IsSome then hint.GenericTypeArgs.Value.Count else 0
-                if gtaCount > 0 then
-                    methods
-                        .Where(fun m -> m.IsGenericMethod && m.GetGenericArguments().Length = gtaCount)
-                        .Select(fun m -> (m :?> MethodInfo).MakeGenericMethod(hint.GenericTypeArgs.Value.ToArray()))
-                        .Cast<MethodBase>()
-                        .ToList()
+        let methods = QMHelpers.MethodsWithName(t, methodName, kind)
+
+        // If we have generic type args and the list is non-empty, we need to choose only methods that have the same number of generic type args, fully instantiated.
+
+        let methods =
+            let gtaCount =
+                if hint.GenericTypeArgs.IsSome then
+                    hint.GenericTypeArgs.Value.Count
                 else
-                    methods
+                    0
 
-            let arity =
-                match hint.Args with
-                | null -> 0
-                | _ as args-> args.Count
-
-            let filteredMethods =
+            if gtaCount > 0 then
                 methods
-                    .Where(fun m -> m.GetParameters().Length = arity)
-                    .Where(fun m -> QMHelpers.SignatureMatches(hint.Args, m))
+                    .Where(fun m -> m.IsGenericMethod && m.GetGenericArguments().Length = gtaCount)
+                    .Select(fun m -> (m :?> MethodInfo).MakeGenericMethod(hint.GenericTypeArgs.Value.ToArray()))
+                    .Cast<MethodBase>()
                     .ToList()
-
-            if filteredMethods.Count = 1 then
-                filteredMethods[0]
             else
-                raise <| QMHelpers.ParamTagsDontResolveException(t, methodName, hint)
+                methods
 
-    static member private NoMethodWithNameException(t:Type, methodName: string, kind: QMMethodKind) =
-        let kindStr = if kind = QMMethodKind.Ctor then "" else kind.ToString().ToLower()
+        let arity =
+            match hint.Args with
+            | null -> 0
+            | _ as args -> args.Count
+
+        let filteredMethods =
+            methods
+                .Where(fun m -> m.GetParameters().Length = arity)
+                .Where(fun m -> QMHelpers.SignatureMatches(hint.Args, m))
+                .ToList()
+
+        if filteredMethods.Count = 1 then
+            filteredMethods[0]
+        else
+            raise <| QMHelpers.ParamTagsDontResolveException(t, methodName, hint)
+
+    static member private NoMethodWithNameException(t: Type, methodName: string, kind: QMMethodKind) =
+        let kindStr =
+            if kind = QMMethodKind.Ctor then
+                ""
+            else
+                kind.ToString().ToLower()
+
         new ArgumentException($"Error - no matches found for {kindStr} {QMHelpers.MethodDescription(t, methodName)}")
 
 
-    static member private ParamTagsDontResolveException(t:Type, methodName: string, hint: ISignatureHint) =
+    static member private ParamTagsDontResolveException(t: Type, methodName: string, hint: ISignatureHint) =
         let hintedSig = hint.Args
-        let tagNames = hintedSig.Cast<Object>().Select(fun tag -> if isNull tag then RTVar.ParamTagAnySym :> obj else tag)
-        let paramTags = PersistentVector.create(tagNames)
-        let genericTypeArgs = if hint.GenericTypeArgs.IsSome then "" else $"<{QMHelpers.GenerateGenericTypeArgString(hint.GenericTypeArgs.Value)}>"
-        new ArgumentException($"Error - param-tags {genericTypeArgs}{paramTags} insufficient to resolve {QMHelpers.MethodDescription(t, methodName)}")
 
-    static member MethodDescription(t:Type, name: string) =
+        let tagNames =
+            hintedSig
+                .Cast<Object>()
+                .Select(fun tag -> if isNull tag then RTVar.ParamTagAnySym :> obj else tag)
+
+        let paramTags = PersistentVector.create (tagNames)
+
+        let genericTypeArgs =
+            if hint.GenericTypeArgs.IsSome then
+                ""
+            else
+                $"<{QMHelpers.GenerateGenericTypeArgString(hint.GenericTypeArgs.Value)}>"
+
+        new ArgumentException(
+            $"Error - param-tags {genericTypeArgs}{paramTags} insufficient to resolve {QMHelpers.MethodDescription(t, methodName)}"
+        )
+
+    static member MethodDescription(t: Type, name: string) =
         let isCtor = t <> null && name.Equals("new")
         let typeType = if isCtor then "constructor" else "method"
         $"""{typeType} {(if isCtor then "" else name)} in class {t.Name}"""
 
-        // TODO: THis is a duplicate of waht is Clojure.Reflection.Reflector
-        // TODO: REview use of type of GenericTypeArgList vs original
+    // TODO: THis is a duplicate of waht is Clojure.Reflection.Reflector
+    // TODO: REview use of type of GenericTypeArgList vs original
     // Just a little convenience function for error messages.
     static member GenerateGenericTypeArgString(typeArgs: ResizeArray<Type>) =
-        if isNull typeArgs then ""
+        if isNull typeArgs then
+            ""
         else
             let sb = StringBuilder()
             sb.Append("<") |> ignore
+
             for i = 0 to typeArgs.Count - 1 do
                 if i > 0 then
                     sb.Append(", ") |> ignore
+
                 sb.Append(typeArgs[i].Name) |> ignore
+
             sb.Append(">") |> ignore
             sb.ToString()
 
@@ -1056,18 +1179,15 @@ type QMHelpers private () =
     static member SignatureMatches(signature: List<Type>, method: MethodBase) =
         let methodSig = method.GetParameters()
 
-        let rec loop (i:int) =
+        let rec loop (i: int) =
             if i >= methodSig.Length then
                 true
+            else if
+                not <| isNull signature[i]
+                && not <| signature[ i ].Equals(methodSig[i].ParameterType)
+            then
+                false
             else
-                if not <| isNull signature[i] && not <| signature[i].Equals(methodSig[i].ParameterType) then
-                    false
-                else
-                    loop (i + 1)
+                loop (i + 1)
+
         loop 0
-
-
-
-
-
-

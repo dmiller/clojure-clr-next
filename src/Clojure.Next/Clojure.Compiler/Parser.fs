@@ -14,7 +14,7 @@ open System.Reflection
 open System.Text.RegularExpressions
 
 // Signature for special form parser methods
-type SpecialFormParser = CompilerEnv * ISeq -> Expr
+type SpecialFormParser = CompilerEnv * ISeq -> AST
 
 exception ParseException of string
 
@@ -96,13 +96,13 @@ type Parser private () =
 
     static member val MaxPositionalArity = 20 // TODO: Do we want to adjust this down to 16? (Match for System.Func)
 
-    static member val NilExprInstance = Expr.Literal(Env = CompilerEnv.Empty, Form = null, Type = NilType, Value = null)
+    static member val NilExprInstance = AST.Literal(LiteralExpr(env = CompilerEnv.Empty, form = null, literalType = NilType, value = null))
 
     static member val TrueExprInstance =
-        Expr.Literal(Env = CompilerEnv.Empty, Form = true, Type = BoolType, Value = true)
+        AST.Literal(LiteralExpr(env = CompilerEnv.Empty, form = true, literalType = BoolType, value = true))
 
     static member val FalseExprInstance =
-        Expr.Literal(Env = CompilerEnv.Empty, Form = false, Type = BoolType, Value = false)
+        AST.Literal(LiteralExpr(env = CompilerEnv.Empty, form = false, literalType = BoolType, value = false))
 
     static member GetSpecialFormParser(op: obj) = SpecialFormToParserMap.valAt (op)
 
@@ -113,9 +113,9 @@ type Parser private () =
     //
     ////////////////////////////////
 
-    static member Analyze(cenv: CompilerEnv, form: obj) : Expr = Parser.Analyze(cenv, form, null)
+    static member Analyze(cenv: CompilerEnv, form: obj) : AST = Parser.Analyze(cenv, form, null)
 
-    static member Analyze(cenv: CompilerEnv, form: obj, name: string) : Expr =
+    static member Analyze(cenv: CompilerEnv, form: obj, name: string) : AST =
 
         try
             // If we have a LazySeq, realize it and  attach the meta data from the initial form
@@ -140,22 +140,22 @@ type Parser private () =
             | :? Symbol as sym -> Parser.AnalyzeSymbol(cenv, sym)
             | :? Keyword as kw ->
                 cenv.RegisterKeyword(kw)
-                Expr.Literal(Env = cenv, Form = form, Type = KeywordType, Value = kw)
+                AST.Literal(LiteralExpr(env = cenv, form = form, literalType = KeywordType, value = kw))
             | _ when Numbers.IsNumeric(form) -> Parser.AnalyzeNumber(cenv, form)
-            | :? String as s -> Expr.Literal(Env = cenv, Form = form, Type = StringType, Value = String.Intern(s))
+            | :? String as s -> AST.Literal(LiteralExpr(env = cenv, form = form, literalType = StringType, value = String.Intern(s)))
             | :? IPersistentCollection as coll when not <| form :? IType && not <| form :? IRecord && coll.count () = 0 ->
                 Parser.OptionallyGenerateMetaInit(
                     cenv,
                     form,
-                    Expr.Literal(Env = cenv, Form = form, Type = EmptyType, Value = coll)
+                    AST.Literal(LiteralExpr(env = cenv, form = form, literalType = EmptyType, value = coll))
                 )
             | :? ISeq as seq -> Parser.AnalyzeSeq(cenv, seq, name)
             | :? IPersistentVector as pv -> Parser.AnalyzeVector(cenv, pv)
-            | :? IRecord -> Expr.Literal(Env = cenv, Form = form, Type = OtherType, Value = form)
-            | :? IType -> Expr.Literal(Env = cenv, Form = form, Type = OtherType, Value = form)
+            | :? IRecord -> AST.Literal(LiteralExpr(env = cenv, form = form, literalType = OtherType, value = form))
+            | :? IType -> AST.Literal(LiteralExpr(env = cenv, form = form, literalType = OtherType, value = form))
             | :? IPersistentMap as pm -> Parser.AnalyzeMap(cenv, pm)
             | :? IPersistentSet as ps -> Parser.AnalyzeSet(cenv, ps)
-            | _ -> Expr.Literal(Env = cenv, Form = form, Type = OtherType, Value = form)
+            | _ -> AST.Literal(LiteralExpr(env = cenv, form = form, literalType = OtherType, value = form))
 
         with
         | :? CompilerException -> reraise ()
@@ -172,18 +172,18 @@ type Parser private () =
     // The naming distinguishes those methods called directly from Analyze().
     // The methods named ParseXXX are parsers for special forms, called from AnalyzeSeq().
 
-    static member AnalyzeNumber(cenv: CompilerEnv, num: obj) : Expr =
+    static member AnalyzeNumber(cenv: CompilerEnv, num: obj) : AST =
         match num with
         | :? int
         | :? double
-        | :? int64 -> Expr.Literal(Env = cenv, Form = num, Type = PrimNumericType, Value = num) // TODO: Why would we not allow other primitive numerics here?
-        | _ -> Expr.Literal(Env = cenv, Form = num, Type = OtherType, Value = num)
+        | :? int64 -> AST.Literal(LiteralExpr(env = cenv, form = num, literalType = PrimNumericType, value = num)) // TODO: Why would we not allow other primitive numerics here?
+        | _ -> AST.Literal(LiteralExpr(env = cenv, form = num, literalType = OtherType, value = num))
 
 
     // Analyzing the collection types
     // The three are very similar to each other.
 
-    static member AnalyzeVector(cenv: CompilerEnv, form: IPersistentVector) : Expr =
+    static member AnalyzeVector(cenv: CompilerEnv, form: IPersistentVector) : AST =
         let mutable constant = true
         let mutable args = PersistentVector.Empty :> IPersistentVector
 
@@ -194,7 +194,7 @@ type Parser private () =
             if not <| v.IsLiteral then
                 constant <- false
 
-        let ret = Expr.Collection(Env = cenv, Form = form, Value = args)
+        let ret = AST.Collection(CollectionExpr(env = cenv, form = form, value = args))
 
         match form with
         | :? IObj as iobj when not <| isNull (iobj.meta ()) -> Parser.OptionallyGenerateMetaInit(cenv, form, ret)
@@ -202,13 +202,13 @@ type Parser private () =
             let mutable rv = PersistentVector.Empty :> IPersistentVector
 
             for i = 0 to args.count () - 1 do
-                rv <- rv.cons (ExprUtils.GetLiteralValue(args.nth (i) :?> Expr))
+                rv <- rv.cons (ExprUtils.GetLiteralValue(args.nth (i) :?> AST))
 
-            Expr.Literal(Env = cenv, Form = form, Type = OtherType, Value = rv)
+            AST.Literal(LiteralExpr(env = cenv, form = form, literalType = OtherType, value = rv))
         | _ -> ret
 
 
-    static member AnalyzeMap(cenv: CompilerEnv, form: IPersistentMap) : Expr =
+    static member AnalyzeMap(cenv: CompilerEnv, form: IPersistentMap) : AST =
         let mutable keysConstant = true
         let mutable valsConstant = true
         let mutable allConstantKeysUnique = true
@@ -242,7 +242,7 @@ type Parser private () =
 
         loop (RTSeq.seq (form))
 
-        let ret = Expr.Collection(Env = cenv, Form = form, Value = keyvals)
+        let ret = AST.Collection(CollectionExpr(env = cenv, form = form, value = keyvals))
 
         match form with
         | :? IObj as iobj when not <| isNull (iobj.meta ()) -> Parser.OptionallyGenerateMetaInit(cenv, form, ret)
@@ -256,17 +256,17 @@ type Parser private () =
                 for i in 0..2 .. (keyvals.count () - 1) do
                     m <-
                         m.assoc (
-                            ExprUtils.GetLiteralValue(keyvals.nth (i) :?> Expr),
-                            ExprUtils.GetLiteralValue(keyvals.nth (i + 1) :?> Expr)
+                            ExprUtils.GetLiteralValue(keyvals.nth (i) :?> AST),
+                            ExprUtils.GetLiteralValue(keyvals.nth (i + 1) :?> AST)
                         )
 
-                Expr.Literal(Env = cenv, Form = form, Type = OtherType, Value = m) // TODO: In the old code, this optimization was a big fail when some values were also maps.  Need to think about this.
+                AST.Literal(LiteralExpr(env = cenv, form = form, literalType = OtherType, value = m)) // TODO: In the old code, this optimization was a big fail when some values were also maps.  Need to think about this.
             else
                 ret
         | _ -> ret
 
 
-    static member AnalyzeSet(cenv: CompilerEnv, form: IPersistentSet) : Expr =
+    static member AnalyzeSet(cenv: CompilerEnv, form: IPersistentSet) : AST =
         let mutable constant = true
         let mutable keys = PersistentVector.Empty :> IPersistentVector
 
@@ -284,18 +284,18 @@ type Parser private () =
 
         loop (form.seq ())
 
-        let ret = Expr.Collection(Env = cenv, Form = form, Value = keys)
+        let ret = AST.Collection(CollectionExpr(env = cenv, form = form, value = keys))
 
         match form with
         | :? IObj as iobj when not <| isNull (iobj.meta ()) -> Parser.OptionallyGenerateMetaInit(cenv, form, ret)
         | _ when constant ->
             let mutable rv = PersistentHashSet.Empty :> IPersistentCollection
-            let x: Expr = ret
+            let x: AST = ret
 
             for i = 0 to keys.count () - 1 do
-                rv <- rv.cons (ExprUtils.GetLiteralValue(keys.nth (i) :?> Expr))
+                rv <- rv.cons (ExprUtils.GetLiteralValue(keys.nth (i) :?> AST))
 
-            Expr.Literal(Env = cenv, Form = form, Type = OtherType, Value = rv)
+            AST.Literal(LiteralExpr(env = cenv, form = form, literalType = OtherType, value = rv))
         | _ -> ret
 
 
@@ -305,16 +305,16 @@ type Parser private () =
     //
     ////////////////////////////////
 
-    static member AnalyzeSymbol(cenv: CompilerEnv, sym: Symbol) : Expr =
+    static member AnalyzeSymbol(cenv: CompilerEnv, sym: Symbol) : AST =
 
         let tag = TypeUtils.TagOf(sym)
 
         // See if we are a local variable or a field/property/QM reference
-        let maybeExpr: Expr option =
+        let maybeExpr: AST option =
             if isNull sym.Namespace then
                 // we might be a local variable
                 match cenv.ReferenceLocal(sym) with
-                | Some lb -> Some(Expr.LocalBinding(Env = cenv, Form = sym, Binding = lb, Tag = tag))
+                | Some lb -> Some(AST.LocalBinding(Env = cenv, Form = sym, Binding = lb, Tag = tag))
                 | None -> None
 
             elif isNull (RTReader.NamespaceFor(sym)) && not <| RTType.IsPosDigit(sym.Name) then
@@ -345,13 +345,13 @@ type Parser private () =
                 elif RT0.booleanCast (RT0.get ((v :> IMeta).meta (), ConstKeyword)) then
                     Parser.Analyze(cenv.WithParserContext(Expression), RTSeq.list (RTVar.QuoteSym, v))
                 else
-                    Expr.Var(Env = cenv, Form = sym, Var = v, Tag = tag)
-            | :? Type as t -> Expr.Literal(Env = cenv, Form = sym, Type = OtherType, Value = t)
-            | :? Symbol -> Expr.UnresolvedVar(Env = cenv, Form = sym, Sym = sym)
+                    AST.Var(Env = cenv, Form = sym, Var = v, Tag = tag)
+            | :? Type as t -> AST.Literal(LiteralExpr(env = cenv, form = sym, literalType = OtherType, value = t))
+            | :? Symbol -> AST.UnresolvedVar(Env = cenv, Form = sym, Sym = sym)
             | _ -> raise <| CompilerException($"Unable to resolve symbol: {sym} in this context")
 
 
-    static member AnalyzeSeq(cenv: CompilerEnv, form: ISeq, name: string) : Expr =
+    static member AnalyzeSeq(cenv: CompilerEnv, form: ISeq, name: string) : AST =
         // TODO: deal with source info
 
         try
@@ -400,23 +400,23 @@ type Parser private () =
     // These are called from AnalyzeSeq() to parse the various special forms
     // Let's start with some easy ones
 
-    static member ImportExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
-        Expr.Import(Env = cenv, Form = form, Typename = (RTSeq.second (form) :?> string))
+    static member ImportExprParser(cenv: CompilerEnv, form: ISeq) : AST =
+        AST.Import(ImportExpr(env = cenv, form = form, typename = (RTSeq.second (form) :?> string), sourceInfo = None))
 
-    static member MonitorEnterExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member MonitorEnterExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         let cenv = cenv.WithParserContext(Expression)
 
-        Expr.Untyped(
+        AST.Untyped(
             Env = cenv,
             Form = form,
             Type = MonitorEnter,
             Target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
         )
 
-    static member MonitorExitExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member MonitorExitExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         let cenv = cenv.WithParserContext(Expression)
 
-        Expr.Untyped(
+        AST.Untyped(
             Env = cenv,
             Form = form,
             Type = MonitorExit,
@@ -426,7 +426,7 @@ type Parser private () =
 
     // cranking up the difficulty level
 
-    static member AssignExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member AssignExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
         if RT0.length (form) <> 3 then
             raise <| ParseException("Malformed assignment, expecting (set! target val)")
@@ -442,10 +442,19 @@ type Parser private () =
             raise <| ParseException("Invalid assignment target")
 
         let bodyCtx = cenv.WithParserContext(Expression)
-        Expr.Assign(Env = cenv, Form = form, Target = target, Value = Parser.Analyze(bodyCtx, RTSeq.third (form)))
+
+        AST.Assign(
+            AssignExpr(
+                env = cenv,
+                form = form,
+                target = target,
+                value = Parser.Analyze(bodyCtx, RTSeq.third (form)),
+                sourceInfo = None
+            )
+        )
 
 
-    static member ThrowExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member ThrowExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         // special case for Eval:  Wrap in FnOnceSym
         let cenv =
             { cenv with
@@ -453,9 +462,9 @@ type Parser private () =
                 IsAssignContext = false }
 
         match RT0.count (form) with
-        | 1 -> Expr.Untyped(Env = cenv, Form = form, Type = Throw, Target = None)
+        | 1 -> AST.Untyped(Env = cenv, Form = form, Type = Throw, Target = None)
         | 2 ->
-            Expr.Untyped(
+            AST.Untyped(
                 Env = cenv,
                 Form = form,
                 Type = Throw,
@@ -465,17 +474,17 @@ type Parser private () =
             raise
             <| InvalidOperationException("Too many arguments to throw, throw expects a single Exception instance")
 
-    static member TheVarExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member TheVarExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         match RTSeq.second (form) with
         | :? Symbol as sym ->
             match Parser.LookupVar(cenv, sym, false) with
             | null -> raise <| ParseException($"Unable to resolve var: {sym} in this context")
-            | _ as v -> Expr.TheVar(Env = cenv, Form = form, Var = v)
+            | _ as v -> AST.TheVar(Env = cenv, Form = form, Var = v)
         | _ as v ->
             raise
             <| ParseException($"Second argument to the-var must be a symbol, found: {v}")
 
-    static member BodyExprParser(cenv: CompilerEnv, forms: ISeq) : Expr =
+    static member BodyExprParser(cenv: CompilerEnv, forms: ISeq) : AST =
         let forms =
             if Util.equals (RTSeq.first (forms), RTVar.DoSym) then
                 RTSeq.next (forms)
@@ -483,7 +492,7 @@ type Parser private () =
                 forms
 
         let stmtcenv = cenv.WithParserContext(Statement)
-        let exprs = List<Expr>()
+        let exprs = List<AST>()
 
         let rec loop (seq: ISeq) =
             match seq with
@@ -500,9 +509,9 @@ type Parser private () =
 
         loop forms
 
-        Expr.Body(Env = cenv, Form = forms, Exprs = exprs)
+        AST.Body(BodyExpr(env = cenv, form = forms, exprs = exprs, sourceInfo = None))
 
-    static member IfExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member IfExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
         // (if test then) or (if test then else)
 
@@ -519,10 +528,19 @@ type Parser private () =
         let thenExpr = Parser.Analyze(bodyCtx, RTSeq.third (form))
         let elseExpr = Parser.Analyze(bodyCtx, RTSeq.fourth (form))
 
-        Expr.If(Env = cenv, Form = form, Test = testExpr, Then = thenExpr, Else = elseExpr, SourceInfo = None) // TODO source info
+        AST.If(
+            IfExpr(
+                env = cenv,
+                form = form,
+                testExpr = testExpr,
+                thenExpr = thenExpr,
+                elseExpr = elseExpr,
+                sourceInfo = None
+            )
+        ) // TODO source info
 
 
-    static member ConstantExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member ConstantExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         let argCount = RT0.count (form) - 1
 
         if argCount <> 1 then
@@ -539,10 +557,10 @@ type Parser private () =
             else
                 Parser.FalseExprInstance
         | _ as n when Numbers.IsNumeric(n) -> Parser.AnalyzeNumber(cenv, n)
-        | :? string as s -> Expr.Literal(Env = cenv, Form = s, Type = StringType, Value = s)
+        | :? string as s -> AST.Literal(LiteralExpr(env = cenv, form = s, literalType = StringType, value = s))
         | :? IPersistentCollection as pc when pc.count () = 0 && (not <| pc :? IMeta || isNull ((pc :?> IMeta).meta ())) ->
-            Expr.Literal(Env = cenv, Form = pc, Type = EmptyType, Value = pc)
-        | _ as v -> Expr.Literal(Env = cenv, Form = v, Type = OtherType, Value = v)
+            AST.Literal(LiteralExpr(env = cenv, form = pc, literalType = EmptyType, value = pc))
+        | _ as v -> AST.Literal(LiteralExpr(env = cenv, form = v, literalType = OtherType, value = v))
 
 
     /////////////////////////////////
@@ -563,7 +581,7 @@ type Parser private () =
                 raise <| ParseException($"Can't let qualified name: {sym}")
         | _ -> raise <| ParseException($"Bad binding form, expected symbol, got: {s}")
 
-    static member LetExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member LetExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
         // form => (let  [var1 val1 var2 val2 ... ] body ... )
         //      or (loop [var1 val1 var2 val2 ... ] body ... )
@@ -648,18 +666,20 @@ type Parser private () =
 
         let bodyExpr = Parser.BodyExprParser(bodyCtx, body)
 
-        Expr.Let(
-            Env = cenv,
-            Form = form,
-            BindingInits = bindingInits,
-            Body = bodyExpr,
-            LoopId = loopId,
-            Mode = (if isLoop then Loop else Let),
-            SourceInfo = None
+        AST.Let(
+            LetExpr(
+                env = cenv,
+                form = form,
+                bindingInits = bindingInits,
+                body = bodyExpr,
+                loopId = loopId,
+                mode = (if isLoop then Loop else Let),
+                sourceInfo = None
+            )
         ) // TODO: source info
 
 
-    static member RecurExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member RecurExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
         // TODO: source info
 
@@ -671,7 +691,7 @@ type Parser private () =
         if cenv.NoRecur then
             raise <| ParseException("Cannot recur across try")
 
-        let args = ResizeArray<Expr>()
+        let args = ResizeArray<AST>()
 
         let argCtx =
             { cenv with
@@ -695,10 +715,10 @@ type Parser private () =
 
         // TODO: original code does type checking on the args here.  We'll have to do that in a later pass.
 
-        Expr.Recur(Env = cenv, Form = form, Args = args, LoopLocals = loopLocals, SourceInfo = None) // TODO: SourceInfo
+        AST.Recur(Env = cenv, Form = form, Args = args, LoopLocals = loopLocals, SourceInfo = None) // TODO: SourceInfo
 
 
-    static member LetFnExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member LetFnExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
         // form => (letfn*  [var1 (fn [args] body) ... ] body ... )
 
@@ -754,14 +774,16 @@ type Parser private () =
             let bindingInit = { Binding = lb; Init = init }
             bindingInits.Add(bindingInit)
 
-        Expr.Let(
-            Env = cenv,
-            Form = form,
-            BindingInits = bindingInits,
-            Body = Parser.BodyExprParser(cenv, body),
-            Mode = LetFn,
-            LoopId = None,
-            SourceInfo = None
+        AST.Let(
+            LetExpr(
+                env = cenv,
+                form = form,
+                bindingInits = bindingInits,
+                body = Parser.BodyExprParser(cenv, body),
+                mode = LetFn,
+                loopId = None,
+                sourceInfo = None
+            )
         ) // TODO: source info
 
 
@@ -771,7 +793,7 @@ type Parser private () =
     //
     ////////////////////////////////
 
-    static member DefExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member DefExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
         // (def x) or (def x initexpr) or (def x "docstring" initexpr)
 
@@ -858,16 +880,18 @@ type Parser private () =
         let init = Parser.Analyze(exprCtx, RTSeq.third (form), var.Symbol.Name)
         let initProvided = RT0.count (form) = 3
 
-        Expr.Def(
-            Env = cenv,
-            Form = form,
-            Var = var,
-            Init = init,
-            InitProvided = initProvided,
-            IsDynamic = isDynamic,
-            ShadowsCoreMapping = shadowsCoreMapping,
-            Meta = meta,
-            SourceInfo = None
+        AST.Def(
+            DefExpr(
+                env = cenv,
+                form = form,
+                var = var,
+                init = init,
+                initProvided = initProvided,
+                isDynamic = isDynamic,
+                shadowsCoreMapping = shadowsCoreMapping,
+                meta = meta,
+                sourceInfo = None
+            )
         ) // TODO: source info})
 
 
@@ -886,7 +910,7 @@ type Parser private () =
             match enclosingMethod with
             | Some m ->
                 match m.Objx with
-                | Expr.Obj(_, _, _, internals, _, _) -> internals.Name
+                | AST.Obj(_, _, _, internals, _, _) -> internals.Name
                 | _ -> raise <| InvalidOperationException("No Objx found on method")
             | None -> Munger.Munge(RTVar.getCurrentNamespace().Name.Name + "$")
 
@@ -906,7 +930,7 @@ type Parser private () =
         // BTW, noe that simpleName had all dots replace, but baseName might still have dots?
         (finalName, finalName.Replace('.', '/'))
 
-    static member FnExprParser(cenv: CompilerEnv, form: ISeq, name: string) : Expr =
+    static member FnExprParser(cenv: CompilerEnv, form: ISeq, name: string) : AST =
 
         let origForm = form
 
@@ -938,7 +962,7 @@ type Parser private () =
             )
 
         let fnExpr =
-            Expr.Obj(
+            AST.Obj(
                 Env = cenv,
                 Form = origForm,
                 Type = ObjXType.Fn,
@@ -1046,7 +1070,7 @@ type Parser private () =
         (
             cenv: CompilerEnv,
             form: obj,
-            objx: Expr,
+            objx: AST,
             objxInternals: ObjXInternals,
             objxRegister: ObjXRegister,
             retTag: obj
@@ -1168,7 +1192,7 @@ type Parser private () =
     //
     ////////////////////////////////
 
-    static member TryExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member TryExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
         if cenv.Pctx <> ParserContext.Return then
             // I'm not sure why we do this.
@@ -1185,8 +1209,8 @@ type Parser private () =
 
             let body = ResizeArray<obj>()
             let catches = ResizeArray<CatchClause>()
-            let mutable bodyExpr: Expr option = None
-            let mutable finallyExpr: Expr option = None
+            let mutable bodyExpr: AST option = None
+            let mutable finallyExpr: AST option = None
             let mutable caught = false
 
 
@@ -1283,7 +1307,7 @@ type Parser private () =
                 Parser.BodyExprParser(cenv, RTSeq.seq (body))
 
             else
-                Expr.Try(Env = cenv, Form = form, TryExpr = bodyExpr.Value, Catches = catches, Finally = finallyExpr) // TODO: source info)
+                AST.Try(Env = cenv, Form = form, TryExpr = bodyExpr.Value, Catches = catches, Finally = finallyExpr) // TODO: source info)
 
 
     /////////////////////////////////
@@ -1320,23 +1344,31 @@ type Parser private () =
     // Case 5:  Default case -- just parse it as an invoke.
     //          analyze the args, and make an Expr.Invoke
 
-    static member MaybeParseVarInvoke(cenv: CompilerEnv, fexpr: Expr, form: ISeq, v: Var) : Expr option =
+    static member MaybeParseVarInvoke(cenv: CompilerEnv, fexpr: AST, form: ISeq, v: Var) : AST option =
 
-        let analyzeMaybeInstanceQ () : Expr option =
+        let analyzeMaybeInstanceQ () : AST option =
             match fexpr with
-            | Expr.Var(Env = e; Form = f; Var = v; Tag = t) when v.Equals(RTVar.InstanceVar) && RT0.count (form) = 3 ->
+            | AST.Var(Env = e; Form = f; Var = v; Tag = t) when v.Equals(RTVar.InstanceVar) && RT0.count (form) = 3 ->
                 let sexpr = Parser.Analyze({ cenv with Pctx = Expression }, RTSeq.second (form))
 
                 match sexpr with
-                | Expr.Literal(Value = v) when (v :? Type) ->
+                | AST.Literal(litExpr) when (litExpr.Value :? Type) ->
                     let texpr = Parser.Analyze({ cenv with Pctx = Expression }, RTSeq.third (form))
 
                     Some
-                    <| Expr.InstanceOf(Env = cenv, Form = form, Expr = texpr, Type = (v :?> Type), SourceInfo = None) // TODO: source info
+                    <| AST.InstanceOf(
+                        InstanceOfExpr(
+                            env = cenv,
+                            form = form,
+                            expr = texpr,
+                            t = (litExpr.Value :?> Type),
+                            sourceInfo = None
+                        )
+                    ) // TODO: source info
                 | _ -> None
             | _ -> None
 
-        let analyzeMaybeStaticInvoke () : Expr option =
+        let analyzeMaybeStaticInvoke () : AST option =
             if
                 RT0.booleanCast (Parser.GetCompilerOption(RTVar.DirectLinkingKeyword))
                 && (* && cenv.Pctx <> ParserContext.Eval *) not v.isDynamic
@@ -1370,7 +1402,7 @@ type Parser private () =
             | None -> None
 
 
-    static member InvokeExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member InvokeExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
         let cenv = cenv.WithParserContext(Expression)
 
@@ -1380,25 +1412,30 @@ type Parser private () =
 
         let result =
             match fexpr with
-            | Expr.Var(Env = e; Form = f; Var = v; Tag = t) -> Parser.MaybeParseVarInvoke(cenv, fexpr, form, v)
-            | Expr.Literal(Type = KeywordType; Value = kw) as kwExpr when
-                RT0.count (form) = 2 && cenv.ObjXRegister.IsSome
+            | AST.Var(Env = e; Form = f; Var = v; Tag = t) -> Parser.MaybeParseVarInvoke(cenv, fexpr, form, v)
+            | AST.Literal(litExpr) as kwExpr when
+                litExpr.Type = KeywordType && RT0.count (form) = 2 && cenv.ObjXRegister.IsSome
                 ->
                 let target = Parser.Analyze(cenv, RTSeq.second (form))
-                let siteIndex = cenv.RegisterKeywordCallSite(kw :?> Keyword)
+                let siteIndex = cenv.RegisterKeywordCallSite(litExpr.Value :?> Keyword)
 
                 Some
-                <| Expr.KeywordInvoke(
-                    Env = cenv,
-                    Form = form,
-                    KwExpr = kwExpr,
-                    Target = target,
-                    Tag = TypeUtils.TagOf(form),
-                    SiteIndex = siteIndex,
-                    SourceInfo = None
+                <| AST.KeywordInvoke(
+                    KeywordInvokeExpr(
+                        env = cenv,
+                        form = form,
+                        kwExpr = kwExpr,
+                        target = target,
+                        tag = TypeUtils.TagOf(form),
+                        siteIndex = siteIndex,
+                        sourceInfo = None
+                    )
                 ) // TODO: source info)
-            | Expr.InteropCall(Type = HostExprType.FieldOrPropertyExpr; IsStatic = true) as sfpExpr -> Some <| sfpExpr
-            | Expr.QualifiedMethod(_) as qmExpr ->
+            | AST.InteropCall(icExpr) as sfpExpr when
+                icExpr.HostExprType = HostExprType.FieldOrPropertyExpr && icExpr.IsStatic
+                ->
+                Some <| sfpExpr //Type = HostExprType.FieldOrPropertyExpr; IsStatic = true
+            | AST.QualifiedMethod(_) as qmExpr ->
                 Some <| Parser.ToHostExpr(cenv, qmExpr, TypeUtils.TagOf(form), form.next ())
             | _ -> None
 
@@ -1406,7 +1443,7 @@ type Parser private () =
         | Some e -> e
         | None ->
 
-            let args = ResizeArray<Expr>()
+            let args = ResizeArray<AST>()
 
             let rec loop (s: ISeq) =
                 if isNull s then
@@ -1419,17 +1456,19 @@ type Parser private () =
 
             // TODO: The constructor would work on protocol details here.
             // Move to later pass?
-            Expr.Invoke(
-                Env = cenv,
-                Form = form,
-                Fexpr = fexpr,
-                Args = args,
-                Tag = TypeUtils.TagOf(form),
-                SourceInfo = None
+            AST.Invoke(
+                InvokeExpr(
+                    env = cenv,
+                    form = form,
+                    fexpr = fexpr,
+                    args = args,
+                    tag = TypeUtils.TagOf(form),
+                    sourceInfo = None
+                )
             )
 
 
-    static member ParseStaticInvokeExpr(cenv: CompilerEnv, form: obj, v: Var, args: ISeq, tag: obj) : Expr option =
+    static member ParseStaticInvokeExpr(cenv: CompilerEnv, form: obj, v: Var, args: ISeq, tag: obj) : AST option =
 
         if not <| v.isBound || isNull <| v.get () then
             None
@@ -1462,7 +1501,7 @@ type Parser private () =
                     else
                         true
 
-                let argExprs = ResizeArray<Expr>()
+                let argExprs = ResizeArray<AST>()
 
                 let rec loop (s: ISeq) =
                     if isNull s then
@@ -1474,7 +1513,7 @@ type Parser private () =
                 loop (RTSeq.seq (args))
 
                 Some
-                <| Expr.StaticInvoke(
+                <| AST.StaticInvoke(
                     Env = cenv,
                     Form = form,
                     Target = target,
@@ -1485,14 +1524,14 @@ type Parser private () =
                     Tag = tag
                 )
 
-    static member ToHostExpr(cenv: CompilerEnv, qmExpr: Expr, tag: Symbol, args: ISeq) =
+    static member ToHostExpr(cenv: CompilerEnv, qmExpr: AST, tag: Symbol, args: ISeq) =
         // TODO: source info
 
         // we have the form (qmfexpr ...args...)
         // We need to decide what the pieces are in ...args...
 
         match qmExpr with
-        | Expr.QualifiedMethod(
+        | AST.QualifiedMethod(
             Env = qmenv
             Form = form
             MethodType = methodType
@@ -1585,19 +1624,21 @@ type Parser private () =
                         $"No {instOrStaticStr} field, property or method taking 0 args{typeArgsStr} named {methodName} found for {methodType.Name}"
                     )
                 | _ ->
-                    Expr.InteropCall(
-                        Env = cenv,
-                        Form = form,
-                        Type = hostExprType,
-                        IsStatic = isStatic,
-                        Tag = tag,
-                        Target = instance,
-                        TargetType = methodType,
-                        MemberName = methodName,
-                        TInfo = memberInfo,
-                        Args = ResizeArray<HostArg>(),
-                        TypeArgs = genericTypeArgs,
-                        SourceInfo = None
+                    AST.InteropCall(
+                        InteropCallExpr(
+                            env = cenv,
+                            form = form,
+                            hostExprType = hostExprType,
+                            isStatic = isStatic,
+                            tag = tag,
+                            target = instance,
+                            targetType = methodType,
+                            memberName = methodName,
+                            tInfo = memberInfo,
+                            args = ResizeArray<HostArg>(),
+                            typeArgs = genericTypeArgs,
+                            sourceInfo = None
+                        )
                     ) // TODO: source info
 
 
@@ -1612,7 +1653,7 @@ type Parser private () =
 
                 match kind with
                 | QMMethodKind.Ctor ->
-                    Expr.New(
+                    AST.New(
                         Env = cenv,
                         Form = form,
                         Constructor = method,
@@ -1627,19 +1668,21 @@ type Parser private () =
 
                     let hostArgs = Parser.ParseArgs(cenv, args)
 
-                    Expr.InteropCall(
-                        Env = cenv,
-                        Form = form,
-                        Type = HostExprType.MethodExpr,
-                        IsStatic = isStatic,
-                        Tag = tag,
-                        Target = instance,
-                        TargetType = methodType,
-                        MemberName = Munger.Munge(methodName),
-                        TInfo = method,
-                        Args = hostArgs,
-                        TypeArgs = genericTypeArgs,
-                        SourceInfo = None
+                    AST.InteropCall(
+                        InteropCallExpr(
+                            env = cenv,
+                            form = form,
+                            hostExprType = HostExprType.MethodExpr,
+                            isStatic = isStatic,
+                            tag = tag,
+                            target = instance,
+                            targetType = methodType,
+                            memberName = Munger.Munge(methodName),
+                            tInfo = method,
+                            args = hostArgs,
+                            typeArgs = genericTypeArgs,
+                            sourceInfo = None
+                        )
                     ) // TODO: source info
 
         | _ -> raise <| ArgumentException("Expected QualifiedMethod expression")
@@ -1651,7 +1694,7 @@ type Parser private () =
     //
     ////////////////////////////////
 
-    static member HostExprParser(cenv: CompilerEnv, form: ISeq) : Expr =
+    static member HostExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         // TODO: Source info
 
         let tag = TypeUtils.TagOf(form)
@@ -1736,19 +1779,21 @@ type Parser private () =
             let methodName = Munger.Munge(methodSym.Name)
             let hostArgs = Parser.ParseArgs(cenv, args)
 
-            Expr.InteropCall(
-                Env = cenv,
-                Form = form,
-                Type = MethodExpr,
-                IsStatic = (not <| isNull staticType),
-                Tag = tag,
-                Target = instance,
-                TargetType = staticType,
-                MemberName = methodName,
-                TInfo = null,
-                Args = hostArgs,
-                TypeArgs = typeArgs,
-                SourceInfo = None
+            AST.InteropCall(
+                InteropCallExpr(
+                    env = cenv,
+                    form = form,
+                    hostExprType = MethodExpr,
+                    isStatic = (not <| isNull staticType),
+                    tag = tag,
+                    target = instance,
+                    targetType = staticType,
+                    memberName = methodName,
+                    tInfo = null,
+                    args = hostArgs,
+                    typeArgs = typeArgs,
+                    sourceInfo = None
+                )
             ) // TODO: source info
 
     static member ParseZeroArityCall
@@ -1756,11 +1801,11 @@ type Parser private () =
             cenv: CompilerEnv,
             form: obj,
             staticType: Type,
-            instance: Expr option,
+            instance: AST option,
             methodSym: Symbol,
             typeArgs: ResizeArray<Type>,
             tag: Symbol
-        ) : Expr =
+        ) : AST =
 
         // TODO: (in original) Figure out if we want to handle the -propname otherwise.
         let memberSym, isPropName =
@@ -1778,19 +1823,21 @@ type Parser private () =
 
         let isStatic = not <| isNull staticType
 
-        Expr.InteropCall(
-            Env = cenv,
-            Form = form,
-            Type = FieldOrPropertyExpr,
-            IsStatic = isStatic,
-            Tag = tag,
-            Target = instance,
-            TargetType = staticType,
-            MemberName = memberName,
-            TInfo = null,
-            Args = ResizeArray<HostArg>(),
-            TypeArgs = typeArgs,
-            SourceInfo = None
+        AST.InteropCall(
+            InteropCallExpr(
+                env = cenv,
+                form = form,
+                hostExprType = FieldOrPropertyExpr,
+                isStatic = isStatic,
+                tag = tag,
+                target = instance,
+                targetType = staticType,
+                memberName = memberName,
+                tInfo = null,
+                args = ResizeArray<HostArg>(),
+                typeArgs = typeArgs,
+                sourceInfo = None
+            )
         ) // TODO: source info
 
 
@@ -1860,22 +1907,24 @@ type Parser private () =
             t: Type,
             memberName: string,
             info: MemberInfo
-        ) : Expr =
+        ) : AST =
 
         // TODO: copy all the constructor code
-        Expr.InteropCall(
-            Env = cenv,
-            Form = form,
-            Type = FieldOrPropertyExpr,
-            IsStatic = true,
-            Tag = tag,
-            Target = None,
-            TargetType = t,
-            MemberName = memberName,
-            TInfo = info,
-            Args = ResizeArray<HostArg>(),
-            TypeArgs = TypeUtils.EmptyTypeList,
-            SourceInfo = None
+        AST.InteropCall(
+            InteropCallExpr(
+                env = cenv,
+                form = form,
+                hostExprType = FieldOrPropertyExpr,
+                isStatic = true,
+                tag = tag,
+                target = None,
+                targetType = t,
+                memberName = memberName,
+                tInfo = info,
+                args = ResizeArray<HostArg>(),
+                typeArgs = TypeUtils.EmptyTypeList,
+                sourceInfo = None
+            )
         )
 
 
@@ -1885,12 +1934,12 @@ type Parser private () =
     //
     ////////////////////////////////
 
-    static member NewExprParser(cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
+    static member NewExprParser(cenv: CompilerEnv, form: ISeq) : AST = Parser.NilExprInstance
 
     // Saving for later, when I figure out what I'm doing
-    static member DefTypeParser () (cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
-    static member ReifyParser () (cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
-    static member CaseExprParser(cenv: CompilerEnv, form: ISeq) : Expr = Parser.NilExprInstance
+    static member DefTypeParser () (cenv: CompilerEnv, form: ISeq) : AST = Parser.NilExprInstance
+    static member ReifyParser () (cenv: CompilerEnv, form: ISeq) : AST = Parser.NilExprInstance
+    static member CaseExprParser(cenv: CompilerEnv, form: ISeq) : AST = Parser.NilExprInstance
 
 
     /////////////////////////////////
@@ -2153,10 +2202,10 @@ type Parser private () =
     //
     //////////////////////////////////
 
-    static member OptionallyGenerateMetaInit(cenv: CompilerEnv, form: obj, expr: Expr) : Expr =
+    static member OptionallyGenerateMetaInit(cenv: CompilerEnv, form: obj, expr: AST) : AST =
         match RT0.meta (form) with
         | null -> expr
-        | _ as meta -> Expr.Meta(Env = cenv, Form = form, Target = expr, Meta = Parser.AnalyzeMap(cenv, meta))
+        | _ as meta -> AST.Meta(Env = cenv, Form = form, Target = expr, Meta = Parser.AnalyzeMap(cenv, meta))
 
 
     //public static Regex UnpackFnNameRE = new Regex("^(.+)/$([^_]+)(__[0-9]+)*$");
@@ -2198,11 +2247,11 @@ type Parser private () =
         | _, _ -> newForm
 
 
-    static member IsAssignableExpr(expr: Expr) : bool =
+    static member IsAssignableExpr(expr: AST) : bool =
         match expr with
-        | Expr.LocalBinding _
-        | Expr.Var _ -> true
-        | Expr.InteropCall(Type = hostType) when hostType = HostExprType.FieldOrPropertyExpr -> true
+        | AST.LocalBinding _
+        | AST.Var _ -> true
+        | AST.InteropCall(icExpr) when icExpr.HostExprType = HostExprType.FieldOrPropertyExpr -> true
         | _ -> false
 
     static member ElideMeta(m: IPersistentMap) = m // TODO: Source-info
@@ -2322,7 +2371,7 @@ type Parser private () =
             else
                 QMMethodKind.Static, sym.Name
 
-        Expr.QualifiedMethod(
+        AST.QualifiedMethod(
             Env = cenv,
             Form = sym,
             MethodType = methodType,

@@ -29,46 +29,22 @@ let compareGenericLists (a: ResizeArray<'T>, b: ResizeArray<'T>) =
         Expect.isTrue comp "Expect same list"
 
 
-let compareInteropCalls (a: Expr, b: Expr) =
+let compareInteropCalls (a: AST, b: AST) =
     match a, b with
-    | Expr.InteropCall(
-        Env = aenv
-        Form = aform
-        Type = atype
-        IsStatic = aisstatic
-        Tag = atag
-        Target = atarget
-        TargetType = atargettype
-        MemberName = amembername
-        TInfo = atinfo
-        Args = aargs
-        TypeArgs = atypeargs
-        SourceInfo = asourceinfo),
-      Expr.InteropCall(
-          Env = benv
-          Form = bform
-          Type = btype
-          IsStatic = bisstatic
-          Tag = btag
-          Target = btarget
-          TargetType = btargettype
-          MemberName = bmembername
-          TInfo = btinfo
-          Args = bargs
-          TypeArgs = btypeargs
-          SourceInfo = bsourceinfo) ->
-        Expect.equal aenv benv "Env should be equal"
-        Expect.equal aform bform "Form should be equal"
-        Expect.equal atype btype "Type should be equal"
-        Expect.equal aisstatic bisstatic "IsStatic should be equal"
-        Expect.equal atag btag "Tag should be equal"
-        Expect.equal atarget btarget "Target should be equal"
-        Expect.equal atargettype btargettype "TargetType should be equal"
-        Expect.equal amembername bmembername "MemberName should be equal"
-        Expect.equal atinfo btinfo "TInfo should be equal"
-        compareGenericLists (aargs, bargs)
-        compareGenericLists (atypeargs, btypeargs)
-        Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
+    | AST.InteropCall(aexpr),
+      AST.InteropCall(bexpr) ->
+        Expect.equal aexpr.Env bexpr.Env "Env should be equal"
+        Expect.equal aexpr.Form bexpr.Form "Form should be equal"
+        Expect.equal aexpr.HostExprType bexpr.HostExprType "Type should be equal"
+        Expect.equal aexpr.IsStatic bexpr.IsStatic "IsStatic should be equal"
+        Expect.equal aexpr.Tag bexpr.Tag "Tag should be equal"
+        Expect.equal aexpr.Target bexpr.Target "Target should be equal"
+        Expect.equal aexpr.TargetType bexpr.TargetType "TargetType should be equal"
+        Expect.equal aexpr.MemberName bexpr.MemberName "MemberName should be equal"
+        Expect.equal aexpr.TInfo bexpr.TInfo "TInfo should be equal"
+        compareGenericLists (aexpr.Args, bexpr.Args)
+        compareGenericLists (aexpr.TypeArgs, bexpr.TypeArgs)
+        Expect.equal aexpr.SourceInfo bexpr.SourceInfo "SourceInfo should be equal"
     | _ -> failwith "Not an InteropCall"
 
 
@@ -90,9 +66,9 @@ let compareSignatureHintOptions (a: ISignatureHint option, b: ISignatureHint opt
     | Some a, Some b -> compareSignatureHints (a, b)
 
 
-let compareQualifiedMethods(a: Expr, b:Expr) =
+let compareQualifiedMethods(a: AST, b:AST) =
     match a, b with
-    | Expr.QualifiedMethod(
+    | AST.QualifiedMethod(
         Env = aenv
         Form = aform
         MethodType = atype
@@ -101,7 +77,7 @@ let compareQualifiedMethods(a: Expr, b:Expr) =
         MethodName = aemethodname
         Kind = akind
         SourceInfo = asourceinfo),
-      Expr.QualifiedMethod(
+      AST.QualifiedMethod(
           Env = benv
           Form = bform
           HintedSig = bsig
@@ -121,9 +97,9 @@ let compareQualifiedMethods(a: Expr, b:Expr) =
     | _ -> failwith "Not a QualifiedMethod"
 
 
-let compareNewExprs (a: Expr, b: Expr) =
+let compareNewExprs (a: AST, b: AST) =
     match a, b with
-    | Expr.New(
+    | AST.New(
         Env = aenv
         Form = aform
         Type = atype
@@ -131,7 +107,7 @@ let compareNewExprs (a: Expr, b: Expr) =
         Args = aargs
         IsNoArgValueTypeCtor = aisnoargvaluetypector
         SourceInfo = asourceinfo),
-      Expr.New(
+      AST.New(
           Env = benv
           Form = bform
           Type = btype
@@ -148,13 +124,13 @@ let compareNewExprs (a: Expr, b: Expr) =
         Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
     | _ -> failwith "Not an InteropCall"
 
-let compareBodies(a: Expr, b: Expr) = 
+let compareBodies(a: AST, b: AST) = 
     match a,b with
-    | Expr.Body(aenv, aform, abody),
-      Expr.Body(benv, bform, bbody) ->
-        Expect.equal aenv benv "Env should be equal"
-        Expect.equal aform bform "Form should be equal"
-        compareGenericLists (abody, bbody)
+    | AST.Body(aexpr),
+      AST.Body(bexpr) ->
+        Expect.equal aexpr.Env bexpr.Env "Env should be equal"
+        Expect.equal aexpr.Form bexpr.Form "Form should be equal"
+        compareGenericLists (aexpr.Exprs, bexpr.Exprs)
     | _ -> failwith "Not a Body"
 
 
@@ -185,7 +161,7 @@ let withMethod(cenv: CompilerEnv ) =
     let internals = ObjXInternals()
 
     let objx =
-        Expr.Obj(
+        AST.Obj(
             Env = cenv,
             Form = null,
             Type = ObjXType.Fn,
@@ -204,7 +180,7 @@ let withMethod(cenv: CompilerEnv ) =
     cenv, method, register, internals
 
 
-let createBinding(sym: Symbol, init: Expr option, index: int, isRecur: bool) =
+let createBinding(sym: Symbol, init: AST option, index: int, isRecur: bool) =
     { Sym = sym
       Tag = null
       Init = None
@@ -215,7 +191,7 @@ let createBinding(sym: Symbol, init: Expr option, index: int, isRecur: bool) =
       IsThis = false
       Index = index }
 
-let createBindingInit(sym: Symbol, init: Expr, index: int, isRecur: bool) =
+let createBindingInit(sym: Symbol, init: AST, index: int, isRecur: bool) =
     let lb = 
         { Sym = sym
           Tag = null
@@ -307,11 +283,11 @@ let compareObjxRegisters(x: ObjXRegister, y: ObjXRegister) =
 
 
 
-let compareObjExprs(ast1: Expr, ast2: Expr) =
+let compareObjExprs(ast1: AST, ast2: AST) =
 
     match ast1, ast2 with
-    | Expr.Obj(Env = env1; Form = form1; Type=type1; Internals = internals1; Register=register1; SourceInfo= info1),
-      Expr.Obj(Env = env2; Form = form2; Type=type2; Internals = internals2; Register=register2; SourceInfo= info2) ->
+    | AST.Obj(Env = env1; Form = form1; Type=type1; Internals = internals1; Register=register1; SourceInfo= info1),
+      AST.Obj(Env = env2; Form = form2; Type=type2; Internals = internals2; Register=register2; SourceInfo= info2) ->
         Expect.equal env1 env2 "Should have same env"
         Expect.equal type1 type2 "Should have same type"  
         // We do not compare Form values -- there might have been a normalization of the body

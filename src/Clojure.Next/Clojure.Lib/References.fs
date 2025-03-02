@@ -168,10 +168,10 @@ and [<Sealed>] LockingTransaction() =
     // Point management
 
     /// The current point.
-    static member val private _lastPoint:
+    static member val private _lastPoint: AtomicLong = AtomicLong()
     // Used to provide a total ordering on transactions for the purpose of determining preference on transactions when there are conflicts.
     // Transactions consume a point for init, for each retry, and on commit if writing.
-    AtomicLong = AtomicLong()
+    
 
     /// The point at the start of the current retry (or first try).
     let mutable _readPoint: int64 = 0L
@@ -1226,7 +1226,7 @@ and [<Sealed>] Agent(v: obj, meta: IPersistentMap) as this =
     new(v) = Agent(v, null)
 
     /// :continue
-    static member private continueKeyword: Keyword = Keyword.intern (null, "continue")
+    static member val continueKeyword: Keyword = Keyword.intern (null, "continue")
 
     /// Get the current state of the agent.
     member _.getState = _state

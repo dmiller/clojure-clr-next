@@ -47,7 +47,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = NilType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = NilType)))
                   "Should return a Literal with null value"
 
           testCase "Parses true"
@@ -58,7 +58,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = BoolType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = BoolType)))
                   "Should return a Literal with null value"
 
           testCase "Parses false"
@@ -69,7 +69,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = BoolType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = BoolType)))
                   "Should return a Literal with null value"
 
 
@@ -81,7 +81,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = KeywordType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = KeywordType)))
                   "Should return a Literal with null value"
 
           testCase "Parses keyword and registers it"
@@ -93,7 +93,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = KeywordType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = KeywordType)))
                   "Should return a Literal with null value"
 
               let kws = register.Keywords
@@ -111,16 +111,15 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form1, Value = form1, Type = KeywordType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form1, value = form1, literalType = KeywordType)))
                   "Should return a Literal with null value"
 
               let ast = Parser.Analyze(cctx, form2)
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form2, Value = form2, Type = KeywordType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form2, value = form2, literalType = KeywordType)))
                   "Should return a Literal with null value"
-
 
               let kws = register.Keywords
               Expect.equal (kws.count ()) 2 "Should be two keywords"
@@ -138,14 +137,14 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form1, Value = form1, Type = KeywordType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form1, value = form1, literalType = KeywordType)))
                   "Should return a Literal with null value"
 
               let ast = Parser.Analyze(cctx, form1)
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form1, Value = form1, Type = KeywordType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form1, value = form1, literalType = KeywordType)))
                   "Should return a Literal with null value"
 
 
@@ -162,7 +161,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = PrimNumericType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = PrimNumericType)))
                   "Should return a numeric Literal"
 
           testCase "Parses a Double"
@@ -173,7 +172,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = PrimNumericType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = PrimNumericType)))
                   "Should return a numeric Literal"
 
 
@@ -185,7 +184,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = PrimNumericType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = PrimNumericType)))
                   "Should return a numeric Literal"
 
 
@@ -197,7 +196,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = OtherType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = OtherType)))
                   "Should return an 'OtherType' Literal"
 
 
@@ -209,7 +208,7 @@ let BasicConstantTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = StringType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = StringType)))
                   "Should return an string Literal"
 
           ]
@@ -226,7 +225,7 @@ let CollectionTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = OtherType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = OtherType)))
                   "Should return a Literal"
 
           testCase "Parses a constant set as a literal"
@@ -237,7 +236,7 @@ let CollectionTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = OtherType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = OtherType)))
                   "Should return a Literal"
 
 
@@ -249,7 +248,7 @@ let CollectionTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = form, Value = form, Type = OtherType))
+                  (AST.Literal(LiteralExpr(env = cctx, form = form, value = form, literalType = OtherType)))
                   "Should return a Literal"
 
           // TODO: non-constant collections
@@ -681,7 +680,7 @@ let SymbolTests =
 
               compareInteropCalls (
                   ast,
-                  (Expr.InteropCall(
+                  (AST.InteropCall(
                       Env = cctx,
                       Form = form,
                       Type = FieldOrPropertyExpr,
@@ -705,7 +704,7 @@ let SymbolTests =
 
               Expect.equal
                   ast
-                  (Expr.QualifiedMethod(
+                  (AST.QualifiedMethod(
                       Env = cctx,
                       Form = form,
                       MethodType = typeof<Int64>,
@@ -726,7 +725,7 @@ let SymbolTests =
 
               Expect.equal
                   ast
-                  (Expr.QualifiedMethod(
+                  (AST.QualifiedMethod(
                       Env = cctx,
                       Form = form,
                       MethodType = typeof<Int64>,
@@ -758,7 +757,7 @@ let SymbolTests =
 
               Expect.equal
                   ast
-                  (Expr.QualifiedMethod(
+                  (AST.QualifiedMethod(
                       Env = cctx,
                       Form = form,
                       MethodType = typeof<Int64>,
@@ -780,7 +779,7 @@ let SymbolTests =
 
               compareQualifiedMethods (
                   ast,
-                  (Expr.QualifiedMethod(
+                  (AST.QualifiedMethod(
                       Env = cctx,
                       Form = form,
                       MethodType = typeof<Int64>,
@@ -803,7 +802,7 @@ let SymbolTests =
               let internals = ObjXInternals()
 
               let objx =
-                  Expr.Obj(
+                  AST.Obj(
                       Env = cctx,
                       Form = null,
                       Type = ObjXType.Fn,
@@ -832,14 +831,14 @@ let SymbolTests =
 
               Expect.equal
                   ast0
-                  (Expr.LocalBinding(Env = cctx, Form = form0, Binding = lbThis, Tag = null))
+                  (AST.LocalBinding(Env = cctx, Form = form0, Binding = lbThis, Tag = null))
                   "Should find binding for this"
 
               let ast1 = Parser.Analyze(cctx, form1)
 
               Expect.equal
                   ast1
-                  (Expr.LocalBinding(Env = cctx, Form = form1, Binding = lbAsdf, Tag = null))
+                  (AST.LocalBinding(Env = cctx, Form = form1, Binding = lbAsdf, Tag = null))
                   "Should find binding for asdf"
 
               let closes = register.Closes
@@ -875,7 +874,7 @@ let SymbolTests =
               let internals = ObjXInternals()
 
               let objx =
-                  Expr.Obj(
+                  AST.Obj(
                       Env = cctx,
                       Form = null,
                       Type = ObjXType.Fn,
@@ -903,21 +902,21 @@ let SymbolTests =
 
               Expect.equal
                   ast0
-                  (Expr.LocalBinding(Env = cctx, Form = form0, Binding = lbThis, Tag = null))
+                  (AST.LocalBinding(Env = cctx, Form = form0, Binding = lbThis, Tag = null))
                   "Should find binding for this"
 
               let ast1 = Parser.Analyze(cctx, form1)
 
               Expect.equal
                   ast1
-                  (Expr.LocalBinding(Env = cctx, Form = form1, Binding = lbAsdf, Tag = null))
+                  (AST.LocalBinding(Env = cctx, Form = form1, Binding = lbAsdf, Tag = null))
                   "Should find binding for asdf"
 
               let ast2 = Parser.Analyze(cctx, pqrsSym)
 
               Expect.equal
                   ast2
-                  (Expr.LocalBinding(Env = cctx, Form = pqrsSym, Binding = lbPqrs, Tag = null))
+                  (AST.LocalBinding(Env = cctx, Form = pqrsSym, Binding = lbPqrs, Tag = null))
                   "Should find binding for pqrs"
 
               let closes = register.Closes
@@ -957,14 +956,14 @@ let SymbolTests =
 
                   Expect.equal
                       ast
-                      (Expr.Literal(Env = cctx, Form = constVar, Value = constVar, Type = OtherType))
+                      (AST.Literal(Env = cctx, Form = constVar, Value = constVar, Type = OtherType))
                       "Should return a Literal"
 
               finally
                   Var.popThreadBindings () |> ignore
 
 
-          testCase "non-local, non-Type, resolves to Var, =>  returns Expr.Var"
+          testCase "non-local, non-Type, resolves to Var, =>  returns AST.Var"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -979,14 +978,14 @@ let SymbolTests =
 
                   Expect.equal
                       ast
-                      (Expr.Var(Env = cctx, Form = abcSym, Var = abcVar, Tag = null))
-                      "Should return an Expr.Var"
+                      (AST.Var(Env = cctx, Form = abcSym, Var = abcVar, Tag = null))
+                      "Should return an AST.Var"
 
               finally
                   Var.popThreadBindings () |> ignore
 
 
-          testCase "non-local, non-Type, resolves to symbol (allow-unresolved = true) =>  Expr.UnresolvedVar"
+          testCase "non-local, non-Type, resolves to symbol (allow-unresolved = true) =>  AST.UnresolvedVar"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -1001,7 +1000,7 @@ let SymbolTests =
 
                   Expect.equal
                       ast
-                      (Expr.UnresolvedVar(Env = cctx, Form = sym, Sym = sym))
+                      (AST.UnresolvedVar(Env = cctx, Form = sym, Sym = sym))
                       "Should return an UnresolvedVar"
 
               finally
@@ -1044,7 +1043,7 @@ let BasicInvokeTests =
                   (fun _ -> Parser.Analyze(cctx, form) |> ignore)
                   "Should throw with nil as fexpr"
 
-          testCase "(:keyword x)  (Just one arg + Register exists) => Expr.KeywordInvoke, callsite registered"
+          testCase "(:keyword x)  (Just one arg + Register exists) => AST.KeywordInvoke, callsite registered"
           <| fun _ ->
               let kw = Keyword.intern (null, "kw")
               let form = ReadFromString "(:kw 7)"
@@ -1056,11 +1055,11 @@ let BasicInvokeTests =
 
               Expect.equal
                   ast
-                  (Expr.KeywordInvoke(
+                  (AST.KeywordInvoke(
                       Env = cctx,
                       Form = form,
-                      KwExpr = (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType)),
-                      Target = (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
+                      KwExpr = (AST.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType)),
+                      Target = (AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
                       Tag = null,
                       SiteIndex = 0,
                       SourceInfo = None
@@ -1068,15 +1067,15 @@ let BasicInvokeTests =
                   "Should return a KeywordInvoke"
           // Had to debug what was wrong with my test.  For reference.  (I had the wrong value for SiteIndex)
           //match ast with
-          //| Expr.KeywordInvoke(Env = kiEnv; Form = kiForm; KwExpr = kwExpr; Target = target; Tag = tag; SiteIndex = index; SourceInfo = si) as ki ->
+          //| AST.KeywordInvoke(Env = kiEnv; Form = kiForm; KwExpr = kwExpr; Target = target; Tag = tag; SiteIndex = index; SourceInfo = si) as ki ->
 
           //      Expect.equal kiEnv cctx "Should have the expected env"
           //      Expect.equal kiForm form "Should have the expected form"
-          //      Expect.isTrue (kwExpr.IsLiteral) "KwExpr should be a Literal"
-          //      Expect.equal kwExpr  (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "KwExpr should be a Literal"
+          //      Expect.isTrue (kwAST.IsLiteral) "KwExpr should be a Literal"
+          //      Expect.equal kwExpr  (AST.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType) ) "KwExpr should be a Literal"
 
           //      Expect.isTrue (target.IsLiteral) "Target should be a Literal"
-          //      Expect.equal target  (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)) "Target should be a Literal"
+          //      Expect.equal target  (AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)) "Target should be a Literal"
 
           //      Expect.isNull tag "Tag should be null"
           //      Expect.equal index 0 "SiteIndex should be 0"
@@ -1094,19 +1093,19 @@ let BasicInvokeTests =
               let ast = Parser.Analyze(cctx, form)
 
               match ast with
-              | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+              | AST.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
 
                   Expect.equal iEnv cctx "Should have the expected env"
                   Expect.equal iForm form "Should have the expected form"
 
                   Expect.equal
                       fexpr
-                      (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType))
+                      (AST.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType))
                       "Fexpr should be a keyword Literal"
 
-                  let expectedArgs = ResizeArray<Expr>()
-                  expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
-                  expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                  let expectedArgs = ResizeArray<AST>()
+                  expectedArgs.Add(AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                  expectedArgs.Add(AST.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
                   compareGenericLists (args, expectedArgs)
 
                   Expect.isNull tag "Tag should be null"
@@ -1123,18 +1122,18 @@ let BasicInvokeTests =
               let ast = Parser.Analyze(cctx, form)
 
               match ast with
-              | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+              | AST.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
 
                   Expect.equal iEnv cctx "Should have the expected env"
                   Expect.equal iForm form "Should have the expected form"
 
                   Expect.equal
                       fexpr
-                      (Expr.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType))
+                      (AST.Literal(Env = cctx, Form = kw, Value = kw, Type = KeywordType))
                       "Fexpr should be a keyword Literal"
 
-                  let expectedArgs = ResizeArray<Expr>()
-                  expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                  let expectedArgs = ResizeArray<AST>()
+                  expectedArgs.Add(AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
                   compareGenericLists (args, expectedArgs)
 
                   Expect.isNull tag "Tag should be null"
@@ -1154,8 +1153,8 @@ let BasicInvokeTests =
               //Expect.equal ast astFexpr "Should be the same as fexpr"
 
               match ast, astFexpr with
-              | Expr.InteropCall(Env = iEnv; Form = iForm; Type = iType; IsStatic = iIsStatic; Tag = iTag; Target = iTarget; TargetType = iTargetType; MemberName = iMemberName; TInfo = iTInfo; Args = iArgs; TypeArgs = iTypeArgs; SourceInfo = iSi),
-                Expr.InteropCall(Env = fEnv; Form = fForm; Type = fType; IsStatic = fIsStatic; Tag = fTag; Target = fTarget; TargetType = fTargetType; MemberName = fMemberName; TInfo = fTInfo; Args = fArgs; TypeArgs = fTypeArgs; SourceInfo = fSi) ->
+              | AST.InteropCall(Env = iEnv; Form = iForm; Type = iType; IsStatic = iIsStatic; Tag = iTag; Target = iTarget; TargetType = iTargetType; MemberName = iMemberName; TInfo = iTInfo; Args = iArgs; TypeArgs = iTypeArgs; SourceInfo = iSi),
+                AST.InteropCall(Env = fEnv; Form = fForm; Type = fType; IsStatic = fIsStatic; Tag = fTag; Target = fTarget; TargetType = fTargetType; MemberName = fMemberName; TInfo = fTInfo; Args = fArgs; TypeArgs = fTypeArgs; SourceInfo = fSi) ->
                   Expect.equal iEnv cctx "Should have the expected env"
                   // Note: forms will not be equal
                   Expect.equal iType fType "Should be Int64"
@@ -1187,18 +1186,18 @@ let BasicInvokeTests =
                   let ast = Parser.Analyze(cctx, form)
 
                   match ast with
-                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+                  | AST.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
 
                       Expect.equal iEnv cctx "Should have the expected env"
                       Expect.equal iForm form "Should have the expected form"
 
                       Expect.equal
                           fexpr
-                          (Expr.Var(Env = cctx, Form = abcSym, Var = abcVar, Tag = null))
-                          "Fexpr should be an Expr.Var"
+                          (AST.Var(Env = cctx, Form = abcSym, Var = abcVar, Tag = null))
+                          "Fexpr should be an AST.Var"
 
-                      let expectedArgs = ResizeArray<Expr>()
-                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                      let expectedArgs = ResizeArray<AST>()
+                      expectedArgs.Add(AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
                       compareGenericLists (args, expectedArgs)
 
                       Expect.isNull tag "Tag should be null"
@@ -1226,7 +1225,7 @@ let BasicInvokeTests =
               finally
                   Var.popThreadBindings () |> ignore
 
-          testCase "(instance? System.Int64 7), instance? mapped to Var in naemsspace   =>  Expr.InstanceOf"
+          testCase "(instance? System.Int64 7), instance? mapped to Var in naemsspace   =>  AST.InstanceOf"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -1242,11 +1241,11 @@ let BasicInvokeTests =
 
                   Expect.equal
                       ast
-                      (Expr.InstanceOf(
+                      (AST.InstanceOf(
                           Env = cctx,
                           Form = form,
                           Type = typeof<int64>,
-                          Expr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                          Expr = AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
                           SourceInfo = None
                       ))
                       "Should be an InstanceOf"
@@ -1269,19 +1268,19 @@ let BasicInvokeTests =
                   let ast = Parser.Analyze(cctx, form)
 
                   match ast with
-                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+                  | AST.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
 
                       Expect.equal iEnv cctx "Should have the expected env"
                       Expect.equal iForm form "Should have the expected form"
 
                       Expect.equal
                           fexpr
-                          (Expr.Var(Env = cctx, Form = RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))
-                          "Fexpr should be an Expr.Var"
+                          (AST.Var(Env = cctx, Form = RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))
+                          "Fexpr should be an AST.Var"
 
-                      let expectedArgs = ResizeArray<Expr>()
-                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
-                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                      let expectedArgs = ResizeArray<AST>()
+                      expectedArgs.Add(AST.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                      expectedArgs.Add(AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
                       compareGenericLists (args, expectedArgs)
 
                       Expect.isNull tag "Tag should be null"
@@ -1306,20 +1305,20 @@ let BasicInvokeTests =
                   let ast = Parser.Analyze(cctx, form)
 
                   match ast with
-                  | Expr.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
+                  | AST.Invoke(Env = iEnv; Form = iForm; Fexpr = fexpr; Args = args; Tag = tag; SourceInfo = si) as invoke ->
 
                       Expect.equal iEnv cctx "Should have the expected env"
                       Expect.equal iForm form "Should have the expected form"
 
                       Expect.equal
                           fexpr
-                          (Expr.Var(Env = cctx, Form = RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))
-                          "Fexpr should be an Expr.Var"
+                          (AST.Var(Env = cctx, Form = RTVar.InstanceVar.Name, Var = RTVar.InstanceVar, Tag = null))
+                          "Fexpr should be an AST.Var"
 
-                      let expectedArgs = ResizeArray<Expr>()
+                      let expectedArgs = ResizeArray<AST>()
 
                       expectedArgs.Add(
-                          Expr.Literal(
+                          AST.Literal(
                               Env = cctx,
                               Form = Symbol.intern ("System.Int64"),
                               Value = typeof<int64>,
@@ -1327,8 +1326,8 @@ let BasicInvokeTests =
                           )
                       )
 
-                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
-                      expectedArgs.Add(Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
+                      expectedArgs.Add(AST.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                      expectedArgs.Add(AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType))
                       compareGenericLists (args, expectedArgs)
 
                       Expect.isNull tag "Tag should be null"
@@ -1375,7 +1374,7 @@ let BasicQMTests =
 
               compareInteropCalls (
                   ast,
-                  (Expr.InteropCall(
+                  (AST.InteropCall(
                       Env = cctx,
                       Form = (RTSeq.first (form)),
                       Type = MethodExpr,
@@ -1403,13 +1402,13 @@ let BasicQMTests =
 
               compareInteropCalls (
                   ast,
-                  (Expr.InteropCall(
+                  (AST.InteropCall(
                       Env = cctx,
                       Form = (RTSeq.first (form)),
                       Type = InstanceZeroArityCallExpr,
                       IsStatic = false,
                       Tag = null,
-                      Target = (Some <| Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
+                      Target = (Some <| AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
                       TargetType = typeof<QMTest>,
                       MemberName = "UI0",
                       TInfo = (typeof<QMTest>.GetMethod ("UI0")),
@@ -1447,13 +1446,13 @@ let BasicQMTests =
 
               args.Add(
                   { HostArg.ParamType = Standard
-                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    ArgExpr = AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
                     LocalBinding = None }
               )
 
               compareInteropCalls (
                   ast,
-                  (Expr.InteropCall(
+                  (AST.InteropCall(
                       Env = cctx,
                       Form = (RTSeq.first (form)),
                       Type = MethodExpr,
@@ -1485,13 +1484,13 @@ let BasicQMTests =
 
               args.Add(
                   { HostArg.ParamType = Standard
-                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    ArgExpr = AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
                     LocalBinding = None }
               )
 
               compareInteropCalls (
                   ast,
-                  (Expr.InteropCall(
+                  (AST.InteropCall(
                       Env = cctx,
                       Form = (RTSeq.first (form)),
                       Type = MethodExpr,
@@ -1523,19 +1522,19 @@ let BasicQMTests =
 
               args.Add(
                   { HostArg.ParamType = Standard
-                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    ArgExpr = AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
                     LocalBinding = None }
               )
 
               compareInteropCalls (
                   ast,
-                  (Expr.InteropCall(
+                  (AST.InteropCall(
                       Env = cctx,
                       Form = (RTSeq.first (form)),
                       Type = MethodExpr,
                       IsStatic = false,
                       Tag = null,
-                      Target = (Some <| Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
+                      Target = (Some <| AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)),
                       TargetType = typeof<QMTest>,
                       MemberName = "UI1",
                       TInfo = (typeof<QMTest>.GetMethod ("UI1")),
@@ -1560,7 +1559,7 @@ let BasicQMTests =
 
               args.Add(
                   { HostArg.ParamType = Standard
-                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    ArgExpr = AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
                     LocalBinding = None }
               )
 
@@ -1568,7 +1567,7 @@ let BasicQMTests =
 
               compareInteropCalls (
                   ast,
-                  (Expr.InteropCall(
+                  (AST.InteropCall(
                       Env = cctx,
                       Form = (RTSeq.first (form)),
                       Type = MethodExpr,
@@ -1584,7 +1583,7 @@ let BasicQMTests =
                   ))
               )
 
-          testCase "(^[long] |ParserTests+QMTest|/new 7)  => constructor call (Expr.New)"
+          testCase "(^[long] |ParserTests+QMTest|/new 7)  => constructor call (AST.New)"
           <| fun _ ->
               let ns1, ns2 = createTestNameSpaces ()
               let cctx = CompilerEnv.Create(Expression)
@@ -1598,7 +1597,7 @@ let BasicQMTests =
 
               args.Add(
                   { HostArg.ParamType = Standard
-                    ArgExpr = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
+                    ArgExpr = AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)
                     LocalBinding = None }
               )
 
@@ -1606,7 +1605,7 @@ let BasicQMTests =
 
               compareNewExprs (
                   ast,
-                  (Expr.New(
+                  (AST.New(
                       Env = cctx,
                       Form = (RTSeq.first (form)),
                       Type = typeof<QMTest>,
@@ -1636,7 +1635,7 @@ let SimpleSpecialOpTests =
               let ast = Parser.Analyze(cctx, form)
 
               let target =
-                  Expr.LocalBinding(
+                  AST.LocalBinding(
                       Env = cctx,
                       Form = Symbol.intern ("x"),
                       Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
@@ -1645,7 +1644,7 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.Untyped(Env = cctx, Form = form, Type = MonitorEnter, Target = Some target))
+                  (AST.Untyped(Env = cctx, Form = form, Type = MonitorEnter, Target = Some target))
                   "Should return a Untyped"
 
           testCase "(monitor-exit x)  => Untyped:MonitorExit"
@@ -1662,7 +1661,7 @@ let SimpleSpecialOpTests =
               let ast = Parser.Analyze(cctx, form)
 
               let target =
-                  Expr.LocalBinding(
+                  AST.LocalBinding(
                       Env = cctx,
                       Form = Symbol.intern ("x"),
                       Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
@@ -1671,7 +1670,7 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.Untyped(Env = cctx, Form = form, Type = MonitorExit, Target = Some target))
+                  (AST.Untyped(Env = cctx, Form = form, Type = MonitorExit, Target = Some target))
                   "Should return a Untyped"
 
 
@@ -1689,7 +1688,7 @@ let SimpleSpecialOpTests =
               let ast = Parser.Analyze(cctx, form)
 
               let target =
-                  Expr.LocalBinding(
+                  AST.LocalBinding(
                       Env = cctx,
                       Form = Symbol.intern ("x"),
                       Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
@@ -1698,7 +1697,7 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.Untyped(Env = cctx, Form = form, Type = Throw, Target = Some target))
+                  (AST.Untyped(Env = cctx, Form = form, Type = Throw, Target = Some target))
                   "Should return a Untyped"
 
 
@@ -1718,7 +1717,7 @@ let SimpleSpecialOpTests =
                   (fun _ -> Parser.Analyze(cctx, form) |> ignore)
                   "Should throw with wrong number of arguments"
 
-          testCase "(if x 7 8)  => Expr.If"
+          testCase "(if x 7 8)  => AST.If"
           <| fun _ ->
 
               let ns1, ns2 = createTestNameSpaces ()
@@ -1732,7 +1731,7 @@ let SimpleSpecialOpTests =
               let ast = Parser.Analyze(cctx, form)
 
               let test =
-                  Expr.LocalBinding(
+                  AST.LocalBinding(
                       Env = cctx,
                       Form = Symbol.intern ("x"),
                       Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
@@ -1741,17 +1740,17 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.If(
+                  (AST.If(
                       Env = cctx,
                       Form = form,
                       Test = test,
-                      Then = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
-                      Else = Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType),
+                      Then = AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      Else = AST.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType),
                       SourceInfo = None
                   ))
-                  "Should return an Expr.If"
+                  "Should return an AST.If"
 
-          testCase "(if x 7)  => Expr.If"
+          testCase "(if x 7)  => AST.If"
           <| fun _ ->
 
               let ns1, ns2 = createTestNameSpaces ()
@@ -1765,7 +1764,7 @@ let SimpleSpecialOpTests =
               let ast = Parser.Analyze(cctx, form)
 
               let test =
-                  Expr.LocalBinding(
+                  AST.LocalBinding(
                       Env = cctx,
                       Form = Symbol.intern ("x"),
                       Binding = (cctx.Locals.valAt (Symbol.intern ("x")) :?> LocalBinding),
@@ -1774,15 +1773,15 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.If(
+                  (AST.If(
                       Env = cctx,
                       Form = form,
                       Test = test,
-                      Then = Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      Then = AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType),
                       Else = Parser.NilExprInstance,
                       SourceInfo = None
                   ))
-                  "Should return an Expr.If"
+                  "Should return an AST.If"
 
           testCase "(if x)  or (if x 7 8 9)   => throws"
           <| fun _ ->
@@ -1806,7 +1805,7 @@ let SimpleSpecialOpTests =
                   (fun _ -> Parser.Analyze(cctx, form) |> ignore)
                   "Should throw with wrong number of arguments"
 
-          testCase "#'abc => Expr.TheVar expression"
+          testCase "#'abc => AST.TheVar expression"
           <| fun _ ->
 
               let ns1, ns2 = createTestNameSpaces ()
@@ -1823,7 +1822,7 @@ let SimpleSpecialOpTests =
 
                   Expect.equal
                       ast
-                      (Expr.TheVar(Env = cctx, Form = form, Var = ns1.findInternedVar (abcSym)))
+                      (AST.TheVar(Env = cctx, Form = form, Var = ns1.findInternedVar (abcSym)))
                       "Should be a TheVar expression"
 
               finally
@@ -1871,7 +1870,7 @@ let SimpleSpecialOpTests =
               finally
                   Var.popThreadBindings () |> ignore
 
-          testCase "(do 7 8) => Expr.Body expression"
+          testCase "(do 7 8) => AST.Body expression"
           <| fun _ ->
 
               let ns1, ns2 = createTestNameSpaces ()
@@ -1886,10 +1885,10 @@ let SimpleSpecialOpTests =
               try
                   let ast = Parser.Analyze(cctx, form)
 
-                  let bodyExprs = ResizeArray<Expr>()
+                  let bodyExprs = ResizeArray<AST>()
 
                   bodyExprs.Add(
-                      Expr.Literal(
+                      AST.Literal(
                           Env = cctx.WithParserContext(Statement),
                           Form = 7L,
                           Value = 7L,
@@ -1897,9 +1896,9 @@ let SimpleSpecialOpTests =
                       )
                   )
 
-                  bodyExprs.Add(Expr.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
+                  bodyExprs.Add(AST.Literal(Env = cctx, Form = 8L, Value = 8L, Type = PrimNumericType))
 
-                  compareBodies (ast, Expr.Body(Env = cctx, Form = RTSeq.next (form), Exprs = bodyExprs))
+                  compareBodies (ast, AST.Body(Env = cctx, Form = RTSeq.next (form), Exprs = bodyExprs))
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -1922,11 +1921,11 @@ let SimpleSpecialOpTests =
 
                   Expect.equal
                       ast
-                      (Expr.Assign(
+                      (AST.Assign(
                           Env = cctx,
                           Form = form,
                           Target =
-                              (Expr.Var(
+                              (AST.Var(
                                   Env =
                                       { cctx with
                                           Pctx = Expression
@@ -1936,14 +1935,14 @@ let SimpleSpecialOpTests =
                                   Tag = null
                               )),
                           Value =
-                              (Expr.Literal(
+                              (AST.Literal(
                                   Env = cctx.WithParserContext(Expression),
                                   Form = 7L,
                                   Value = 7L,
                                   Type = PrimNumericType
                               ))
                       ))
-                      "Should return Expr.Assign"
+                      "Should return AST.Assign"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -1966,11 +1965,11 @@ let SimpleSpecialOpTests =
                   let ast = Parser.Analyze(cctx, form)
 
                   let expected =
-                      (Expr.Assign(
+                      (AST.Assign(
                           Env = cctx,
                           Form = form,
                           Target =
-                              (Expr.LocalBinding(
+                              (AST.LocalBinding(
                                   Env =
                                       { cctx with
                                           Pctx = Expression
@@ -1980,7 +1979,7 @@ let SimpleSpecialOpTests =
                                   Tag = null
                               )),
                           Value =
-                              (Expr.Literal(
+                              (AST.Literal(
                                   Env = cctx.WithParserContext(Expression),
                                   Form = 7L,
                                   Value = 7L,
@@ -1988,7 +1987,7 @@ let SimpleSpecialOpTests =
                               ))
                       ))
 
-                  Expect.equal ast expected "Should return Expr.Assign"
+                  Expect.equal ast expected "Should return AST.Assign"
 
               finally
                   Var.popThreadBindings () |> ignore
@@ -2011,7 +2010,7 @@ let SimpleSpecialOpTests =
                   let ast = Parser.Analyze(cctx, form)
 
                   let expectedTarget =
-                      Expr.InteropCall(
+                      AST.InteropCall(
                           Env =
                               { cctx with
                                   Pctx = Expression
@@ -2030,7 +2029,7 @@ let SimpleSpecialOpTests =
                       )
 
                   let expectedValue =
-                      Expr.Literal(
+                      AST.Literal(
                           Env = cctx.WithParserContext(Expression),
                           Form = 7L,
                           Value = 7L,
@@ -2038,7 +2037,7 @@ let SimpleSpecialOpTests =
                       )
 
                   //let expected =
-                  //    (Expr.Assign(
+                  //    (AST.Assign(
                   //        Env = cctx,
                   //        Form = form,
                   //        Target = expectedTarget,
@@ -2046,7 +2045,7 @@ let SimpleSpecialOpTests =
 
                   // Because interop calls are problematic to compare, we have to do this in pieces
                   match ast with
-                  | Expr.Assign(Env = aEnv; Form = aForm; Target = aTarget; Value = aValue) ->
+                  | AST.Assign(Env = aEnv; Form = aForm; Target = aTarget; Value = aValue) ->
 
                       Expect.equal aEnv cctx "Should have the expected env"
                       Expect.equal aForm form "Should have the expected form"
@@ -2080,7 +2079,7 @@ let SimpleSpecialOpTests =
               finally
                   Var.popThreadBindings () |> ignore
 
-          testCase """(clojure.core/import* "SomeType") => creates Expr.Import"""
+          testCase """(clojure.core/import* "SomeType") => creates AST.Import"""
           <| fun _ ->
 
               let ns1, ns2 = createTestNameSpaces ()
@@ -2094,7 +2093,7 @@ let SimpleSpecialOpTests =
 
               try
                   let ast = Parser.Analyze(cctx, form)
-                  Expect.equal ast (Expr.Import(Env = cctx, Form = form, Typename = "SomeType")) "Should be an Import"
+                  Expect.equal ast (AST.Import(Env = cctx, Form = form, Typename = "SomeType")) "Should be an Import"
               finally
                   Var.popThreadBindings () |> ignore
 
@@ -2137,14 +2136,14 @@ let SimpleSpecialOpTests =
 
               let form = ReadFromString("'7")
               let ast = Parser.Analyze(cctx, form)
-              Expect.equal ast (Expr.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)) "'7 is 7"
+              Expect.equal ast (AST.Literal(Env = cctx, Form = 7L, Value = 7L, Type = PrimNumericType)) "'7 is 7"
 
               let form = ReadFromString("'\"abc\"")
               let ast = Parser.Analyze(cctx, form)
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = "abc", Value = "abc", Type = StringType))
+                  (AST.Literal(Env = cctx, Form = "abc", Value = "abc", Type = StringType))
                   "'\"abc\" is \"abc\""
 
               let form = ReadFromString("'[]")
@@ -2152,7 +2151,7 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = EmptyType))
+                  (AST.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = EmptyType))
                   "'[] is EmptyType]"
 
               let form = ReadFromString("'[1 2 3]")
@@ -2160,7 +2159,7 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
+                  (AST.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
                   "'[1 2 3] is not EmptyType"
 
               let form = ReadFromString("' ^:kw [ 1 2 3]")
@@ -2168,7 +2167,7 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
+                  (AST.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
                   "'collection with meta is not EmptyType"
 
               let form = ReadFromString("'x")
@@ -2176,7 +2175,7 @@ let SimpleSpecialOpTests =
 
               Expect.equal
                   ast
-                  (Expr.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
+                  (AST.Literal(Env = cctx, Form = RTSeq.second (form), Value = RTSeq.second (form), Type = OtherType))
                   "quote anything else is OtherType"
 
           ]
@@ -2235,7 +2234,7 @@ let LetTests =
               let firstBindingInit =
                   createBindingInit (
                       xSym,
-                      Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      AST.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
                       0,
                       false
                   )
@@ -2251,14 +2250,14 @@ let LetTests =
                       IsRecurContext = false
                       LoopLocals = null }
 
-              let expectedBodyForms = ResizeArray<Expr>()
-              expectedBodyForms.Add(Expr.LocalBinding(Env = bodyCctx, Form = xSym, Binding = firstBinding, Tag = null))
+              let expectedBodyForms = ResizeArray<AST>()
+              expectedBodyForms.Add(AST.LocalBinding(Env = bodyCctx, Form = xSym, Binding = firstBinding, Tag = null))
 
               let expectedBody =
-                  Expr.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
+                  AST.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
 
               match ast with
-              | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
+              | AST.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
                   Expect.equal eenv cctx "Should have the expected env"
                   Expect.equal eform form "Should have the expected form"
                   Expect.equal mode LetExprMode.Let "Should be a Let"
@@ -2288,7 +2287,7 @@ let LetTests =
               let firstBindingInit =
                   createBindingInit (
                       xSym,
-                      Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      AST.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
                       0,
                       false
                   )
@@ -2301,7 +2300,7 @@ let LetTests =
               let secondBindingInit =
                   createBindingInit (
                       ySym,
-                      Expr.Literal(Env = secondCctx, Form = 8L, Value = 8L, Type = PrimNumericType),
+                      AST.Literal(Env = secondCctx, Form = 8L, Value = 8L, Type = PrimNumericType),
                       1,
                       false
                   )
@@ -2315,14 +2314,14 @@ let LetTests =
                       IsRecurContext = false
                       LoopLocals = null }
 
-              let expectedBodyForms = ResizeArray<Expr>()
-              expectedBodyForms.Add(Expr.LocalBinding(Env = bodyCctx, Form = xSym, Binding = firstBinding, Tag = null))
+              let expectedBodyForms = ResizeArray<AST>()
+              expectedBodyForms.Add(AST.LocalBinding(Env = bodyCctx, Form = xSym, Binding = firstBinding, Tag = null))
 
               let expectedBody =
-                  Expr.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
+                  AST.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
 
               match ast with
-              | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
+              | AST.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
                   Expect.equal eenv cctx "Should have the expected env"
                   Expect.equal eform form "Should have the expected form"
                   Expect.equal mode LetExprMode.Let "Should be a Let"
@@ -2352,7 +2351,7 @@ let LetTests =
               let firstBindingInit =
                   createBindingInit (
                       xSym,
-                      Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      AST.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
                       0,
                       false
                   )
@@ -2365,7 +2364,7 @@ let LetTests =
               let secondBindingInit =
                   createBindingInit (
                       ySym,
-                      Expr.LocalBinding(Env = secondCctx, Form = xSym, Binding = firstBinding, Tag = null),
+                      AST.LocalBinding(Env = secondCctx, Form = xSym, Binding = firstBinding, Tag = null),
                       1,
                       false
                   )
@@ -2381,14 +2380,14 @@ let LetTests =
                       IsRecurContext = false
                       LoopLocals = null }
 
-              let expectedBodyForms = ResizeArray<Expr>()
-              expectedBodyForms.Add(Expr.LocalBinding(Env = bodyCctx, Form = ySym, Binding = secondBinding, Tag = null))
+              let expectedBodyForms = ResizeArray<AST>()
+              expectedBodyForms.Add(AST.LocalBinding(Env = bodyCctx, Form = ySym, Binding = secondBinding, Tag = null))
 
               let expectedBody =
-                  Expr.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
+                  AST.Body(Env = bodyCctx, Form = RTSeq.next (RTSeq.next (form)), Exprs = expectedBodyForms)
 
               match ast with
-              | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
+              | AST.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
                   Expect.equal eenv cctx "Should have the expected env"
                   Expect.equal eform form "Should have the expected form"
                   Expect.equal mode LetExprMode.Let "Should be a Let"
@@ -2412,7 +2411,7 @@ let LetTests =
               // Need to dig out the stupid loop id so we can do direct comparisons
               let loopId =
                   match ast with
-                  | Expr.Let(LoopId = id) -> id
+                  | AST.Let(LoopId = id) -> id
                   | _ -> failtest "Should be a Let"
 
 
@@ -2425,7 +2424,7 @@ let LetTests =
               let firstBindingInit =
                   createBindingInit (
                       xSym,
-                      Expr.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
+                      AST.Literal(Env = firstCctx, Form = 7L, Value = 7L, Type = PrimNumericType),
                       0,
                       true
                   )
@@ -2438,7 +2437,7 @@ let LetTests =
               let secondBindingInit =
                   createBindingInit (
                       ySym,
-                      Expr.LocalBinding(Env = secondCctx, Form = xSym, Binding = firstBinding, Tag = null),
+                      AST.LocalBinding(Env = secondCctx, Form = xSym, Binding = firstBinding, Tag = null),
                       1,
                       true
                   )
@@ -2450,11 +2449,11 @@ let LetTests =
               expectedLoopLocals.Add(secondBinding)
 
               match ast with
-              | Expr.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
+              | AST.Let(Env = eenv; Form = eform; BindingInits = bindings; Body = body; Mode = mode) ->
                   Expect.equal mode LetExprMode.Loop "Should be a loop"
 
                   match body with
-                  | Expr.Body(Env = benv) ->
+                  | AST.Body(Env = benv) ->
                       Expect.isTrue (benv.LoopId.IsSome) "Should have a loop id"
                       let loopLocals = benv.LoopLocals
                       Expect.isNotNull loopLocals "Should have loop locals"
@@ -2531,13 +2530,13 @@ let RecurTests =
               let ast = Parser.Analyze(cctx, form)
 
               match ast with
-              | Expr.Let(Body = body) ->
-                  match body with
-                  | Expr.Body(Exprs = exprs) ->
-                      Expect.equal exprs.Count 1 "Should have one expression"
+              | AST.Let(letExpr) ->
+                  match letExpr.Body with
+                  | AST.Body(bodyExpr) ->
+                      Expect.equal bodyExpr.Exprs.Count 1 "Should have one expression"
 
-                      match exprs[0] with
-                      | Expr.Recur(LoopLocals = loopLocals; Args = args) ->
+                      match bodyExpr.Exprs[0] with
+                      | AST.Recur(LoopLocals = loopLocals; Args = args) ->
                           Expect.equal loopLocals.Count 1 "Should have one loop local"
                           Expect.equal args.Count 1 "Should have one arg"
                       | _ -> failtest "Should be a Recur"
@@ -2608,7 +2607,7 @@ let TryTests =
               let ast = Parser.Analyze(cctx, form)
 
               match ast with
-              | Expr.Try(Env = env; TryExpr = tryExpr; Catches = catches; Finally = finallyExpr) ->
+              | AST.Try(Env = env; TryExpr = tryExpr; Catches = catches; Finally = finallyExpr) ->
                   Expect.isTrue tryExpr.IsBody "Should be a body expression"
                   Expect.equal catches.Count 2 "Should have one catches"
                   Expect.isTrue finallyExpr.IsSome "Should have a finally expression"
@@ -2692,7 +2691,7 @@ let DefTests =
 
                   Expect.equal
                       ast
-                      (Expr.Def(
+                      (AST.Def(
                           Env = cctx,
                           Form = form,
                           Var = vVar,
@@ -2724,11 +2723,11 @@ let DefTests =
 
                   Expect.equal
                       ast
-                      (Expr.Def(
+                      (AST.Def(
                           Env = cctx,
                           Form = form,
                           Var = vVar,
-                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          Init = AST.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
                           InitProvided = true,
                           IsDynamic = false,
                           ShadowsCoreMapping = false,
@@ -2755,15 +2754,15 @@ let DefTests =
                   let vSym = Symbol.intern "v"
                   let vVar = ns1.findInternedVar (vSym)
                   let metaMap = ReadFromString "{:doc \"something\"}"
-                  let metaExpr = Expr.Literal(Env=cctx, Form=metaMap, Value=metaMap, Type=OtherType)
+                  let metaExpr = AST.Literal(Env=cctx, Form=metaMap, Value=metaMap, Type=OtherType)
 
                   Expect.equal
                       ast
-                      (Expr.Def(
+                      (AST.Def(
                           Env = cctx,
                           Form = form,
                           Var = vVar,
-                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          Init = AST.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
                           InitProvided = true,
                           IsDynamic = false,
                           ShadowsCoreMapping = false,
@@ -2789,15 +2788,15 @@ let DefTests =
                   let vSym = Symbol.intern "v"
                   let vVar = ns1.findInternedVar (vSym)
                   let metaMap = ReadFromString "{:dynamic true}"
-                  let metaExpr = Expr.Literal(Env=cctx, Form=metaMap, Value=metaMap, Type=OtherType)
+                  let metaExpr = AST.Literal(Env=cctx, Form=metaMap, Value=metaMap, Type=OtherType)
 
                   Expect.equal
                       ast
-                      (Expr.Def(
+                      (AST.Def(
                           Env = cctx,
                           Form = form,
                           Var = vVar,
-                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          Init = AST.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
                           InitProvided = true,
                           IsDynamic = true,
                           ShadowsCoreMapping = false,
@@ -2825,15 +2824,15 @@ let DefTests =
                   let vVar = ns1.findInternedVar (vSym)
                   let metaMapForm = ReadFromString "{:arglists '([x])}"
                   let metaMap = ReadFromString "{:arglists ([x])}" :?> IPersistentMap
-                  let metaExpr = Expr.Literal(Env=cctx, Form=metaMapForm, Value=metaMap, Type=OtherType)
+                  let metaExpr = AST.Literal(Env=cctx, Form=metaMapForm, Value=metaMap, Type=OtherType)
 
                   Expect.equal
                       ast
-                      (Expr.Def(
+                      (AST.Def(
                           Env = cctx,
                           Form = form,
                           Var = vVar,
-                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          Init = AST.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
                           InitProvided = true,
                           IsDynamic = false,
                           ShadowsCoreMapping = false,
@@ -2866,11 +2865,11 @@ let DefTests =
 
                   Expect.equal
                       ast
-                      (Expr.Def(
+                      (AST.Def(
                           Env = cctx,
                           Form = form,
                           Var = fredVar,
-                          Init = Expr.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
+                          Init = AST.Literal(Env=cctx, Form=7L, Value=7L, Type=PrimNumericType),
                           InitProvided = true,
                           IsDynamic = false,
                           ShadowsCoreMapping = true,
@@ -2948,7 +2947,7 @@ let FnTests =
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
-                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
                       Expect.equal env cctx "Should have the expected env"
                       Expect.equal form form "Should have the expected form"
                       Expect.isTrue (internals.OnceOnly) "Should be once only"
@@ -2980,9 +2979,9 @@ let FnTests =
                       Expect.isFalse method0.IsVariadic "Should not be variadic"
                       Expect.equal method0.NumParams 1 "Should have one param"
                       match method0.Body with
-                      | Expr.Body(Exprs=exprs) -> 
-                        Expect.equal exprs.Count 1 "should have one form in the body"
-                        let e0 = exprs[0]
+                      | AST.Body(bodyExpr) -> 
+                        Expect.equal bodyExpr.Exprs.Count 1 "should have one form in the body"
+                        let e0 = bodyExpr.Exprs[0]
                         Expect.isTrue e0.IsLocalBinding "should be a local binding"
                       | _ -> failtest "Expected body form to be a Body"
                   | _ -> failtest "Should be an Obj"
@@ -3005,7 +3004,7 @@ let FnTests =
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
-                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
                       Expect.isFalse (internals.OnceOnly) "Should be once only"
                       Expect.isTrue (internals.Name.StartsWith($"{ns1Name}$fn__"))  "Name should have proper prefix"
                       Expect.isTrue (internals.InternalName.StartsWith($"{ns1Name}$fn__"))  "InternalName should have proper prefix"
@@ -3023,9 +3022,9 @@ let FnTests =
                       Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
                       let method0 = internals.Methods[0]
                       match method0.Body with
-                      | Expr.Body(Exprs=exprs) -> 
-                        Expect.equal exprs.Count 1 "should have one form in the body"
-                        let e0 = exprs[0]
+                      | AST.Body(bodyExpr) -> 
+                        Expect.equal bodyExpr.Exprs.Count 1 "should have one form in the body"
+                        let e0 = bodyExpr.Exprs[0]
                         Expect.isTrue e0.IsInvoke "should be a local binding"
                       | _ -> failtest "Expected body form to be a Body"
                   | _ -> failtest "Should be an Obj"
@@ -3050,7 +3049,7 @@ let FnTests =
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
-                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
 
                       Expect.equal (register.Closes.count()) 0 "Should not have any Closes"
                       Expect.equal (register.Constants.count()) 2 "Should have two Constants"
@@ -3063,9 +3062,9 @@ let FnTests =
                       let method0 = internals.Methods[0]
                       Expect.isTrue method0.UsesThis "Does use this"
                       match method0.Body with
-                      | Expr.Body(Exprs=exprs) -> 
-                        Expect.equal exprs.Count 1 "should have one form in the body"
-                        let e0 = exprs[0]
+                      | AST.Body(bodyExpr) -> 
+                        Expect.equal bodyExpr.Exprs.Count 1 "should have one form in the body"
+                        let e0 = bodyExpr.Exprs[0]
                         Expect.isTrue e0.IsInvoke "should be an invocation"
                       | _ -> failtest "Expected body form to be a Body"
                   | _ -> failtest "Should be an Obj"
@@ -3089,7 +3088,7 @@ let FnTests =
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
-                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
 
                       Expect.equal (register.Closes.count()) 0 "Should not have any Closes"
                       Expect.equal (register.Constants.count()) 1 "Should have one Constants"
@@ -3101,9 +3100,9 @@ let FnTests =
                       Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
                       let method0 = internals.Methods[0]
                       match method0.Body with
-                      | Expr.Body(Exprs=exprs) -> 
-                        Expect.equal exprs.Count 1 "should have one form in the body"
-                        let e0 = exprs[0]
+                      | AST.Body(bodyExpr) -> 
+                        Expect.equal bodyExpr.Exprs.Count 1 "should have one form in the body"
+                        let e0 = bodyExpr.Exprs[0]
                         Expect.isTrue e0.IsKeywordInvoke "should be an KeywordInvoke"
                       | _ -> failtest "Expected body form to be a Body"
                   | _ -> failtest "Should be an Obj"
@@ -3120,7 +3119,7 @@ let FnTests =
               let ast = Parser.Analyze(cctx,form)
 
               match ast with
-              | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+              | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
                   Expect.equal internals.Methods.Count 1 "Should have one method"
                   Expect.isTrue (internals.VariadicMethod.IsSome) "Should  have a variadic method"
                   Expect.isNotNull (internals.Tag) "Should have a tag"
@@ -3146,7 +3145,7 @@ let FnTests =
               let ast = Parser.Analyze(cctx,form)
 
               match ast with
-              | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+              | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
                   Expect.isNull (internals.Tag) "Should not have a tag"
                   let method0 = internals.Methods[0]
                   Expect.equal method0.RetType typeof<double> "Should have int32 return type"
@@ -3185,7 +3184,7 @@ let FnTests =
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
-                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
 
                       Expect.equal (register.Closes.count()) 1 "Should have one Closes"
                       let keys = RTMap.keys(register.Closes)
@@ -3200,9 +3199,9 @@ let FnTests =
                       Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
                       let method0 = internals.Methods[0]
                       match method0.Body with
-                      | Expr.Body(Exprs=exprs) -> 
-                        Expect.equal exprs.Count 1 "should have one form in the body"
-                        let e0 = exprs[0]
+                      | AST.Body(bodyExpr) -> 
+                        Expect.equal bodyExpr.Exprs.Count 1 "should have one form in the body"
+                        let e0 = bodyExpr.Exprs[0]
                         Expect.isTrue e0.IsInvoke "should be an Invoke"
                       | _ -> failtest "Expected body form to be a Body"
                   | _ -> failtest "Should be an Obj"
@@ -3242,7 +3241,7 @@ let FnTests =
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
-                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
 
                       Expect.equal (register.Closes.count()) 1 "Should have one Closes"
                       let keys = RTMap.keys(register.Closes)
@@ -3257,9 +3256,9 @@ let FnTests =
                       Expect.equal (register.VarCallsites.count()) 0 "Should not have any VarCallsites"
                       let method0 = internals.Methods[0]
                       match method0.Body with
-                      | Expr.Body(Exprs=exprs) -> 
-                        Expect.equal exprs.Count 1 "should have one form in the body"
-                        let e0 = exprs[0]
+                      | AST.Body(bodyExpr) -> 
+                        Expect.equal bodyExpr.Exprs.Count 1 "should have one form in the body"
+                        let e0 = bodyExpr.Exprs[0]
                         Expect.isTrue e0.IsObj "should be an Obj (fn)"
                       | _ -> failtest "Expected body form to be a Body"
                   | _ -> failtest "Should be an Obj"
@@ -3285,14 +3284,14 @@ let FnTests =
                   let ast = Parser.Analyze(cctx,form)
 
                   match ast with
-                  | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                  | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
                       Expect.equal (register.Closes.count()) 0 "Should have no Closes"
                       let method0 = internals.Methods[0]
                       match method0.Body with
-                      | Expr.Body(Exprs=exprs) -> 
-                        Expect.equal exprs.Count 1 "should have one form in the body"
-                        match exprs[0] with
-                        | Expr.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
+                      | AST.Body(bodyExpr) -> 
+                        Expect.equal bodyExpr.Exprs.Count 1 "should have one form in the body"
+                        match bodyExpr.Exprs[0] with
+                        | AST.Obj(Env = env; Form = form; Type = typ; Internals = internals; Register = register; SourceInfo = sourceInfo) ->
                             Expect.isTrue internals.HasEnclosingMethod "Inner has enclosing method"
                             Expect.equal (register.Closes.count()) 1 "Internal should have one close"
                             let keys = RTMap.keys(register.Closes)
@@ -3342,7 +3341,7 @@ let FnTests =
                 Expect.isTrue ast.IsObj "Should have an AST"
 
                 let tw = new System.IO.StringWriter()
-                ExprUtils.DebugPrint(tw, ast)
+                //ExprUtils.DebugPrint(tw, ast)
                 let s = tw.ToString()
                 Expect.isNotNull s "Should have a string"
 
