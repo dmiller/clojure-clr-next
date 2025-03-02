@@ -68,60 +68,30 @@ let compareSignatureHintOptions (a: ISignatureHint option, b: ISignatureHint opt
 
 let compareQualifiedMethods(a: AST, b:AST) =
     match a, b with
-    | AST.QualifiedMethod(
-        Env = aenv
-        Form = aform
-        MethodType = atype
-        HintedSig = asig
-        TagClass = atag
-        MethodName = aemethodname
-        Kind = akind
-        SourceInfo = asourceinfo),
-      AST.QualifiedMethod(
-          Env = benv
-          Form = bform
-          HintedSig = bsig
-          MethodType = btype
-          TagClass = btag
-          MethodName = bemethodname
-          Kind = bkind
-          SourceInfo = bsourceinfo) ->
-        Expect.equal aenv benv "Env should be equal"
-        Expect.equal aform bform "Form should be equal"
-        Expect.equal atype btype "Type should be equal"
-        Expect.equal atag btag "Tag should be equal"
-        compareSignatureHintOptions (asig, bsig)
-        Expect.equal aemethodname bemethodname "MethodName should be equal"
-        Expect.equal akind bkind "Kind should be equal"
-        Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
+    | AST.QualifiedMethod(aExpr),
+      AST.QualifiedMethod(bExpr) ->
+        Expect.equal aExpr.Env bExpr.Env "Env should be equal"
+        Expect.equal aExpr.Form bExpr.Form "Form should be equal"
+        Expect.equal aExpr.MethodType bExpr.MethodType "Type should be equal"
+        Expect.equal aExpr.TagClass bExpr.TagClass "Tag should be equal"
+        compareSignatureHintOptions (aExpr.HintedSig, bExpr.HintedSig)
+        Expect.equal aExpr.MethodName bExpr.MethodName "MethodName should be equal"
+        Expect.equal aExpr.Kind bExpr.Kind "Kind should be equal"
+        Expect.equal aExpr.SourceInfo bExpr.SourceInfo "SourceInfo should be equal"
     | _ -> failwith "Not a QualifiedMethod"
 
 
 let compareNewExprs (a: AST, b: AST) =
     match a, b with
-    | AST.New(
-        Env = aenv
-        Form = aform
-        Type = atype
-        Constructor = aconstructor
-        Args = aargs
-        IsNoArgValueTypeCtor = aisnoargvaluetypector
-        SourceInfo = asourceinfo),
-      AST.New(
-          Env = benv
-          Form = bform
-          Type = btype
-          Constructor = bconstructor
-          Args = bargs
-          IsNoArgValueTypeCtor = bIsNoArgValueTypeCtor
-          SourceInfo = bsourceinfo) ->
-        Expect.equal aenv benv "Env should be equal"
-        Expect.equal aform bform "Form should be equal"
-        Expect.equal atype btype "Type should be equal"
-        Expect.equal aconstructor bconstructor "Constructor should be equal"
-        compareGenericLists (aargs, bargs)
-        Expect.equal aisnoargvaluetypector bIsNoArgValueTypeCtor "IsNoArgValueTypeCtor should be equal"
-        Expect.equal asourceinfo bsourceinfo "SourceInfo should be equal"
+    | AST.New(a),
+      AST.New(b) ->
+        Expect.equal a.Env b.Env "Env should be equal"
+        Expect.equal a.Form b.Form "Form should be equal"
+        Expect.equal a.Type b.Type "Type should be equal"
+        Expect.equal a.Constructor b.Constructor "Constructor should be equal"
+        compareGenericLists (a.Args, b.Args)
+        Expect.equal a.IsNoArgValueTypeCtor b.IsNoArgValueTypeCtor "IsNoArgValueTypeCtor should be equal"
+        Expect.equal a.SourceInfo b.SourceInfo "SourceInfo should be equal"
     | _ -> failwith "Not an InteropCall"
 
 let compareBodies(a: AST, b: AST) = 

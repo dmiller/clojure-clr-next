@@ -81,85 +81,31 @@ type AST =
     | KeywordInvoke of KeywordInvokeExpr
     | Let of LetExpr // combines LetExpr, LoopExpr, LetFnExpr
     | Literal of LiteralExpr // Combines ConstExpr, NumberExpr, NilExpr, StringExpr, BoolExpr , KeywordExpr, EmptyExpr
-
-
-    | LocalBinding of Env: CompilerEnv * Form: obj * Binding: LocalBinding * Tag: Symbol
-
-    | Meta of Env: CompilerEnv * Form: obj * Target: AST * Meta: AST
-
-    //| Method of Env: CompilerEnv * Form: obj * Args: ResizeArray<HostArg>
-
-    | New of
-        Env: CompilerEnv *
-        Form: obj *
-        Constructor: MethodBase *
-        Args: ResizeArray<HostArg> *
-        Type: Type *
-        IsNoArgValueTypeCtor: bool *
-        SourceInfo: SourceInfo option
-
-    | Obj of
-        Env: CompilerEnv *
-        Form: obj *
-        Type: ObjXType *
-        Internals: ObjXInternals *
-        Register: ObjXRegister *
-        SourceInfo: SourceInfo option
-
-    | QualifiedMethod of
-        Env: CompilerEnv *
-        Form: obj *
-        MethodType: Type *
-        HintedSig: ISignatureHint option *  // Problem with circularity -- decided to define an interface to resolve
-        MethodSymbol: Symbol *
-        MethodName: string *
-        Kind: QMMethodKind *
-        TagClass: Type *
-        SourceInfo: SourceInfo option
-
-    | Recur of
-        Env: CompilerEnv *
-        Form: obj *
-        Args: ResizeArray<AST> *
-        LoopLocals: ResizeArray<LocalBinding> *
-        SourceInfo: SourceInfo option
-
-    | StaticInvoke of
-        Env: CompilerEnv *
-        Form: obj *
-        Target: Type *
-        Method: MethodInfo *
-        RetType: Type *
-        Args: ResizeArray<AST> *
-        IsVariadic: bool *
-        Tag: obj
-
-    | TheVar of Env: CompilerEnv * Form: obj * Var: Var
-
-    | Try of Env: CompilerEnv * Form: obj * TryExpr: AST * Catches: ResizeArray<CatchClause> * Finally: AST option
-
-    | UnresolvedVar of Env: CompilerEnv * Form: obj * Sym: Symbol
-
-    | Var of Env: CompilerEnv * Form: obj * Var: Var * Tag: obj
-
-    | Untyped of  // combines MonitorEnterExpr, MonitorExitExpr, ThrowExpr
-        Env: CompilerEnv *
-        Form: obj *
-        Type: UntypedExprType *
-        Target: AST option
+    | LocalBinding of LocalBindingExpr
+    | Meta of MetaExpr
+    | New of NewExpr
+    | Obj of ObjExpr
+    | QualifiedMethod of QualifiedMethodExpr
+    | Recur of RecurExpr
+    | StaticInvoke of StaticInvokeExpr
+    | TheVar of TheVarExpr
+    | Try of TryExpr
+    | UnresolvedVar of UnresolvedVarExpr
+    | Var of VarExpr
+    | Untyped of UntypedExpr // combines MonitorEnterExpr, MonitorExitExpr, ThrowExpr
 
 and [<AbstractClass>] ExprBase(env: CompilerEnv, form: obj, sourceInfo: SourceInfo option) =
     member val Env = env
     member val Form = form
     member val SourceInfo = sourceInfo
 
-and AssignExpr(env: CompilerEnv, form: obj, target: AST, value: AST, sourceInfo: SourceInfo option) =
-    inherit ExprBase(env, form, sourceInfo)
+and AssignExpr(env: CompilerEnv, form: obj, target: AST, value: AST) =
+    inherit ExprBase(env, form, None)
     member val Target = target
     member val Value = value
 
-and BodyExpr(env: CompilerEnv, form: obj, exprs: ResizeArray<AST>, sourceInfo: SourceInfo option) =
-    inherit ExprBase(env, form, sourceInfo)
+and BodyExpr(env: CompilerEnv, form: obj, exprs: ResizeArray<AST>) =
+    inherit ExprBase(env, form, None)
     member val Exprs = exprs
 
 and CaseExpr
@@ -277,6 +223,76 @@ and LiteralExpr(env: CompilerEnv, form: obj, literalType: LiteralType, value: ob
     inherit ExprBase(env, form, None)
     member val Type = literalType
     member val Value = value
+
+and LocalBindingExpr(env: CompilerEnv, form: obj, binding: LocalBinding, tag: Symbol) =
+    inherit ExprBase(env, form, None)
+    member val Binding = binding
+    member val Tag = tag
+
+and MetaExpr(env: CompilerEnv, form: obj, target: AST, meta: AST) =
+    inherit ExprBase(env, form, None)
+    member val Target = target
+    member val Meta = meta
+
+and NewExpr(env: CompilerEnv, form: obj, constructor: MethodBase, args: ResizeArray<HostArg>, t: Type, isNoArgValueTypeCtor: bool, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Constructor = constructor
+    member val Args = args
+    member val Type = t
+    member val IsNoArgValueTypeCtor = isNoArgValueTypeCtor
+
+and ObjExpr(env: CompilerEnv, form: obj, objxType: ObjXType, internals: ObjXInternals, register: ObjXRegister, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Type = objxType
+    member val Internals = internals
+    member val Register = register
+
+and QualifiedMethodExpr(env: CompilerEnv, form: obj, methodType: Type, hintedSig: ISignatureHint option, methodSymbol: Symbol, methodName: string, kind: QMMethodKind, tagClass: Type, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val MethodType = methodType
+    member val HintedSig = hintedSig  // Problem with circularity -- decided to define an interface to resolve
+    member val MethodSymbol = methodSymbol
+    member val MethodName = methodName
+    member val Kind = kind
+    member val TagClass = tagClass
+
+and RecurExpr(env: CompilerEnv, form: obj, args: ResizeArray<AST>, loopLocals: ResizeArray<LocalBinding>, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val Args = args
+    member val LoopLocals = loopLocals
+
+and StaticInvokeExpr(env: CompilerEnv, form: obj, target: Type, method: MethodInfo, retType: Type, args: ResizeArray<AST>, isVariadic: bool, tag: obj) =
+    inherit ExprBase(env, form, None)
+    member val Target = target
+    member val Method = method
+    member val RetType = retType
+    member val Args = args
+    member val IsVariadic = isVariadic
+    member val Tag = tag
+
+and TheVarExpr(env: CompilerEnv, form: obj, var: Var) =
+    inherit ExprBase(env, form, None)
+    member val Var = var
+
+and TryExpr(env: CompilerEnv, form: obj, tryExpr: AST, catches: ResizeArray<CatchClause>, finallyExpr: AST option, sourceInfo: SourceInfo option) =
+    inherit ExprBase(env, form, sourceInfo)
+    member val TryExpr = tryExpr
+    member val Catches = catches
+    member val Finally = finallyExpr
+
+and UnresolvedVarExpr(env: CompilerEnv, form: obj, sym: Symbol) =
+    inherit ExprBase(env, form, None)
+    member val Sym = sym
+
+and VarExpr(env: CompilerEnv, form: obj, var: Var, tag: Symbol) =
+    inherit ExprBase(env, form, None)
+    member val Var = var
+    member val Tag = tag
+
+and UntypedExpr(env: CompilerEnv, form: obj, exprType: UntypedExprType, target: AST option) =
+    inherit ExprBase(env, form, None)
+    member val Type = exprType
+    member val Target = target
 
 and BindingInit = { Binding: LocalBinding; Init: AST }
 

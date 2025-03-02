@@ -314,7 +314,7 @@ type Parser private () =
             if isNull sym.Namespace then
                 // we might be a local variable
                 match cenv.ReferenceLocal(sym) with
-                | Some lb -> Some(AST.LocalBinding(Env = cenv, Form = sym, Binding = lb, Tag = tag))
+                | Some lb -> Some(AST.LocalBinding(LocalBindingExpr(env = cenv, form = sym, binding = lb, tag = tag)))
                 | None -> None
 
             elif isNull (RTReader.NamespaceFor(sym)) && not <| RTType.IsPosDigit(sym.Name) then
@@ -345,9 +345,9 @@ type Parser private () =
                 elif RT0.booleanCast (RT0.get ((v :> IMeta).meta (), ConstKeyword)) then
                     Parser.Analyze(cenv.WithParserContext(Expression), RTSeq.list (RTVar.QuoteSym, v))
                 else
-                    AST.Var(Env = cenv, Form = sym, Var = v, Tag = tag)
+                    AST.Var(VarExpr(env = cenv, form = sym, var = v, tag = tag))
             | :? Type as t -> AST.Literal(LiteralExpr(env = cenv, form = sym, literalType = OtherType, value = t))
-            | :? Symbol -> AST.UnresolvedVar(Env = cenv, Form = sym, Sym = sym)
+            | :? Symbol -> AST.UnresolvedVar(UnresolvedVarExpr(env = cenv, form = sym, sym = sym))
             | _ -> raise <| CompilerException($"Unable to resolve symbol: {sym} in this context")
 
 
@@ -406,22 +406,22 @@ type Parser private () =
     static member MonitorEnterExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         let cenv = cenv.WithParserContext(Expression)
 
-        AST.Untyped(
-            Env = cenv,
-            Form = form,
-            Type = MonitorEnter,
-            Target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
-        )
+        AST.Untyped(UntypedExpr(
+            env = cenv,
+            form = form,
+            exprType = MonitorEnter,
+            target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
+        ))
 
     static member MonitorExitExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         let cenv = cenv.WithParserContext(Expression)
 
-        AST.Untyped(
-            Env = cenv,
-            Form = form,
-            Type = MonitorExit,
-            Target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
-        )
+        AST.Untyped(UntypedExpr(
+            env = cenv,
+            form = form,
+            exprType = MonitorExit,
+            target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
+        ))
 
 
     // cranking up the difficulty level
@@ -448,8 +448,7 @@ type Parser private () =
                 env = cenv,
                 form = form,
                 target = target,
-                value = Parser.Analyze(bodyCtx, RTSeq.third (form)),
-                sourceInfo = None
+                value = Parser.Analyze(bodyCtx, RTSeq.third (form))
             )
         )
 
@@ -462,14 +461,14 @@ type Parser private () =
                 IsAssignContext = false }
 
         match RT0.count (form) with
-        | 1 -> AST.Untyped(Env = cenv, Form = form, Type = Throw, Target = None)
+        | 1 -> AST.Untyped(UntypedExpr(env = cenv, form = form, exprType = Throw, target = None))
         | 2 ->
-            AST.Untyped(
-                Env = cenv,
-                Form = form,
-                Type = Throw,
-                Target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
-            )
+            AST.Untyped(UntypedExpr(
+                env = cenv,
+                form = form,
+                exprType = Throw,
+                target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
+            ))
         | _ ->
             raise
             <| InvalidOperationException("Too many arguments to throw, throw expects a single Exception instance")
@@ -479,7 +478,7 @@ type Parser private () =
         | :? Symbol as sym ->
             match Parser.LookupVar(cenv, sym, false) with
             | null -> raise <| ParseException($"Unable to resolve var: {sym} in this context")
-            | _ as v -> AST.TheVar(Env = cenv, Form = form, Var = v)
+            | _ as v -> AST.TheVar(TheVarExpr(env = cenv, form = form, var = v))
         | _ as v ->
             raise
             <| ParseException($"Second argument to the-var must be a symbol, found: {v}")
@@ -509,7 +508,7 @@ type Parser private () =
 
         loop forms
 
-        AST.Body(BodyExpr(env = cenv, form = forms, exprs = exprs, sourceInfo = None))
+        AST.Body(BodyExpr(env = cenv, form = forms, exprs = exprs))
 
     static member IfExprParser(cenv: CompilerEnv, form: ISeq) : AST =
 
@@ -715,7 +714,7 @@ type Parser private () =
 
         // TODO: original code does type checking on the args here.  We'll have to do that in a later pass.
 
-        AST.Recur(Env = cenv, Form = form, Args = args, LoopLocals = loopLocals, SourceInfo = None) // TODO: SourceInfo
+        AST.Recur(RecurExpr(env = cenv, form = form, args = args, loopLocals = loopLocals, sourceInfo = None)) // TODO: SourceInfo
 
 
     static member LetFnExprParser(cenv: CompilerEnv, form: ISeq) : AST =
@@ -910,7 +909,7 @@ type Parser private () =
             match enclosingMethod with
             | Some m ->
                 match m.Objx with
-                | AST.Obj(_, _, _, internals, _, _) -> internals.Name
+                | AST.Obj(objExpr) -> objExpr.Internals.Name
                 | _ -> raise <| InvalidOperationException("No Objx found on method")
             | None -> Munger.Munge(RTVar.getCurrentNamespace().Name.Name + "$")
 
@@ -962,14 +961,14 @@ type Parser private () =
             )
 
         let fnExpr =
-            AST.Obj(
-                Env = cenv,
-                Form = origForm,
-                Type = ObjXType.Fn,
-                Internals = internals,
-                Register = register,
-                SourceInfo = None
-            ) // TODO: source info  -- original has a SpanMap field
+            AST.Obj(ObjExpr(
+                env = cenv,
+                form = origForm,
+                objxType = ObjXType.Fn,
+                internals = internals,
+                register = register,
+                sourceInfo = None
+            )) // TODO: source info  -- original has a SpanMap field
 
         let newCenv =
             { cenv with
@@ -1307,7 +1306,7 @@ type Parser private () =
                 Parser.BodyExprParser(cenv, RTSeq.seq (body))
 
             else
-                AST.Try(Env = cenv, Form = form, TryExpr = bodyExpr.Value, Catches = catches, Finally = finallyExpr) // TODO: source info)
+                AST.Try(TryExpr(env = cenv, form = form, tryExpr = bodyExpr.Value, catches = catches, finallyExpr = finallyExpr, sourceInfo = None)) // TODO: source info)
 
 
     /////////////////////////////////
@@ -1348,7 +1347,7 @@ type Parser private () =
 
         let analyzeMaybeInstanceQ () : AST option =
             match fexpr with
-            | AST.Var(Env = e; Form = f; Var = v; Tag = t) when v.Equals(RTVar.InstanceVar) && RT0.count (form) = 3 ->
+            | AST.Var(varExpr) when varExpr.Var.Equals(RTVar.InstanceVar) && RT0.count (form) = 3 ->
                 let sexpr = Parser.Analyze({ cenv with Pctx = Expression }, RTSeq.second (form))
 
                 match sexpr with
@@ -1412,7 +1411,7 @@ type Parser private () =
 
         let result =
             match fexpr with
-            | AST.Var(Env = e; Form = f; Var = v; Tag = t) -> Parser.MaybeParseVarInvoke(cenv, fexpr, form, v)
+            | AST.Var(varExpr) -> Parser.MaybeParseVarInvoke(cenv, fexpr, form, varExpr.Var) 
             | AST.Literal(litExpr) as kwExpr when
                 litExpr.Type = KeywordType && RT0.count (form) = 2 && cenv.ObjXRegister.IsSome
                 ->
@@ -1513,16 +1512,16 @@ type Parser private () =
                 loop (RTSeq.seq (args))
 
                 Some
-                <| AST.StaticInvoke(
-                    Env = cenv,
-                    Form = form,
-                    Target = target,
-                    Method = m,
-                    RetType = m.ReturnType,
-                    Args = argExprs,
-                    IsVariadic = isVariadic,
-                    Tag = tag
-                )
+                <| AST.StaticInvoke(StaticInvokeExpr(
+                    env = cenv,
+                    form = form,
+                    target = target,
+                    method = m,
+                    retType = m.ReturnType,
+                    args = argExprs,
+                    isVariadic = isVariadic,
+                    tag = tag
+                ))
 
     static member ToHostExpr(cenv: CompilerEnv, qmExpr: AST, tag: Symbol, args: ISeq) =
         // TODO: source info
@@ -1531,19 +1530,11 @@ type Parser private () =
         // We need to decide what the pieces are in ...args...
 
         match qmExpr with
-        | AST.QualifiedMethod(
-            Env = qmenv
-            Form = form
-            MethodType = methodType
-            HintedSig = hintedSig
-            MethodSymbol = methodSymbol
-            MethodName = methodName
-            Kind = kind
-            TagClass = tagClass
-            SourceInfo = sourceInfo) ->
+        | AST.QualifiedMethod(qmExpr)
+            ->
 
             let instance, args =
-                match kind with
+                match qmExpr.Kind with
                 | QMMethodKind.Instance ->
                     let instance =
                         Parser.Analyze(cenv.WithParserContext(Expression), RTSeq.first (args))
@@ -1578,7 +1569,7 @@ type Parser private () =
             // If the QME has a nonempty generic type args list, we us it in preference.
 
             let genericTypeArgs =
-                match hintedSig with
+                match qmExpr.HintedSig with
                 | Some hsig ->
                     match hsig.GenericTypeArgs with
                     | Some gta -> gta
@@ -1587,21 +1578,21 @@ type Parser private () =
 
             let hasGenericTypeArgs = genericTypeArgs.Count > 0
 
-            let isZeroArityCall = RT0.count (args) = 0 && kind <> QMMethodKind.Ctor
+            let isZeroArityCall = RT0.count (args) = 0 && qmExpr.Kind <> QMMethodKind.Ctor
 
             if isZeroArityCall then
                 // we know this is not a constructor call.
-                let isStatic = (kind = QMMethodKind.Static)
+                let isStatic = (qmExpr.Kind = QMMethodKind.Static)
 
                 let memberInfo =
                     if not hasGenericTypeArgs then
-                        Reflector.GetFieldOrPropertyInfo(methodType, methodName, isStatic)
+                        Reflector.GetFieldOrPropertyInfo(qmExpr.MethodType, qmExpr.MethodName, isStatic)
                     else
                         null
 
                 let memberInfo, hostExprType =
                     if isNull memberInfo then
-                        Reflector.GetArityZeroMethod(methodType, methodName, genericTypeArgs, isStatic) :> MemberInfo,
+                        Reflector.GetArityZeroMethod(qmExpr.MethodType, qmExpr.MethodName, genericTypeArgs, isStatic) :> MemberInfo,
                         (if isStatic then
                              HostExprType.MethodExpr
                          else
@@ -1621,19 +1612,19 @@ type Parser private () =
 
                     raise
                     <| MissingMemberException(
-                        $"No {instOrStaticStr} field, property or method taking 0 args{typeArgsStr} named {methodName} found for {methodType.Name}"
+                        $"No {instOrStaticStr} field, property or method taking 0 args{typeArgsStr} named {qmExpr.MethodName} found for {qmExpr.MethodType.Name}"
                     )
                 | _ ->
                     AST.InteropCall(
                         InteropCallExpr(
                             env = cenv,
-                            form = form,
+                            form = qmExpr.Form,
                             hostExprType = hostExprType,
                             isStatic = isStatic,
                             tag = tag,
                             target = instance,
-                            targetType = methodType,
-                            memberName = methodName,
+                            targetType = qmExpr.MethodType,
+                            memberName = qmExpr.MethodName,
                             tInfo = memberInfo,
                             args = ResizeArray<HostArg>(),
                             typeArgs = genericTypeArgs,
@@ -1647,37 +1638,37 @@ type Parser private () =
                 // Need to figure out if it matters in the new world order.
                 // Look at contructors for InstanceMethodExpr, StaticMethodExpr, InstanceFieldExpr, InstancePropertyExpr, etc.
                 let method =
-                    match hintedSig with
-                    | Some hsig -> QMHelpers.ResolveHintedMethod(methodType, methodName, kind, hsig)
+                    match qmExpr.HintedSig with
+                    | Some hsig -> QMHelpers.ResolveHintedMethod(qmExpr.MethodType, qmExpr.MethodName, qmExpr.Kind, hsig)
                     | None -> null
 
-                match kind with
+                match qmExpr.Kind with
                 | QMMethodKind.Ctor ->
-                    AST.New(
-                        Env = cenv,
-                        Form = form,
-                        Constructor = method,
-                        Args = Parser.ParseArgs(cenv, args),
-                        Type = methodType,
-                        IsNoArgValueTypeCtor = false,
-                        SourceInfo = None
-                    ) // TODO: source info)
+                    AST.New(NewExpr(
+                        env = cenv,
+                        form = qmExpr.Form,
+                        constructor = method,
+                        args = Parser.ParseArgs(cenv, args),
+                        t = qmExpr.MethodType,
+                        isNoArgValueTypeCtor = false,
+                        sourceInfo = None
+                    )) // TODO: source info)
 
                 | _ ->
-                    let isStatic = (kind = QMMethodKind.Static)
+                    let isStatic = (qmExpr.Kind = QMMethodKind.Static)
 
                     let hostArgs = Parser.ParseArgs(cenv, args)
 
                     AST.InteropCall(
                         InteropCallExpr(
                             env = cenv,
-                            form = form,
+                            form = qmExpr.Form,
                             hostExprType = HostExprType.MethodExpr,
                             isStatic = isStatic,
                             tag = tag,
                             target = instance,
-                            targetType = methodType,
-                            memberName = Munger.Munge(methodName),
+                            targetType = qmExpr.MethodType,
+                            memberName = Munger.Munge(qmExpr.MethodName),
                             tInfo = method,
                             args = hostArgs,
                             typeArgs = genericTypeArgs,
@@ -2205,7 +2196,7 @@ type Parser private () =
     static member OptionallyGenerateMetaInit(cenv: CompilerEnv, form: obj, expr: AST) : AST =
         match RT0.meta (form) with
         | null -> expr
-        | _ as meta -> AST.Meta(Env = cenv, Form = form, Target = expr, Meta = Parser.AnalyzeMap(cenv, meta))
+        | _ as meta -> AST.Meta(MetaExpr(env = cenv, form = form, target = expr, meta = Parser.AnalyzeMap(cenv, meta)))
 
 
     //public static Regex UnpackFnNameRE = new Regex("^(.+)/$([^_]+)(__[0-9]+)*$");
@@ -2371,14 +2362,14 @@ type Parser private () =
             else
                 QMMethodKind.Static, sym.Name
 
-        AST.QualifiedMethod(
-            Env = cenv,
-            Form = sym,
-            MethodType = methodType,
-            HintedSig = hintedSig,
-            MethodSymbol = sym,
-            MethodName = methodName,
-            Kind = kind,
-            TagClass = tagClass,
-            SourceInfo = None
-        ) // TODO: source info)
+        AST.QualifiedMethod(QualifiedMethodExpr(
+            env = cenv,
+            form = sym,
+            methodType = methodType,
+            hintedSig = hintedSig,
+            methodSymbol = sym,
+            methodName = methodName,
+            kind = kind,
+            tagClass = tagClass,
+            sourceInfo = None
+        )) // TODO: source info)
