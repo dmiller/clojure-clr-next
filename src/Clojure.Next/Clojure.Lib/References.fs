@@ -171,7 +171,7 @@ and [<Sealed>] LockingTransaction() =
     static member val private _lastPoint: AtomicLong = AtomicLong()
     // Used to provide a total ordering on transactions for the purpose of determining preference on transactions when there are conflicts.
     // Transactions consume a point for init, for each retry, and on commit if writing.
-    
+
 
     /// The point at the start of the current retry (or first try).
     let mutable _readPoint: int64 = 0L

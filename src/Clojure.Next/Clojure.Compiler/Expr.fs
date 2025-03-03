@@ -104,6 +104,18 @@ and AssignExpr(env: CompilerEnv, form: obj, target: AST, value: AST) =
     member val Target = target
     member val Value = value
 
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? AssignExpr as ae ->
+            this.Env.Equals(ae.Env)
+            && Util.equals (this.Form, ae.Form)
+            && this.Target.Equals(ae.Target)
+            && this.Value.Equals(ae.Value)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Target, this.Value)
+
 and BodyExpr(env: CompilerEnv, form: obj, exprs: ResizeArray<AST>) =
     inherit ExprBase(env, form, None)
     member val Exprs = exprs
@@ -140,7 +152,18 @@ and CollectionExpr(env: CompilerEnv, form: obj, value: obj) =
     inherit ExprBase(env, form, None)
     member val Value = value
 
-and DefExpr(env: CompilerEnv, form: obj, var: Var, init: AST, meta: AST option, initProvided: bool, isDynamic: bool, shadowsCoreMapping: bool, sourceInfo: SourceInfo option) =
+and DefExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        var: Var,
+        init: AST,
+        meta: AST option,
+        initProvided: bool,
+        isDynamic: bool,
+        shadowsCoreMapping: bool,
+        sourceInfo: SourceInfo option
+    ) =
     inherit ExprBase(env, form, sourceInfo)
     member val Var = var
     member val Init = init
@@ -149,20 +172,73 @@ and DefExpr(env: CompilerEnv, form: obj, var: Var, init: AST, meta: AST option, 
     member val IsDynamic = isDynamic
     member val ShadowsCoreMapping = shadowsCoreMapping
 
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? DefExpr as de ->
+            this.Env.Equals(de.Env)
+            && Util.equals (this.Form, de.Form)
+            && this.Var.Equals(de.Var)
+            && this.Init.Equals(de.Init)
+            && Util.equals (this.Meta, de.Meta)
+            && this.InitProvided = de.InitProvided
+            && this.IsDynamic = de.IsDynamic
+            && this.ShadowsCoreMapping = de.ShadowsCoreMapping
+        | _ -> false
+
+    override this.GetHashCode() = 
+        HashCode.Combine(this.Env, this.Form, this.Var, this.Init, this.Meta, this.InitProvided, this.IsDynamic, this.ShadowsCoreMapping)
+    
+
 and IfExpr(env: CompilerEnv, form: obj, testExpr: AST, thenExpr: AST, elseExpr: AST, sourceInfo: SourceInfo option) =
     inherit ExprBase(env, form, sourceInfo)
     member val Test = testExpr
     member val Then = thenExpr
     member val Else = elseExpr
 
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? IfExpr as ie ->
+            this.Env.Equals(ie.Env)
+            && Util.equals (this.Form, ie.Form)
+            && this.Test.Equals(ie.Test)
+            && this.Then.Equals(ie.Then)
+            && this.Else.Equals(ie.Else)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Test, this.Then, this.Else)
+
 and ImportExpr(env: CompilerEnv, form: obj, typename: string, sourceInfo: SourceInfo option) =
     inherit ExprBase(env, form, sourceInfo)
     member val Typename = typename
+
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? ImportExpr as ie ->
+            this.Env.Equals(ie.Env)
+            && Util.equals (this.Form, ie.Form)
+            && Util.equals (this.Typename, ie.Typename)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Typename)
 
 and InstanceOfExpr(env: CompilerEnv, form: obj, expr: AST, t: Type, sourceInfo: SourceInfo option) =
     inherit ExprBase(env, form, sourceInfo)
     member val Expr = expr
     member val Type = t
+
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? InstanceOfExpr as ioe ->
+            this.Env.Equals(ioe.Env)
+            && Util.equals (this.Form, ioe.Form)
+            && this.Expr.Equals(ioe.Expr)
+            && this.Type.Equals(ioe.Type)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Expr, this.Type)
 
 and InteropCallExpr
     (
@@ -196,12 +272,37 @@ and InvokeExpr(env: CompilerEnv, form: obj, fexpr: AST, args: ResizeArray<AST>, 
     member val Args = args
     member val Tag = tag
 
-and KeywordInvokeExpr(env: CompilerEnv, form: obj, kwExpr: AST, target: AST, tag: Symbol, siteIndex: int, sourceInfo: SourceInfo option) =
+and KeywordInvokeExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        kwExpr: AST,
+        target: AST,
+        tag: Symbol,
+        siteIndex: int,
+        sourceInfo: SourceInfo option
+    ) =
     inherit ExprBase(env, form, sourceInfo)
     member val KwExpr = kwExpr
     member val Target = target
     member val Tag = tag
     member val SiteIndex = siteIndex
+
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? KeywordInvokeExpr as kie ->
+            this.Env.Equals(kie.Env)
+            && Util.equals (this.Form, kie.Form)
+            && this.KwExpr.Equals(kie.KwExpr)
+            && this.Target.Equals(kie.Target)
+            && Util.equals (this.Tag, kie.Tag)
+            && this.SiteIndex = kie.SiteIndex
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.KwExpr, this.Target, this.Tag, this.SiteIndex)
+
+        
 
 and LetExpr
     (
@@ -224,44 +325,131 @@ and LiteralExpr(env: CompilerEnv, form: obj, literalType: LiteralType, value: ob
     member val Type = literalType
     member val Value = value
 
+    override this.Equals(o: obj) : bool =
+        match o with
+        | :? LiteralExpr as le ->
+            this.Env.Equals(le.Env)
+            && Util.equals (this.Form, le.Form)
+            && this.Type.Equals(le.Type)
+            && Util.equals (this.Value, le.Value)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Type, this.Value)
+
 and LocalBindingExpr(env: CompilerEnv, form: obj, binding: LocalBinding, tag: Symbol) =
     inherit ExprBase(env, form, None)
     member val Binding = binding
     member val Tag = tag
+
+    override this.Equals (obj: obj): bool = 
+        match obj with
+        | :? LocalBindingExpr as lbe ->
+            this.Env.Equals(lbe.Env)
+            && Util.equals (this.Form, lbe.Form)
+            && this.Binding.Equals(lbe.Binding)
+            && Util.equals (this.Tag, lbe.Tag)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Binding, this.Tag)
+
+
 
 and MetaExpr(env: CompilerEnv, form: obj, target: AST, meta: AST) =
     inherit ExprBase(env, form, None)
     member val Target = target
     member val Meta = meta
 
-and NewExpr(env: CompilerEnv, form: obj, constructor: MethodBase, args: ResizeArray<HostArg>, t: Type, isNoArgValueTypeCtor: bool, sourceInfo: SourceInfo option) =
+and NewExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        constructor: MethodBase,
+        args: ResizeArray<HostArg>,
+        t: Type,
+        isNoArgValueTypeCtor: bool,
+        sourceInfo: SourceInfo option
+    ) =
     inherit ExprBase(env, form, sourceInfo)
     member val Constructor = constructor
     member val Args = args
     member val Type = t
     member val IsNoArgValueTypeCtor = isNoArgValueTypeCtor
 
-and ObjExpr(env: CompilerEnv, form: obj, objxType: ObjXType, internals: ObjXInternals, register: ObjXRegister, sourceInfo: SourceInfo option) =
+and ObjExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        objxType: ObjXType,
+        internals: ObjXInternals,
+        register: ObjXRegister,
+        sourceInfo: SourceInfo option
+    ) =
     inherit ExprBase(env, form, sourceInfo)
     member val Type = objxType
     member val Internals = internals
     member val Register = register
 
-and QualifiedMethodExpr(env: CompilerEnv, form: obj, methodType: Type, hintedSig: ISignatureHint option, methodSymbol: Symbol, methodName: string, kind: QMMethodKind, tagClass: Type, sourceInfo: SourceInfo option) =
+and QualifiedMethodExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        methodType: Type,
+        hintedSig: ISignatureHint option,
+        methodSymbol: Symbol,
+        methodName: string,
+        kind: QMMethodKind,
+        tagClass: Type,
+        sourceInfo: SourceInfo option
+    ) =
     inherit ExprBase(env, form, sourceInfo)
     member val MethodType = methodType
-    member val HintedSig = hintedSig  // Problem with circularity -- decided to define an interface to resolve
+    member val HintedSig = hintedSig // Problem with circularity -- decided to define an interface to resolve
     member val MethodSymbol = methodSymbol
     member val MethodName = methodName
     member val Kind = kind
     member val TagClass = tagClass
 
-and RecurExpr(env: CompilerEnv, form: obj, args: ResizeArray<AST>, loopLocals: ResizeArray<LocalBinding>, sourceInfo: SourceInfo option) =
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? QualifiedMethodExpr as qme ->
+            this.Env.Equals(qme.Env)
+            && Util.equals (this.Form, qme.Form)
+            && this.MethodType.Equals(qme.MethodType)
+            && Util.equals (this.HintedSig, qme.HintedSig)
+            && this.MethodSymbol.Equals(qme.MethodSymbol)
+            && Util.equals (this.MethodName, qme.MethodName)
+            && this.Kind = qme.Kind
+            && this.TagClass.Equals(qme.TagClass)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.MethodType, this.HintedSig, this.MethodSymbol, this.MethodName, this.Kind, this.TagClass)
+
+and RecurExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        args: ResizeArray<AST>,
+        loopLocals: ResizeArray<LocalBinding>,
+        sourceInfo: SourceInfo option
+    ) =
     inherit ExprBase(env, form, sourceInfo)
     member val Args = args
     member val LoopLocals = loopLocals
 
-and StaticInvokeExpr(env: CompilerEnv, form: obj, target: Type, method: MethodInfo, retType: Type, args: ResizeArray<AST>, isVariadic: bool, tag: obj) =
+and StaticInvokeExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        target: Type,
+        method: MethodInfo,
+        retType: Type,
+        args: ResizeArray<AST>,
+        isVariadic: bool,
+        tag: obj
+    ) =
     inherit ExprBase(env, form, None)
     member val Target = target
     member val Method = method
@@ -274,7 +462,26 @@ and TheVarExpr(env: CompilerEnv, form: obj, var: Var) =
     inherit ExprBase(env, form, None)
     member val Var = var
 
-and TryExpr(env: CompilerEnv, form: obj, tryExpr: AST, catches: ResizeArray<CatchClause>, finallyExpr: AST option, sourceInfo: SourceInfo option) =
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? TheVarExpr as tve ->
+            this.Env.Equals(tve.Env)
+            && Util.equals (this.Form, tve.Form)
+            && this.Var.Equals(tve.Var)
+        | _ -> false
+
+        override this.GetHashCode() =
+            HashCode.Combine(this.Env, this.Form, this.Var)
+
+and TryExpr
+    (
+        env: CompilerEnv,
+        form: obj,
+        tryExpr: AST,
+        catches: ResizeArray<CatchClause>,
+        finallyExpr: AST option,
+        sourceInfo: SourceInfo option
+    ) =
     inherit ExprBase(env, form, sourceInfo)
     member val TryExpr = tryExpr
     member val Catches = catches
@@ -284,15 +491,50 @@ and UnresolvedVarExpr(env: CompilerEnv, form: obj, sym: Symbol) =
     inherit ExprBase(env, form, None)
     member val Sym = sym
 
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? UnresolvedVarExpr as uve ->
+            this.Env.Equals(uve.Env)
+            && Util.equals (this.Form, uve.Form)
+            && this.Sym.Equals(uve.Sym)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Sym)
+
 and VarExpr(env: CompilerEnv, form: obj, var: Var, tag: Symbol) =
     inherit ExprBase(env, form, None)
     member val Var = var
     member val Tag = tag
 
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? VarExpr as ve ->
+            this.Env.Equals(ve.Env)
+            && Util.equals (this.Form, ve.Form)
+            && this.Var.Equals(ve.Var)
+            && Util.equals (this.Tag, ve.Tag)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Var, this.Tag)
+
 and UntypedExpr(env: CompilerEnv, form: obj, exprType: UntypedExprType, target: AST option) =
     inherit ExprBase(env, form, None)
     member val Type = exprType
     member val Target = target
+
+    override this.Equals (obj: obj): bool =
+        match obj with
+        | :? UntypedExpr as ue ->
+            this.Env.Equals(ue.Env)
+            && Util.equals (this.Form, ue.Form)
+            && this.Type.Equals(ue.Type)
+            && Util.equals (this.Target, ue.Target)
+        | _ -> false
+
+    override this.GetHashCode() =
+        HashCode.Combine(this.Env, this.Form, this.Type, this.Target)
 
 and BindingInit = { Binding: LocalBinding; Init: AST }
 

@@ -96,7 +96,8 @@ type Parser private () =
 
     static member val MaxPositionalArity = 20 // TODO: Do we want to adjust this down to 16? (Match for System.Func)
 
-    static member val NilExprInstance = AST.Literal(LiteralExpr(env = CompilerEnv.Empty, form = null, literalType = NilType, value = null))
+    static member val NilExprInstance =
+        AST.Literal(LiteralExpr(env = CompilerEnv.Empty, form = null, literalType = NilType, value = null))
 
     static member val TrueExprInstance =
         AST.Literal(LiteralExpr(env = CompilerEnv.Empty, form = true, literalType = BoolType, value = true))
@@ -142,7 +143,8 @@ type Parser private () =
                 cenv.RegisterKeyword(kw)
                 AST.Literal(LiteralExpr(env = cenv, form = form, literalType = KeywordType, value = kw))
             | _ when Numbers.IsNumeric(form) -> Parser.AnalyzeNumber(cenv, form)
-            | :? String as s -> AST.Literal(LiteralExpr(env = cenv, form = form, literalType = StringType, value = String.Intern(s)))
+            | :? String as s ->
+                AST.Literal(LiteralExpr(env = cenv, form = form, literalType = StringType, value = String.Intern(s)))
             | :? IPersistentCollection as coll when not <| form :? IType && not <| form :? IRecord && coll.count () = 0 ->
                 Parser.OptionallyGenerateMetaInit(
                     cenv,
@@ -406,22 +408,26 @@ type Parser private () =
     static member MonitorEnterExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         let cenv = cenv.WithParserContext(Expression)
 
-        AST.Untyped(UntypedExpr(
-            env = cenv,
-            form = form,
-            exprType = MonitorEnter,
-            target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
-        ))
+        AST.Untyped(
+            UntypedExpr(
+                env = cenv,
+                form = form,
+                exprType = MonitorEnter,
+                target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
+            )
+        )
 
     static member MonitorExitExprParser(cenv: CompilerEnv, form: ISeq) : AST =
         let cenv = cenv.WithParserContext(Expression)
 
-        AST.Untyped(UntypedExpr(
-            env = cenv,
-            form = form,
-            exprType = MonitorExit,
-            target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
-        ))
+        AST.Untyped(
+            UntypedExpr(
+                env = cenv,
+                form = form,
+                exprType = MonitorExit,
+                target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
+            )
+        )
 
 
     // cranking up the difficulty level
@@ -444,12 +450,7 @@ type Parser private () =
         let bodyCtx = cenv.WithParserContext(Expression)
 
         AST.Assign(
-            AssignExpr(
-                env = cenv,
-                form = form,
-                target = target,
-                value = Parser.Analyze(bodyCtx, RTSeq.third (form))
-            )
+            AssignExpr(env = cenv, form = form, target = target, value = Parser.Analyze(bodyCtx, RTSeq.third (form)))
         )
 
 
@@ -463,12 +464,14 @@ type Parser private () =
         match RT0.count (form) with
         | 1 -> AST.Untyped(UntypedExpr(env = cenv, form = form, exprType = Throw, target = None))
         | 2 ->
-            AST.Untyped(UntypedExpr(
-                env = cenv,
-                form = form,
-                exprType = Throw,
-                target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
-            ))
+            AST.Untyped(
+                UntypedExpr(
+                    env = cenv,
+                    form = form,
+                    exprType = Throw,
+                    target = (Some <| Parser.Analyze(cenv, RTSeq.second (form)))
+                )
+            )
         | _ ->
             raise
             <| InvalidOperationException("Too many arguments to throw, throw expects a single Exception instance")
@@ -961,14 +964,16 @@ type Parser private () =
             )
 
         let fnExpr =
-            AST.Obj(ObjExpr(
-                env = cenv,
-                form = origForm,
-                objxType = ObjXType.Fn,
-                internals = internals,
-                register = register,
-                sourceInfo = None
-            )) // TODO: source info  -- original has a SpanMap field
+            AST.Obj(
+                ObjExpr(
+                    env = cenv,
+                    form = origForm,
+                    objxType = ObjXType.Fn,
+                    internals = internals,
+                    register = register,
+                    sourceInfo = None
+                )
+            ) // TODO: source info  -- original has a SpanMap field
 
         let newCenv =
             { cenv with
@@ -1306,7 +1311,16 @@ type Parser private () =
                 Parser.BodyExprParser(cenv, RTSeq.seq (body))
 
             else
-                AST.Try(TryExpr(env = cenv, form = form, tryExpr = bodyExpr.Value, catches = catches, finallyExpr = finallyExpr, sourceInfo = None)) // TODO: source info)
+                AST.Try(
+                    TryExpr(
+                        env = cenv,
+                        form = form,
+                        tryExpr = bodyExpr.Value,
+                        catches = catches,
+                        finallyExpr = finallyExpr,
+                        sourceInfo = None
+                    )
+                ) // TODO: source info)
 
 
     /////////////////////////////////
@@ -1411,7 +1425,7 @@ type Parser private () =
 
         let result =
             match fexpr with
-            | AST.Var(varExpr) -> Parser.MaybeParseVarInvoke(cenv, fexpr, form, varExpr.Var) 
+            | AST.Var(varExpr) -> Parser.MaybeParseVarInvoke(cenv, fexpr, form, varExpr.Var)
             | AST.Literal(litExpr) as kwExpr when
                 litExpr.Type = KeywordType && RT0.count (form) = 2 && cenv.ObjXRegister.IsSome
                 ->
@@ -1512,16 +1526,18 @@ type Parser private () =
                 loop (RTSeq.seq (args))
 
                 Some
-                <| AST.StaticInvoke(StaticInvokeExpr(
-                    env = cenv,
-                    form = form,
-                    target = target,
-                    method = m,
-                    retType = m.ReturnType,
-                    args = argExprs,
-                    isVariadic = isVariadic,
-                    tag = tag
-                ))
+                <| AST.StaticInvoke(
+                    StaticInvokeExpr(
+                        env = cenv,
+                        form = form,
+                        target = target,
+                        method = m,
+                        retType = m.ReturnType,
+                        args = argExprs,
+                        isVariadic = isVariadic,
+                        tag = tag
+                    )
+                )
 
     static member ToHostExpr(cenv: CompilerEnv, qmExpr: AST, tag: Symbol, args: ISeq) =
         // TODO: source info
@@ -1530,8 +1546,7 @@ type Parser private () =
         // We need to decide what the pieces are in ...args...
 
         match qmExpr with
-        | AST.QualifiedMethod(qmExpr)
-            ->
+        | AST.QualifiedMethod(qmExpr) ->
 
             let instance, args =
                 match qmExpr.Kind with
@@ -1592,7 +1607,8 @@ type Parser private () =
 
                 let memberInfo, hostExprType =
                     if isNull memberInfo then
-                        Reflector.GetArityZeroMethod(qmExpr.MethodType, qmExpr.MethodName, genericTypeArgs, isStatic) :> MemberInfo,
+                        Reflector.GetArityZeroMethod(qmExpr.MethodType, qmExpr.MethodName, genericTypeArgs, isStatic)
+                        :> MemberInfo,
                         (if isStatic then
                              HostExprType.MethodExpr
                          else
@@ -1639,20 +1655,23 @@ type Parser private () =
                 // Look at contructors for InstanceMethodExpr, StaticMethodExpr, InstanceFieldExpr, InstancePropertyExpr, etc.
                 let method =
                     match qmExpr.HintedSig with
-                    | Some hsig -> QMHelpers.ResolveHintedMethod(qmExpr.MethodType, qmExpr.MethodName, qmExpr.Kind, hsig)
+                    | Some hsig ->
+                        QMHelpers.ResolveHintedMethod(qmExpr.MethodType, qmExpr.MethodName, qmExpr.Kind, hsig)
                     | None -> null
 
                 match qmExpr.Kind with
                 | QMMethodKind.Ctor ->
-                    AST.New(NewExpr(
-                        env = cenv,
-                        form = qmExpr.Form,
-                        constructor = method,
-                        args = Parser.ParseArgs(cenv, args),
-                        t = qmExpr.MethodType,
-                        isNoArgValueTypeCtor = false,
-                        sourceInfo = None
-                    )) // TODO: source info)
+                    AST.New(
+                        NewExpr(
+                            env = cenv,
+                            form = qmExpr.Form,
+                            constructor = method,
+                            args = Parser.ParseArgs(cenv, args),
+                            t = qmExpr.MethodType,
+                            isNoArgValueTypeCtor = false,
+                            sourceInfo = None
+                        )
+                    ) // TODO: source info)
 
                 | _ ->
                     let isStatic = (qmExpr.Kind = QMMethodKind.Static)
@@ -2362,14 +2381,16 @@ type Parser private () =
             else
                 QMMethodKind.Static, sym.Name
 
-        AST.QualifiedMethod(QualifiedMethodExpr(
-            env = cenv,
-            form = sym,
-            methodType = methodType,
-            hintedSig = hintedSig,
-            methodSymbol = sym,
-            methodName = methodName,
-            kind = kind,
-            tagClass = tagClass,
-            sourceInfo = None
-        )) // TODO: source info)
+        AST.QualifiedMethod(
+            QualifiedMethodExpr(
+                env = cenv,
+                form = sym,
+                methodType = methodType,
+                hintedSig = hintedSig,
+                methodSymbol = sym,
+                methodName = methodName,
+                kind = kind,
+                tagClass = tagClass,
+                sourceInfo = None
+            )
+        ) // TODO: source info)

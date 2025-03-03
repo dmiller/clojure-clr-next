@@ -354,7 +354,7 @@ and [<Sealed>] EmptyList(m) =
         override _.Contains(v) = false
 
 /// Implementation of a persistent list.
-and [<AllowNullLiteral>] PersistentList private (meta: IPersistentMap, _first: obj, _rest: IPersistentList, _count: int) =
+and [<AllowNullLiteral>] PersistentList internal (meta: IPersistentMap, _first: obj, _rest: IPersistentList, _count: int) =
     inherit ASeq(meta)
 
     /// Construct a PersistentList of one item with null metadata
