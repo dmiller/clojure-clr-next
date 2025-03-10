@@ -1,0 +1,75 @@
+strict digraph G {
+
+rankdir = RL;
+
+/* here start the interfaces */
+
+{
+	node [shape=box];
+
+	AssignableExpr;
+	MaybePrimitiveExpr -> { Expr };
+	Expr;
+}
+
+/* Here start (mostly) the classes */
+
+{
+	node [shape=ellipse]           
+		   
+	AssignExpr                   -> { Expr };          
+	BodyExpr                     -> { MaybePrimitiveExpr };
+	BooleanExpr                  -> { LiteralExpr };
+	CaseExpr                     -> { MaybePrimitiveExpr };
+	ConstantExpr                 -> { LiteralExpr };
+	DefExpr                      -> { Expr };
+	EmptyExpr                    -> { Expr };	
+	FieldOrPropertyExpr          -> { HostExpr, AssignableExpr };
+	FnExpr                       -> { ObjExpr };
+	HostExpr                     -> { MaybePrimitiveExpr };
+	IfExpr                       -> { MaybePrimitiveExpr };
+	ImportExpr                   -> { Expr };  
+	InstanceFieldOrPropertyExpr  -> { FieldOrPropertyExpr };	
+	InstanceFieldExpr            -> { InstanceFieldOrPropertyExpr };
+	InstancePropertyExpr         -> { InstanceFieldOrPropertyExpr };
+	InstanceMethodExpr           -> { MethodExpr };
+	InstanceOfExpr               -> { MaybePrimitiveExpr };
+	InstanceZeroArityCallExpr    -> { HostExpr };         
+	InvokeExpr                   -> { Expr };            
+	KeywordExpr                  -> { LiteralExpr };
+	KeywordInvokeExpr            -> { Expr }; 
+	LetExpr                      -> { MaybePrimitiveExpr };
+	LetFnExpr                    -> { MaybePrimitiveExpr };
+	LiteralExpr                  -> { Expr };  
+	LocalBindingExpr             -> { MaybePrimitiveExpr, AssignableExpr };
+	MapExpr                      -> { Expr };
+	MetaExpr                     -> { Expr };   
+	MethodExpr                   -> { HostExpr };
+	MethodParamExpr              -> { MaybePrimitiveExpr };   
+	MonitorEnterExpr             -> { UntypedExpr };   
+	MonitorExitExpr              -> { UntypedExpr }; 
+	NewExpr                      -> { Expr };
+	NewInstanceExpr              -> { ObjExpr };
+	NilExpr                      -> { LiteralExpr };           
+	NumberExpr                   -> { LiteralExpr, MaybePrimitiveExpr };
+	ObjExpr                      -> { Expr };                          
+	RecurExpr                    -> { MaybePrimitiveExpr };
+	QualifiedMethodExpr          -> { Expr };
+	SetExpr                      -> { Expr };   
+	StaticFieldOrPropertyExpr    -> { FieldOrPropertyExpr };
+	StaticFieldExpr              -> { StaticFieldOrPropertyExpr };
+	StaticPropertyExpr           -> { StaticFieldOrPropertyExpr };
+	StaticInvokeExpr             -> { MaybePrimitiveExpr };
+	StaticMethodExpr             -> { MethodExpr };
+	StringExpr                   -> { LiteralExpr }; 
+	TheVarExpr                   -> { Expr };   
+	ThrowExpr                    -> { UntypedExpr }; 
+	TryExpr                      -> { Expr };   
+	UnresolvedVarExpr            -> { Expr };   
+	UntypedExpr                  -> { Expr };   
+	VarExpr                      -> { Expr, AssignableExpr };   
+	VectorExpr                   -> { Expr }; 
+
+}
+
+}
