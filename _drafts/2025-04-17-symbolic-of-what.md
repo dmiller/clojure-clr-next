@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Symbolic of what?
-date: 2023-01-06 00:00:00 -0500
+date: 2023-04-17 00:00:00 -0500
 categories: general
 ---
 
