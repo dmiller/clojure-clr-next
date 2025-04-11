@@ -169,26 +169,113 @@ private static Expr AnalyzeSymbol(Symbol symbol)
 ## Resolving symbols
 
 A lot of heavy lifting is taking place in that call to `Compiler.Resolve`.
+`Compiler.Resolve` calls `Compiler.ResolveIn` with the current namespace and `allowPrivate` set to `false` (don't allow access to `Var`s marked as private).   I hope the detailed comments in the code suffice to explain what is going on.
 
+```C#
+private static object ResolveIn(Namespace n, Symbol symbol, bool allowPrivate)
+{
+    // Symbol resolution is always relative to some namespace, passed as the first argument to this method.
+    // The main discriminator here is whether the symbol has a namespace or not.
 
+    if (symbol.Namespace != null)
+    {
+        // The symbol has a namespace.  
+        // Note that this section of code returns or throws, no fall-through to later code.
+        // In the context where this method is called, it is assumed you have already checked
+        //   whether the namespace of the symbol names a type.  And that it does not.  
+        // Unless it of the form Type/digit.  THat is handled here.
 
+        // First we check to see if the namespace of the symbol names an actual namespace, either an alias or a real namespace.
+        Namespace ns = namespaceFor(n, symbol);
 
-ReferenceLocal
-HostExpr.MaybeType
-RegisterVar
+        if (ns == null)
+        {   
+            // It does not name a namespace.  Our only hope is that we have Type/digit.
+            Type at = HostExpr.MaybeArrayType(symbol);
+            if ( at != null)
+                return at;
+            throw new InvalidOperationException("No such namespace: " + symbol.Namespace);
+        }
 
+        // The namespace of the symbol is a namespace.  Look up the name of the symbol in that namespace.
+        // We are only interested in a mapping to a Var.
+        Var v = ns.FindInternedVar(Symbol.intern(symbol.Name));
+        if (v == null)
+            throw new InvalidOperationException("No such var: " + symbol);
 
-## There's more
+        // Note that we might not allow reference to private var in another namespace.
+        else if (v.Namespace != CurrentNamespace && !v.isPublic && !allowPrivate)
+            throw new InvalidOperationException(string.Format("var: {0} is not public", symbol));
+        return v;
+    }
 
-In my work on ClojureCLR.Next, I implemented the parser as a standalone project.
-The test suite for the parser has almost 60 tests for symbol interpretation. This includes tests for looking up / resolving symbols in the context of namespaces and aliases and types, plus tests for the various AST nodes that can be created from symbols.
+    // If we reach here, the symbol does not have a namespace.
+    // We first check if the name has . in it.  If so, it had better be a type.
+    // This will throw an exception if it does not name a type.
+    else if (symbol.Name.IndexOf('.') > 0 || symbol.Name[symbol.Name.Length - 1] == ']')
+    {
+        return RT.classForNameE(symbol.Name);
 
-Here is a sample of test descriptions.  
-The first two lists are for symbol lookup and resolution, used in parsing, 
-but not looking at what AST node would be created.
-Do you know all of these rules?
+    // ns and in-ns are special cases.  They are always found.
+    else if (symbol.Equals(NsSym))
+        return RT.NSVar;
+    else if (symbol.Equals(InNsSym))
+        return RT.InNSVar;
+    else
+    
+        // Do not look at this. Do not look at this.  Do not look at this.
+        // This relates to some weirdness in the compiler regarding base classes for classes implementing functions.
+        // Present in both ClojureCLR and Clojure JVM.
+        if (Util.equals(symbol, CompileStubSymVar.get()))
+            return CompileStubClassVar.get();
 
-These are when the symbol has namespace:
+        // We look for the symbol in the namespace that was passed in.
+        
+        object o = n.GetMapping(symbol);
+
+        // Ignore. Ignore. Ignore.  This relates to double-definitions for types when compiling.  ClojureCLR only.
+        if (o is Type type)
+        {
+            var tName = type.FullName;
+            var compiledType = Compiler.FindDuplicateCompiledType(tName);
+            if (compiledType is not null && Compiler.IsCompiling)
+                return compiledType;
+        }
+
+        // If there is no mapping, we can return the symbol itself _only_ if *allow-unresolved-vars* is true.
+        // Otherwise, we throw an exception.
+        if (o == null)
+        {
+            if (RT.booleanCast(RT.AllowUnresolvedVarsVar.deref()))
+                return symbol;
+            else
+                throw new InvalidOperationException(string.Format("Unable to resolve symbol: {0} in this context", symbol));
+        }
+
+        // There was a mapping.  Return it.
+        return o;
+    }
+}
+```
+
+## Dangling references
+
+To finish of this code, some brief comments on a few of the auxiliary methods mentioned above.
+
+`Compiler.ReferenceLocal` is called when we have identified a reference to a local binding.  It does some bookkeeping needed for code-gen.  Specifically, it notes the usage of the local binding in the containing function (if there is one) and any functions above that is might be nested in.  This is so that we know to close over those variables when creating an instance of the function.  It also notes if the local variable is the `this` variable; reference to `this` precludes static linking.  But more about that in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-04-19-functional-anatomy}).
+
+`Compiler.RegisterVar` is similar.  It just notes the reference to the `Var` in the containing function (if there is one).  A field in the class implementing the function will be created and initialized to the `Var` in question.
+
+Looking up types corresponding to names is done in `HostExpr.MaybeType` and `HostExpr.MaybeArrayType`.  
+I've written about these in [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type}).
+
+## I'm feeling a little testy
+
+In my work on ClojureCLR.Next, I implemented the parser separately from the rest of the compiler, leaving out some of the bookkeeping, deferring type analysis and other semantic meddling for later phases.  This separation allowed me to develop a test suite for just the parser.  This test suite  has almost 60 tests for symbol interpretation alone. This includes tests for looking up / resolving symbols in the context of namespaces and aliases and types, plus tests for the various AST nodes that can be created from symbols.
+
+Do you know all of these rules for intrerpreting symbols?  (I didn't.)  
+
+First, tests for resolving symbols without worrying about AST node construction. These are when the symbol has namespace:
 
 - ns/name, ns is namespace alias, no var found for name (throws)
 - ns/name, ns is namespace alias, not current namespace, var found, var is private, privates not allowed (throws)
@@ -205,8 +292,7 @@ These are when the symbol does not have a namespace:
 - `ns` -- treated as a special case -- always found
 - name found in current namespace (return var)  (there are variants in the resolve/lookup code that will create the `Var` if not found)
 
-Several kinds of AST nodes can be created from symbols.  The details of node types is bit beyond where we can go here,
-but perhaps you can get the gist:
+Several kinds of AST nodes can be created from symbols.  The details of node types are covered in [C4: AST me anything]({{site.baseurl}}{% post_url 2025-04-16-AST-me-anything}).   For symbols with a namespace:
 
 - ns/name, ns names a `Type`, that type has a field or property with the given name  => `StaticFieldExpr` or `StaticPropertyExpr`
 - ns/name, ns names a `Type`, no field or property found, name does not start with a period  => `QualifiedMethodExpr`, Static 
@@ -223,6 +309,3 @@ Without a namespace:
 - not local, not a type, resolves to a Var, Var is not macro, not const => `VarExpr`
 - not local, not a type, does not resolve, allow-unresolved = true => `UnresolvedVarExpr`
 - not local, not a type, does not resolve, allow-unresolved = false => throws
-
-
-
