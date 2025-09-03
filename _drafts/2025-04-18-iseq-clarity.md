@@ -8,14 +8,17 @@ categories: general
 
 
 
-The `ISeq` analyzer is `Compiler.AnalyzeSeq`. It receives an ISeq, which will be of the form `(op ...args...)`.
-It first tries to macroexpand the form.  If macroexpanding gives us back soemthing other than what we started with, it just calls `Compiler.Analyze` on that new things.  Otherwise:
+The `ISeq` analyzer is `Compiler.AnalyzeSeq`. It receives an `ISeq`, which will be of the form `(op ...args...)`.
+And we know that `op` is not symbol whose name starts with "def".   Whatever.
+
+
+It first tries to macroexpand the form.  If macroexpanding gives us back soemthing other than what we started with, it just calls `Compiler.Analyze` on that new thing.  Otherwise:
 
 
 - if `op` is `nil`, throw an exception
 - if `op` is a `Var` or a symbol that resolves to a `Var`, and that `Var` has `:inline` metadata with an entry with correct number of arguments, invoke that entry (it should be an `IFn`) on the arguments and recursively analyze the result.  
 - If `op` is a special form, call the corresponding special form parser. (See below).
-- Otherwise, call the parse for `InvokeExpr` (Also see below.)
+- Otherwise, call the parser for `InvokeExpr` (Also see below.)
 
 
 The compiler has a map from special form symbols to the parser to be used for that special form.
@@ -72,9 +75,42 @@ Also, some operators you are unlikely to type directly.  More commonly they come
 
 ### The invocation parser   
 
-The catch-all parser at the end of `AnalyzeSeq` is `InvokeExpr.Parser.Parse`.  It might not return an `InvokeExpr`.
-It could alternatively return a `KeywordInvokeExpr` or a `StaticInvokeExpr`.  
-I discussed static invocation in another blog post, [The function of naming; the naming of functions]({{site.baseurl}}{% post_url 2025-02-28-function-naming}).
+The catch-all parser at the end of `AnalyzeSeq` is `InvokeExpr.Parser.Parse`.  When called, we know the form to analyze looks like `(f arg1 arg2 ...)` and we know `f` is not special form symbol, as detailed above.. It might not be a symbol at all; we could have a form such as `((fn [x] (inc (* 2 x)))  y)`.  This parser does a lot of special-case analysis to determine the best type of AST node to compute.
+
+The first step is to call `Compiler.Analyze` on `f`.   Call the resulting AST node `fexpr`.
+The following special cases are handled:
+
+- `instance?`.    There is a special type of AST node just for this case:  `InstanceOfExpr`.  (I don't know it gets its own node type.)   The conditions for this are:
+    - `fexpr` is a `VarExpr`
+    - the `Var` is actually `#'instance?`
+    - the form has exactly two arguments.  
+    
+    
+
+- static invocation.  The type of AST node to create is `StaticInvokeExpr` The conditions are:
+    `fexpr` is a `VarExpr`
+    - the `:direct-linking` compiler option is set to true
+    - we are not in an 'evaluation context' (more on that some other day).
+    - the `Var` is not marked as dynamic, does not have metatdata `:redef` = true, and does not have metadata ':declared' = true
+    - The Var is bound to a class that has an `invokeStatic` method with a matching number of arguments
+    I discussed static invocation in another blog post, [The function of naming; the naming of functions]({{site.baseurl}}{% post_url 2025-02-28-function-naming}).  It also will be discussed in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-04-19-functional-anatomy}).
+
+- primitive invocation.  We create an AST node of type `InstanceMethodExpr` to invoke the `.invokePrim` method of the function.  The conditions are:
+    - `fexpr` is a `VarExpr`
+    - the `Var` is bound to a class that has an `invokePrim` method with a matching number of arguments  (determined by looking at the `:arglists` metadata on the `Var`)
+    - we are not in an 'evaluation context' (more on that some other day).
+    We will discuss this in more detail in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-04-19-functional-anatomy}).
+
+- keyword invocation.  When our form looks like `(:keyword coll)`, we create an AST node of type `KeywordInvokeExpr`.  The conditions are:
+    - `fexpr` is a `KeywordExpr`
+    - the form has exactly one argument
+
+- passthrough of `StaticFieldExpr` and `StaticPropertyExpr`.  This is to deal with the so-called "static field bug that replaces a reference in parens with the field itself rather than trying to invoke the value in the field."  Think of it as dealing with `(Int64/MaxValue)` when you should be writing just `Int64/MaxValue`.  
+
+- Dealing with `QualifiedMethodExpr`.
+
+
+
 
 
 ## Conclusion
