@@ -1,0 +1,22 @@
+strict digraph G {
+
+rankdir = RL;
+
+node [shape=box];
+	
+IFn;
+IFnArity;
+Fn;
+IObj;
+IComparer;
+
+AFn -> {IFn, IFnArity};
+
+AFunction -> { AFn, Fn, IObj, IComparer };
+
+RestFn -> AFunction;
+
+"AFunction+MetaWrapper" -> RestFn;
+
+
+}

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: C4 - Symbolic of what?
-date: 2023-04-17 00:00:00 -0500
+date: 2025-10-02 00:00:00 -0500
 categories: general
 ---
 
@@ -10,14 +10,12 @@ We look at the interpretation of symbols in Clojure code.
 
 ## Introduction 
  
-Symbols but are given meaning by a complex web of interactions among the Lisp reader, 
+Symbols are given meaning by a complex web of interactions among the Lisp reader, 
 namespaces, the Clojure compiler, and the Clojure runtime.
 
 We'll skip the reader, though the interpretation of symbols as discussed below does come into just a bit in the reading of syntax-quote (` `` `) forms.  But that's a bit off the path we need to travel.
 
-The code for resolving symbols and translating them in context into nodes in the abstract syntax tree (AST) is complex.
-There are appear to be some reduncancies that could be eliminated, along with a few other simplifications.
-But for that, I needed more clarity on the rules for symbol interpretation.  What follows is not complete, by any means, but it is a starting point.
+The code for resolving symbols and translating them  into nodes in the abstract syntax tree (AST) is complex. In face, there appear to be some reduncancies that could be eliminated, along with a few other simplifications.  But let us proceed with the code we have.
 
 ## An example
 
@@ -53,32 +51,30 @@ Within the call to `f`, we must interpret each symbol that occurs in the form, i
 
 
 ```Clojure
-f  x  y  ns2/g  namespace.with.a.long.name/h  System.Int64  String/ToUpper System.Text.StringBuilder
+f  x  y  ns2/g  namespace.with.a.long.name/h Int64/MaxValue String/.ToUpper System.Text.StringBuilder
 ```
 
 `x` and `y` are easy.  They do not have a namespace, so they could be local bindings.  Local binding takes precedence over other possible interpretations.  Indeed, the current context has local binding for those symbols.  The analyzer will produce `LocalBindingExpr` nodes for them.
 
 `f` also does not have namespace.  However, it not bound in the current lexical scope.  
-It does not have a namespace, so it does not refer to directly or indirectly (via an alias) to a namespace.
+It does not have a namespace, so we don't need to figure out what its namespace actually is.
 The remaining option is that it has a mapping in the current namespace.  It does, to a `Var` and that is what we use. The analyer will produce a `VarExpr` node for it.
 
-`ns2/g` is a bit more complicated.  It has a namespace, so it can't be a local binding.  We need to determine what namespace `ns2` stands for.  This requires looking up `ns2` in the current namespace.  The current namespace is `ns1`, which has an alias for `namespace.with.a.long.name`.  So we look up `g` in `namespace.with.a.long.name`, finding a `Var`.  We also check to see if `g` is private.  It is not, so we can use it.  The analyzer will also produce a `VarExpr` node.
+`ns2/g` is a bit more complicated.  It has a namespace, so it can't be a local binding.  We need to determine what namespace `ns2` stands for.  This requires looking up `ns2` in the current namespace.  The current namespace is `ns1`, which has `ns2` as an alias for `namespace.with.a.long.name`.  We look up `g` in `namespace.with.a.long.name`, finding a `Var`.  We also check to see if `g` is private.  It is not, so we can use it.  The analyzer will produce a `VarExpr` node.
 
 `namespace.with.a.long.name/h` is also easy.  `namespace.with.a.long.name` is not an alias but the name of an existing namespace.  And `h` is a public `Var` in that namespace.  So we can use it.  The analyzer will produce a `VarExpr` node for it.
 
 Next consider `Int64/MaxValue`. It does have a namespace, so it can't be a local.  We check for if `Int64` is a namespace alias; it is not.
-However, the `ns1` namespace does have a mapping from the symbol `Int64` to the type `System.Int64`.  (By default, all namespaces are set up with mappings to 'system' types from their unqualified names.)   So we have a symbol with the namespace mapping to a type.  We must check to see if the name of the symbol, in this case `MaxValue` is a property or field in that type.  There is such a property in the type `System.Int64`, so we can use it.  The analyzer will produce a `StaticFieldExpr` node for it.
+However, the `ns1` namespace does have a mapping from the symbol `Int64` to the type `System.Int64`.  (By default, all namespaces are set up with mappings to 'system' types from their unqualified names.)   So we have a symbol with the namespace mapping to a type.  We must check to see if the name of the symbol, in this case `MaxValue` is a property or field in that type.  `System.Int64.MaxValue` existsThe analyzer will produce a `StaticFieldExpr` node.
 
-`String/.ToUpper` is similar.  In this case, because this symbol appears in the functional position of function invocation, 
-given that `String` maps to `System.String`, we look for methods also. Beacause the name starts with a period, we look for an instance method, and find one.  In this case, there will not be a node separately for `String/.ToUpper`; rather, the analyzer will create an `InstanceMethodExpr` node for the entire expression.  
+`String/.ToUpper` is similar.  In this case, because this symbol appears in the functional position of function invocation and given that `String` maps to `System.String`, we look for methods also. Beacause the name starts with a period, we look for an instance method, and find one.  In this case, there will not be a node separately for `String/.ToUpper`; rather, the analyzer will create an `InstanceMethodExpr` node for the entire expression.  
 
-Finally, we have `System.Text.StringBuilder`.  When we have a symbol with no namespace and periods in the name, we look for a type.
-In this case, we do find a type.  If it didn't name a type, we would go on and treat the same as a symbol with no periods. (And probably fail).  To express the type in the AST, the analyzer will create a `ConstantExpr` node.  
+Finally, we have `System.Text.StringBuilder`.  When we have a symbol with no namespace and periods in the name, we look for a type. In this case, we do find a type.  If it didn't name a type, we would go on and treat the same as a symbol with no periods. (And probably fail).  To express the type in the AST, the analyzer will create a `ConstantExpr` node.  
 
 
 ## A look at the code
 
-We can profitably take a look at the actual C# code for `Compiler.AnalyzeSymbol`.  
+Now that we are warmed up, we can profitably  look at the actual C# code for `Compiler.AnalyzeSymbol`.  
 
 ```C#
 private static Expr AnalyzeSymbol(Symbol symbol)
@@ -262,7 +258,7 @@ private static object ResolveIn(Namespace n, Symbol symbol, bool allowPrivate)
 
 To finish of this code, some brief comments on a few of the auxiliary methods mentioned above.
 
-`Compiler.ReferenceLocal` is called when we have identified a reference to a local binding.  It does some bookkeeping needed for code-gen.  Specifically, it notes the usage of the local binding in the containing function (if there is one) and any functions above that is might be nested in.  This is so that we know to close over those variables when creating an instance of the function.  It also notes if the local variable is the `this` variable; reference to `this` precludes static linking.  But more about that in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-04-19-functional-anatomy}).
+`Compiler.ReferenceLocal` is called when we have identified a reference to a local binding.  It does some bookkeeping needed for code-gen.  Specifically, it notes the usage of the local binding in the containing function (if there is one) and any functions above that is might be nested in.  This is so that we know to close over those variables when creating an instance of the function.  It also notes if the local variable is the `this` variable; reference to `this` precludes static linking.  But more about that in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-10-04-functional-anatomy}).
 
 `Compiler.RegisterVar` is similar.  It just notes the reference to the `Var` in the containing function (if there is one).  A field in the class implementing the function will be created and initialized to the `Var` in question.
 
@@ -292,7 +288,7 @@ These are when the symbol does not have a namespace:
 - `ns` -- treated as a special case -- always found
 - name found in current namespace (return var)  (there are variants in the resolve/lookup code that will create the `Var` if not found)
 
-Several kinds of AST nodes can be created from symbols.  The details of node types are covered in [C4: AST me anything]({{site.baseurl}}{% post_url 2025-04-16-AST-me-anything}).   For symbols with a namespace:
+Several kinds of AST nodes can be created from symbols.  The details of node types are covered in [C4: AST me anything]({{site.baseurl}}{% post_url 2025-10-01-AST-me-anything}).   For symbols with a namespace:
 
 - ns/name, ns names a `Type`, that type has a field or property with the given name  => `StaticFieldExpr` or `StaticPropertyExpr`
 - ns/name, ns names a `Type`, no field or property found, name does not start with a period  => `QualifiedMethodExpr`, Static 
