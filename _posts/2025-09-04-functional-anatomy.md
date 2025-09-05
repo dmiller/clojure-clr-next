@@ -288,7 +288,7 @@ I'll leave `applyTo` as an exercise.
 
 ## Static invocation
 
-In the previous post [C4: ISeq clarity]({{site.baseurl}}{% post_url 2025-09-03-iseq-clarity }), I touched upon the notion of static invocation of functions.  Static invocation is an efficiency hack.  It allows a call such as
+In the previous post  __ISeq clarity__, I touched upon the notion of static invocation of functions.  Static invocation is an efficiency hack.  It allows a call such as
 
 ```Clojure
 (f 1 2 3)

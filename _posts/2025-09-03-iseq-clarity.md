@@ -94,13 +94,13 @@ The following special cases are handled:
     - we are not in an 'evaluation context' (more on that some other day).
     - the `Var` is not marked as dynamic, does not have metatdata `:redef` = true, and does not have metadata ':declared' = true
     - The Var is bound to a class that has an `invokeStatic` method with a matching number of arguments
-    I discussed static invocation in another blog post, [The function of naming; the naming of functions]({{site.baseurl}}{% post_url 2025-02-28-function-naming }).  It also will be discussed in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy }).
+    I discussed static invocation in another blog post, [The function of naming; the naming of functions]({{site.baseurl}}{% post_url 2025-02-28-function-naming }).  It also will be discussed in __C4: Functional anatomy__.
 
 - primitive invocation.  We create an AST node of type `InstanceMethodExpr` to invoke the `.invokePrim` method of the function.  The conditions are:
     - `fexpr` is a `VarExpr`
     - the `Var` is bound to a class that has an `invokePrim` method with a matching number of arguments  (determined by looking at the `:arglists` metadata on the `Var`)
     - we are not in an 'evaluation context' (more on that some other day).
-    We will discuss this in more detail in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy }).
+    We will discuss this in more detail in __C4: Functional anatomy__.
 
 - keyword invocation.  When our form looks like `(:keyword coll)`, we create an AST node of type `KeywordInvokeExpr`.  The conditions are:
     - `fexpr` is a `KeywordExpr`
