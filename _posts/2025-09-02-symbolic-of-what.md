@@ -13,7 +13,7 @@ We look at the interpretation of symbols in Clojure code.
 Symbols are given meaning by a complex web of interactions among the Lisp reader, 
 namespaces, the Clojure compiler, and the Clojure runtime.
 
-We'll skip the reader, though the interpretation of symbols as discussed below does come into just a bit in the reading of syntax-quote (` `` `) forms.  But that's a bit off the path we need to travel.
+We'll skip the reader, though the interpretation of symbols as discussed below does come into just a bit in the reading of syntax-quote forms.  But that's a bit off the path we need to travel.
 
 The code for resolving symbols and translating them  into nodes in the abstract syntax tree (AST) is complex. In face, there appear to be some reduncancies that could be eliminated, along with a few other simplifications.  But let us proceed with the code we have.
 
@@ -262,8 +262,7 @@ To finish of this code, some brief comments on a few of the auxiliary methods me
 
 `Compiler.RegisterVar` is similar.  It just notes the reference to the `Var` in the containing function (if there is one).  A field in the class implementing the function will be created and initialized to the `Var` in question.
 
-Looking up types corresponding to names is done in `HostExpr.MaybeType` and `HostExpr.MaybeArrayType`.  
-I've written about these in [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type %}).
+Looking up types corresponding to names is done in `HostExpr.MaybeType` and `HostExpr.MaybeArrayType`.  I've written about these in [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type %}).
 
 ## I'm feeling a little testy
 
