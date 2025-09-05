@@ -263,7 +263,7 @@ To finish of this code, some brief comments on a few of the auxiliary methods me
 `Compiler.RegisterVar` is similar.  It just notes the reference to the `Var` in the containing function (if there is one).  A field in the class implementing the function will be created and initialized to the `Var` in question.
 
 Looking up types corresponding to names is done in `HostExpr.MaybeType` and `HostExpr.MaybeArrayType`.  
-I've written about these in [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type }).
+I've written about these in __Are you my type?__.
 
 ## I'm feeling a little testy
 

@@ -94,7 +94,7 @@ The following special cases are handled:
     - we are not in an 'evaluation context' (more on that some other day).
     - the `Var` is not marked as dynamic, does not have metatdata `:redef` = true, and does not have metadata ':declared' = true
     - The Var is bound to a class that has an `invokeStatic` method with a matching number of arguments
-    I discussed static invocation in another blog post, [The function of naming; the naming of functions]({{site.baseurl}}{% post_url 2025-02-28-function-naming }).  It also will be discussed in __C4: Functional anatomy__.
+    I discussed static invocation in another blog post, __The function of naming; the naming of functions__.  It also will be discussed in __C4: Functional anatomy__.
 
 - primitive invocation.  We create an AST node of type `InstanceMethodExpr` to invoke the `.invokePrim` method of the function.  The conditions are:
     - `fexpr` is a `VarExpr`

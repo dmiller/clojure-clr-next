@@ -302,7 +302,7 @@ to bypass the usual dynamic dispatch that does a lookup of the current value of 
 
 When these conditions are met, for each `invoke` the function defines, there will be a `staticInvoke` method of the same arity with the actual function definition.  The `invoke` just calls the `staticInvoke` of the same arity.
 
-I provide more detail on some of the issues of static linking in a previous post outside this series:  [The function of naming; the naming of functions]({{site.baseurl}}{% post_url 2025-02-28-function-naming }). 
+I provide more detail on some of the issues of static linking in a previous post outside this series: __The function of naming; the naming of function__. 
 
 ## Primitive urges
 
