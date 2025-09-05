@@ -1,7 +1,7 @@
 ---
 layout: post
 title: C4 - AST me anything
-date: 2025-10-01 00:00:00 -0500
+date: 2025-09-01 00:00:00 -0500
 categories: general
 ---
 
@@ -245,5 +245,5 @@ The main body of the `Compiler.Analyze` method just steps through a series of te
 The node types mentioned in this list from a very small subset of the all the node types.
 Here we see pretty much a few data-oriented node types.  Clearly the `Symbol` and `ISeq` analyzers are doing the heavy lifting.  Enough that each gets its own post:
 
-- [Symbolic of what?]({{site.baseurl}}{% post_url 2025-10-02-symbolic-of-what})
-- [ISeq clarity]({{site.baseurl}}{% post_url 2025-10-03-iseq-clarity})
+- [Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what})
+- [ISeq clarity]({{site.baseurl}}{% post_url 2025-09-03-iseq-clarity})
