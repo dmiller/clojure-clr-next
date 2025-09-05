@@ -245,5 +245,5 @@ The main body of the `Compiler.Analyze` method just steps through a series of te
 The node types mentioned in this list from a very small subset of the all the node types.
 Here we see pretty much a few data-oriented node types.  Clearly the `Symbol` and `ISeq` analyzers are doing the heavy lifting.  Enough that each gets its own post:
 
-- __Symbolic of what?__
-- __ISeq clarity__
+- [C4: Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what %}) - A little digression on what symbols represent
+- [C4: ISeq clarity]({{site.baseurl}}{% post_url 2025-09-03-iseq-clarity %}) - How to analyze an `ISeq`
