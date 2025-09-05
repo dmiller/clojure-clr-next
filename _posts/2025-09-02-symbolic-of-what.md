@@ -258,12 +258,12 @@ private static object ResolveIn(Namespace n, Symbol symbol, bool allowPrivate)
 
 To finish of this code, some brief comments on a few of the auxiliary methods mentioned above.
 
-`Compiler.ReferenceLocal` is called when we have identified a reference to a local binding.  It does some bookkeeping needed for code-gen.  Specifically, it notes the usage of the local binding in the containing function (if there is one) and any functions above that is might be nested in.  This is so that we know to close over those variables when creating an instance of the function.  It also notes if the local variable is the `this` variable; reference to `this` precludes static linking.  But more about that in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy}).
+`Compiler.ReferenceLocal` is called when we have identified a reference to a local binding.  It does some bookkeeping needed for code-gen.  Specifically, it notes the usage of the local binding in the containing function (if there is one) and any functions above that is might be nested in.  This is so that we know to close over those variables when creating an instance of the function.  It also notes if the local variable is the `this` variable; reference to `this` precludes static linking.  But more about that in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy }).
 
 `Compiler.RegisterVar` is similar.  It just notes the reference to the `Var` in the containing function (if there is one).  A field in the class implementing the function will be created and initialized to the `Var` in question.
 
 Looking up types corresponding to names is done in `HostExpr.MaybeType` and `HostExpr.MaybeArrayType`.  
-I've written about these in [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type}).
+I've written about these in [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type }).
 
 ## I'm feeling a little testy
 
@@ -288,7 +288,7 @@ These are when the symbol does not have a namespace:
 - `ns` -- treated as a special case -- always found
 - name found in current namespace (return var)  (there are variants in the resolve/lookup code that will create the `Var` if not found)
 
-Several kinds of AST nodes can be created from symbols.  The details of node types are covered in [C4: AST me anything]({{site.baseurl}}{% post_url 2025-09-01-AST-me-anything}).   For symbols with a namespace:
+Several kinds of AST nodes can be created from symbols.  The details of node types are covered in [C4: AST me anything]({{site.baseurl}}{% post_url 2025-09-01-AST-me-anything }).   For symbols with a namespace:
 
 - ns/name, ns names a `Type`, that type has a field or property with the given name  => `StaticFieldExpr` or `StaticPropertyExpr`
 - ns/name, ns names a `Type`, no field or property found, name does not start with a period  => `QualifiedMethodExpr`, Static 

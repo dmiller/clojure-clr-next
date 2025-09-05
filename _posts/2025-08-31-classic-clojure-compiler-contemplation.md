@@ -10,10 +10,10 @@ In this post, we look at the overall structure of the compiler.
 
 The other posts in the series are:
 
-- [C4: AST me anything]({{site.baseurl}}{% post_url 2025-09-01-AST-me-anything}) - A tour of the AST nodes produced by the compiler
-- [C4: Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what}) - A little digression on what symbols represent
-- [C4: ISeq clarity]({{site.baseurl}}{% post_url 2025-09-03-iseq-clarity}) - How to analyze an `ISeq`
-- [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy}) - How functions are implemented in Clojure
+- [C4: AST me anything]({{site.baseurl}}{% post_url 2025-09-01-AST-me-anything }) - A tour of the AST nodes produced by the compiler
+- [C4: Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what }) - A little digression on what symbols represent
+- [C4: ISeq clarity]({{site.baseurl}}{% post_url 2025-09-03-iseq-clarity }) - How to analyze an `ISeq`
+- [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy }) - How functions are implemented in Clojure
 - __C4: The fn*: talkin' 'bout my generation__ - Code-gen for functions
 - __C4: How type-ical__ - Type analysis by the compiler
 - __C4: I have something to emit__ - More on code generation
