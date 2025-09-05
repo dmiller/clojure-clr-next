@@ -10,7 +10,7 @@ In this post, we look at the overall structure of the compiler.
 
 The other posts in the series are:
 
-- __C4: AST me anything__ - A tour of the AST nodes produced by the compiler
+- [C4: AST me anything]({{site.baseurl}}{% post_url 2025-09-01-AST-me-anything %}) - A tour of the AST nodes produced by the compiler
 - __C4: Symbolic of what?__ - A little digression on what symbols represent
 - __C4: ISeq clarity__ - How to analyze an `ISeq`
 - __C4: Functional anatomy__ - How functions are implemented in Clojure
