@@ -5,7 +5,7 @@ date: 2025-09-04 00:00:00 -0500
 categories: general
 ---
 
-We look at the implementation of functions in ClojureCLR and how evaluation/compilation translates a source code definition of a function to the underlying class representation.
+We look at the implementation of functions in ClojureCLR and how evaluation/compilation translates a source code definition of a function to the underlying class representation.  (The first of several posts on this topic.)
 
 ## The universe, and everything
 

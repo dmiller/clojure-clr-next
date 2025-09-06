@@ -1,0 +1,26 @@
+strict digraph G {
+
+rankdir = RL;
+
+node [shape=box];
+	
+subgraph objexprrelated {
+	node [shape=box];
+
+    Expr;
+	ObjExpr -> { Expr };
+    NewInstanceExpr -> { ObjExpr };
+    FnExpr -> { ObjExpr };
+
+}	
+
+subgraph objmethodrelated {
+	node [shape=box];
+
+	ObjMethod;
+    NewInstanceMethod -> { ObjMethod };
+    FnMethod -> { ObjMethod };
+}	
+
+
+}
