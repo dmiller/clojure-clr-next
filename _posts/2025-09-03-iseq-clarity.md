@@ -5,7 +5,7 @@ date: 2025-09-03 00:00:00 -0500
 categories: general
 ---
 
-How the Clojure analyzer process an `ISeq`
+How the Clojure analyzer processes an `ISeq`.
 
 
 The `ISeq` analyzer is `Compiler.AnalyzeSeq`. It receives an `ISeq`, which will be of the form `(op ...args...)`.
