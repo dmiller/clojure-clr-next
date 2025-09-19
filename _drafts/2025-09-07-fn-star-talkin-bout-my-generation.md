@@ -16,7 +16,7 @@ The primary classes involved in function code generation are:
 <img src="{{site.baseurl | prepend: site.url}}/assets/images/objexpr.png" alt="Graph of all types related to ObjExpr" />
 
 I have no idea why `ObjExpr` and `ObjMethod` are named what they are.
-`FnExpr` is the AST node that represents an `fn*` form.  `FnMethod` represents an `invoke` method of the generated class. 
+`FnExpr` is the AST node that represents an `fn*` form;  `FnMethod` represents an `invoke` method of the generated class. 
 `NewInstanceExpr` represents a `deftype` or `reify` form; `NewInstanceMethod` represents a method of the generated class.
 For these, a significant amount of code lies in the base classes `ObjExpr` and `ObjMethod`. We will focus here on `FnExpr` and `FnMethod`.  Most of this analysis applies to `NewInstanceExpr` and `NewInstanceMethod` as well.
 
@@ -33,9 +33,13 @@ Note: Do not confuse `NewInstanceExpr` with `NewExpr` -- the latter represents a
 | FnMethod.cs  |  458 |  157 | 
 | NewInstanceMethod.cs |  321 |  117 |
 
-Doesn't seem like much?  It's packed.  And dependent on a some other goodies that we will get to shortly.
+Doesn't seem like much?  It's packed.  And dependent on a some other goodies that we will get to in due course.
 
 ## Out of control
 
+If you try to track the flow of data in the parsing and code generation, particularly with respect to functions, you will soon find yourself in a pit of despair.    I am going to ignore that aspect of the code for now.
+You can get the details in the upcoming [C4: Out of control][TBD] post.
+
+What is important for now is to know that, by whatever obscure means, the parsing of forms in the methods of an `fn*` collects information that eventually is folded into either the `FnMethod` or the `FnExpr` instance that is being generated.
 
 
