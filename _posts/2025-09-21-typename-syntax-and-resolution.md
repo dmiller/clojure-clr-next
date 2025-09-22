@@ -55,7 +55,7 @@ For a variety of reasons, I decided to use the syntax of fully-qualified type na
 
 A non-trivial problem with that choice; the syntax uses characters such as backquotes, commas and square brackets that are not valid in Clojure symbols.  So I had to come up with a way to write a symbol using characters that the Lisp reader would not normally accept.  (Any alternative syntax likely would have had the same problem.)
 
-Other Lisps have solutions to this problem.  I decided to use a simplified version of the symbol syntax used in CommonLisp.  This is the |-escaping used by the Clojure Lisp reader.  Read about it in [Reader extension: |-quoting](https://github.com/clojure/clojure-clr/wiki/Reader-extension:-%7C%E2%80%90quoting).
+Other Lisps have solutions to this problem.  I decided to use a simplified version of the symbol syntax used in CommonLisp.  This is the `|`-quotiing used by the Clojure Lisp reader.  Read about it in [Reader extension: `|`-quoting](https://github.com/clojure/clojure-clr/wiki/Reader-extension:-%7C%E2%80%90quoting).
 
 Thus we end up with the aforementioned
 
