@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Typename syntax and resolution in ClojureCLR
-date: 2023-01-09 00:00:00 -0500
+date: 2025-09-21 00:00:00 -0500
 categories: general
 ---
 
@@ -15,7 +15,7 @@ Several significant improvements have been made to typename syntax and resolutio
 
 - You can define type aliases for any type, including generic types.
 - You can use type aliases at the top level or embedded as generic type parameters.
-- You can use the built-in Clojure primitive type names such as `int`, `long`, `shorts`, etc. as generic type parameters or to define things such as 'pointer-to-int' (`int*`).
+- You can use the built-in Clojure primitive type names such as `int`, `long`, `shorts`, etc. as generic type parameters.
 - In many places, you no longer need to include the arity of the generic type in the name.
 
 With these changes, you can write code like this:
@@ -266,25 +266,9 @@ long                             ;; => #object[core$long 0x28993d0 "clojure.core
                                  ;; on the JVM, this is a type hint for the primitive numeric type 'long'
 ```
 
-The typename resolution code will recognize `int` and friends when they appear appear in type definitions.  In the case of something like `int`, this would only occur of there are pointer, by-ref, or array modifiers.  Examples:
+The typename resolution code will recognize `int` and friends when they appear appear in type definitions as generic type parameters only.  Of course, the pre-existing usage in type hints is unaffected.
 
-```clojure
-int     ;; => #object[core$long 0x28993d0 "clojure.core$long"]  -- the value for int is the function 'int'
-|int|   ;; => #object[core$long 0x28993d0 "clojure.core$long"]  -- same symbol; don't be fooled by the |-escaping.
-|int*|  ;; => System.Int32* -- pointer to an Int32
- |int*[]|  ;; => System.Int32*/1 == System.Int32*[] -- array of Int32 pointers
-```
-
-As for `int`, where its mapping to the underlying Var defining the `int` function is dominant, the same is true for things like `int*`
-
-```clojure
-|int*|   ; => System.Int32* -- pointer to an Int32
-(defn int* [x] (inc x))  ;; defines a function named int*
-|int*|   ; => #object[user$int_STAR___4782 0x2e85172 "user$int_STAR___4782"]
-         ;    the mapping to the function dominates
-```
-
-THis will not be a problem with type hints.  And certainly not a problem when using these names as generic type parameters.
+Note: I tried to allow expressions like `|int*[]|` to be used at the top level, something way down deep in the compiler had a problem with that.  I decided it wasn't worth the effort to find a solution -- for now.  You can still use `|System.Int32*[]|` or define an alias.
 
 
 ### Inferring generic type arity
