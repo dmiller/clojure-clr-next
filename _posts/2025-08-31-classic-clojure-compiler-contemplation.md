@@ -15,11 +15,13 @@ The other posts in the series are:
 - [C4: ISeq clarity]({{site.baseurl}}{% post_url 2025-09-03-iseq-clarity %}) - How to analyze an `ISeq`
 - [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy %}) - How functions are implemented in Clojure
 - __C4: fn*: talkin' 'bout my generation__ - Code-gen for functions
-- __C4: How type-ical__ - Type analysis by the compiler
-- __C4: I have something to emit__ - More on code generation
+- __C4: Tag! You're int!__ - Type analysis by the compiler
+- __C4: Primitive urges__ -- How primitive types are handled 
+- __C$: Of intrinsic merit__ - Intrinsics and direct generation of IL instructions
 - __C4: A time for reflection__ -- Reflection and dynamic callsites
 - __C4: Is there a protocol for that?__ -- Protocols
 - __C4: Out of control__ -- Some points about flow of control and data in the compiler
+- __C4: Some assembly required__ -- Assembly generation for AOT compilation
 
 ## The terms of discussion
 

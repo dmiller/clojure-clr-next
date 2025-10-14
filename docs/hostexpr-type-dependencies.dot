@@ -1,0 +1,37 @@
+strict digraph G {
+
+rankdir = BT;
+
+/* here start the interfaces */
+
+{
+	node [shape=box];
+
+	AssignableExpr;
+	MaybePrimitiveExpr -> { Expr };
+	Expr;
+}
+
+/* Here start (mostly) the classes */
+
+{
+	node [shape=ellipse]           
+		   
+
+	FieldOrPropertyExpr          -> { HostExpr, AssignableExpr };
+ 	HostExpr                     -> { MaybePrimitiveExpr };
+	InstanceFieldOrPropertyExpr  -> { FieldOrPropertyExpr };	
+	InstanceFieldExpr            -> { InstanceFieldOrPropertyExpr };
+	InstancePropertyExpr         -> { InstanceFieldOrPropertyExpr };
+	InstanceMethodExpr           -> { MethodExpr };
+	InstanceZeroArityCallExpr    -> { HostExpr };        
+	MethodExpr                   -> { HostExpr };	
+	NewExpr                      -> { Expr };
+	StaticFieldOrPropertyExpr    -> { FieldOrPropertyExpr };
+	StaticFieldExpr              -> { StaticFieldOrPropertyExpr };
+	StaticPropertyExpr           -> { StaticFieldOrPropertyExpr };
+	StaticMethodExpr             -> { MethodExpr };
+
+}
+
+}
