@@ -13,7 +13,7 @@ Clojurists by nature are type-loose; they'd prefer not to think about types.  Bu
 
 The Clojure compiler computes and propagates type information throughout the abstract syntax tree (AST) as it is constructed. These calculations combine user-supplied type hints,  characteristics of individual functions (return types, signatures of host platform methods), and inherent characteristics of the each basic expression class.
 
-This post explores how typing information is propagated through the AST.  In post [Primitive urges][TBD], we will see how the compiler uses this information to avoid boxing of numeric values.  How reflection is avoided will be covered in [C4: A time for reflection][TBD].
+This post explores how typing information is propagated through the AST.  In post [C4: Primitive urges]({{site.baseurl}}{% post_url 2025-10-17-primitive-urges %}), we will see how the compiler uses this information to avoid boxing of numeric values.  How reflection is avoided will be covered in [C4: A time for reflection][TBD].
 
 ## Just a hint
 
@@ -256,7 +256,7 @@ The only remaining `HostExpr` derivative is `InstanceZeroArityCallExpr`.  This i
 
 That leaves us with `NewExpr`.  For `NewExpr`, we know the type we are creating; that gives us our `ClrType`.  
 
-I'll toss one more in here.  Though not derived from `HostExpr`, `StaticInvokeExpr` is just a special case of `StaticMethodExpr` where the method is an `invokeStatic` on an `IFn`-derived class.  This node type comes up in direct linking of function calls.  For more information, refer to [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy %}) and [C4: fn*: talkin' 'bout my generation][TBD].
+I'll toss one more in here.  Though not derived from `HostExpr`, `StaticInvokeExpr` is just a special case of `StaticMethodExpr` where the method is an `invokeStatic` on an `IFn`-derived class.  This node type comes up in direct linking of function calls.  For more information, refer to [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy %}) and [C4: fn*: talkin' 'bout my generation]({{site.baseurl}}{% post_url 2025-10-15-fn-star-talkin-bout-my-generation %}).
 
 
 ## Symbols and bindings
@@ -348,7 +348,7 @@ _cachedHasType = Tag != null || (Init != null && Init.HasClrType);
 ```
 
 We have a type if either we have a tag or we have an initialization form and _it_ has a type.
-There is a condition above this which negates having a type. In English:  if there is an initialization form, and it has a type and its type is a primitive type (this would have to be a tag on the initialization expression), but the initialization expression is not a `MaybePrimitiveExpr` -- something capable of emitting a primitive value -- then we are in trouble.  We want to hold a primitive value without boxing, but our initialization is at best going to yield a boxed value.  So we say we don't have a type.   We discuss primitive types in great detail in [C4: Primitive urges][TBD].
+There is a condition above this which negates having a type. In English:  if there is an initialization form, and it has a type and its type is a primitive type (this would have to be a tag on the initialization expression), but the initialization expression is not a `MaybePrimitiveExpr` -- something capable of emitting a primitive value -- then we are in trouble.  We want to hold a primitive value without boxing, but our initialization is at best going to yield a boxed value.  So we say we don't have a type.   We discuss primitive types in great detail in [C4: Primitive urges]({{site.baseurl}}{% post_url 2025-10-17-primitive-urges %}).
 
 If we do have a type, a user-supplied tag takes precedence over the type of the initialization expression, per usual.
 
@@ -476,7 +476,7 @@ else
     method._retType = typeof(object);
 ```
 
-By the time you get through this code, `method._retType` is either `typeof(long)`, `typeof(double)`, or `typeof(object)`.  Hmmm.  Where have we seen this combo before?  ODL ... primitive interfaces.  We retain just enough information to calculate which prim interface we should implement.  (See [C4: Primitive urges][TBD].)
+By the time you get through this code, `method._retType` is either `typeof(long)`, `typeof(double)`, or `typeof(object)`.  Hmmm.  Where have we seen this combo before?  ODL ... primitive interfaces.  We retain just enough information to calculate which prim interface we should implement.  (See [C4: Primitive urges]({{site.baseurl}}{% post_url 2025-10-17-primitive-urges %}).)
 
 We've handled:
 
@@ -543,7 +543,7 @@ Does your head hurt yet?  I've been whistling past this graveyard for 15 years. 
 
 ## Recur-ing nightmares
 
-We've had enough. I'll put off discussion of how type information plays into `RecurExpr`  until later.  See [C4: Primitive urges][TBD].
+We've had enough. I'll put off discussion of how type information plays into `RecurExpr`  until later.  See [C4: Primitive urges]({{site.baseurl}}{% post_url 2025-10-17-primitive-urges %}).
 
 ## Processing tags
 

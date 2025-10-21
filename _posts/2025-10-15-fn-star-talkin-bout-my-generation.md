@@ -55,7 +55,7 @@ The `ObjExpr` class maintains the following collections:
 - `ProtocolCallsites`: places where protocol methods are called.  
 
 
-`Constants` contributes static fields to the function class. `Closes` defines the values needed for the constructor of the function class. `KeywordCallsites` and `ProtocolCallsites` also contribute static fields.  We'll discuss keyword callsites in [C4: Key in-site][TBD].  We'll discuss protocol callsites in [C4: Is there a protocol for that?][TBD].
+`Constants` contributes static fields to the function class. `Closes` defines the values needed for the constructor of the function class. `KeywordCallsites` and `ProtocolCallsites` also contribute static fields.  We'll discuss keyword callsites in [C4: Key in-site]{{site.baseurl}}{% post_url 2025-10-19-key-in-site %}.  We'll discuss protocol callsites in [C4: Is there a protocol for that?]{{site.baseurl}}{% post_url 2025-10-20-is-there-a-protocol-for-that %}.
 
 Let's look at some examples.
 

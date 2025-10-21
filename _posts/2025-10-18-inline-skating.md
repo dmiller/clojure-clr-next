@@ -9,7 +9,7 @@ Inlining allows the compiler to replace some function calls with direct code ins
 
 After the heavy lifting of the last few posts, this post is just a little palate cleanser.
 
-In [C4 - Primitive urges][TBD], we looked at how unnecessary boxing of primitive types can be avoided.  That is accomplished by signficant compiler magic spread over a large number of classes.
+In  [C4: Primitive urges]({{site.baseurl}}{% post_url 2025-10-17-primitive-urges %}), we looked at how unnecessary boxing of primitive types can be avoided.  That is accomplished by signficant compiler magic spread over a large number of classes.
 
 In contrast, inlining and intrinsic operations are very localized and easy to understand.
 
@@ -140,7 +140,7 @@ Inlining will help us.  `f` will compile directly to a call to `clojure.lang.Num
 
 There are a lot of overloads of `Numbers.add` to handle different types of arguments.  In this case, because we do not have more specific type information about `x` and `y`, we will end up calling the version that takes two `object` arguments.  This will result in boxing if `x` and `y` are primitive type values, and a bunch of type checking and dispatching inside `Numbers.add`.
 
-We learned in  [C4 - Primitive urges][TBD] how to avoid boxing.  If we restrict the types of `x` and `y` to, say, `double`, we can avoid boxing:
+We learned in  [C4: Primitive urges]({{site.baseurl}}{% post_url 2025-10-17-primitive-urges %}) how to avoid boxing.  If we restrict the types of `x` and `y` to, say, `double`, we can avoid boxing:
 
 
 ```clojure
