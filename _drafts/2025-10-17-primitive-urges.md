@@ -1,7 +1,7 @@
 ---
 layout: post
 title: C4 - Primitive urges
-date: 2025-09-09 00:00:00 -0500
+date: 2025-10-17 00:00:00 -0500
 categories: general
 ---
 
@@ -11,14 +11,14 @@ How primitive types are handled in the Clojure compiler.
 
 We would like to avoid unnecessary boxing and unboxing of primitive values. 
 
-By default, the Clojure compiler will generate reference values everywhere.  To avoid this in the case of primitive values, we need to things:
+By default, the Clojure compiler will generate reference values everywhere.  To avoid this in the case of primitive values, we need two things:
 
 - an expression that can generate a primitive value
 - a context that can accept a primitive value
 
 ## MaybePrimitiveExpr
 
-An AST node type that can possibly generate a privitive value indicates this by deriving from `MaybePrimitiveExpr`. 
+An AST node type that can possibly generate a primitive value indicates this by deriving from `MaybePrimitiveExpr`. 
 
 ```C#    
 public interface MaybePrimitiveExpr : Expr
@@ -47,7 +47,7 @@ A given instance of a `MaybePrimitiveExpr`-implementating class may or may not b
 
 ### CanEmitPrimitive
 
-For most of these, the computation of `CanEmitPrimitive` is straightforward.  For example, `NumberExpr` can always emit a primitive value; it only emits `long` and `double` values.   Whether a `BodyExpr` can emit a primitive value depends on whether its last expression can emit a primitive value.  `HostExpr`-derived classes can emit a primitive value if they are not reflections: we have the explicit `MethodInfo`/`PropertyInfo`/`FieldInfo` to work with and the return type of that is primitive.  Many of the others have an explicit return type calculated; `CanEmitPrimitive` is true if that type is primitive.
+For most of these, the computation of `CanEmitPrimitive` is straightforward.  For example, `NumberExpr` can always emit a primitive value; it can emit only `long` and `double` values.   Whether a `BodyExpr` can emit a primitive value depends on whether its last expression can emit a primitive value.  `HostExpr`-derived classes can emit a primitive value if they are not reflections: we have the explicit `MethodInfo`/`PropertyInfo`/`FieldInfo` to work with and the return type of that is primitive.  Many of the others have an explicit return type calculated; `CanEmitPrimitive` is true if that type is primitive.
 
 The most complicated formula for `CanEmitPrimitive` is in `IfExpr`.  We need both the 'then' and the 'else' expressions to be `MaybePrimitiveExpr`.  They both must have `CanEmitPrimitive` be true, and they must be of the same primitive type -- or one of them can have a return type of type `Recur.RecurType`.  You might recall from [C4: Tag! You're int!][TBD] that `Recur.RecurType` is a special type used as the return type of a `RecurExpr`.  The only reason `RecurExpr` implements `MaybePrimitiveExpr` is to make this code work:
 
@@ -66,17 +66,16 @@ _thenExpr is MaybePrimitiveExpr tExpr
 Are there any surprising exclusions here?  A few omissions strike me.
 
 - `BooleanExpr` -- Perhaps this has something to do with the way boolean values are handled in ClojureJVM; I really don't know.  I tried implementing it. The code is trivial.  However, it messes up parsing or code generation (I forget which) in `recur` expressions.  I never got around to figuring out why or how to solve it.
-- `LetFnExpr` -- this should parallel `LetExpr`.  The difference is in the intializations, not in the body.
+- `LetFnExpr` -- this should parallel `LetExpr`.  The difference is in the intializations, not in the body.  Not sure why it was left out.
 
-One that is not surprising with a bit of analysis: `FnExpr`.  Recall that the `FnExpr` itself returns a function object; its value definitely is not primitive.  The question is actually whether the the given application of a function to arguments can return a primitive value.
-That analysis is done by `InvokeExpr` and will be discussed below.
+One that is not surprising with a bit of analysis: `FnExpr`.  Recall that the `FnExpr` itself returns a function object; its value definitely is not primitive.  The question is actually whether the the given application of a function to arguments can return a primitive value. That analysis is done by `InvokeExpr` and will be discussed below.
 
 ### EmitUnboxed
 
 For most of these expressions, the `EmitUnboxed` method is straightforward. For example,
-for `BodyExpr`, the code for `Emit` and `EmitUnboxed` are identical except for the call to the last expression.  We are going to call `LastExpr.Emit(...)` or `(LastExpr as MaybePrimitiveExpr).EmitUnboxed(...)`, respectively.
+for `BodyExpr`, the code for `Emit` and `EmitUnboxed` are identical except for the call to emit the last expression.  We are going to call `LastExpr.Emit(...)` or `(LastExpr as MaybePrimitiveExpr).EmitUnboxed(...)`, respectively.
 
-Some are trickier.  For example, `IfExpr`.  `IfExpr` emits three sections of code:  the test, the 'then' code, and the 'else' code.  Independent of whether we are emitting the `IfExp` as boxed or unboxed -- that depends on who is calling it and whether `CanEmitPrimitive` is true -- we still might be able to emit the 'test' code as unboxed.   Then we emit the 'then' and 'else' code as boxed or unboxed, depending on whether we are emitting the `IfExpr` as boxed or unboxed.  
+Some are trickier.  For example, `IfExpr`.  `IfExpr` emits three sections of code:  the test, the 'then' code, and the 'else' code.  Independent of whether we are emitting the `IfExpr` as boxed or unboxed -- that depends on who is calling it and whether `CanEmitPrimitive` is true -- we still might be able to emit the 'test' code as unboxed.   Then we emit the 'then' and 'else' code as boxed or unboxed, depending on whether we are emitting the `IfExpr` as boxed or unboxed.  
 
 
 ## Callsites
@@ -85,7 +84,11 @@ Where do we call `MaybePrimitiveExpr.EmitUnboxed`?
 
 Some of the calls are pass-throughs.  For example, if we have a `BodyExpr`, if we call its `Emit`, it calls `LastExpr.Emit(...)`; if we call its `EmitUnboxed`, it calls `LastExpr.EmitUnboxed(...)`.   This is true for many of our `MaybePrimitiveExpr`-implementing classes that have subordinate AST nodes.
 
-Where are the 'instigators', the places that decide on whether to call `Emit` or `EmitUnboxed` on subordinate expressions independently of whether the instigator itself is being emitted as boxed or unboxed?  Instigators are the root causes of primitive urges.
+Where are the 'instigators', the places that decide whether to call `Emit` or `EmitUnboxed` on subordinate expressions independent of whether the instigator itself is being emitted as boxed or unboxed?  
+
+> Instigators are the root causes of primitive urges.
+
+(I just made that up.  It sounded impressive.)
 
 We've seen one already: `IfExpr`. Its decision to call `EmitUnboxed` on its 'test' expression is independent of whether the `IfExpr` itself is being emitted as boxed or unboxed.
 
@@ -94,10 +97,7 @@ For a local binding with an initialization, if the initialization expression is 
 
 Also, in `deftype`s and related, we can have mutable fields.  The code to assign to a mutable field can call `EmitUnboxed` on the value expression under the same conditions as for `LetExpr`.
 
-A major locus is method calls for host platform interop.  One should look at the abstract class `MethodExpr` and its derived classes `InstanceMethodExpr` and `StaticInvokeExpr`.   We might call either `Emit` or `EmitUnboxed` on the `MethodExpr` itself, depending on what the calling context is interested in.  The only difference between `Emit` and `EmitUnboxed` is whether we box the return value or not.   `MethodExpr` instigates primitive generation when dealing with the arguments to the method call and this is independent of whether the return value is boxed or not.
-
-
-These are used for method calls, property accesses, and field accesses.  The decision to call `EmitUnboxed` on the target expression (for instance methods) and on the argument expressions is independent of whether the method call itself is being emitted as boxed or unboxed.  The code for emitting the argument to for a parameter is:
+A major locus is method calls for host platform interop.  One should look at the abstract class `MethodExpr` and its derived classes `InstanceMethodExpr` and `StaticInvokeExpr`.   We might call either `Emit` or `EmitUnboxed` on the `MethodExpr` itself, depending on what the calling context is interested in.  The only difference between `Emit` and `EmitUnboxed` is whether we box the return value or not.   `MethodExpr` instigates primitive generation when dealing with the arguments to the method call and this is independent of whether the return value is boxed or not. The code for emitting the argument to for a parameter is:
 
 ```C#
 public static void EmitTypedArg(ObjExpr objx, CljILGen ilg, Type paramType, Expr arg)
@@ -157,8 +157,7 @@ public static void EmitTypedArg(ObjExpr objx, CljILGen ilg, Type paramType, Expr
 }
 ```
 
-At the very end you see the call to `HostExpr.EmitUnboxArg`.  It looks at the paramType and generates a call to a conversion method for numeric types, or to `Opcodes.CastClass`.  It inadequately deals with CLR value types.  (See below.)  Some things are best not discussed in polite company.
- 
+At the very end you see the call to `HostExpr.EmitUnboxArg`.  It looks at the paramType and generates a call to a conversion method for numeric types, or to `Opcodes.CastClass`.  It inadequately deals with CLR value types.  (See below.)  Some things are best not discussed in polite company. 
 
 There is similar code over in `NewExpr` for constructor calls.
 
@@ -201,7 +200,7 @@ The second special case is when
 Suppose these conditions are met.  And suppose the indicated primitive interface is, say `DLO` (take a `double` and a `long`, return an `object`).  Then we generate the following form:
 
 ```Clojure
-(.invokeStatic (^IFn$DLO form ...args...))
+(.invokePrim (^IFn$DLO form ...args...))
 ```
 
 (and transfer metadata from the original form to this one).  Analyzing this will generate a host platform interop call -- specifically, a static method call.  The `StaticMethodExpr` will take take care to avoid unnecessary boxing of the argument and return values. 
@@ -225,7 +224,7 @@ Let us contemplate
 (defn calling2 ^double [] (circle-area (fp 1.0 2.0 3.0)))
 ```
 
-The only host-interop is getting the value of π.  Compiling (with direct linking turned on) and decompiling to C#, we get:
+The only host-interop is getting the value of π.  Compiling `fb` (with direct linking turned on) and decompiling to C#, we get:
 
 
 ```C#
@@ -244,7 +243,9 @@ public class boxing$fb : AFunction
 }
 ```
 
-`fb` ("f with boxing") has no type information, so argument and return types are `object`.  Boxing and unboxing will occur as needed.
+`fb` ("f with boxing") has no type information, so argument and return types are `object`.  Boxing and unboxing will occur as needed. 
+
+Compiling `fp`, we get:
 
 ```C#
 public class boxing$fp : AFunction, DDD
@@ -290,7 +291,7 @@ Just doing a rough timing in a loop, `calling2` is about 5x as fast as `calling1
 
 ## Intrinsics
 
-Why `fp` has a direct IL `add` instruction, while `fb` has to go through `Numbers.add` is a story worthy of its post.  See [C4: Of intrinsic merit][TBD].
+Why `fp` has a direct IL `add` instruction but `fb` has to go through `Numbers.add` is a story worthy of its own post.  See [C4: Inline skating][TBD].
 
 ## CLR considerations
 

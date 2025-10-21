@@ -17,9 +17,10 @@ The other posts in the series are:
 - __C4: fn*: talkin' 'bout my generation__ - Code-gen for functions
 - __C4: Tag! You're int!__ - Type analysis by the compiler
 - __C4: Primitive urges__ -- How primitive types are handled 
-- __C$: Of intrinsic merit__ - Intrinsics and direct generation of IL instructions
+- __C4: Inline skating__ - How inlining is used to optimize performance
+- __C4: Key in-site__  Keyword callsites
+- __C4: Is there a protocol for that?__ -- Protocol implementation
 - __C4: A time for reflection__ -- Reflection and dynamic callsites
-- __C4: Is there a protocol for that?__ -- Protocols
 - __C4: Out of control__ -- Some points about flow of control and data in the compiler
 - __C4: Some assembly required__ -- Assembly generation for AOT compilation
 

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: C4 - Inline skating
-date: 2025-09-12 00:00:00 -0500
+date: 2025-10-18 00:00:00 -0500
 categories: general
 ---
 
@@ -34,7 +34,7 @@ We will take our examples from the Clojure core library.  We start with a simple
 
 Ignoring the metadata, we have a simple function definitions that does host interop, calling a static method in the `clojure.lang.Util` class.
 
-You can ignore the `:static` metadata; it is no longer used.  Of relevance is the `:inline` metadata.  It's value is a function that takes a single argument and returns a list.  It is reminiscent of a macro definition, and in fact its use is similar.
+You can ignore the `:static` metadata; it is no longer used.  Of relevance is the `:inline` metadata.  Its value is a function that takes a single argument and returns a list.  It is reminiscent of a macro definition, and in fact its use is similar.
 
 Suppose we are compiling and reach the expression:
 
@@ -121,7 +121,7 @@ __TMI warning!__: One last note on the core code.  You will see one mysterious f
 
 ## Intrinsic operations
 
-Now that we have user-defined inlining, we can look at intrinsic operations.  These are used to replace calls to certain static methods with direct MSIL/bytecode instructions.  This form is not user-definable; it is hard-coded in the compiler and applies to basic arithmetic, logical, and bitwise operations on primitive types.
+Now that we have user-defined inlining, we can look at intrinsic operations.  These are used to replace calls to certain static methods with direct MSIL/bytecode instructions.  This is not user-definable; it is hard-coded in the compiler and applies to basic arithmetic, logical, and bitwise operations on primitive types.
 
 Consider:
 
@@ -157,7 +157,7 @@ One would expect this to compile to:
 ```
 
 where now we will be calling the `double Numbers.add(double, double)` overload of `Numbers.add`.
-And that would be case if not for intrinsic operation inlining.  In the method that does code generation for host interop calls where we know the actual method to invoke (i.e., not a reflection situation), we find:
+And that would be case if not for intrinsic operation inlining.  In the method that does code generation for host interop calls, where we know the actual method to invoke (i.e., not a reflection situation) we find:
 
 ```C#
 // ... Code to put the arguments on the stack ...
@@ -184,7 +184,7 @@ There are internal tables that map certain static methods to sequences of MSIL/b
 		// return P_0 + P_1;
 		IL_0000: ldarg.0
 		IL_0001: ldarg.1
-		IL_0002: add
+		IL_0002: add     // <<<<==== intrinsic operation inlining
 		IL_0003: ret
 ```
 
@@ -218,8 +218,6 @@ These are called with a label for the false branch.  This substitution is done o
 
 Regular inlining reduces `(< x y)` to `(. clojure.lang.Numbers (lt x y))`.  There is an intrinsic definition for `Numbers.lt(double,double)`.  We end up generating the code:
 
-For example, a call to `Numbers.equiv(double,double)` will be inlined with:
-
 ```C#
 		// return (P_0 >= P_1) ? P_1 : P_0;
 		IL_0000: ldarg.0
@@ -227,7 +225,6 @@ For example, a call to `Numbers.equiv(double,double)` will be inlined with:
 		IL_0002: bge IL_000d
 
 		IL_0007: ldarg.0
-		// (no C# code)
 		IL_0008: br IL_000e
 
 		IL_000d: ldarg.1
@@ -236,5 +233,3 @@ For example, a call to `Numbers.equiv(double,double)` will be inlined with:
 ``` 
 
 Intrinsic operations are a powerful optimization technique.  However, it is a closed set of operations defined in the compiler, not available for user extension.  Perhaps that's a good thing?
-
-

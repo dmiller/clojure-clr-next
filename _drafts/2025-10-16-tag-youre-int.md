@@ -1,38 +1,37 @@
 ---
 layout: post
 title: C4 - Tag! You're int!
-date: 2025-04-20 00:00:00 -0500
+date: 2025-10-16 00:00:00 -0500
 categories: general
 ---
 
-Chasing type hints around the compiler.
+Chasing type hints around the Clojure compiler.
 
 ## Introduction
 
-It is perhaps fair to say that Clojurists by nature are type-loose; they'd prefer not to think about types.  But one must contemplate types at minimum for efficiency, for example, to avoid reflection in platform interop and to avoid boxing of numeric values.  
+Clojurists by nature are type-loose; they'd prefer not to think about types.  But a Clojurist must contemplate types occasionally, to avoid reflection in platform interop and to avoid boxing numeric values.  
 
-The Clojure compiler computes and propagates type information throughout the abstract syntax tree (AST) as it is constructed. These calculations combine explicit types (`"string"` is a `String`), user-supplied type hints,  characteristics of individual functions (return types), and inherent characteristics of the each basic expression class.
+The Clojure compiler computes and propagates type information throughout the abstract syntax tree (AST) as it is constructed. These calculations combine user-supplied type hints,  characteristics of individual functions (return types, signatures of host platform methods), and inherent characteristics of the each basic expression class.
 
-We''ll explore these calculations in some detail and also look at how the compiler uses this information in code generation.  What we will not consider here is the resolution of platform interop; that will be covered in [C4: A time for reflection][TBD].
+This post explores how typing information is propagated through the AST.  In post [Primitive urges][TBD], we will see how the compiler uses this information to avoid boxing of numeric values.  How reflection is avoided will be covered in [C4: A time for reflection][TBD].
 
 ## Just a hint
 
-Clojure coders supply type hints in various ways.  The most common is the `^SomeType` metadata tag, which translates to `{:tag SomeType}` in the metadata map.  One should keep in mind that these are hints, not mandates.  If one writes:
+Clojure coders supply type hints in various ways.  The most common is a `^SomeType` metadata tag, which translates to `{:tag SomeType}` in the metadata map.  One should keep in mind that the `:tag` is a hint, not a mandate.  If one writes:
 
 ```clojure
 (defn f  [^String s] 
-  (if (> (count s) 18)
+  (if (>= (count s) 18)
        Int32/MaxValue
        (Int32/Parse s)))
 ```
 
-The `^String` type hint will prevent reflection on the call to `Int32/Parse`.
-But it is still perfectly okay to pass a non-string value to `f`.  No one will know unless it's count is less than or equal to 18.
-
+the `^String` type hint will prevent reflection on the call to `Int32/Parse`.
+But it is still perfectly okay to pass a non-string value to `f`.  It will be noticed unless its count is less than 18, in which case an exception will be thrown -- Can't cast whatever to String.
 
 ## The root
 
-Where to begin?  We know tags are important, and in fact a field named `Tag` or something similar appears in many expression classes.  The string "tag" appears in the the JVM's "Compiler.java" file 284 times.  Go for it.
+Where to begin?  We know tags are important, and in fact a field named `Tag` or something similar appears in many AST node classes.  The string "tag" appears in the the JVM's "Compiler.java" file 284 times.  Happy code chasing!
 
 A slightly more systematic approach starts with the hierarchy of AST node types.  The root is `Expr`; it exposes type information for each class.
 
@@ -41,18 +40,17 @@ public interface Expr
 {
     bool HasClrType { get; }    // hasJavaClass in ClojureJVM
     Type ClrType { get; }       // getJavaClass in ClojureJVM
-
     // ...
 } 
 ```  
 
 Note that if `HasClrType` is false, then `ClrType` will throw an exception if accessed.  Always check `HasClrType` first.
 
-I went through the 55 classes starting at `Expr` and descending the hierarchy and examined the code for each `HasClrType` and `ClrType` for each.   (ClojureCLR has a few more `Expr`-derived classes than ClojureJVM due to some differences in how the former deals with subclasses of `HostExpr`.) You can see my results in [a PDF of my Excel spreadsheet]({{site.baseurl | prepend: site.url}}/assets/expr-analysis.pdf").
+I went through the 55 classes starting at `Expr` and descending the hierarchy and examined the code for each `HasClrType` and `ClrType` for each.   (ClojureCLR has a few more `Expr`-derived classes than ClojureJVM due to some differences in how the former deals with subclasses of `HostExpr`.) You can see my results in [a PDF of my Excel spreadsheet]({{site.baseurl | prepend: site.url}}/assets/expr-analysis.pdf"). 
 
 A quick examination reveals some general categories of AST nodes that we can dispense with quickly.
 
-- Node types derived from `UntypedExpr`:  `MonitorEnterExpr`, `MonitorExitExpr`, and `ThrowExpr`.
+- Node types derived from `UntypedExpr`:  `MonitorEnterExpr`, `MonitorExitExpr`, and `ThrowExpr`. Not a surprise to learn that `HasClrType` is always false for these.
 - Other node types that do not carry type information: `ImportExpr`, `UnresolvedVarExpr`.
 - Node types that hold constant values or similar data that carry the type.
 
@@ -72,7 +70,7 @@ A quick examination reveals some general categories of AST nodes that we can dis
 | `TheVarExpr` | `typeof(Var)` | From `#'Name`,  always yields a `Var` |
 | `VectorExpr` | `typeof(IPersistentVector)` | A vector literal always yields a vector |
 
-- Node types that return their tag if present: `VarExpr`, `KeywordInvokeExpr`;
+- Node types that return their tag if present: `VarExpr`, `KeywordInvokeExpr`.
 
 - Pass-throughs: these node types simply yield the type of their contained expression.
 
@@ -119,22 +117,22 @@ internal static Type MaybeClrType(ICollection<Expr> exprs)
 ```
  In other words, throws are ignored.  If any expression has no type, the `CaseExpr` has no type.  If all expressions have the same type, that is the type of the `CaseExpr`.  Otherwise, the `CaseExpr` has no type.
 
-- `IfExpr`: This would be straightforward:  if the types of the 'then' clause and the 'else' clause match, use that.    However, there is a complication: `recur`.  Unless you are writing an infinite loop, a `recur` expression will occur inside either the 'then' or the 'else' clause of an `if` expression.  Moreover, it has to have nothing following it, so it essentially will surface as the "value" of the containing clause.
+- `IfExpr`: The most obvious statement would be:  if the types of the 'then' clause and the 'else' clause match, use that.    However, there is a complication: `recur`.  Typically, a `recur` expression will occur inside either the 'then' or the 'else' clause of an `if` expression.  Moreover, it has to have nothing following it, so it  will surface as the "value" of the containing clause.
 
-Of course, in reality a `recur` does not have a value; it is a go-to: strictly flow control.  However, we code `RecurExpr` so that it does return a type, a special type used only here, a type that when detected by `IfExpr` indicates that a `recur` is present.  
+Of course, a `recur` actually does not have a value; it is a go-to: strictly flow control.  However, we code `RecurExpr` so that it does return a type, a special type used only here, a type that when detected by `IfExpr` indicates that a `recur` is present. 
 
 The type that is used is `typeof(Recur)`.  [Note: not `RecurExpr`.]  Defined as
 
 ```C#
-    public static class Recur
-    {
-        public static readonly Type RecurType = typeof(Recur);
-    }
+public static class Recur
+{
+    public static readonly Type RecurType = typeof(Recur);
+}
 ```
 
 In `RecurExpr`, `HasClrType` is always true and `ClrType` always returns `Recur.RecurType`.
 
-For `IfExpr`, inferring a proper type requires that "the types of the 'then' clause and the 'else' clause match" is true if we treat`Recur.RecurType` as matching any type.  The code `IfExpr.HasClrType` is:
+For an `IfExpr` to have a type, then 'then' clause and the 'else' clause each much have a type and they must agree or one of them must be `Recur.RecurType`.  We also allow a `null` value to match and reference type (which is say, any non-value type).  
 
 ```C#
 return _thenExpr.HasClrType
@@ -178,7 +176,7 @@ Even though we plan to cover the details of reflection for interop elsewhere, we
 
 ClojureCLR has a few more classes than ClojureJVM here because we have to deal with properties in addition to fields and methods.  Fields and properties share enough characteristics that they can share a base class, `InstanceFieldOrPropertyExpr` or `StaticFieldOrPropertyExpr`.  
 
-The classes under `HostExpr` handle `HasClrType` and `ClrType` in almost identically.  There are two ways type information is available.  If the method or property or field is known, i.e., we have identified a `Type` and corresponding `MethodInfo`, `PropertyInfo`, or `FieldInfo`, then the type is available from that.  Or the user can supply a type hint on the interop call expression.  If we are in a reflection situation and do not have the `MethodInfo`, `PropertyInfo`, or `FieldInfo`, then the type hint will be all that we have.  If both are availble, there are two circumstances:  For field/property, the user type hint takes precedence.
+The classes under `HostExpr` handle `HasClrType` and `ClrType`  almost identically.  There are two ways type information is available.  If the method or property or field is known, i.e., we have identified a `Type` and corresponding `MethodInfo`, `PropertyInfo`, or `FieldInfo`, then the type is available from that.  Or the user can supply a type hint on the interop call expression.  If we are in a reflection situation and do not have the `MethodInfo`, `PropertyInfo`, or `FieldInfo`, then the type hint will be all that we have.  If both are availble, there are two circumstances:  For field/property, the user type hint takes precedence.
 For method calls, it's a bit more complicated. See below.
 
 `InstanceFieldExpr` and `InstancePropertyExpr` are almost identical.  Let's use the former:
@@ -252,7 +250,7 @@ public static Type RetType(Type tc, Type ret)
 ```
 
 Static method/property/field expressions are almost identical.
-The only significant differnce is that `HasClrType` returns true: there is always a type known for static properties and fields.
+The only significant difference is that `HasClrType` always returns true: there is always a type known for static properties and fields.
 
 The only remaining `HostExpr` derivative is `InstanceZeroArityCallExpr`.  This is created when we have an interop call that we know is an instance call (as opposed to a static call) but we can't resolve the name of the method/property/field.  We are in a reflection situation.  The only way we have a `ClrType` is if the user has supplied a type hint.  
 
@@ -260,7 +258,6 @@ That leaves us with `NewExpr`.  For `NewExpr`, we know the type we are creating;
 
 I'll toss one more in here.  Though not derived from `HostExpr`, `StaticInvokeExpr` is just a special case of `StaticMethodExpr` where the method is an `invokeStatic` on an `IFn`-derived class.  This node type comes up in direct linking of function calls.  For more information, refer to [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy %}) and [C4: fn*: talkin' 'bout my generation][TBD].
 
-```C
 
 ## Symbols and bindings
 
@@ -286,7 +283,7 @@ The possible expressions returned by `AnalyzeSymbol` are:
 | `new LocalBindingExpr(b, tag)` | A local binding, e.g. a `let` or `fn` parameter |
 | `new StaticFieldExpr(... , tag, t, symbol.Name, finfo);` | A static field access |
 | `new StaticPropertyExpr(..., tag, t, symbol.Name, pinfo);` | A static property access |
-| `new QualifiedMethodExpr(t, symbol)` | A qualified method call |
+| `new QualifiedMethodExpr(t, symbol)` | A qualified method reference (static, instance, or constructor on a known type) |
 | `new VarExpr(oAsVar, tag);` | A variable reference |
 | `new ConstantExpr(o);` | A constant value |
 | `new UnresolvedVarExpr(oAsSymbol);` | An unresolved variable reference |
@@ -351,10 +348,9 @@ _cachedHasType = Tag != null || (Init != null && Init.HasClrType);
 ```
 
 We have a type if either we have a tag or we have an initialization form and _it_ has a type.
-There is a check beyond this which negates having a type. In English:  if there is an initialization form, and it has a type and its type is a primitive type (this would have to be a tag on the initialization expression), but the initialization expression is not a `MaybePrimitiveExpr` -- something capable of emitting a primitive value -- then we are in trouble.  We want to hold a primitive value without boxing, but our initialization is at best going to yield a boxed value.  So we say we don't have a type.   We discuss primitive types in great detail in [C4: Primitive urges][TBD].
+There is a condition above this which negates having a type. In English:  if there is an initialization form, and it has a type and its type is a primitive type (this would have to be a tag on the initialization expression), but the initialization expression is not a `MaybePrimitiveExpr` -- something capable of emitting a primitive value -- then we are in trouble.  We want to hold a primitive value without boxing, but our initialization is at best going to yield a boxed value.  So we say we don't have a type.   We discuss primitive types in great detail in [C4: Primitive urges][TBD].
 
 If we do have a type, a user-supplied tag takes precedence over the type of the initialization expression, per usual.
-
 
  `LocalBindingExpr` wraps a `LocalBinding`.  The occurrence of the reference (the `Symbol` name of the binding) can also be tagged, yielding a third source  of type information.  This is straightforward:  the tag on the symbol at the reference site takes precedence over the type coming from the `LocalBinding` definition.  The code is starting to look kind of familiar:
 
@@ -401,7 +397,7 @@ What you are missing here is the metadata that is attached.  On the symbol `f`, 
 {:my-data 2, :tag String, :arglists (quote ([x])), :doc "Comment", :other-data 3}
 ```
 
-Mostly there is a pass-through of the metadata on `f` in the defining form, with some additions: the comment gets attached via `:doc`; the map after the comment gets merged and  `:arglists` metadata is attached. 
+Mostly there is a pass-through of the metadata on `f` in the defining form, with some additions: the comment gets attached via `:doc`; the options map after the comment gets merged and  `:arglists` metadata is attached. 
 
  If you look at the form `(clojure.core/fn ...)`, you will find the metadata
 
@@ -480,7 +476,7 @@ else
     method._retType = typeof(object);
 ```
 
-By the time you get through this code, `method._retType` is either `typeof(long)`, `typeof(double)`, or `typeof(object)`.  Hmmm.  Where have we seen this combo before?  ODL ... primitive interfaces.  We retain just enough information calculate which prim interface we can implement.  (See [C4: Primitive urges][TBD].)
+By the time you get through this code, `method._retType` is either `typeof(long)`, `typeof(double)`, or `typeof(object)`.  Hmmm.  Where have we seen this combo before?  ODL ... primitive interfaces.  We retain just enough information to calculate which prim interface we should implement.  (See [C4: Primitive urges][TBD].)
 
 We've handled:
 
@@ -498,7 +494,7 @@ The remaining type hints we will encounter in function definitions are the type 
 - Create a `LocalBinding` for the parameter.
     - The `LocalBinding` has `Tag` field.  Here we pass in the `:tag` on the parameter symbol directly, unless the declared type is primitive (`long` or `double` only), in which case this is set to null.  I do not know why.  But we'll be okay. See the kludge below.
     - The `LocalBinding` also has a `DeclaredType` field.  The value computed in the previous step is used here.  This is _only_ used during `Recur` calculations.
-    - There is some really weird kludginess of passing a `MethodParamExpr` as initialization expression to `LocalBinding` but only when the declared type is primitive. The sole purpose of that is make sure `LocalBinding.PrimitiveType` returns the primitive type. Massive kludge.  Ick.)
+    - There is some really weird kludginess of passing a `MethodParamExpr` as initialization expression to `LocalBinding` but only when the declared type is primitive. The sole purpose of that is make sure `LocalBinding.PrimitiveType` returns the primitive type. Massive kludge.  Ick.
 
 There are some provisions to properly deal with `&` and the following "rest" parameter (which will have a type of `ISeq`).
 
@@ -547,7 +543,7 @@ Does your head hurt yet?  I've been whistling past this graveyard for 15 years. 
 
 ## Recur-ing nightmares
 
-We've had enough. I'll put this off until later.  See [C4: Primitive urges][TBD].
+We've had enough. I'll put off discussion of how type information plays into `RecurExpr`  until later.  See [C4: Primitive urges][TBD].
 
 ## Processing tags
 
