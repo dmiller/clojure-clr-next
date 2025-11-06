@@ -65,12 +65,7 @@ The forms listed above are the preferred expressions in user code.  One should o
 - `(. instance-expr (method-symbol args*))` or `(. instance-expr method-symbol args*)`
 - `(. Classname-symbol (method-symbol args*))` or `(. Classname-symbol method-symbol args*)`
 
-These forms are handled by the `HostExpr` parser. `HostExpr` is an abstract class;  it will generate an instance of one its concrete subclasses.  For ClojureCLR, these are:
-
-<img src="{{site.baseurl | prepend: site.url}}/assets/images/hostexpr-type-dependencies.png" alt="Graph of all types related to HostExpr" />
-
-The JVM is simpler;  it has fewer subclasses of `HostExpr`.  The CLR complications arise from the need to handle properties, which do not exist on the JVM.  Unfortunately, this copmplication means that the parsing logic differs enough that we need to treat them separately.  We'll start with the JVM version.
-
+These forms are handled by the `HostExpr` parser. `HostExpr` is an abstract class;  it will generate an instance of one its concrete subclasses.  
 
 ### HostExpr parsing on the JVM
 
@@ -92,14 +87,87 @@ Next we try to determine if we are looking at a field access or a method call.  
 boolean maybeField = RT.length(form) == 3 && (RT.third(form) instanceof Symbol);
 ```
 
-Next, we see if there is a zero-arity member of the given name, either static or instance.
-If we are in the static case, we have the type.  If we in the instance case, it is necessary that the `instance` AST node have a known type.  If we find a zero-arity method (), we set `maybeField` to false; otherwise it remains true.  (I don't know enough about the JVM reflection APIs to know how looking for zero-arith methods picks up field accessors.  Check out `Reflector.getMethods()` if you are curious.)
+We then check if there is a zero-arity method of the given name -- unless we have an instance call and the name starts with`-`, in which case we are definitely dealing with a field access.  We still might be a field if there no zero-arity methods.
 
-If at this point we have `maybeField` true, we will create either an `InstanceFieldExpr` or a `StaticFieldExpr` node.  The only wrinkle is if the field name starts with a `-`, in which case we strip off the `-`.  
+```Java
+if(maybeField && !(((Symbol)RT.third(form)).name.charAt(0) == '-'))
+    {
+    Symbol sym = (Symbol) RT.third(form);
+    if(c != null)
+        maybeField = Reflector.getMethods(c, 0, munge(sym.name), true).size() == 0;
+    else if(instance != null && instance.hasJavaClass() && instance.getJavaClass() != null)
+        maybeField = Reflector.getMethods(instance.getJavaClass(), 0, munge(sym.name), false).size() == 0;
+    }
+```
 
-If `maybeField` is false, we are looking at a method call -- maybe.  We will create either an `InstanceMethodExpr` or a `StaticMethodExpr` node, depending on whether we are dealing with an instance or static member.  Note that we might still be dealing with a property access in the case that we have an instance access and the type of the `instance` AST node is not known.  It will be up to the code generation phase to generate reflection code in this case.
+What happens next determines if `maybeField` is true or not.
+If `maybeField` is true, we _might_ be looking at a field access. 
+We create a `StaticFieldExpr` node if we are in the static case (`c` is non-null.)
+We create an `InstanceFieldExpr` node if we are not in the static case.
+We pass a flag indicating if the name started with a `-`, indicating that we are definitely dealing with a field access.  Don't be fooled.  An `InstanceFieldExpr` can generate reflection code that can access either a method or field at runtime, depending on what the runtime type of the `instance` expression turns out to be.  See below.
+
+If `maybeField` is false, we are looking at a method call.  We create either a `StaticMethodExpr` or an `InstanceMethodExpr` node, depending on whether we are dealing with an instance or static member.
+
+| Target is | `maybeField` | Node created |
+|-----------|--------------|--------------|
+| Type      | true         | `StaticFieldExpr` |
+| Type      | false        | `StaticMethodExpr` |
+| Not a type | true         | `InstanceFieldExpr` |
+| Not a type | false        | `InstanceMethodExpr` |
+
+The constructors for each of these node types does some additional analysis.
+
+- `StaticMethodExpr`:
+    - We have a known static type, we have a name, we have an arity.  If there are no methods of the given name and arity on the given type, we throw an error.  (Method used to do method lookup:  `Reflector.getMethods(...)`.)
+    - if there is more than one method of the given name and arity, we try to resolve to the best match based on the method argument types and the types of the provided arguments. (Method used to find best match: `Compiler.getMatchingParams(...)`.)
+    - if we cannot pick a best match, we will generate a reflection call during code-gen.  (Maybe) print a warning.
+    - if we have a best match, we will be able to generate a direct call during code-gen.
+    - if we have a direct match and *unchecked-math* is :worn-on-boxed and the method is on the list of 'boxed match' methods, (maybe) print a warning.
+
+- `InstanceMethodExpr`:
+    - if we do not know the type of our target, we will be generating reflection code during code-gen. (Maybe) print a warning.
+    - if we do know the type, the process is similar to `StaticMethodExpr` -- look for methods of the given name and arity, try to find a best match, etc.  No boxing warnings, though; those methods are static only.  There is an additional step to if we find a method but its declaring class is not public: we look up the class hierarchy to see if there is a public superclass that also declares the method.  (`Reflector.getAsMethodOfPublicBase(...)` does this.)
+
+- `StaticFieldExpr`:
+    - this gets called only if there is not a zero-arity method of the given name on the given type.
+    - if there is no field of the given name on the given type, we throw an error.
+    - We will only generate code if there is a field of the given name on the given type, so no reflection will be needed.
+
+- `InstanceFieldExpr`:
+    - if we know the type of our target, we look for a field of the given name on that type.  
+    - if the target type is unknown or we can't find a field on the target type, (maybe) print a warning; we will generate reflection code during code-gen.
+
+
+### Code generation on the JVM
+
+- `StaticFieldExpr` is the simplest.  
+    - If we make it to code-gen, we know the type and the field.  We can just emit the code to access the static field.  This will never generate reflection code.
+
+The other three node types have to decide if they can emit direct calls or if they need to emit reflection code.
+
+- `StaticMethodExpr` 
+    - direct:  Emit the arguments, possibly with casts--that's done by `MethodExpr.emitTypedArgs(...)`.  Call the method.
+    - reflection: set up a call to `Reflector.invokeStaticMethod(...)`, passing the class, method name, and arguments as an array.
+- `InstanceMethodExpr`
+    - direct: Emit the target, emit the arguments, possibly with casts - also done by `MethodExpr.emitTypedArgs(...)`.  Call the method.
+    - reflection: if we know the type (but we didn't have a good match on the method), set up a call to `Reflector.invokeInstanceMethodOfClass(...)`, passing the target, the target class, the method name, and arguments as an array.  If we don't know the type, we call `Reflector.invokeInstanceMethod(...)`.
+- `InstanceFieldExpr` 
+    - direct: emit the target, get the field value.
+    - reflection: set up a call to `Reflector.invokeNoArgInstanceMember(...)`. As mentioned above, this one hides a trick.  It can call a zero-arity method or access a field, depending on what is found.
+
+There is some complexity buried in the various ancillary methods used to do method lookup, best-match selection, argument casting, and runtime dispatch.  Let's dig in.
+
+`Reflector.getMethods`  - used both at compile-time and during runtime reflection.  
+ `Compiler.getMatchingParams(...)`
 
 ### HostExpr parsing on the CLR
+
+For ClojureCLR, the type hierarchy around host interop expressions looks like:
+
+<img src="{{site.baseurl | prepend: site.url}}/assets/images/hostexpr-type-dependencies.png" alt="Graph of all types related to HostExpr" />
+
+The JVM is simpler;  it has fewer subclasses of `HostExpr`.  The CLR complications arise from the need to handle properties, which do not exist on the JVM.  Unfortunately, this copmplication means that the parsing logic differs enough that we need to treat them separately.  We'll start with the JVM version.
+
 
 Reflection regarding type members -- methods vs fields vs properties -- differs non-trivially in CLR-land.  ClojureCLR using the Dynamic Language Runtime (DLR) to handle reflection also has a bearing on how to handle ambiguity in the input.   So I chose a somewhat different approach to parsing host expressions.
 
