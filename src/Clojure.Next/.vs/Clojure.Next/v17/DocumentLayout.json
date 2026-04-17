@@ -1,0 +1,188 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{DB537DE6-BB22-4AC0-886B-2FE08F304A79}|Clojure.Compiler.Tests\\Clojure.Compiler.Tests.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\clojure.next\\clojure.compiler.tests\\parsertests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{DB537DE6-BB22-4AC0-886B-2FE08F304A79}|Clojure.Compiler.Tests\\Clojure.Compiler.Tests.fsproj|solutionrelative:clojure.compiler.tests\\parsertests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{6EC7063E-0445-4F57-8CC9-D7EB7DBC486D}|Clojure.Lib\\Clojure.Lib.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\clojure.next\\clojure.lib\\namespace.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{6EC7063E-0445-4F57-8CC9-D7EB7DBC486D}|Clojure.Lib\\Clojure.Lib.fsproj|solutionrelative:clojure.lib\\namespace.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{58311A2C-6B1F-4875-A5B3-F934825D398B}|Clojure.Compiler\\Clojure.Compiler.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\clojure.next\\clojure.compiler\\parser.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{58311A2C-6B1F-4875-A5B3-F934825D398B}|Clojure.Compiler\\Clojure.Compiler.fsproj|solutionrelative:clojure.compiler\\parser.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{58311A2C-6B1F-4875-A5B3-F934825D398B}|Clojure.Compiler\\Clojure.Compiler.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\clojure.next\\clojure.compiler\\expr.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{58311A2C-6B1F-4875-A5B3-F934825D398B}|Clojure.Compiler\\Clojure.Compiler.fsproj|solutionrelative:clojure.compiler\\expr.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{58311A2C-6B1F-4875-A5B3-F934825D398B}|Clojure.Compiler\\Clojure.Compiler.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\clojure.next\\clojure.compiler\\munger.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{58311A2C-6B1F-4875-A5B3-F934825D398B}|Clojure.Compiler\\Clojure.Compiler.fsproj|solutionrelative:clojure.compiler\\munger.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{58311A2C-6B1F-4875-A5B3-F934825D398B}|Clojure.Compiler\\Clojure.Compiler.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\clojure.next\\clojure.compiler\\itype.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{58311A2C-6B1F-4875-A5B3-F934825D398B}|Clojure.Compiler\\Clojure.Compiler.fsproj|solutionrelative:clojure.compiler\\itype.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 229,
+          "SelectedChildIndex": 12,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Namespace.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Lib\\Namespace.fs",
+              "RelativeDocumentMoniker": "Clojure.Lib\\Namespace.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Lib\\Namespace.fs",
+              "RelativeToolTip": "Clojure.Lib\\Namespace.fs",
+              "ViewState": "AgIAAHwFAAAAAAAAAAAEwIgFAAAWAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-09-06T03:59:15.279Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{dee22b65-9761-4a26-8fb2-759b971d6dfc}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{be4d7042-ba3f-11d2-840e-00c04f9902c1}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{68487888-204a-11d3-87eb-00c04f7971a5}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:130:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e1b7d1f8-9b3c-49b1-8f4f-bfc63a88835d}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{4a9b7e51-aa16-11d0-a8c5-00a0c921a4d2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ParserTests.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler.Tests\\ParserTests.fs",
+              "RelativeDocumentMoniker": "Clojure.Compiler.Tests\\ParserTests.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler.Tests\\ParserTests.fs",
+              "RelativeToolTip": "Clojure.Compiler.Tests\\ParserTests.fs",
+              "ViewState": "AgIAAGcAAAAAAAAAAAAAAIgKAABCAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-09-06T03:40:24.718Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Parser.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler\\Parser.fs",
+              "RelativeDocumentMoniker": "Clojure.Compiler\\Parser.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler\\Parser.fs",
+              "RelativeToolTip": "Clojure.Compiler\\Parser.fs",
+              "ViewState": "AgIAAEUEAAAAAAAAAAAEwFEEAAAdAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-09-06T03:38:45.111Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Munger.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler\\Munger.fs",
+              "RelativeDocumentMoniker": "Clojure.Compiler\\Munger.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler\\Munger.fs",
+              "RelativeToolTip": "Clojure.Compiler\\Munger.fs",
+              "ViewState": "AgIAAF0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-09-06T03:38:38.919Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "IType.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler\\IType.fs",
+              "RelativeDocumentMoniker": "Clojure.Compiler\\IType.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler\\IType.fs",
+              "RelativeToolTip": "Clojure.Compiler\\IType.fs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-09-06T03:38:31.595Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Expr.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler\\Expr.fs",
+              "RelativeDocumentMoniker": "Clojure.Compiler\\Expr.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Clojure.Next\\Clojure.Compiler\\Expr.fs",
+              "RelativeToolTip": "Clojure.Compiler\\Expr.fs",
+              "ViewState": "AgIAAJIFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-09-06T03:38:30.726Z",
+              "EditorCaption": ""
+            }
+          ]
+        },
+        {
+          "DockedWidth": 229,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{004be353-6879-467c-9d1e-9ac23cdf6d49}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{605322a2-17ae-43f4-b60f-766556e46c87}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{0ad07096-bba9-4900-a651-0598d26f6d24}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{9a7cebbb-dc5c-4986-bc49-962da46aa506}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

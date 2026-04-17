@@ -1,0 +1,309 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{EE29D334-8882-4077-B3B6-30A2202D0DFE}|StaticField.Benchmark\\StaticField.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\staticfield.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{EE29D334-8882-4077-B3B6-30A2202D0DFE}|StaticField.Benchmark\\StaticField.Benchmark.fsproj|solutionrelative:staticfield.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7DFDB984-03DD-43E8-A0D9-227BC3B3A1CE}|StaticField.CSharp\\StaticField.CSharp.csproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\staticfield.csharp\\class1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7DFDB984-03DD-43E8-A0D9-227BC3B3A1CE}|StaticField.CSharp\\StaticField.CSharp.csproj|solutionrelative:staticfield.csharp\\class1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EE29D334-8882-4077-B3B6-30A2202D0DFE}|StaticField.Benchmark\\StaticField.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\staticfield.benchmark\\staticfield.benchmark.fsproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{EE29D334-8882-4077-B3B6-30A2202D0DFE}|StaticField.Benchmark\\StaticField.Benchmark.fsproj|solutionrelative:staticfield.benchmark\\staticfield.benchmark.fsproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7DFDB984-03DD-43E8-A0D9-227BC3B3A1CE}|StaticField.CSharp\\StaticField.CSharp.csproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\staticfield.csharp\\staticfield.csharp.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{7DFDB984-03DD-43E8-A0D9-227BC3B3A1CE}|StaticField.CSharp\\StaticField.CSharp.csproj|solutionrelative:staticfield.csharp\\staticfield.csharp.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{34E17BF3-F41C-40E4-8A1E-B03873392EBF}|Dispatch.Benchmark\\DispatchBenchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\dispatch.benchmark\\dispatchers.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{34E17BF3-F41C-40E4-8A1E-B03873392EBF}|Dispatch.Benchmark\\DispatchBenchmark.fsproj|solutionrelative:dispatch.benchmark\\dispatchers.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F7540167-1680-4B65-8339-AB3B195BFAA3}|TypeDispatch.Benchmark\\TypeDispatch.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\typedispatch.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{F7540167-1680-4B65-8339-AB3B195BFAA3}|TypeDispatch.Benchmark\\TypeDispatch.Benchmark.fsproj|solutionrelative:typedispatch.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DFA6ED47-BD61-4FF8-87D9-32B237BC1905}|Converter.Benchmark\\Converter.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\converter.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{DFA6ED47-BD61-4FF8-87D9-32B237BC1905}|Converter.Benchmark\\Converter.Benchmark.fsproj|solutionrelative:converter.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{2F3A47A3-535E-499B-888F-9322FF52E34A}|ForIn.Benchmark\\ForIn.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\forin.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{2F3A47A3-535E-499B-888F-9322FF52E34A}|ForIn.Benchmark\\ForIn.Benchmark.fsproj|solutionrelative:forin.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3F5819EA-A822-45B5-BF8C-5082F0A2DEF7}|LetRecIteration.Benchmark\\LetRecIteration.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\letreciteration.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{3F5819EA-A822-45B5-BF8C-5082F0A2DEF7}|LetRecIteration.Benchmark\\LetRecIteration.Benchmark.fsproj|solutionrelative:letreciteration.benchmark\\tests.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3F5819EA-A822-45B5-BF8C-5082F0A2DEF7}|LetRecIteration.Benchmark\\LetRecIteration.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\letreciteration.benchmark\\readme.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}",
+      "RelativeMoniker": "D:0:0:{3F5819EA-A822-45B5-BF8C-5082F0A2DEF7}|LetRecIteration.Benchmark\\LetRecIteration.Benchmark.fsproj|solutionrelative:letreciteration.benchmark\\readme.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EE29D334-8882-4077-B3B6-30A2202D0DFE}|StaticField.Benchmark\\StaticField.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\staticfield.benchmark\\readme.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}",
+      "RelativeMoniker": "D:0:0:{EE29D334-8882-4077-B3B6-30A2202D0DFE}|StaticField.Benchmark\\StaticField.Benchmark.fsproj|solutionrelative:staticfield.benchmark\\readme.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3F5819EA-A822-45B5-BF8C-5082F0A2DEF7}|LetRecIteration.Benchmark\\LetRecIteration.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\letreciteration.benchmark\\program.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{3F5819EA-A822-45B5-BF8C-5082F0A2DEF7}|LetRecIteration.Benchmark\\LetRecIteration.Benchmark.fsproj|solutionrelative:letreciteration.benchmark\\program.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{017A7B9B-BB5C-4DCF-862F-E33BD57709D3}|Literal.Benchmark\\Literal.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\literal.benchmark\\program.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{017A7B9B-BB5C-4DCF-862F-E33BD57709D3}|Literal.Benchmark\\Literal.Benchmark.fsproj|solutionrelative:literal.benchmark\\program.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{EE29D334-8882-4077-B3B6-30A2202D0DFE}|StaticField.Benchmark\\StaticField.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\staticfield.benchmark\\program.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{EE29D334-8882-4077-B3B6-30A2202D0DFE}|StaticField.Benchmark\\StaticField.Benchmark.fsproj|solutionrelative:staticfield.benchmark\\program.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{017A7B9B-BB5C-4DCF-862F-E33BD57709D3}|Literal.Benchmark\\Literal.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\literal.benchmark\\valueholder.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}",
+      "RelativeMoniker": "D:0:0:{017A7B9B-BB5C-4DCF-862F-E33BD57709D3}|Literal.Benchmark\\Literal.Benchmark.fsproj|solutionrelative:literal.benchmark\\valueholder.fs||{8A5AA6CF-46E3-4520-A70A-7393D15233E9}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{017A7B9B-BB5C-4DCF-862F-E33BD57709D3}|Literal.Benchmark\\Literal.Benchmark.fsproj|c:\\work\\clojure\\clojure-clr-next\\src\\experiments\\benchmarks\\literal.benchmark\\literal.benchmark.fsproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{017A7B9B-BB5C-4DCF-862F-E33BD57709D3}|Literal.Benchmark\\Literal.Benchmark.fsproj|solutionrelative:literal.benchmark\\literal.benchmark.fsproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 232,
+          "SelectedChildIndex": 19,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e1b7d1f8-9b3c-49b1-8f4f-bfc63a88835d}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{dee22b65-9761-4a26-8fb2-759b971d6dfc}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{4a9b7e51-aa16-11d0-a8c5-00a0c921a4d2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{be4d7042-ba3f-11d2-840e-00c04f9902c1}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{68487888-204a-11d3-87eb-00c04f7971a5}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "StaticField.CSharp",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.CSharp\\StaticField.CSharp.csproj",
+              "RelativeDocumentMoniker": "StaticField.CSharp\\StaticField.CSharp.csproj",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.CSharp\\StaticField.CSharp.csproj",
+              "RelativeToolTip": "StaticField.CSharp\\StaticField.CSharp.csproj",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAUAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2024-06-25T19:18:28.689Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Class1.cs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.CSharp\\Class1.cs",
+              "RelativeDocumentMoniker": "StaticField.CSharp\\Class1.cs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.CSharp\\Class1.cs",
+              "RelativeToolTip": "StaticField.CSharp\\Class1.cs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAYAAAA7AAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-06-25T19:09:22.262Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Dispatchers.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Dispatch.Benchmark\\Dispatchers.fs",
+              "RelativeDocumentMoniker": "Dispatch.Benchmark\\Dispatchers.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Dispatch.Benchmark\\Dispatchers.fs",
+              "RelativeToolTip": "Dispatch.Benchmark\\Dispatchers.fs",
+              "ViewState": "AQIAAEEAAAAAAAAAAAASwFwAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-25T18:32:54.755Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "Tests.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\TypeDispatch.Benchmark\\Tests.fs",
+              "RelativeDocumentMoniker": "TypeDispatch.Benchmark\\Tests.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\TypeDispatch.Benchmark\\Tests.fs",
+              "RelativeToolTip": "TypeDispatch.Benchmark\\Tests.fs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAB8AAAAQAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-25T18:28:05.096Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "Tests.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\ForIn.Benchmark\\Tests.fs",
+              "RelativeDocumentMoniker": "ForIn.Benchmark\\Tests.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\ForIn.Benchmark\\Tests.fs",
+              "RelativeToolTip": "ForIn.Benchmark\\Tests.fs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAkAAAAEAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-20T19:31:47.879Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "Tests.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Converter.Benchmark\\Tests.fs",
+              "RelativeDocumentMoniker": "Converter.Benchmark\\Tests.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Converter.Benchmark\\Tests.fs",
+              "RelativeToolTip": "Converter.Benchmark\\Tests.fs",
+              "ViewState": "AQIAADoAAAAAAAAAAAAAwE0AAAAQAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-20T19:31:21.164Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "README.md",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\LetRecIteration.Benchmark\\README.md",
+              "RelativeDocumentMoniker": "LetRecIteration.Benchmark\\README.md",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\LetRecIteration.Benchmark\\README.md",
+              "RelativeToolTip": "LetRecIteration.Benchmark\\README.md",
+              "ViewState": "AQIAABMAAAAAAAAAAAAUwDoAAAAJAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2024-06-20T17:53:02.423Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "Tests.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\LetRecIteration.Benchmark\\Tests.fs",
+              "RelativeDocumentMoniker": "LetRecIteration.Benchmark\\Tests.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\LetRecIteration.Benchmark\\Tests.fs",
+              "RelativeToolTip": "LetRecIteration.Benchmark\\Tests.fs",
+              "ViewState": "AQIAAC0AAAAAAAAAAAAAADsAAAARAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-20T17:35:44.051Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "Program.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\LetRecIteration.Benchmark\\Program.fs",
+              "RelativeDocumentMoniker": "LetRecIteration.Benchmark\\Program.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\LetRecIteration.Benchmark\\Program.fs",
+              "RelativeToolTip": "LetRecIteration.Benchmark\\Program.fs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAYAAAAkAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-20T17:35:06.777Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "README.md",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.Benchmark\\README.md",
+              "RelativeDocumentMoniker": "StaticField.Benchmark\\README.md",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.Benchmark\\README.md",
+              "RelativeToolTip": "StaticField.Benchmark\\README.md",
+              "ViewState": "AQIAAGkAAAAAAAAAAAAAAHcAAABgAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2024-06-20T13:15:42.754Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "Program.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Literal.Benchmark\\Program.fs",
+              "RelativeDocumentMoniker": "Literal.Benchmark\\Program.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Literal.Benchmark\\Program.fs",
+              "RelativeToolTip": "Literal.Benchmark\\Program.fs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-20T04:11:19.761Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "StaticField.Benchmark.fsproj",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.Benchmark\\StaticField.Benchmark.fsproj",
+              "RelativeDocumentMoniker": "StaticField.Benchmark\\StaticField.Benchmark.fsproj",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.Benchmark\\StaticField.Benchmark.fsproj",
+              "RelativeToolTip": "StaticField.Benchmark\\StaticField.Benchmark.fsproj",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001351|",
+              "WhenOpened": "2024-06-20T04:10:59.739Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Tests.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.Benchmark\\Tests.fs",
+              "RelativeDocumentMoniker": "StaticField.Benchmark\\Tests.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.Benchmark\\Tests.fs",
+              "RelativeToolTip": "StaticField.Benchmark\\Tests.fs",
+              "ViewState": "AQIAAB4AAAAAAAAAAAAAAC4AAAARAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-20T04:11:10.548Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "Program.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.Benchmark\\Program.fs",
+              "RelativeDocumentMoniker": "StaticField.Benchmark\\Program.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\StaticField.Benchmark\\Program.fs",
+              "RelativeToolTip": "StaticField.Benchmark\\Program.fs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAcAAAAkAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-20T04:10:56.42Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "Literal.Benchmark.fsproj",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Literal.Benchmark\\Literal.Benchmark.fsproj",
+              "RelativeDocumentMoniker": "Literal.Benchmark\\Literal.Benchmark.fsproj",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Literal.Benchmark\\Literal.Benchmark.fsproj",
+              "RelativeToolTip": "Literal.Benchmark\\Literal.Benchmark.fsproj",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001351|",
+              "WhenOpened": "2024-06-20T04:09:28.949Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "ValueHolder.fs",
+              "DocumentMoniker": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Literal.Benchmark\\ValueHolder.fs",
+              "RelativeDocumentMoniker": "Literal.Benchmark\\ValueHolder.fs",
+              "ToolTip": "C:\\work\\clojure\\clojure-clr-next\\src\\Experiments\\Benchmarks\\Literal.Benchmark\\ValueHolder.fs",
+              "RelativeToolTip": "Literal.Benchmark\\ValueHolder.fs",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAABIAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-20T03:58:11.996Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

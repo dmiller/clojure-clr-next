@@ -200,7 +200,3 @@ Short answer: yeah.
 
 I did some simple tests to look at things like thread affinity and flooding the thread pool.  The simplest things to do is to replace a call like `(t/await ...)` with `(.Wait ...)`.  The latter does not yield its thread;  the difference in performance is notable.
 
-## Where to use it?
-
-
-
