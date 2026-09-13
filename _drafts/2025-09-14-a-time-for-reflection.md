@@ -5,11 +5,13 @@ date: 2025-09-14 00:00:00 -0500
 categories: general
 ---
 
-Sometimes you can't avoid reflection.  We discuss how Clojure(JVM/CLR) try to avoid reflection and how they handle reflection that can't be avoided.  ClojureCLR differs significantly from ClojureJVM in using the services of the Dynamic Language Runtime (DLR) to handle reflection; we defer that discussion to [Dyn-O-Site][TBD].  This post covers the general details of parsing and reflection handling in ClojureJVM.
+ We discuss how Clojures (JVM/CLR) try to avoid reflection and how they handle reflection that can't be avoided.  This post covers the general details reflection detection common to both Clojures and how reflection is coded in ClojureJVM.  
+
+ ClojureCLR differs significantly from ClojureJVM in using the services of the Dynamic Language Runtime (DLR) to handle reflection; that discussion follows in [Dyn-O-Site][TBD].  
 
 ## Introduction
 
-Given a host expression, we analyze it to determine if we can resolve the exact type and specific member (method, property, field, constructor) to be invoked.  If we can, then there is no need for reflection:  We can compile the host expression to a direct call to the member, possibly with type casts on arguments and the return value to ensure conformance to the member's signature.  If we cannot determine the exact type+member, we need to generate code that uses reflection to determine the member to be invoked at runtime.
+When we encounter a host interop expression during compilation, we analyze it to determine if we can resolve the exact type and specific member (method, property (CLR only), field, constructor) to be invoked.  If we can, then there is no need for reflection; we can compile the host expression to a direct call to the member, possibly with type casts on arguments and the return value to ensure conformance to the member's signature.  If we cannot determine the exact type+member, we need to generate code that uses reflection to determine the member to be invoked at runtime.
 
 If you need a refresher on host interop expressions, refer to [Java interop](https://clojure.org/reference/java_interop). There are some extensions to the syntax of host interop expressions in ClojureCLR; these will be covered in [Dyn-O-Site][TBD].   
 
@@ -38,9 +40,9 @@ For constructors (see [Java interop: The Dot special form](https://clojure.org/r
 
 Several of the forms are expanded to expressions involving the dot (`.`) special form; that special form is handed by the `HostExpr` parser.  The classic `(Classname. args*)` also macroexpands to `(new Classname args)`, which is handled by the `NewExpr` parser.
 
-The new 'qualified' forms, AKA qualified method expressions or QMEs, were introduced in Clojure 1.12.
-Except for `Classname/staticMethod`, which had been handled;  in 1.12, it got moved to the QME-handling code.  An expression of type `QualifiedMethodExpr` is created by `Compiler.AnalyzeSymbol` when it runs into `Classname/staticMethod` or `Classname/.instanceMethod` or `Classname/new` forms.  
-These are then seen as the `(QME args)` in the `InvokeExpr` parser, which will directly create the desired AST node rather than going through the `HostExpr` parser as we do with the others.
+The new 'qualified' forms, AKA qualified method expressions or QMEs, were introduced in Clojure 1.12.  These are symbols of the form `Classname/memberName`.  Previously only static members received special handling; in version 1.12, Clojure added support for instance members and constructors as well; all three (static/instance/constructor) are dealt with as QMEs.  The QME-handling code was added to `Compiler.AnalyzeSymbol`. 
+(See [Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what %}).) An expression of type `QualifiedMethodExpr` is created by `Compiler.AnalyzeSymbol` when it runs into `Classname/`_staticMethod_ or `Classname/.`_instanceMethod_ or `Classname/new` forms.    
+These are then seen as `(QME args)` in the `InvokeExpr` parser, which will directly create the desired AST node rather than going through the `HostExpr` parser as we do with the 'dot' forms.
 
 Another way of presenting the information above is:
 
@@ -48,14 +50,15 @@ Another way of presenting the information above is:
 |------------|----------|----|
 | `(.instanceMember instance args*)` <br/>  `(.instanceMember Classname args*)` <br/>  `(.-instanceField instance)`  | macroexpands to `.` special form | handled by `HostExpr` parser |
 | `Classname/staticField` | detected by `AnalyzeSymbol` |  will result in either QME or `FieldOrPropertyExpr`|
-|  `(Classname/staticMethod args*)` <br/> `(Classname/.instanceMethod instance args*)` <br/> `(Classname/new args*)`| `AnalyzeSymbol` create QME | handled by `InvokeExpr` parser |
+|  `(Classname/staticMethod args*)` <br/> `(Classname/.instanceMethod instance args*)` <br/> `(Classname/new args*)`| `AnalyzeSymbol` creates QME, `(QME args)` is processed| handled by `InvokeExpr` parser |
 | `(new Classname args*)` | already a special form | handled by `NewExpr` parser|  |
+
 
 ## The `.` special form
 
-The forms listed above are the preferred expressions in user code.  One should only write the `.` special form directly in macro definitions.  However, in the compiler, macroexpansion yields `.` special forms, and that becomes the locus of analysis.
+The forms in the __Expression__ column in the table above are the preferred expressions in user code.  One should only write the `.` special form directly in macro definitions.  In the compiler, macroexpansion translates the user-preferred style to  `.` special forms, and that becomes the locus of analysis.
 
-[Java interop: The Dot special form](https://clojure.org/reference/java_interop#_the_dot_special_form) give us the list of syntacic expressions that must be parsed.
+[Java interop: The Dot special form](https://clojure.org/reference/java_interop#_the_dot_special_form) give us the list of syntactic expressions that must be parsed.
 
 - `(. instance-expr member-symbol)`
 - `(. Classname-symbol member-symbol)`
@@ -64,6 +67,8 @@ The forms listed above are the preferred expressions in user code.  One should o
 - `(. Classname-symbol (method-symbol args*))` or `(. Classname-symbol method-symbol args*)`
 
 These forms are handled by the `HostExpr` parser. `HostExpr` is an abstract class;  it will generate an instance of one its concrete subclasses.  
+
+For the rest of this post, we will focus on parsing and code generation of host expression in ClojureJVM.  ClojureCLR has some additional complications, which will be covered in [Dyn-O-Site][TBD].
 
 ### HostExpr parsing on the JVM
 
@@ -79,7 +84,7 @@ if(c == null)
 
 At this point, if `c` is non-null, we are dealing with a static member;  otherwise, we are dealing with an instance member, and `instance` holds the AST node for the target expression.
 
-Next we try to determine if we are looking at a field access or a method call.  The first requirement is that our form looks like `(. target symbol)`:
+Next we try to determine if we are looking at a field access or a method call.  The first requirement for being a field access is that our form looks like `(. target symbol)`:
 
 ```Java
 boolean maybeField = RT.length(form) == 3 && (RT.third(form) instanceof Symbol);
@@ -181,7 +186,7 @@ The possible results are:
 - tie - there is more than one method that is equally good;  an error is thrown.
 - no match - no method matches;  -1 is returned.
 
-`getMatchingParams` is a rather condensed 50 lines of code.  Unwrapping the logic, roughlyit does the following for each method:
+`getMatchingParams` is a rather dense 50 lines of code.  Unwrapping the logic, roughlyit does the following for each method:
 
 - check the parameter types against the argument expression types.  We count the number of exact matches.  If a parameter is not an exact match, we call `Reflector.paramArgTypeMatch(...)` to see if the argument type can be converted to the parameter type. (See below.)  If not, this method is not a match; move on to the next method.
 - if all parameters are exact matches, we have an exact match; record its index and note that we have an exact match.  The code here is a little obscure;  there is some possibility of more than one exact match on parameters -- I'm not sure how that happens on the JVM -- so there is some code to decide if we prefer this one over the previous exact match, based on return type. But we come out of this with the index of some exact match method and the 'exact match' flag set to true.

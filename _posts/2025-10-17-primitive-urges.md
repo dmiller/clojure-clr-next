@@ -28,7 +28,7 @@ public interface MaybePrimitiveExpr : Expr
     }
 ```
 
-A given instance of a `MaybePrimitiveExpr`-implementating class may or may not be able to emit a primitive value, depending on its internal state.  This is indicated by the `CanEmitPrimitive` property.  If this is true, then the `EmitUnboxed` method can be called to generate IL that leaves a primitive value on the stack.  However, whether or not to call `EmitUnboxed` instead of the usual `Emit` method is decided by the context in which the expression appears.
+A given instance of a `MaybePrimitiveExpr`-implementing class may or may not be able to emit a primitive value, depending on its internal state.  This is indicated by the `CanEmitPrimitive` property.  If this is true, then the `EmitUnboxed` method can be called to generate IL that leaves a primitive value on the stack.  However, whether or not to call `EmitUnboxed` instead of the usual `Emit` method is decided by the context in which the expression appears.
 
  The following expression types implement `MaybePrimitiveExpr`:
 
@@ -187,7 +187,7 @@ The first special case has these conditions:
 - the `Var` is bound to a value
 - the type of the value has a static `invokeStatic` method with the correct arity (and an `ISeq`-typed last parameter for variadic calls)
 
-If all these conditions are met, we create a `StaticInvokeExpr` to represent the call.  This is of relevance here because (a) `StaticInvokeExpr` implements `MaybePrimitiveExpr` and (b) whether or not its `Emit` or `EmitUnboxed` method is called, we will be calling `EmitTypedArg` to avoid unnecessary boxing genering argument values and passing them to the `invokeStatic` method.
+If all these conditions are met, we create a `StaticInvokeExpr` to represent the call.  This is of relevance here because (a) `StaticInvokeExpr` implements `MaybePrimitiveExpr` and (b) whether or not its `Emit` or `EmitUnboxed` method is called, we will be calling `EmitTypedArg` to avoid unnecessary boxing generating argument values and passing them to the `invokeStatic` method.
 
 The second special case is when
 
