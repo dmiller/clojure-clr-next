@@ -5,3 +5,9 @@ _site
 vendor
 
 .fake
+
+
+
+.lsp/.cache/
+.calva/
+.clj-kondo/
