@@ -70,7 +70,7 @@ Sorting a bunch of strings or creating a sorted map under ordinal comparison exe
 
 **Culture-sensitive comparisons have not been consistent over time.**
 
-"Before .NET 5, the .NET globalization APIs used different underlying libraries on different platforms. ... If you upgrade your app to target .NET 5 or later, you might see changes in your app even if you don't realize you're using globalization facilities." (See [Globalization and ICU - .NET | Microsoft Learn](https://learn.microsoft.com/en-us/dotnet/core/extensions/globalization-icu)).  And you can switch globalization providers.   ClojureCLR on .NET Framework uses NLS, not ICU, so Framework and .NET builds of ClojureCLR on the same machine can yield different results.  That's just on Windows.  Let us not discuss Linux and Mac.  Read it and weep.
+"Before .NET 5, the .NET globalization APIs used different underlying libraries on different platforms. ... If you upgrade your app to target .NET 5 or later, you might see changes in your app even if you don't realize you're using globalization facilities." (See [Globalization and ICU - .NET](https://learn.microsoft.com/en-us/dotnet/core/extensions/globalization-icu)).  And you can switch globalization providers.   ClojureCLR on .NET Framework uses NLS, not ICU, so Framework and .NET builds of ClojureCLR on the same machine can yield different results.  That's just on Windows.  Let us not discuss Linux and Mac.  Read it and weep.
 
 ## Going deeper
 
