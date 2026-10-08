@@ -5,7 +5,7 @@ date: 2025-09-14 00:00:00 -0500
 categories: general
 ---
 
- We discuss how Clojures (JVM/CLR) try to avoid reflection and how they handle reflection that can't be avoided.  This post covers the general details reflection detection common to both Clojures and how reflection is coded in ClojureJVM.  
+ We discuss how Clojures (JVM/CLR) try to avoid reflection and how they handle reflection that can't be avoided.  This post covers the general details of reflection detection common to both Clojures and how reflection is coded in ClojureJVM.  
 
  ClojureCLR differs significantly from ClojureJVM in using the services of the Dynamic Language Runtime (DLR) to handle reflection; that discussion follows in [Dyn-O-Site][TBD].  
 
@@ -16,11 +16,11 @@ When we encounter a host interop expression during compilation, we analyze it to
 If you need a refresher on host interop expressions, refer to [Java interop](https://clojure.org/reference/java_interop). There are some extensions to the syntax of host interop expressions in ClojureCLR; these will be covered in [Dyn-O-Site][TBD].   
 
 
-## Analysis of host expressions
+## Syntax of host expressions
 
 Look at [Java interop: Member access](https://clojure.org/reference/java_interop#_member_access) for a description of the various host interop expressions.  
 
-| Expression | Macroexpansion | AST node | QME |
+| Expression | Macroexpansion | QME |
 |------------|-------------|----------|----|
 | `(.instanceMember instance args*)` | `(. instance instanceMember args*)` |  |  |
 | `(.instanceMember Classname args*)` |  `(. (identity Classname) instanceMember args*)` |  |  |
@@ -37,21 +37,12 @@ For constructors (see [Java interop: The Dot special form](https://clojure.org/r
 | `(Classname/new args*)` | |  `NewExpr` |  Y | 
 | `(new Classname args*)` | |  `NewExpr` |  |
 
+The syntactic recognition of the these forms occur in several places in the compiler.  Any of the "classic" forms involving a '.' are caught during the macroexpanion phase of parsing a sequence `(op ...)`.  If the `op` is symbol without a namespace starting or ending with a '.', then the form is macroexpanded as shown.   `.` is a special form handled by the `HostExpr` parser, and similarly for `new` and `NewExpr`.
 
-Several of the forms are expanded to expressions involving the dot (`.`) special form; that special form is handed by the `HostExpr` parser.  The classic `(Classname. args*)` also macroexpands to `(new Classname args)`, which is handled by the `NewExpr` parser.
+The new "qualified" forms, AKA qualified method expressions or QMEs, were introduced in Clojure 1.12.  These are symbols of the form `Classname/memberName`.  Previously only static members received special handling; in version 1.12, Clojure added support for instance members and constructors as well; all three (static/instance/constructor) are dealt with as QMEs.  When trying to identify the `op` in a sequence `(op ...)`, if the `op` is a symbol, the symbol analyzer will check if it is a QME; basically, the symbol has a namespace part that is not the name a namespace in the current Clojure environment, and that namespace part does resolve to a type.  If so, the symbol is treated as a QME and the `op` is replaced with a `(QME args*)` form.  The `InvokeExpr` parser will then handle the `(QME args*)` form directly, rather than going through the `HostExpr` parser as we do with the 'dot' forms. (See [Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what %}).) 
 
-The new 'qualified' forms, AKA qualified method expressions or QMEs, were introduced in Clojure 1.12.  These are symbols of the form `Classname/memberName`.  Previously only static members received special handling; in version 1.12, Clojure added support for instance members and constructors as well; all three (static/instance/constructor) are dealt with as QMEs.  The QME-handling code was added to `Compiler.AnalyzeSymbol`. 
-(See [Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what %}).) An expression of type `QualifiedMethodExpr` is created by `Compiler.AnalyzeSymbol` when it runs into `Classname/`_staticMethod_ or `Classname/.`_instanceMethod_ or `Classname/new` forms.    
-These are then seen as `(QME args)` in the `InvokeExpr` parser, which will directly create the desired AST node rather than going through the `HostExpr` parser as we do with the 'dot' forms.
 
-Another way of presenting the information above is:
-
-| Expression | AST node | QME |
-|------------|----------|----|
-| `(.instanceMember instance args*)` <br/>  `(.instanceMember Classname args*)` <br/>  `(.-instanceField instance)`  | macroexpands to `.` special form | handled by `HostExpr` parser |
-| `Classname/staticField` | detected by `AnalyzeSymbol` |  will result in either QME or `FieldOrPropertyExpr`|
-|  `(Classname/staticMethod args*)` <br/> `(Classname/.instanceMethod instance args*)` <br/> `(Classname/new args*)`| `AnalyzeSymbol` creates QME, `(QME args)` is processed| handled by `InvokeExpr` parser |
-| `(new Classname args*)` | already a special form | handled by `NewExpr` parser|  |
+The QME forms are a little simpler to handle.  From syntactic considerations, we know (in the non-constructor case) whether we are dealing with a static or instance member and we know the type.  Thus, for example, we know that we will generate a `StaticMethodExpr` or an `InstanceMethodExpr` and can generate those directly.   The `.` form requires more analysis.  However, in the end, when it comes down to method resolution and the need for reflection, the decisions are identical. Hence, we can just focus on the `.` forms.
 
 
 ## The `.` special form
