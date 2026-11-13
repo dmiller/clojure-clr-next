@@ -366,3 +366,8 @@ MigrationBackup/
 testing/
 
 Stage/
+
+
+## Clojure tool artifacts/
+
+.calva/
