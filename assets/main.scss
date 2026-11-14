@@ -119,12 +119,12 @@
     flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    column-gap: $spacing-unit;
+    column-gap: 0;
   }
   .site-title, .site-nav { float: none; }
   .site-nav .page-link {
     white-space: nowrap;
-    &:not(:last-child) { margin-right: 14px; }
+    &:not(:last-child) { margin-right: 12px; }
   }
 }
 
@@ -151,53 +151,55 @@ a:focus-visible, summary:focus-visible {
   border-radius: 2px;
 }
 
-// ---- Dark mode, following the reader's system setting ----
+// ---- Theme switch (header) ----
+
+.theme-toggle {
+  display: none;                       // shown only when the theme script has run
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px;
+  margin-left: 8px;
+  color: $grey-color-dark;
+  cursor: pointer;
+  line-height: 0;
+  align-self: center;
+  svg {
+    display: none;
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  &:hover { border-color: $grey-color-light; }
+  &:focus-visible { outline: 2px solid $brand-color; outline-offset: 2px; }
+}
+:root[data-theme-choice] .theme-toggle { display: inline-block; }
+:root[data-theme-choice="system"] .theme-toggle .icon-system,
+:root[data-theme-choice="light"] .theme-toggle .icon-light,
+:root[data-theme-choice="dark"] .theme-toggle .icon-dark { display: block; }
+
+@media screen and (min-width: $on-palm + 1) {
+  .site-nav { margin-left: auto; padding-left: 20px; }
+}
+@include media-query($on-palm) {
+  // minima puts the menu button at the top right; the switch sits to its left.
+  .theme-toggle { position: absolute; top: 13px; right: 62px; margin: 0; }
+}
+
+// ---- Dark mode ----
+// Dark styles apply when the system is dark and the reader hasn't chosen light,
+// or when the reader has chosen dark with the header switch. The choice is
+// stored in localStorage and applied as <html data-theme> by _includes/head.html.
 
 @import "syntax-dark";
+@import "dark-theme";
 
 @media (prefers-color-scheme: dark) {
-  $d-bg: #16181c;
-  $d-surface: #1f2328;
-  $d-text: #e2e4e8;
-  $d-muted: #9ba1a8;
-  $d-border: #353a41;
-  $d-link: #79b8ff;
-
-  body { color: $d-text; background-color: $d-bg; }
-  a { color: $d-link; &:visited { color: #b392f0; } }
-  .post-meta, .footer-col-wrapper, .rss-subscribe { color: $d-muted; }
-  blockquote { color: $d-muted; border-left-color: $d-border; }
-  hr { border-color: $d-border; }
-
-  .site-header { border-top-color: #4a5058; border-bottom-color: $d-border; }
-  .site-title, .site-title:visited { color: $d-text; }
-  .site-nav .page-link, .site-nav .page-link:visited { color: $d-text; }
-  .site-nav { background-color: $d-bg; border-color: $d-border; }
-  .site-nav .menu-icon > svg path { fill: $d-muted; }
-  .site-footer { border-top-color: $d-border; }
-  .svg-icon { fill: $d-muted; }
-
-  pre, code { background-color: $d-surface; border-color: $d-border; color: $d-text; }
-  .highlight, .highlighter-rouge .highlight, .highlight pre { background-color: $d-surface; }
-  pre code, .highlight .w { background-color: transparent; }
-
-  table {
-    color: $d-text;
-    border-color: $d-border;
-    tr:nth-child(even) { background-color: lighten($d-bg, 3%); }
-    th { background-color: $d-surface; border-color: $d-border; }
-    td { border-color: $d-border; }
-  }
-
-  .post-content img { background-color: #fff; }   // diagrams are drawn on white
-
-  .card, .topic-chip { border-color: $d-border; }
-  .card, .card:visited { color: $d-text; }
-  .card h3 { color: $d-link; }
-  .card:hover, .topic-chip:hover { border-color: $d-link; }
-  .topic-chip span { color: $d-muted; }
-  .series-box { background-color: $d-surface; border-left-color: $d-link; }
-  .year-heading, .series-nav { border-color: $d-border; }
-
-  a:focus-visible, summary:focus-visible { outline-color: $d-link; }
+  :root:not([data-theme="light"]) { @include syntax-dark; @include dark-theme; }
 }
+:root[data-theme="dark"] { color-scheme: dark; @include syntax-dark; @include dark-theme; }
+:root[data-theme="light"] { color-scheme: light; }

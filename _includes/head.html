@@ -1,0 +1,46 @@
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {%- comment -%}
+    Light/dark theme. Runs before the stylesheet loads so a saved choice shows
+    without a flash. localStorage "theme" is "light" or "dark"; absent means
+    follow the system. Sets on <html>:
+      data-theme        - only when the reader chose light or dark (used by CSS)
+      data-theme-choice - system | light | dark (which switch icon to show)
+      data-pf-theme     - the effective theme, for Pagefind's search UI
+    The switch itself is in _includes/header.html.
+  {%- endcomment -%}
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var dark = window.matchMedia("(prefers-color-scheme: dark)");
+      function stored() {
+        try { var t = localStorage.getItem("theme"); return t === "light" || t === "dark" ? t : null; }
+        catch (e) { return null; }
+      }
+      function apply(choice) {
+        if (choice) root.setAttribute("data-theme", choice); else root.removeAttribute("data-theme");
+        root.setAttribute("data-theme-choice", choice || "system");
+        root.setAttribute("data-pf-theme", choice || (dark.matches ? "dark" : "light"));
+      }
+      window.siteTheme = {
+        get: stored,
+        set: function (choice) {
+          try { if (choice) localStorage.setItem("theme", choice); else localStorage.removeItem("theme"); } catch (e) {}
+          apply(choice);
+        }
+      };
+      apply(stored());
+      dark.addEventListener("change", function () { apply(stored()); });
+      // Another tab changed the setting.
+      window.addEventListener("storage", function (e) { if (e.key === "theme") apply(stored()); });
+    })();
+  </script>
+  {%- seo -%}
+  <link rel="stylesheet" href="{{ "/assets/main.css" | relative_url }}">
+  {%- feed_meta -%}
+  {%- if jekyll.environment == 'production' and site.google_analytics -%}
+    {%- include google-analytics.html -%}
+  {%- endif -%}
+</head>

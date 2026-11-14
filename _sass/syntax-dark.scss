@@ -1,5 +1,5 @@
-// Rouge 'github.dark' theme (rougify style github.dark), used in dark mode only.
-@media (prefers-color-scheme: dark) {
+// Rouge 'github.dark' theme (rougify style github.dark), for dark mode.
+@mixin syntax-dark {
   .highlight table td { padding: 5px; }
   .highlight table pre { margin: 0; }
   .highlight, .highlight .w {

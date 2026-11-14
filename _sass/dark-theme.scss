@@ -1,0 +1,49 @@
+// Dark color overrides. Included by assets/main.scss when the effective theme is dark.
+@mixin dark-theme {
+  $d-bg: #16181c;
+  $d-surface: #1f2328;
+  $d-text: #e2e4e8;
+  $d-muted: #9ba1a8;
+  $d-border: #353a41;
+  $d-link: #79b8ff;
+
+  body { color: $d-text; background-color: $d-bg; }
+  a { color: $d-link; &:visited { color: #b392f0; } }
+  .post-meta, .footer-col-wrapper, .rss-subscribe { color: $d-muted; }
+  blockquote { color: $d-muted; border-left-color: $d-border; }
+  hr { border-color: $d-border; }
+
+  .site-header { border-top-color: #4a5058; border-bottom-color: $d-border; }
+  .site-title, .site-title:visited { color: $d-text; }
+  .site-nav .page-link, .site-nav .page-link:visited { color: $d-text; }
+  .site-nav { background-color: $d-bg; border-color: $d-border; }
+  .site-nav .menu-icon > svg path { fill: $d-muted; }
+  .site-footer { border-top-color: $d-border; }
+  .svg-icon { fill: $d-muted; }
+
+  pre, code { background-color: $d-surface; border-color: $d-border; color: $d-text; }
+  .highlight, .highlighter-rouge .highlight, .highlight pre { background-color: $d-surface; }
+  pre code, .highlight .w { background-color: transparent; }
+
+  table {
+    color: $d-text;
+    border-color: $d-border;
+    tr:nth-child(even) { background-color: lighten($d-bg, 3%); }
+    th { background-color: $d-surface; border-color: $d-border; }
+    td { border-color: $d-border; }
+  }
+
+  .post-content img { background-color: #fff; }   // diagrams are drawn on white
+
+  .card, .topic-chip { border-color: $d-border; }
+  .card, .card:visited { color: $d-text; }
+  .card h3 { color: $d-link; }
+  .card:hover, .topic-chip:hover { border-color: $d-link; }
+  .topic-chip span { color: $d-muted; }
+  .series-box { background-color: $d-surface; border-left-color: $d-link; }
+  .year-heading, .series-nav { border-color: $d-border; }
+
+  a:focus-visible, summary:focus-visible { outline-color: $d-link; }
+
+  .theme-toggle { color: $d-muted; &:hover { border-color: $d-border; } &:focus-visible { outline-color: $d-link; } }
+}
