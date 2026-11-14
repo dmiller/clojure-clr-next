@@ -3,6 +3,10 @@ layout: post
 title: C4 - Functional anatomy
 date: 2025-09-04 00:00:00 -0500
 categories: general
+project: clr
+series: "C4"
+series_part: 5
+tags: [compiler-design]
 ---
 
 We look at the implementation of functions in ClojureCLR and how evaluation/compilation translates a source code definition of a function to the underlying class representation.  (The first of several posts on this topic.)
@@ -288,7 +292,7 @@ I'll leave `applyTo` as an exercise.
 
 ## Static invocation
 
-In the previous post  [C4: ISeq clarity]({{site.baseurl}}{% post_url 2025-09-03-iseq-clarity %}), I touched upon the notion of static invocation of functions.  Static invocation is an efficiency hack.  It allows a call such as
+In the previous post  [C4: ISeq clarity]({% post_url 2025-09-03-iseq-clarity %}), I touched upon the notion of static invocation of functions.  Static invocation is an efficiency hack.  It allows a call such as
 
 ```Clojure
 (f 1 2 3)
@@ -302,7 +306,7 @@ to bypass the usual dynamic dispatch that does a lookup of the current value of 
 
 When these conditions are met, for each `invoke` the function defines, there will be a `staticInvoke` method of the same arity with the actual function definition.  The `invoke` just calls the `staticInvoke` of the same arity.
 
-I provide more detail on some of the issues of static linking in a previous post outside this series, [The function of naming; the naming of functions]({{site.baseurl}}{% post_url 2025-02-28-function-naming %}). 
+I provide more detail on some of the issues of static linking in a previous post outside this series, [The function of naming; the naming of functions]({% post_url 2025-02-28-function-naming %}). 
 
 ## Primitive urges
 

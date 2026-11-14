@@ -3,6 +3,8 @@ layout: post
 title: AOT compilation issues
 date: 2025-02-20 00:00:00 -0500
 categories: general
+project: clr
+tags: [compiler]
 ---
 
 A look at the issues involved in restoring AOT compilation to ClojureCLR.
@@ -120,7 +122,7 @@ it so happens that 'naked' `let`s get wrapped with a `fn` -- don't ask -- so eve
 I _think_ that this very little effect at that point in the process -- but most likely I will have to do double generation even during syntactic analysis.  
  Emitting twice, once for saving and once for progressive evaluation,  might work.  But there are complications I have not figured out yet. 
 
- [Edit: The first version of this post had a digression on direct linking here.  I've moved that to a [separate post]({{site.baseurl}}{% post_url 2025-02-20-AOT-compilation-issues %}).]
+ [Edit: The first version of this post had a digression on direct linking here.  I've moved that to a [separate post]({% post_url 2025-02-20-AOT-compilation-issues %}).]
 
 The biggest task to start is to go over line of code in the compiler to see if there is any chance that we could cross-reference from  dynamic (eval) assembly types to/from persisted assembly types.  Either direction, the code won't run.  (If the dynamic code references something in the persisteed assembly, we can't run it -- the persistent assembly type can't be run.  If the persisted code references a something in the eval assembly, we won't be able to save the assembly;  been there, done that, when first writing the compiler code.)
 

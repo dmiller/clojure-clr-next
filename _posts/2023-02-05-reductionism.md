@@ -3,6 +3,8 @@ layout: post
 title: Reductionism
 date: 2023-02-05 12:00:00 -0500
 categories: general
+project: next
+tags: [data-structures]
 ---
 
 You can be a boss at reducers if you know this one weird trick!
@@ -383,7 +385,7 @@ And with that, let's quit.
 
 ## Behind the scenes
 
-What I've not talked about is all the machinery behind the `CollReduce` protocol.   That all lies out in the Clojure source code and is not our present concern.  Mostly.  I did have to dig into it to solve one problem.  There is a `reduce` method in `ArrayChunk`.   That actually is the reduce method for the `IChunk` interface.  (See previous post [Laziness and Chunking]({{site.baseurl}}{% post_url 2023-02-03-laziness-and-chunking %}.)  The `reduce` method in `ArrayChunk` does stop early when it gets a `Reduced` object back from the reducer function, but it returns the `Reduced` object, not the wrapped value.  I struggled with this for a while until finally getting set on the correct track by Alex Miller over in the #clr-dev channel in the Clojurian slack.  First is to note that this `reduce` is for `IChunk`.  Then you have to figure out where it gets called from.  And that's where the protocol comes in. `reduce` will through the `CollReduce` protocol, which in this case will end up going through the `InternalReduce` protocol, wherein we find a handler for `IChunkedSeq`:
+What I've not talked about is all the machinery behind the `CollReduce` protocol.   That all lies out in the Clojure source code and is not our present concern.  Mostly.  I did have to dig into it to solve one problem.  There is a `reduce` method in `ArrayChunk`.   That actually is the reduce method for the `IChunk` interface.  (See previous post [Laziness and Chunking]({% post_url 2023-02-03-laziness-and-chunking %}).  The `reduce` method in `ArrayChunk` does stop early when it gets a `Reduced` object back from the reducer function, but it returns the `Reduced` object, not the wrapped value.  I struggled with this for a while until finally getting set on the correct track by Alex Miller over in the #clr-dev channel in the Clojurian slack.  First is to note that this `reduce` is for `IChunk`.  Then you have to figure out where it gets called from.  And that's where the protocol comes in. `reduce` will through the `CollReduce` protocol, which in this case will end up going through the `InternalReduce` protocol, wherein we find a handler for `IChunkedSeq`:
 
 ```Clojure
   clojure.lang.IChunkedSeq

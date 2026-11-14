@@ -3,6 +3,8 @@ layout: post
 title: Typename syntax and resolution in ClojureCLR
 date: 2025-09-21 00:00:00 -0500
 categories: general
+project: clr
+tags: [feature]
 ---
 
 Wherein we describe the significant enhancements to typename syntax and resolution in ClojureCLR effective with version 1.12.3-alpha2.
@@ -29,7 +31,7 @@ With these changes, you can write code like this:
 
 ## ClojureCLR typename syntax and resolution: _status quo ante_
 
-I wrote previously about  typename resolution in ClojureCLR in [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type %}).  That post described the strategies used to look up types by name, and some of the tradeoffs involved.
+I wrote previously about  typename resolution in ClojureCLR in [Are you my type?]({% post_url 2025-03-01-are-you-my-type %}).  That post described the strategies used to look up types by name, and some of the tradeoffs involved.
 
 Two prominent pain points in dealing with typenames and resolving them are:
 
@@ -82,8 +84,8 @@ Namespaces already supply a mechanism for mapping symbols to types.
 
 Use of the symbol-to-type map is embedded all over the Clojure interpreter/compiler code.  I've written a little about this:
 
-- [C4: Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what %}) - A little digression on what symbols represent
-- [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type %}).
+- [C4: Symbolic of what?]({% post_url 2025-09-02-symbolic-of-what %}) - A little digression on what symbols represent
+- [Are you my type?]({% post_url 2025-03-01-are-you-my-type %}).
 
 
 Every namespace comes pre-loaded with a set of type aliases for all the public types in the `System` namespace in assemblies that are loaded during Clojure initialization.  This is why you have been able to write

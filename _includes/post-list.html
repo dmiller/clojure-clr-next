@@ -1,0 +1,18 @@
+{%- comment -%}
+  A list of posts.
+  Params: posts (required), excerpts (true to show excerpts), compact (true for a dense list).
+{%- endcomment -%}
+{%- assign date_format = site.minima.date_format | default: "%b %-d, %Y" -%}
+<ul class="post-list{% if include.compact %} compact{% endif %}">
+  {%- for post in include.posts -%}
+  <li>
+    <span class="post-meta">{{ post.date | date: date_format }}{% include post-labels.html post=post %}</span>
+    <h3>
+      <a class="post-link" href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
+    </h3>
+    {%- if include.excerpts -%}
+      {{ post.excerpt }}
+    {%- endif -%}
+  </li>
+  {%- endfor -%}
+</ul>

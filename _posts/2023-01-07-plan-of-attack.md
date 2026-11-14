@@ -3,6 +3,8 @@ layout: post
 title: The plan of attack
 date: 2023-01-07 00:00:00 -0500
 categories: general
+project: next
+tags: [design]
 ---
 
 One does not simply start writing a Clojure implementation.  One needs a plan.

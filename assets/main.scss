@@ -1,0 +1,95 @@
+---
+# Only the main Sass file needs front matter (the dashes are enough)
+---
+
+@import "minima";
+
+// ---- Additions for the site's navigation (projects, series, topics) ----
+
+.post-meta .meta-item::before {
+  content: "\00b7";
+  margin: 0 0.4em;
+}
+
+.lead {
+  @include relative-font-size(1.125);
+}
+
+// Dense post lists (archive, topic and project pages)
+.post-list.compact {
+  > li { margin-bottom: $spacing-unit / 2; }
+  h3 { @include relative-font-size(1.125); margin-bottom: 0; }
+}
+
+.year-heading {
+  margin-top: $spacing-unit;
+  border-bottom: 1px solid $grey-color-light;
+}
+
+// Front page
+.intro { @include relative-font-size(1.125); margin-bottom: $spacing-unit; }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: $spacing-unit / 2;
+  margin-bottom: $spacing-unit;
+}
+
+.card {
+  display: block;
+  padding: $spacing-unit / 2;
+  border: 1px solid $grey-color-light;
+  border-radius: 6px;
+  color: $text-color;
+  h3 { color: $brand-color; margin-bottom: 0.25em; }
+  p { margin-bottom: 0.5em; }
+  &:hover { text-decoration: none; border-color: $brand-color; }
+  &, &:visited { color: $text-color; }
+}
+
+.series-summary {
+  list-style: none;
+  margin-left: 0;
+  margin-bottom: $spacing-unit;
+  li { margin-bottom: 0.3em; }
+  .post-meta { margin-left: 0.5em; }
+}
+
+.topic-list { margin-bottom: $spacing-unit; line-height: 2.2; }
+
+.topic-chip {
+  display: inline-block;
+  margin: 0 0.4em 0.4em 0;
+  padding: 0.1em 0.7em;
+  border: 1px solid $grey-color-light;
+  border-radius: 1em;
+  line-height: 1.6;
+  white-space: nowrap;
+  span { color: $grey-color; @include relative-font-size(0.8); margin-left: 0.2em; }
+  &:hover { text-decoration: none; border-color: $brand-color; }
+}
+
+// Series box at the top of a post, and part-to-part links at the bottom
+.series-box {
+  margin: 0 0 $spacing-unit;
+  padding: 0.5em 0.9em;
+  background: lighten($grey-color-light, 7%);
+  border-left: 4px solid $brand-color;
+  border-radius: 3px;
+  summary { cursor: pointer; }
+  ol { margin: 0.5em 0 0.3em 1.5em; }
+  .current { font-weight: bold; }
+}
+
+.series-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: $spacing-unit / 2;
+  margin: $spacing-unit 0;
+  padding-top: $spacing-unit / 2;
+  border-top: 1px solid $grey-color-light;
+  a { display: block; max-width: 48%; }
+  .post-meta { display: block; }
+  .series-next { text-align: right; margin-left: auto; }
+}

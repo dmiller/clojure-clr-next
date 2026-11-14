@@ -3,6 +3,10 @@ layout: post
 title: Persistent vectors, Part 3 -- Transiency
 date: 2023-02-18 12:00:00 -0500
 categories: general
+project: next
+series: "Persistent vectors"
+series_part: 3
+tags: [data-structures]
 ---
 
 Clojure's vectors, hash-maps and hash-sets support _transients_.  We examine the implementation of transiency for `PersistentVector`.

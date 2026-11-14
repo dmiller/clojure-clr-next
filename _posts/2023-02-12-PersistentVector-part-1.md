@@ -3,6 +3,10 @@ layout: post
 title: Persistent vectors, Part 1 -- The landscape
 date: 2023-02-12 12:00:00 -0500
 categories: general
+project: next
+series: "Persistent vectors"
+series_part: 1
+tags: [data-structures]
 ---
 
 This is the first of a series of posts on the design and implementation of `PersistentVector`, an immutable, persistent vector class supporting a transient mode for efficient batch operations. 

@@ -1,0 +1,22 @@
+---
+layout: page
+---
+{%- assign proj = site.data.projects[page.project] -%}
+{%- assign posts = site.posts | where: "project", page.project -%}
+<p class="lead">{{ proj.description }}</p>
+
+{{ content }}
+
+{%- assign series_names = posts | map: "series" | compact | uniq -%}
+{%- if series_names.size > 0 -%}
+<h2>Series</h2>
+<ul class="series-summary">
+  {%- for s in series_names -%}
+  {%- assign parts = posts | where: "series", s -%}
+  <li><a href="{{ '/series/' | relative_url }}#{{ s | slugify }}">{{ s }}</a> <span class="post-meta">{{ parts.size }} part{% if parts.size != 1 %}s{% endif %}</span></li>
+  {%- endfor -%}
+</ul>
+{%- endif -%}
+
+<h2>All {{ posts.size }} posts</h2>
+{% include posts-by-year.html posts=posts %}

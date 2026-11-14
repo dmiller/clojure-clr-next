@@ -3,13 +3,15 @@ layout: post
 title: Are you my type?
 date: 2025-03-01 00:00:00 -0500
 categories: general
+project: clr
+tags: [types]
 ---
 
 How to do type lookups in ClojureCLR: some experiments and a new way forward.
 
 ## Assemblies: to infinity and beyond
 
-In a previous post -- [The function of naming; the naming of functions]({{site.baseurl}}{% post_url 2025-02-28-function-naming %}) -- I floated the idea of generating assemblies with abandon.  The benefits were outlined in that article, primarily a simplification in handling internal naming of functions.  What are the costs?
+In a previous post -- [The function of naming; the naming of functions]({% post_url 2025-02-28-function-naming %}) -- I floated the idea of generating assemblies with abandon.  The benefits were outlined in that article, primarily a simplification in handling internal naming of functions.  What are the costs?
 
 Assemblies themselves are fairly small.  I ran some tests.  In .NET 9, it appears that memory usage per assembly allocation is roughly 850 bytes.
 I also generated some simple types in those assemblies.  They average around 3.5K bytes each. In a proliferation model, the extra memory overhead is not all that substantial.  Even with large files and a _long_ time spent typing at the REPL, well, what are a few megabytes among friends?  

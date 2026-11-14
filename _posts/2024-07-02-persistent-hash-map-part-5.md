@@ -3,21 +3,25 @@ layout: post
 title: PersistentHashMap, part 5 -- At a loss
 date: 2024-07-02 00:00:00 -0500
 categories: general
+project: next
+series: "PersistentHashMap"
+series_part: 5
+tags: [data-structures]
 ---
 
 We look at performance of the new F# version of     `PersistentHashMap` and compare it to the Clojure version.  And in the end, declare ourselved mystified.
 
 This is the final post in a series on `PersistentHashMap`. The previous posts are:
 
-- [Part 1: Making a hash of things (this post)]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-1 %})
-- [Part 2: The root]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-2 %})
-- [Part 3: The guts]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-3 %})
-- [Part 4: Other matters]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-4 %})
+- [Part 1: Making a hash of things (this post)]({% post_url 2024-07-02-persistent-hash-map-part-1 %})
+- [Part 2: The root]({% post_url 2024-07-02-persistent-hash-map-part-2 %})
+- [Part 3: The guts]({% post_url 2024-07-02-persistent-hash-map-part-3 %})
+- [Part 4: Other matters]({% post_url 2024-07-02-persistent-hash-map-part-4 %})
 
 # Performance
 
 Given my level of F# experience, I'm always concerned about doing something stupid that will kill performance.  
-(See [this serieds]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-1 %}) for an example.
+(See [this serieds]({% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-1 %}) for an example.
 So I decided to do some performance testing.  
 
 I focused on several operations:  `assoc`; `assoc` on a transient map; and `containsKey`.  Construction one element at a time, efficient construction, and lookup.  I coded some benchmarks. I ran them using ints for keys and using strings for keys -- I wanted to make sure that the numeric comparisons were not a problem (see the link above).

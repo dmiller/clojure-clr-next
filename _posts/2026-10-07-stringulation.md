@@ -3,6 +3,8 @@ layout: post
 title: Stringulation
 date: 2026-10-07 00:00:00 -0500
 categories: general
+project: clr
+tags: [performance]
 ---
 
 I've been stringing you along for years.  Time for a (breaking?) change?

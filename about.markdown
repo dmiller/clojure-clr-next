@@ -14,3 +14,8 @@ Working on the next generation implementation of Clojure on .NET.
 - The [#clr](https://clojurians.slack.com/archives/C060SFCPR) channel in the [Clojurians Slack](https://clojurians.slack.com)
 - The [ClojureCLR](https://ask.clojure.org/index.php/clojureclr) category in [Ask Clojure](https://ask.clojure.org/)
 
+## Other pages on this site
+
+- [Some links to relevant reading]({{ '/data/links.html' | relative_url }})
+- [Typing in original Clojure (JVM/CLR)]({{ '/docs/original-version-type-computation.html' | relative_url }})
+

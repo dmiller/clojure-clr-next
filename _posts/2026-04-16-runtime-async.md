@@ -3,6 +3,8 @@ layout: post
 title: Runtime async
 date: 2026-04-16 00:00:00 -0500
 categories: general
+project: clr
+tags: [feature]
 ---
 
 Starting with .NET 11, the .NET runtime now offers runtime support for async/await. The latest release of ClojureCLR (1.12.3-alpha6) provides experimental support for this feature.  In this post, we'll take a look at what async/await, how it works on the CLR, and how ClojureCLR supports it.

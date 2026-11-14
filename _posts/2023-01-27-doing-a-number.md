@@ -3,11 +3,13 @@ layout: post
 title: Doing a number on Numbers
 date: 2023-01-27 00:00:00 -0500
 categories: general
+project: next
+tags: [numerics]
 ---
 
 Actually, more like `Numbers` did a number on me.  But we're good friends now.  `Numbers` is ready to go.  This is a long post; `Numbers` is big.
 
-In the previous post, [_A numbers game_]({{site.baseurl}}{% post_url 2023-01-19-a-numbers-game %}), I talked about how I might approach implementing `clojure.lang.Numbers`, the heart of the implementation of arithmetic in Clojure. At the end of that post was a section called "What we'll do":
+In the previous post, [_A numbers game_]({% post_url 2023-01-19-a-numbers-game %}), I talked about how I might approach implementing `clojure.lang.Numbers`, the heart of the implementation of arithmetic in Clojure. At the end of that post was a section called "What we'll do":
 
 > - Implement enough of `Ops` and its subclasses to get `equiv`, `compare`, and `hasheq`
 > - Maybe contemplate whether there is a better way to accomplish the two-parameter arg dispatch  in F#.

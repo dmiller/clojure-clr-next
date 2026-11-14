@@ -3,11 +3,15 @@ layout: post
 title: Corrigendum -- Static initialization   
 date: 2024-06-18 00:00:00 -0500
 categories: general
+project: next
+series: "Micro-benchmarks"
+series_part: 4
+tags: [benchmarking]
 ---
 
 I must have made an error benchmarking static initialziations, detailed in a preceding post.  Here I do a little more analysis and provide a correction to my comments and to the code.
 
-In  [A mega-dose of micro-benchmarks, Part 2 -- By the numbers]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %}), there was a section toward the end that discussed the performance hit of static initialization. Further investigation proved that previous analysis was incorrect.
+In  [A mega-dose of micro-benchmarks, Part 2 -- By the numbers]({% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %}), there was a section toward the end that discussed the performance hit of static initialization. Further investigation proved that previous analysis was incorrect.
 
 __TL;DR__: I made a claim that a static initialization being done in the `Numbers` package was causing a non-trivial performance hit compared to the C# code. The earlier analysis was wrong. And in the long run, it really doesn't matter.
 

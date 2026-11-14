@@ -3,6 +3,8 @@ layout: post
 title: Say my name. ... Heisenbug.
 date: 2024-12-10 00:00:00 -0500
 categories: general
+project: clr
+tags: [miscellaneous]
 ---
 
 Oft cited, rarely sighted, now sited ... here.

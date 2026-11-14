@@ -3,6 +3,10 @@ layout: post
 title: C4 - Key in-site
 date: 2025-10-19 00:00:00 -0500
 categories: general
+project: clr
+series: "C4"
+series_part: 10
+tags: [compiler-design]
 ---
 
 We look at how `(:keyword arg)` callsites are compiled in Clojure.

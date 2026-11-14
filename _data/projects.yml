@@ -1,0 +1,14 @@
+# The two projects the blog covers. Keys match the `project:` field in post front matter.
+# `url` is the project's page; `description` appears on the front page and the project page.
+next:
+  name: ClojureCLR.Next
+  url: /projects/next/
+  description: >-
+    A ground-up rewrite of the ClojureCLR engine in F#:
+    the core data structures, numerics, concurrency, and the design decisions behind them.
+clr:
+  name: ClojureCLR
+  url: /projects/clr/
+  description: >-
+    The current ClojureCLR implementation:
+    how its compiler works, new language features, and performance work.

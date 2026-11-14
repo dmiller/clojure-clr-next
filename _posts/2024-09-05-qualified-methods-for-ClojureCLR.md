@@ -3,6 +3,8 @@ layout: post
 title: Qualified methods -- for ClojureCLR
 date: 2024-09-05 00:00:00 -0500
 categories: general
+project: clr
+tags: [compiler]
 ---
 
 Clojure has introduced a new _qualified methods_ feature allows for Java methods to be passed to higher-order functions.  This feature also provides alternative ways to invoke methods and constructors, and new ways to specify type hints.  We need to enhance this mechanism for ClojureCLR in the same ways we enhanced 'classic' interop. 

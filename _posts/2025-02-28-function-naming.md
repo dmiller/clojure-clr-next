@@ -3,6 +3,8 @@ layout: post
 title: The function of naming; the naming of functions
 date: 2025-02-28 00:00:00 -0500
 categories: general
+project: clr
+tags: [types]
 ---
 
 Looking at how some differences between the JVM's classfile model and  .Net's assembly model manifest in ClojureCLR, and thoughts about making some changes.
@@ -274,4 +276,4 @@ under Framework 4.x because we have not had AOT-compilation under Core and later
 Why not get rid of the counter approach and the single eval assembly and go the Clojure(JVM) route: generate assemblies like popcorn at a movie theater?  My disinclination was based on an unexamined hypothesis that so much assembly creation would be a detrimental.  But I never tested the hypothesis.
 
 So I decided to test that hypothesis as I work on re-activating AOT-compilation.  A full explanation of what I learned will take us into other realms.  And this is post is already long enough.
-So I'll save the analysis for the next post: [Are you my type?]({{site.baseurl}}{% post_url 2025-03-01-are-you-my-type %}).
+So I'll save the analysis for the next post: [Are you my type?]({% post_url 2025-03-01-are-you-my-type %}).

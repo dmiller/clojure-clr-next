@@ -3,6 +3,8 @@ layout: post
 title: For your Cons-ideration
 date: 2023-01-08 00:00:00 -0500
 categories: general
+project: next
+tags: [design, data-structures]
 ---
 
 To build a Lisp, you could perhaps start with the simplest data structure, the cons cell: a simple record structure with two fields that hold pointers and a staple of Lisp implementation from the beginning.   

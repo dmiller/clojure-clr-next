@@ -3,6 +3,10 @@ layout: post
 title: Persistent vectors, Part 2 -- Immutability and persistence
 date: 2023-02-12 13:00:00 -0500
 categories: general
+project: next
+series: "Persistent vectors"
+series_part: 2
+tags: [data-structures]
 ---
 
 An implementation of a vector class that is immutable, persistent, and efficient takes some non-trivial machinery.  It's time to go deep.

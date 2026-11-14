@@ -3,6 +3,8 @@ layout: post
 title: Laziness and chunking
 date: 2023-02-03 12:00:00 -0500
 categories: general
+project: next
+tags: [data-structures]
 ---
 
 Laziness is a central concept in the handling of sequences in Clojure.  Chunking comes along as an efficiency measure.  Surprisingly, at the level of implementation we are looking at it, very little needs to be done; laziness is defined most in the Clojure code that builds `clojure.core`. We'll take a look at what is needed at the bottom to support laziness and chunking.

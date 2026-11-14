@@ -3,6 +3,10 @@ layout: post
 title: C4 - Is there a protocol for that?
 date: 2025-10-20 00:00:00 -0500
 categories: general
+project: clr
+series: "C4"
+series_part: 11
+tags: [compiler-design]
 ---
 
 We take a look at how Clojure protocols are implemented.

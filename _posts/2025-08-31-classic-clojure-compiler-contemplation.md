@@ -3,6 +3,10 @@ layout: post
 title: C4 - Classic Clojure Compiler Contemplation
 date: 2025-08-31 00:00:00 -0500
 categories: general
+project: clr
+series: "C4"
+series_part: 1
+tags: [compiler-design]
 ---
 
 The first in a series of posts analyzing the Clojure (JVM/CLR) compiler.
@@ -10,16 +14,16 @@ In this post, we look at the overall structure of the compiler.
 
 The other posts in the series are:
 
-- [C4: AST me anything]({{site.baseurl}}{% post_url 2025-09-01-AST-me-anything %}) - A tour of the AST nodes produced by the compiler
-- [C4: Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what %}) - A little digression on what symbols represent
-- [C4: ISeq clarity]({{site.baseurl}}{% post_url 2025-09-03-iseq-clarity %}) - How to analyze an `ISeq`
-- [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy %}) - How functions are implemented in Clojure
-- [C4: fn*: talkin' 'bout my generation]({{site.baseurl}}{% post_url 2025-10-15-fn-star-talkin-bout-my-generation %}) - Code-gen for functions
-- [C4: Tag! You're int!]({{site.baseurl}}{% post_url 2025-10-16-tag-youre-int %}) - Type analysis by the compiler
-- [C4: Primitive urges]({{site.baseurl}}{% post_url 2025-10-17-primitive-urges %}) - How primitive types are handled
-- [C4: Inline skating]({{site.baseurl}}{% post_url 2025-10-18-inline-skating %}) - How inlining is used to optimize performance
-- [C4: Key in-site]({{site.baseurl}}{% post_url 2025-10-19-key-in-site %}) - Keyword callsites
-- [C4: Is there a protocol for that?]({{site.baseurl}}{% post_url 2025-10-20-is-there-a-protocol-for-that %}) - Protocol implementation
+- [C4: AST me anything]({% post_url 2025-09-01-AST-me-anything %}) - A tour of the AST nodes produced by the compiler
+- [C4: Symbolic of what?]({% post_url 2025-09-02-symbolic-of-what %}) - A little digression on what symbols represent
+- [C4: ISeq clarity]({% post_url 2025-09-03-iseq-clarity %}) - How to analyze an `ISeq`
+- [C4: Functional anatomy]({% post_url 2025-09-04-functional-anatomy %}) - How functions are implemented in Clojure
+- [C4: fn*: talkin' 'bout my generation]({% post_url 2025-10-15-fn-star-talkin-bout-my-generation %}) - Code-gen for functions
+- [C4: Tag! You're int!]({% post_url 2025-10-16-tag-youre-int %}) - Type analysis by the compiler
+- [C4: Primitive urges]({% post_url 2025-10-17-primitive-urges %}) - How primitive types are handled
+- [C4: Inline skating]({% post_url 2025-10-18-inline-skating %}) - How inlining is used to optimize performance
+- [C4: Key in-site]({% post_url 2025-10-19-key-in-site %}) - Keyword callsites
+- [C4: Is there a protocol for that?]({% post_url 2025-10-20-is-there-a-protocol-for-that %}) - Protocol implementation
 - __C4: A time for reflection__ -- Reflection and dynamic callsites
 - __C4: Out of control__ -- Some points about flow of control and data in the compiler
 - __C4: Some assembly required__ -- Assembly generation for AOT compilation

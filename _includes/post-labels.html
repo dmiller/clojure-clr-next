@@ -1,0 +1,20 @@
+{%- comment -%}
+  Project, series and (optionally) topic links for a post.
+  Params: post (required), topics (true to include topic links).
+{%- endcomment -%}
+{%- assign p = include.post -%}
+{%- if p.project and site.data.projects[p.project] -%}
+  {%- assign proj = site.data.projects[p.project] -%}
+  <span class="meta-item"><a href="{{ proj.url | relative_url }}">{{ proj.name }}</a></span>
+{%- endif -%}
+{%- if p.series -%}
+  <span class="meta-item"><a href="{{ '/series/' | relative_url }}#{{ p.series | slugify }}">{{ p.series }}{% if p.series_part %}, part {{ p.series_part }}{% endif %}</a></span>
+{%- endif -%}
+{%- if include.topics and p.tags.size > 0 -%}
+  <span class="meta-item">
+    {%- for t in p.tags -%}
+      <a class="topic" href="{{ '/topics/' | append: t | append: '/' | relative_url }}">{{ site.data.topics[t].name | default: t }}</a>
+      {%- unless forloop.last %}, {% endunless -%}
+    {%- endfor -%}
+  </span>
+{%- endif -%}

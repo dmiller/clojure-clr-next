@@ -3,11 +3,15 @@ layout: post
 title: C4 - fn* -- talkin' 'bout my generation
 date: 2025-10-15 00:00:00 -0500
 categories: general
+project: clr
+series: "C4"
+series_part: 6
+tags: [compiler-design]
 ---
 
 We look at code generation for functions in ClojureCLR.
 
-In a previous post ([C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy %})), we looked at how functions are represented in ClojureCLR.  That post focused on the interfaces and classes that form the basis of the representation of functions.  When we define a function in ClojureCLR,  we generate a class derived from one of the base classes (typically `AFunction` or `RestFn`); there is a significant amount of support code that gets added. That support code is the topic of this post.
+In a previous post ([C4: Functional anatomy]({% post_url 2025-09-04-functional-anatomy %})), we looked at how functions are represented in ClojureCLR.  That post focused on the interfaces and classes that form the basis of the representation of functions.  When we define a function in ClojureCLR,  we generate a class derived from one of the base classes (typically `AFunction` or `RestFn`); there is a significant amount of support code that gets added. That support code is the topic of this post.
 
 ## Our playground
 
@@ -55,7 +59,7 @@ The `ObjExpr` class maintains the following collections:
 - `ProtocolCallsites`: places where protocol methods are called.  
 
 
-`Constants` contributes static fields to the function class. `Closes` defines the values needed for the constructor of the function class. `KeywordCallsites` and `ProtocolCallsites` also contribute static fields.  We'll discuss keyword callsites in [C4: Key in-site]{{site.baseurl}}{% post_url 2025-10-19-key-in-site %}.  We'll discuss protocol callsites in [C4: Is there a protocol for that?]{{site.baseurl}}{% post_url 2025-10-20-is-there-a-protocol-for-that %}.
+`Constants` contributes static fields to the function class. `Closes` defines the values needed for the constructor of the function class. `KeywordCallsites` and `ProtocolCallsites` also contribute static fields.  We'll discuss keyword callsites in [C4: Key in-site]{% post_url 2025-10-19-key-in-site %}.  We'll discuss protocol callsites in [C4: Is there a protocol for that?]{% post_url 2025-10-20-is-there-a-protocol-for-that %}.
 
 Let's look at some examples.
 
@@ -128,7 +132,7 @@ public class compiler$f1 : AFunction
 }
 ```
 
- Now would be a good time to review [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy %}) to understand the base class `AFunction`,  details on direct linking, and other background information.
+ Now would be a good time to review [C4: Functional anatomy]({% post_url 2025-09-04-functional-anatomy %}) to understand the base class `AFunction`,  details on direct linking, and other background information.
 
 If we have several arities, we get multiple `invoke` and `invokeStatic` methods.  For example:
 
@@ -337,7 +341,7 @@ When we call `(h 12)`, say, we get back a new instance of the inner function cla
 
 ## Direct linking
 
-Direct linking is a performance optimization that allows calls to functions to bypass some of the overhead of the general function call mechanism.  It is described in [C4: Functional anatomy]({{site.baseurl}}{% post_url 2025-09-04-functional-anatomy %}).
+Direct linking is a performance optimization that allows calls to functions to bypass some of the overhead of the general function call mechanism.  It is described in [C4: Functional anatomy]({% post_url 2025-09-04-functional-anatomy %}).
 
 The examples above were compiled with direct linking turned off; I wanted to show the generation of `Var` static fields in the function classes.  When compiled with direct linking turned on,
 

@@ -3,6 +3,8 @@ layout: post
 title: A road to maps
 date: 2023-02-03 00:00:00 -0500
 categories: general
+project: next
+tags: [data-structures]
 ---
 
 I'd like to draw a roadmap for how to approach implementing the remaining collections.

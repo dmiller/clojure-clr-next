@@ -3,6 +3,10 @@ layout: post
 title: PersistentHashMap, part 4 -- Other matters
 date: 2024-07-02 00:00:00 -0500
 categories: general
+project: next
+series: "PersistentHashMap"
+series_part: 4
+tags: [data-structures]
 ---
 
 We continue our discussion of `PersistentHashMap` with a discussion of transiency and alternative F# coding techniques.
@@ -10,13 +14,13 @@ We continue our discussion of `PersistentHashMap` with a discussion of transienc
 
 The previous posts in this series are:
 
-- [Part 1: Making a hash of things (this post)]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-1 %})
-- [Part 2: The root]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-2 %})
-- [Part 3: The guts]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-3 %})
+- [Part 1: Making a hash of things (this post)]({% post_url 2024-07-02-persistent-hash-map-part-1 %})
+- [Part 2: The root]({% post_url 2024-07-02-persistent-hash-map-part-2 %})
+- [Part 3: The guts]({% post_url 2024-07-02-persistent-hash-map-part-3 %})
 
 # Transiency
 
-I refer you to the [discussion]({{site.baseurl}}{% post_url 2023-02-18-PersistentVector-part-3 %}) of transiency in the `PersistentVector` series.
+I refer you to the [discussion]({% post_url 2023-02-18-PersistentVector-part-3 %}) of transiency in the `PersistentVector` series.
 
 As for `PersistentVector`, `PersistentHashMap` supports interfaces such as `IEditableCollection`, `ITransientCollection`, `ITransientAssociative`.  There is one additional, map-specific transiency inteface:
 
@@ -79,4 +83,4 @@ Given that each variation was causing me to rework hundreds of lines of code, I 
 
 # Onward
 
-We conclude this series of posts with a [look at performance]({{site.baseurl}}{% post_url 2024-07-02-persistent-hash-map-part-5 %}) and a comparison of the F# and Clojure versions of `PersistentHashMap`.
+We conclude this series of posts with a [look at performance]({% post_url 2024-07-02-persistent-hash-map-part-5 %}) and a comparison of the F# and Clojure versions of `PersistentHashMap`.

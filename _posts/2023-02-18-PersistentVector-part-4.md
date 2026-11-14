@@ -3,6 +3,10 @@ layout: post
 title: Persistent vectors, Part 4 -- Performance
 date: 2023-02-18 15:00:00 -0500
 categories: general
+project: next
+series: "Persistent vectors"
+series_part: 4
+tags: [data-structures]
 ---
 
 This is the first data structure we've worked on where performance can reasonably be tested.  How does the new F# version of the code compare to the original C#?  Where can performance be improved?

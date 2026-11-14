@@ -3,6 +3,10 @@ layout: post
 title: Circular reasoning (part 2)
 date: 2023-01-17 00:00:00 -0500
 categories: general
+project: next
+series: "Circular reasoning"
+series_part: 2
+tags: [design]
 ---
 
 The code with the greatest entanglement across the Clojure codebase comes in the static classes `clojure.lang.RT` and `clojure.lang.Util`.  How can these classes be restructured to reduce cyclic dependence and improve clarity?  
@@ -101,7 +105,7 @@ The multiple versions of `RT.seq` solution seems unachievable.  Indirecting thro
 
 One solution is protocols.  If you are familiar with protocols in Clojure, basically some variation on that theme. Here, types would be registered as supporting the protocol corresponding to `RT.seq`.  
 
-You will recall my mentioning in  [ClojureCLR reconsidered]({{site.baseurl}}{% post_url 2023-01-06-clojureclr-reconsidered %}) that Rich Hickey would use protocols from the bottom up if rewriting Clojure from scratch.  Poster child here.
+You will recall my mentioning in  [ClojureCLR reconsidered]({% post_url 2023-01-06-clojureclr-reconsidered %}) that Rich Hickey would use protocols from the bottom up if rewriting Clojure from scratch.  Poster child here.
 
  Based on what is in ClojureCLR right now,  our version would need enchancements to handle generic classes (open or closed), maybe for types that are `.IsArray`, and some other variations.  It would need to be performant.
 

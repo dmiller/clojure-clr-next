@@ -3,14 +3,18 @@ layout: post
 title: A mega-dose of micro-benchmarks, Part 3 -- Finishing touches   
 date: 2024-06-18 00:00:00 -0500
 categories: general
+project: next
+series: "Micro-benchmarks"
+series_part: 3
+tags: [benchmarking]
 ---
 
 We apply some finishing touches to the `PersistentArrayMap` creation code.  And then declare success.
 
 Refer to the preceding posts
 
-- [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-1 %})
-- [A mega-dose of micro-benchmarks, Part 2 -- By the numbers]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %})
+- [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-1 %})
+- [A mega-dose of micro-benchmarks, Part 2 -- By the numbers]({% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %})
 
 for context.
 

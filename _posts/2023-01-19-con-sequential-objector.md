@@ -3,6 +3,8 @@ layout: post
 title: con-Sequential objector
 date: 2023-01-19 06:00:00 -0500
 categories: general
+project: next
+tags: [design]
 ---
 
 In which I contemplate the meaning of `Sequential`.   This is an easy one compared to what you just went through.

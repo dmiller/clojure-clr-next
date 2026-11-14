@@ -3,6 +3,10 @@ layout: post
 title: A mega-dose of micro-benchmarks, Part 1 -- Setting the stage   
 date: 2024-06-18 00:00:00 -0500
 categories: general
+project: next
+series: "Micro-benchmarks"
+series_part: 1
+tags: [benchmarking]
 ---
 
 We go deep doing micro-benchmarks to improve the performance of one little function.
@@ -14,8 +18,8 @@ One concern that I have had is that the performance of the new ClojureCLR might 
 
 Two previous posts lay the groundwork for what maps look like in Clojure(JVM/CLR):
 
-- [This map is the territory]({{site.baseurl}}{% post_url 2023-01-11-this-map-is-the-territory %}) discusses the interfaces that a map must implement and presents a naive implementation of a map.
-- [A road to maps]({{site.baseurl}}{% post_url 2023-02-03-a-road-to-maps %}) discuses the various classes that are involved in getting to implementations of `PersistentVector`, `PersistentHashMap`, and company.  (There are four articles here on `PersistentVector` -- we won't need them at this time.)
+- [This map is the territory]({% post_url 2023-01-11-this-map-is-the-territory %}) discusses the interfaces that a map must implement and presents a naive implementation of a map.
+- [A road to maps]({% post_url 2023-02-03-a-road-to-maps %}) discuses the various classes that are involved in getting to implementations of `PersistentVector`, `PersistentHashMap`, and company.  (There are four articles here on `PersistentVector` -- we won't need them at this time.)
 
 
 # `PersistentArrayMap`
@@ -186,4 +190,4 @@ In the subsequent posts of this series, I'll dig into the individual benchmarks 
 There are many pitfalls in doing micro-benchmarking.  I'm sure I'm aware of only a few.
 Fortunately, I had a comparison point in the C# ClojureCLR code. I started at the top, worked my way through calls to isolate where there were performance differences, compared the generated IL code (and occasionally assembler code), and tried to figure out an improvement in the F#.  Once I had a improvement showing in the microbenchmark, I would move back up the call tree and see if there was an improvement at higher levels of the code.
 
-Ready ... set ... [go]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %})!
+Ready ... set ... [go]({% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-2 %})!

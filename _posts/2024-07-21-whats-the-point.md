@@ -3,6 +3,8 @@ layout: post
 title: What's the point?  BigDecimal in review
 date: 2024-07-21 00:00:00 -0500
 categories: general
+project: next
+tags: [numerics]
 ---
 
 More to the point: Where's the point?  Recently I had to dig into the `BigDecimal` implementation to fix a reported bug. Every time I have to look at the `BigDecimal` code, it is a journey of rediscovery.  I'm going to write down a few things to save me some time in the future.

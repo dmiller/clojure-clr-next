@@ -1,0 +1,24 @@
+# Display names for topics. Keys match the values in a post's `tags:` list.
+# Topics are shown in this order. A tag missing here still gets a page, under its raw name.
+design:
+  name: Design
+data-structures:
+  name: Data structures
+numerics:
+  name: Numerics
+stm:
+  name: STM
+benchmarking:
+  name: Benchmarking
+performance:
+  name: Performance
+compiler-design:
+  name: Compiler design
+compiler:
+  name: Compiler
+types:
+  name: Types
+feature:
+  name: Language features
+miscellaneous:
+  name: Miscellaneous

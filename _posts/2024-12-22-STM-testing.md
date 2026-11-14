@@ -3,6 +3,10 @@ layout: post
 title: STM in Clojure - Testing
 date: 2024-12-22 00:10:00 -0500
 categories: general
+project: next
+series: "STM"
+series_part: 3
+tags: [stm]
 ---
 
 We develop a small framework for testing transaction interaction.
@@ -10,8 +14,8 @@ We develop a small framework for testing transaction interaction.
 This is the third in a series on implementing STM in Clojure.
 Previous posts:
 
-- [Part 1: STM in Clojure - Design]({{site.baseurl}}{% post_url 2024-12-22-STM-design %}).
-- [Part 2: STM in Clojure - Code]({{site.baseurl}}{% post_url 2024-12-22-STM-code %})
+- [Part 1: STM in Clojure - Design]({% post_url 2024-12-22-STM-design %}).
+- [Part 2: STM in Clojure - Code]({% post_url 2024-12-22-STM-code %})
 
 
 ## Testing transactions

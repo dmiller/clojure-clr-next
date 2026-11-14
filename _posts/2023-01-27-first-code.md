@@ -3,6 +3,8 @@ layout: post
 title: First code
 date: 2023-01-27 05:00:00 -0500
 categories: general
+project: next
+tags: [design]
 ---
 
 We have working code.

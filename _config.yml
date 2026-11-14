@@ -34,6 +34,24 @@ plugins:
 
 show_excerpts: true
 
+# Pages in the top navigation bar, in order.
+header_pages:
+  - projects/next.md
+  - projects/clr.md
+  - series.md
+  - topics.md
+  - archive.md
+  - about.markdown
+
+sass:
+  sourcemap: never   # Jekyll 4 would otherwise publish assets/main.css.map
+  style: compressed  # as the old github-pages build did
+
+# Post URLs are frozen at their original form. Jekyll's default permalink
+# includes :categories, so without this, changing a post's categories would
+# change its public URL. Use tags or other front matter for organizing posts.
+permalink: /general/:year/:month/:day/:title:output_ext
+
 # Exclude from processing.
 # The following items will not be processed, by default.
 # Any item listed under the `exclude:` key here will be automatically added to
@@ -42,7 +60,20 @@ show_excerpts: true
 # Excluded items can be processed by explicitly listing the directories or
 # their entries' file path in the `include:` list.
 #
-# exclude:
+exclude:
+  - docs/planning/   # working notes for site changes, not for publication
+  - src/             # project source; nothing on the site links into it
+  # The github-pages build drops its default exclusions once this list is set,
+  # so restate them.
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - vendor/
+
+# Default exclusions:
 #   - .sass-cache/
 #   - .jekyll-cache/
 #   - gemfiles/

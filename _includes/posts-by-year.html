@@ -1,0 +1,6 @@
+{%- comment -%} Params: posts (required, newest first). {%- endcomment -%}
+{%- assign years = include.posts | group_by_exp: "p", "p.date | date: '%Y'" -%}
+{%- for year in years -%}
+  <h2 class="year-heading" id="y{{ year.name }}">{{ year.name }}</h2>
+  {% include post-list.html posts=year.items compact=true %}
+{%- endfor -%}

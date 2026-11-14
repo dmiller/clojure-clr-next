@@ -1,0 +1,73 @@
+---
+layout: default
+---
+{%- comment -%}
+  minima 2.5.1's post layout, plus project/series/topic links and series navigation.
+{%- endcomment -%}
+{%- if page.series -%}
+  {%- assign parts = site.posts | where: "series", page.series | sort: "series_part" -%}
+  {%- assign idx = -1 -%}
+  {%- for p in parts -%}
+    {%- if p.url == page.url -%}{%- assign idx = forloop.index0 -%}{%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+<article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">{{ page.title | escape }}</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="{{ page.date | date_to_xmlschema }}" itemprop="datePublished">
+        {%- assign date_format = site.minima.date_format | default: "%b %-d, %Y" -%}
+        {{ page.date | date: date_format -}}
+      </time>
+      {%- if page.author -%}
+        • <span itemprop="author" itemscope itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">{{ page.author }}</span></span>
+      {%- endif -%}
+      {%- include post-labels.html post=page topics=true -%}
+    </p>
+  </header>
+
+  {%- if page.series and idx >= 0 -%}
+  <aside class="series-box">
+    <details>
+      <summary>Part {{ idx | plus: 1 }} of {{ parts.size }} in the series <strong>{{ page.series }}</strong></summary>
+      <ol>
+        {%- for p in parts -%}
+        <li>
+          {%- if forloop.index0 == idx -%}
+            <span class="current">{{ p.title | escape }}</span>
+          {%- else -%}
+            <a href="{{ p.url | relative_url }}">{{ p.title | escape }}</a>
+          {%- endif -%}
+        </li>
+        {%- endfor -%}
+      </ol>
+    </details>
+  </aside>
+  {%- endif -%}
+
+  <div class="post-content e-content" itemprop="articleBody">
+    {{ content }}
+  </div>
+
+  {%- if page.series and idx >= 0 and parts.size > 1 -%}
+  <nav class="series-nav" aria-label="{{ page.series }} series">
+    {%- if idx > 0 -%}
+      {%- assign prev_i = idx | minus: 1 -%}
+      {%- assign prev = parts[prev_i] -%}
+      <a class="series-prev" href="{{ prev.url | relative_url }}"><span class="post-meta">← Part {{ idx }}</span>{{ prev.title | escape }}</a>
+    {%- else -%}<span></span>{%- endif -%}
+    {%- assign next_i = idx | plus: 1 -%}
+    {%- if next_i < parts.size -%}
+      {%- assign next = parts[next_i] -%}
+      <a class="series-next" href="{{ next.url | relative_url }}"><span class="post-meta">Part {{ next_i | plus: 1 }} →</span>{{ next.title | escape }}</a>
+    {%- endif -%}
+  </nav>
+  {%- endif -%}
+
+  {%- if site.disqus.shortname -%}
+    {%- include disqus_comments.html -%}
+  {%- endif -%}
+
+  <a class="u-url" href="{{ page.url | relative_url }}" hidden></a>
+</article>

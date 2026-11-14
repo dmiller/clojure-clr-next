@@ -3,6 +3,8 @@ layout: post
 title: This map is the territory
 date: 2023-01-11 00:00:00 -0500
 categories: general
+project: next
+tags: [data-structures]
 ---
 
 Maps are hugely important in Clojure programming.   Internally, they are supported by a specific group of interfaces.  Here we will examine these interfaces and provide an incredibly naive implementation.  The intention is to make clear the mechanics of these interfaces in a simple setting.  Later, when we implement realistic maps, we can wave at this stuff in passing and focus on the intricacies of the data structures themselves.

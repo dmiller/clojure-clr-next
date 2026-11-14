@@ -3,11 +3,15 @@ layout: post
 title: A mega-dose of micro-benchmarks, Part 2 -- by the numbers   
 date: 2024-06-18 00:00:00 -0500
 categories: general
+project: next
+series: "Micro-benchmarks"
+series_part: 2
+tags: [benchmarking]
 ---
 
 Improving the numerics code for type mapping, operations lookup, and conversions.
 
-Refer to the preceding post, [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-1 %}), for the context of the code we are looking at here.
+Refer to the preceding post, [A mega-dose of micro-benchmarks, Part 1 -- Setting the stage]({% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-1 %}), for the context of the code we are looking at here.
 
 Any performance improvements in the code handling numeric operations is going to affect more than just `PersistentArrayMap.createWithCheck`, so it's worth taking a look.
 
@@ -406,7 +410,7 @@ module Initializer =
 ```
 
 >  There must have been a problem in my original benchmark of `ops` and my conclusions on the impact of static initializations.  I have since redone that work
-and provided  a [corrigendum]({{site.baseurl}}{% post_url 2024-06-24-corrigendum-static-initialization %}).  Ignore some of what follows.
+and provided  a [corrigendum]({% post_url 2024-06-24-corrigendum-static-initialization %}).  Ignore some of what follows.
 
 
 
@@ -499,5 +503,5 @@ At least if don't compare `Int32`s and `Double`s too often.
 
 And that's it for the numbers.
 
-In the [next post]({{site.baseurl}}{% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-3 %}), we look at the topmost level of the code, `PersistentArrayMap.createWithCheck`.  We'll see if we can get a win there.
+In the [next post]({% post_url 2024-06-18-mega-dose-of-micro-benchmarks-part-3 %}), we look at the topmost level of the code, `PersistentArrayMap.createWithCheck`.  We'll see if we can get a win there.
 

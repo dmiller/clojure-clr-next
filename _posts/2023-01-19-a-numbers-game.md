@@ -3,6 +3,8 @@ layout: post
 title: A numbers game
 date: 2023-01-19 00:00:00 -0500
 categories: general
+project: next
+tags: [numerics]
 ---
 
 Getting started implementing Clojure collections requires methods in `clojure.lang.Util` for operations such as equality testing and hashing.  These methods must operate properly on numeric types.   The machinery for this is the class `clojure.lang.Numbers`.

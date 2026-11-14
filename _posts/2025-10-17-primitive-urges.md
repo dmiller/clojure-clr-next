@@ -3,6 +3,10 @@ layout: post
 title: C4 - Primitive urges
 date: 2025-10-17 00:00:00 -0500
 categories: general
+project: clr
+series: "C4"
+series_part: 8
+tags: [compiler-design]
 ---
 
 How primitive types are handled in the Clojure compiler.
@@ -49,7 +53,7 @@ A given instance of a `MaybePrimitiveExpr`-implementing class may or may not be 
 
 For most of these, the computation of `CanEmitPrimitive` is straightforward.  For example, `NumberExpr` can always emit a primitive value; it can emit only `long` and `double` values.   Whether a `BodyExpr` can emit a primitive value depends on whether its last expression can emit a primitive value.  `HostExpr`-derived classes can emit a primitive value if they are not reflections: we have the explicit `MethodInfo`/`PropertyInfo`/`FieldInfo` to work with and the return type of that is primitive.  Many of the others have an explicit return type calculated; `CanEmitPrimitive` is true if that type is primitive.
 
-The most complicated formula for `CanEmitPrimitive` is in `IfExpr`.  We need both the 'then' and the 'else' expressions to be `MaybePrimitiveExpr`.  They both must have `CanEmitPrimitive` be true, and they must be of the same primitive type -- or one of them can have a return type of type `Recur.RecurType`.  You might recall from [C4: Tag! You're int!]({{site.baseurl}}{% post_url 2025-10-16-tag-youre-int %}) that `Recur.RecurType` is a special type used as the return type of a `RecurExpr`.  The only reason `RecurExpr` implements `MaybePrimitiveExpr` is to make this code work:
+The most complicated formula for `CanEmitPrimitive` is in `IfExpr`.  We need both the 'then' and the 'else' expressions to be `MaybePrimitiveExpr`.  They both must have `CanEmitPrimitive` be true, and they must be of the same primitive type -- or one of them can have a return type of type `Recur.RecurType`.  You might recall from [C4: Tag! You're int!]({% post_url 2025-10-16-tag-youre-int %}) that `Recur.RecurType` is a special type used as the return type of a `RecurExpr`.  The only reason `RecurExpr` implements `MaybePrimitiveExpr` is to make this code work:
 
 ```c#
 _thenExpr is MaybePrimitiveExpr tExpr
@@ -291,7 +295,7 @@ Just doing a rough timing in a loop, `calling2` is about 5x as fast as `calling1
 
 ## Intrinsics
 
-Why `fp` has a direct IL `add` instruction but `fb` has to go through `Numbers.add` is a story worthy of its own post.  See [C4: Inline skating]({{site.baseurl}}{% post_url 2025-10-18-inline-skating %}).
+Why `fp` has a direct IL `add` instruction but `fb` has to go through `Numbers.add` is a story worthy of its own post.  See [C4: Inline skating]({% post_url 2025-10-18-inline-skating %}).
 
 ## CLR considerations
 

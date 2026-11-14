@@ -3,6 +3,8 @@ layout: post
 title: ClojureCLR -- Reconsidered
 date: 2023-01-06 00:00:00 -0500
 categories: general
+project: next
+tags: [design]
 ---
 
 Introducing a project to rewrite ClojureCLR -- ClojureCLR.Next.  With this blog, I hope to record some of the thinking I go through in the process, for myself mostly but perhaps for a future maintainer of the project.

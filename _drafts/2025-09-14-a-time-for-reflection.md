@@ -3,6 +3,9 @@ layout: post
 title: C4 - A time for reflection
 date: 2025-09-14 00:00:00 -0500
 categories: general
+project: clr
+series: "C4"
+tags: [compiler-design]
 ---
 
  We discuss how Clojures (JVM/CLR) try to avoid reflection and how they handle reflection that can't be avoided.  This post covers the general details of reflection detection common to both Clojures and how reflection is coded in ClojureJVM.  
@@ -39,7 +42,7 @@ For constructors (see [Java interop: The Dot special form](https://clojure.org/r
 
 The syntactic recognition of the these forms occur in several places in the compiler.  Any of the "classic" forms involving a '.' are caught during the macroexpanion phase of parsing a sequence `(op ...)`.  If the `op` is symbol without a namespace starting or ending with a '.', then the form is macroexpanded as shown.   `.` is a special form handled by the `HostExpr` parser, and similarly for `new` and `NewExpr`.
 
-The new "qualified" forms, AKA qualified method expressions or QMEs, were introduced in Clojure 1.12.  These are symbols of the form `Classname/memberName`.  Previously only static members received special handling; in version 1.12, Clojure added support for instance members and constructors as well; all three (static/instance/constructor) are dealt with as QMEs.  When trying to identify the `op` in a sequence `(op ...)`, if the `op` is a symbol, the symbol analyzer will check if it is a QME; basically, the symbol has a namespace part that is not the name a namespace in the current Clojure environment, and that namespace part does resolve to a type.  If so, the symbol is treated as a QME and the `op` is replaced with a `(QME args*)` form.  The `InvokeExpr` parser will then handle the `(QME args*)` form directly, rather than going through the `HostExpr` parser as we do with the 'dot' forms. (See [Symbolic of what?]({{site.baseurl}}{% post_url 2025-09-02-symbolic-of-what %}).) 
+The new "qualified" forms, AKA qualified method expressions or QMEs, were introduced in Clojure 1.12.  These are symbols of the form `Classname/memberName`.  Previously only static members received special handling; in version 1.12, Clojure added support for instance members and constructors as well; all three (static/instance/constructor) are dealt with as QMEs.  When trying to identify the `op` in a sequence `(op ...)`, if the `op` is a symbol, the symbol analyzer will check if it is a QME; basically, the symbol has a namespace part that is not the name a namespace in the current Clojure environment, and that namespace part does resolve to a type.  If so, the symbol is treated as a QME and the `op` is replaced with a `(QME args*)` form.  The `InvokeExpr` parser will then handle the `(QME args*)` form directly, rather than going through the `HostExpr` parser as we do with the 'dot' forms. (See [Symbolic of what?]({% post_url 2025-09-02-symbolic-of-what %}).) 
 
 
 The QME forms are a little simpler to handle.  From syntactic considerations, we know (in the non-constructor case) whether we are dealing with a static or instance member and we know the type.  Thus, for example, we know that we will generate a `StaticMethodExpr` or an `InstanceMethodExpr` and can generate those directly.   The `.` form requires more analysis.  However, in the end, when it comes down to method resolution and the need for reflection, the decisions are identical. Hence, we can just focus on the `.` forms.

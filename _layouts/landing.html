@@ -1,0 +1,53 @@
+---
+layout: default
+---
+{%- comment -%} The curated front page: intro, projects, series, topics, recent posts. {%- endcomment -%}
+<div class="home">
+  <div class="intro">{{ content }}</div>
+
+  <h2 class="post-list-heading">Projects</h2>
+  <div class="cards">
+    {%- for entry in site.data.projects -%}
+    {%- assign key = entry[0] -%}
+    {%- assign proj = entry[1] -%}
+    {%- assign n = site.posts | where: "project", key | size -%}
+    <a class="card" href="{{ proj.url | relative_url }}">
+      <h3>{{ proj.name }}</h3>
+      <p>{{ proj.description }}</p>
+      <span class="post-meta">{{ n }} posts →</span>
+    </a>
+    {%- endfor -%}
+  </div>
+
+  <h2 class="post-list-heading">Series</h2>
+  {%- assign series_names = site.posts | map: "series" | compact | uniq -%}
+  <ul class="series-summary">
+    {%- for s in series_names -%}
+    {%- assign parts = site.posts | where: "series", s -%}
+    {%- assign newest = parts | first -%}
+    {%- assign oldest = parts | last -%}
+    {%- assign y1 = oldest.date | date: "%Y" -%}{%- assign y2 = newest.date | date: "%Y" -%}
+    <li>
+      <a href="{{ '/series/' | relative_url }}#{{ s | slugify }}">{{ s }}</a>
+      <span class="post-meta">{{ parts.size }} parts · {{ site.data.projects[newest.project].name }} · {{ y1 }}{% if y2 != y1 %}–{{ y2 }}{% endif %}</span>
+    </li>
+    {%- endfor -%}
+  </ul>
+
+  <h2 class="post-list-heading">Topics</h2>
+  <p class="topic-list">
+    {%- for entry in site.data.topics -%}
+    {%- assign t = entry[0] -%}
+    {%- if site.tags[t] -%}
+    <a class="topic-chip" href="{{ '/topics/' | append: t | append: '/' | relative_url }}">{{ entry[1].name }} <span>{{ site.tags[t].size }}</span></a>
+    {%- endif -%}
+    {%- endfor -%}
+  </p>
+
+  <h2 class="post-list-heading">Recent posts</h2>
+  {%- assign recent = site.posts | slice: 0, 5 -%}
+  {% include post-list.html posts=recent excerpts=site.show_excerpts %}
+
+  <p><a href="{{ '/archive/' | relative_url }}">All {{ site.posts.size }} posts →</a></p>
+  <p class="rss-subscribe">subscribe <a href="{{ "/feed.xml" | relative_url }}">via RSS</a></p>
+</div>
