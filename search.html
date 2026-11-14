@@ -1,0 +1,27 @@
+---
+layout: page
+title: Search
+permalink: /search/
+---
+{%- comment -%}
+  Pagefind search. The index in /pagefind/ is built after Jekyll by
+  `npx pagefind --site _site` (see .github/workflows and _tools/build.sh).
+  Only post bodies are indexed (data-pagefind-body in _layouts/post.html).
+{%- endcomment -%}
+<link href="{{ '/pagefind/pagefind-component-ui.css' | relative_url }}" rel="stylesheet">
+<script src="{{ '/pagefind/pagefind-component-ui.js' | relative_url }}" type="module"></script>
+
+<pagefind-config bundle-path="{{ '/pagefind/' | relative_url }}" base-url="{{ '/' | relative_url }}"></pagefind-config>
+
+<div class="search">
+  <pagefind-input placeholder="Search the posts"></pagefind-input>
+  <div class="search-filters">
+    <pagefind-filter-dropdown filter="project" label="Project"></pagefind-filter-dropdown>
+    <pagefind-filter-dropdown filter="series" label="Series" sort="alphabetical"></pagefind-filter-dropdown>
+    <pagefind-filter-dropdown filter="topic" label="Topic" sort="alphabetical"></pagefind-filter-dropdown>
+  </div>
+  <pagefind-summary></pagefind-summary>
+  <pagefind-results></pagefind-results>
+</div>
+
+<noscript><p>Search needs JavaScript. You can browse by <a href="{{ '/topics/' | relative_url }}">topic</a> or the <a href="{{ '/archive/' | relative_url }}">archive</a> instead.</p></noscript>

@@ -14,7 +14,20 @@ layout: default
 <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
 
   <header class="post-header">
-    <h1 class="post-title p-name" itemprop="name headline">{{ page.title | escape }}</h1>
+    <h1 class="post-title p-name" itemprop="name headline" data-pagefind-meta="title">{{ page.title | escape }}</h1>
+    {%- comment -%} Search filters and sort key for Pagefind (see search.html). {%- endcomment -%}
+    <div hidden>
+      <span data-pagefind-sort="date">{{ page.date | date: "%Y-%m-%d" }}</span>
+      {%- if page.project and site.data.projects[page.project] -%}
+      <span data-pagefind-filter="project">{{ site.data.projects[page.project].name }}</span>
+      {%- endif -%}
+      {%- if page.series -%}
+      <span data-pagefind-filter="series">{{ page.series }}</span>
+      {%- endif -%}
+      {%- for t in page.tags -%}
+      <span data-pagefind-filter="topic">{{ site.data.topics[t].name | default: t }}</span>
+      {%- endfor -%}
+    </div>
     <p class="post-meta">
       <time class="dt-published" datetime="{{ page.date | date_to_xmlschema }}" itemprop="datePublished">
         {%- assign date_format = site.minima.date_format | default: "%b %-d, %Y" -%}
@@ -46,7 +59,7 @@ layout: default
   </aside>
   {%- endif -%}
 
-  <div class="post-content e-content" itemprop="articleBody">
+  <div class="post-content e-content" itemprop="articleBody" data-pagefind-body>
     {{ content }}
   </div>
 

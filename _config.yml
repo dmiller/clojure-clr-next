@@ -41,6 +41,7 @@ header_pages:
   - series.md
   - topics.md
   - archive.md
+  - search.html
   - about.markdown
 
 sass:

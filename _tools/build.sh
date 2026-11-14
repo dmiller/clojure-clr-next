@@ -22,3 +22,6 @@ MSYS_NO_PATHCONV=1 docker run --rm \
     JEKYLL_ENV=production bundle exec jekyll build --quiet -d /srv/site/_site 2>&1 | grep -v -i -E "deprecat|sass|color\.|math\.div|[╷│╵]|^ *$|@import|root stylesheet|More info|Suggestion|Recommendation|migrator|repetitive|verbose" || true
     echo "Built $(find /srv/site/_site -type f | wc -l) files into _site"
   '
+
+# Build the search index into _site/pagefind/, as the workflow does. Needs Node.
+npx --yes pagefind@1.5.2 --site _site | tail -6

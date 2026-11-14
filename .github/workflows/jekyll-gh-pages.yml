@@ -41,6 +41,9 @@ jobs:
         run: bundle exec jekyll build
         env:
           JEKYLL_ENV: production
+      - name: Build the search index
+        # Pagefind indexes the built HTML and writes _site/pagefind/.
+        run: npx --yes pagefind@1.5.2 --site _site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 
