@@ -11,6 +11,11 @@ permalink: /search/
 <link href="{{ '/pagefind/pagefind-component-ui.css' | relative_url }}" rel="stylesheet">
 <script src="{{ '/pagefind/pagefind-component-ui.js' | relative_url }}" type="module"></script>
 
+<script>
+  // Use Pagefind's dark theme when the reader's system is in dark mode.
+  if (window.matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.pfTheme = "dark";
+</script>
+
 <pagefind-config bundle-path="{{ '/pagefind/' | relative_url }}" base-url="{{ '/' | relative_url }}"></pagefind-config>
 
 <div class="search">

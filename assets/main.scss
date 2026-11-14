@@ -106,3 +106,98 @@
     > * { margin: 0; }
   }
 }
+
+// ---- Light visual updates ----
+
+:root { color-scheme: light dark; }
+
+// Header: title and nav share a row when they fit; otherwise the nav drops to
+// its own line instead of wrapping item by item. (Phones keep minima's menu.)
+@media screen and (min-width: $on-palm + 1) {
+  .site-header .wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: $spacing-unit;
+  }
+  .site-title, .site-nav { float: none; }
+  .site-nav .page-link {
+    white-space: nowrap;
+    &:not(:last-child) { margin-right: 14px; }
+  }
+}
+
+// Slightly roomier reading text, and a calmer code style
+.post-content {
+  line-height: 1.65;
+  h2, h3 { margin-top: 1.4em; }
+}
+
+pre, code {
+  @include relative-font-size(0.875);
+  background-color: #f6f8fa;
+  border-color: #e3e6ea;
+}
+pre { padding: 10px 14px; border-radius: 6px; }
+.highlight, .highlighter-rouge .highlight, .highlight pre { background-color: #f6f8fa; }
+pre code { background-color: transparent; }
+
+.post-content img { border-radius: 4px; }
+
+a:focus-visible, summary:focus-visible {
+  outline: 2px solid $brand-color;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+// ---- Dark mode, following the reader's system setting ----
+
+@import "syntax-dark";
+
+@media (prefers-color-scheme: dark) {
+  $d-bg: #16181c;
+  $d-surface: #1f2328;
+  $d-text: #e2e4e8;
+  $d-muted: #9ba1a8;
+  $d-border: #353a41;
+  $d-link: #79b8ff;
+
+  body { color: $d-text; background-color: $d-bg; }
+  a { color: $d-link; &:visited { color: #b392f0; } }
+  .post-meta, .footer-col-wrapper, .rss-subscribe { color: $d-muted; }
+  blockquote { color: $d-muted; border-left-color: $d-border; }
+  hr { border-color: $d-border; }
+
+  .site-header { border-top-color: #4a5058; border-bottom-color: $d-border; }
+  .site-title, .site-title:visited { color: $d-text; }
+  .site-nav .page-link, .site-nav .page-link:visited { color: $d-text; }
+  .site-nav { background-color: $d-bg; border-color: $d-border; }
+  .site-nav .menu-icon > svg path { fill: $d-muted; }
+  .site-footer { border-top-color: $d-border; }
+  .svg-icon { fill: $d-muted; }
+
+  pre, code { background-color: $d-surface; border-color: $d-border; color: $d-text; }
+  .highlight, .highlighter-rouge .highlight, .highlight pre { background-color: $d-surface; }
+  pre code, .highlight .w { background-color: transparent; }
+
+  table {
+    color: $d-text;
+    border-color: $d-border;
+    tr:nth-child(even) { background-color: lighten($d-bg, 3%); }
+    th { background-color: $d-surface; border-color: $d-border; }
+    td { border-color: $d-border; }
+  }
+
+  .post-content img { background-color: #fff; }   // diagrams are drawn on white
+
+  .card, .topic-chip { border-color: $d-border; }
+  .card, .card:visited { color: $d-text; }
+  .card h3 { color: $d-link; }
+  .card:hover, .topic-chip:hover { border-color: $d-link; }
+  .topic-chip span { color: $d-muted; }
+  .series-box { background-color: $d-surface; border-left-color: $d-link; }
+  .year-heading, .series-nav { border-color: $d-border; }
+
+  a:focus-visible, summary:focus-visible { outline-color: $d-link; }
+}
